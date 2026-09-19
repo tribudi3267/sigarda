@@ -9,15 +9,15 @@ export const APP = {
 // Identitas Gugus Depan. Ubah di sini, seluruh aplikasi dan dokumen cetak ikut berubah.
 export const GUDEP = {
   nama: 'Gugus Depan SMAN 1 Bukateja',
-  singkat: 'Gudep SMAN 1 Bukateja',
+  singkat: 'Ambalan Gajah Mada/Christina M.T',
   sekolah: 'SMA Negeri 1 Bukateja',
   alamat: 'Bukateja, Kabupaten Purbalingga, Jawa Tengah',
   kota: 'Bukateja',
-  nomorGudep: '.........', // isi nomor gudep resmi
+  nomorGudep: '10.701/10.702', // isi nomor gudep resmi
   kwarran: 'Kwartir Ranting Bukateja',
   kwarcab: 'Kwartir Cabang Purbalingga',
   kodeSurat: 'GD-SMAN1-BKT',
-  pembina: { jabatan: 'Pembina Gudep', nama: 'Nama Pembina Gudep', nta: '.........' },
+  pembina: { jabatan: 'Pembina Gudep', nama: 'Diana Udhi Hendriyanto, S.Pd.M.Pd', nta: '11.03.10.701.02365' },
   ketuaAmbalan: { jabatan: 'Pradana Dewan Ambalan', nama: 'Nama Pradana', nta: '.........' },
 };
 

@@ -220,7 +220,13 @@ pengguna melihat "Server sedang menerima terlalu banyak percobaan masuk" (bukan 
 **Authentication > Rate Limits** bila tersedia pada paket Anda.
 
 **Data pribadi.** Nama, NIS, kelas, dan agama anggota (sebagian besar di bawah umur) tersimpan di server Supabase. Pastikan pihak sekolah atau Pembina mengetahui dan menyetujuinya.
-Paket gratis Supabase menonaktifkan proyek yang tidak dipakai sekitar 1 minggu (dapat dihidupkan lagi dari dashboard) dan tidak menyediakan cadangan harian otomatis: unduh rekap Excel secara berkala.
+Paket gratis Supabase menonaktifkan proyek yang tidak dipakai sekitar 1 minggu (dapat dihidupkan lagi dari dashboard) dan tidak menyediakan cadangan harian otomatis: cadangkan sendiri (lihat bawah).
+
+### Cadangan data (satu klik)
+Klik dua kali [`Cadangkan-SIGARDA.bat`](Cadangkan-SIGARDA.bat) (tanpa Docker; hanya butuh Node). Saat pertama kali, tempel alamat **Session pooler**
+(Dashboard > **Connect** > tab Session pooler) dan ketik password database; alamat disimpan tanpa password, password tidak pernah disimpan.
+Hasilnya di `%USERPROFILE%\Cadangan-SIGARDA\TAHUN-BULAN-TANGGAL_JAMMENIT\`: `sigarda-cadangan.sql` (akun login berikut hash PIN, dan seluruh data) serta `BACA-SAYA.txt`
+(cara memulihkan). Koneksi hanya-baca. Berkas ini rahasia: jangan diunggah ke GitHub. Sumber kode: [`scripts/cadangan/cadangkan.mjs`](scripts/cadangan/cadangkan.mjs).
 
 **Yang belum ditangani:** data dimuat penuh saat masuk (dibaca per 1000 baris); untuk ribuan Penegak aktif, pemuatan awal akan melambat dan perlu penyaringan per tahun ajaran.
 
