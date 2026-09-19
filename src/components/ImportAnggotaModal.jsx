@@ -23,6 +23,8 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
   const [baris, setBaris] = useState([]);
   const [galat, setGalat] = useState('');
   const [hasil, setHasil] = useState([]);
+  const [ditolakServer, setDitolakServer] = useState([]);
+  const [kemajuan, setKemajuan] = useState(null);
 
   const periksa = periksaBaris(baris, users, kelompok);
   const siap = periksa.filter((r) => r.siap);
@@ -47,28 +49,34 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
     return undefined;
   };
 
-  const impor = () => {
-    const r = imporAnggota(baris, kelompok);
+  const impor = async () => {
+    if (sibuk) return;
+    setSibuk(true);
+    setKemajuan({ selesai: 0, total: siap.length });
+    const r = await imporAnggota(baris, kelompok, (selesai, total) => setKemajuan({ selesai, total }));
+    setSibuk(false);
+    setKemajuan(null);
     if (r.ok) {
       setHasil(r.daftar);
+      setDitolakServer([...r.ditolakServer, ...(r.galatBerhenti ? [{ no: '-', pesan: r.galatBerhenti }] : [])]);
       setTahap('hasil');
     }
   };
 
   const unduhPin = () =>
     unduhXlsx({
-      namaFile: `pin-awal-${kelompok}-${hariIni()}.xlsx`,
+      namaFile: `akun-baru-${kelompok}-${hariIni()}.xlsx`,
       sheets: [{
-        nama: 'PIN Awal',
+        nama: 'Akun Baru',
         judul: [
-          `Daftar PIN awal ${label} baru (RAHASIA)`,
+          `Daftar nama pengguna dan PIN awal ${label} baru (RAHASIA)`,
           `Dibuat ${fmtTanggal(hariIni())}. Bagikan langsung ke masing-masing orang. PIN wajib diganti saat login pertama.`,
         ],
         kolom: [
           { header: 'No', key: 'no', lebar: 6, rata: 'center' },
           { header: 'Nama', key: 'nama', lebar: 30 },
+          { header: 'Nama Pengguna', key: 'username', lebar: 22 },
           ...(penegak ? [
-            { header: 'NIS', key: 'nis', lebar: 12 },
             { header: 'Kelas', key: 'kelas', lebar: 9, rata: 'center' },
             { header: 'Sangga', key: 'sangga', lebar: 20 },
           ] : []),
@@ -82,9 +90,9 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
     pilih: <button className="btn btn-outline" onClick={onTutup}>Batal</button>,
     periksa: (
       <>
-        <button className="btn btn-outline" onClick={() => { setTahap('pilih'); setBaris([]); }}>Pilih file lain</button>
-        <button className="btn btn-primary" onClick={impor} disabled={siap.length === 0}>
-          Impor {siap.length} anggota
+        <button className="btn btn-outline" onClick={() => { setTahap('pilih'); setBaris([]); }} disabled={sibuk}>Pilih file lain</button>
+        <button className="btn btn-primary" onClick={impor} disabled={siap.length === 0 || sibuk}>
+          {sibuk && kemajuan ? `Mengimpor ${kemajuan.selesai} dari ${kemajuan.total}...` : `Impor ${siap.length} anggota`}
         </button>
       </>
     ),
@@ -97,7 +105,9 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
         <div>
           <ol className="list-decimal space-y-1 pl-5 text-sm text-pramuka-700">
             <li>Unduh template Excel {label}, lalu isi datanya (satu baris satu orang).</li>
-            <li>{penegak ? 'Kolom wajib: Nama Lengkap, Kelas, Sangga, Agama. NIS dianjurkan.' : 'Kolom wajib: Nama Lengkap. PIN Awal boleh dikosongkan.'}</li>
+            <li>{penegak
+              ? 'Kolom wajib: Nama Lengkap, NIS, Kelas, Sangga, Agama. NIS menjadi nama pengguna untuk masuk. PIN Awal boleh dikosongkan.'
+              : 'Kolom wajib: Nama Lengkap. Nama Pengguna dan PIN Awal boleh dikosongkan (dibuat otomatis).'}</li>
             <li>Unggah file di bawah, periksa pratinjaunya, lalu impor. Maksimal {MAKS_BARIS} baris.</li>
           </ol>
 
@@ -113,7 +123,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
 
           {galat && <p role="alert" className="mt-3 text-sm font-medium text-red-700">{galat}</p>}
           <p className="mt-4 rounded-md bg-pramuka-50 px-3 py-2 text-xs leading-relaxed text-pramuka-700">
-            PIN awal boleh diisi pada kolom PIN Awal. Jika dikosongkan, aplikasi membuat PIN acak untuk tiap anggota.
+            PIN awal (6 angka) boleh diisi pada kolom PIN Awal. Jika dikosongkan, server membuat PIN acak untuk tiap anggota.
             Semua yang diimpor wajib mengganti PIN saat login pertama.
           </p>
         </div>
@@ -173,17 +183,18 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
             <Icon nama="cek" className="h-4 w-4" /> {hasil.length} {label} berhasil diimpor.
           </p>
           <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-950">
-            Catat atau unduh daftar PIN awal sekarang. PIN ini hanya tampil sekali. Bagikan langsung ke masing-masing anggota;
-            mereka wajib menggantinya saat login pertama.
+            Catat atau unduh daftar nama pengguna dan PIN awal sekarang. PIN ini hanya tampil sekali. Bagikan langsung ke
+            masing-masing anggota; mereka wajib menggantinya saat login pertama.
           </p>
           <button className="btn btn-gold btn-sm mt-3" onClick={unduhPin}>
-            <Icon nama="unduh" className="h-4 w-4" /> Unduh daftar PIN awal (.xlsx)
+            <Icon nama="unduh" className="h-4 w-4" /> Unduh daftar akun baru (.xlsx)
           </button>
           <div className="mt-3 max-h-[35vh] overflow-auto rounded-lg border border-pramuka-200">
             <table className="w-full text-left text-sm">
               <thead className="sticky top-0 bg-pramuka-100 text-pramuka-800">
                 <tr>
                   <th className="px-3 py-2 font-semibold">Nama</th>
+                  <th className="px-3 py-2 font-semibold">Nama pengguna</th>
                   {penegak && <th className="px-3 py-2 font-semibold">Kelas</th>}
                   <th className="px-3 py-2 font-semibold">PIN awal</th>
                 </tr>
@@ -192,6 +203,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
                 {hasil.map((h, i) => (
                   <tr key={i}>
                     <td className="px-3 py-2 font-semibold">{h.nama}</td>
+                    <td className="px-3 py-2 font-mono">{h.username}</td>
                     {penegak && <td className="px-3 py-2">{h.kelas}, {h.sangga}</td>}
                     <td className="px-3 py-2 font-mono font-bold tracking-widest">{h.pin}</td>
                   </tr>
@@ -199,6 +211,14 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
               </tbody>
             </table>
           </div>
+          {ditolakServer.length > 0 && (
+            <div role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+              <p className="font-semibold">{ditolakServer.length} baris ditolak server:</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">
+                {ditolakServer.map((d, i) => <li key={i}>Baris {d.no}: {d.pesan}</li>)}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </Modal>

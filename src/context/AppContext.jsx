@@ -1,18 +1,22 @@
-﻿import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { storage } from '../lib/storage';
-import { buatSeed } from '../data/seed';
-import {
-  ajukanPengujian, batalkanPengajuan, catatHasilUji, layakGaruda, pesertaDenganPeran,
-} from '../lib/skuLogic';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { ambilKlien, GALAT_KONFIGURASI, LOKAL } from '../lib/supabaseClient';
+import { buatApi } from '../lib/api';
+import { pesertaDenganPeran } from '../lib/skuLogic';
 import { adalahJumat, tanggalValid, KODE_STATUS } from '../lib/absensiLogic';
-import { catatPengujiPortofolio, ubahItemPortofolio } from '../lib/portofolioLogic';
-import {
-  bolehResetPin, buatPinAcak, catatGagal, formatPinSah, statusKunci, validasiPinBaru, MAKS_GAGAL,
-} from '../lib/pinLogic';
-import { KELOMPOK_IMPOR, kelompokDari, periksaBaris } from '../lib/importAnggota';
-import { bolehKelolaMateri, geserMateri, validasiMateri } from '../lib/materiLogic';
-import { buatId, hariIni } from '../lib/format';
+import { bolehResetPin, validasiPinBaru } from '../lib/pinLogic';
+import { periksaBaris } from '../lib/importAnggota';
+import { bolehKelolaMateri, validasiMateri } from '../lib/materiLogic';
+import { hariIni } from '../lib/format';
 
+/**
+ * STATE APLIKASI
+ *
+ * Sumber kebenaran ada di server (Supabase). Di sini hanya salinan (cache) sesuai izin pengguna yang masuk,
+ * dalam bentuk data yang sama dengan yang dipakai seluruh halaman:
+ *   db = { users, progress, absensi, portofolio, materi }   (lihat src/lib/mapDb.js)
+ * Setiap aksi memanggil server lebih dulu, lalu menyegarkan bagian data yang terpengaruh.
+ * Aksi mengembalikan { ok, pesan, ... } dan tidak pernah melempar galat ke halaman.
+ */
 const Ctx = createContext(null);
 
 export function useApp() {
@@ -21,46 +25,28 @@ export function useApp() {
   return ctx;
 }
 
-// Data lama tanpa absensi/portofolio dianggap tidak valid, mulai dari data contoh.
-// Akun yang dibuat sebelum fitur PIN dianggap masih memakai PIN awal dari admin, sehingga
-// wajib menggantinya saat login berikutnya (wajibGantiPin bernilai true bila belum tercatat).
-const muatDb = () => {
-  const d = storage.load();
-  if (!(d?.users && d?.progress && d?.absensi && d?.portofolio)) return buatSeed();
-  return {
-    ...d,
-    users: d.users.map((u) => ({ ...u, wajibGantiPin: u.wajibGantiPin ?? true })),
-    materi: Array.isArray(d.materi) ? d.materi : [], // data lama belum punya materi
-  };
-};
+const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [] };
+const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi waktu Edge Function)
+const JEDA_SEGARKAN_MS = 30000;
 
 const ditolak = (notify, pesan) => {
   notify(pesan, 'err');
   return { ok: false, pesan };
 };
 
-/** Samakan penulisan dengan data yang sudah ada (abaikan huruf besar/kecil dan spasi ganda). */
-const kanon = (nilai, daftar) => {
-  const bersih = (nilai ?? '').trim().replace(/\s+/g, ' ');
-  return daftar.find((x) => x.toLowerCase() === bersih.toLowerCase()) ?? bersih;
-};
+const KELOMPOK_DARI_DATA = (d) => (d.role === 'peserta' ? 'peserta' : d.role === 'admin' ? 'admin' : d.jabatan === 'Pembina' ? 'pembina' : 'dewan');
 
 export function AppProvider({ children }) {
-  const [db, setDb] = useState(muatDb);
-  const [sesiId, setSesiId] = useState(() => storage.loadSession());
+  const [status, setStatus] = useState('memuat'); // memuat | siap | konfigurasi | galat
+  const [galatMuat, setGalatMuat] = useState('');
+  const [sesiId, setSesiId] = useState(null);
+  const [db, setDb] = useState(DB_KOSONG);
   const [toast, setToast] = useState(null);
-  const [kunci, setKunci] = useState(() => storage.loadKunci() ?? {}); // percobaan login salah per akun
+  const apiRef = useRef(null);
+  const lokalRef = useRef(null);
+  const terakhirMuat = useRef(0);
 
-  useEffect(() => {
-    storage.save(db);
-  }, [db]);
-  useEffect(() => {
-    storage.saveKunci(kunci);
-  }, [kunci]);
-  useEffect(() => {
-    storage.saveSession(sesiId);
-  }, [sesiId]);
-
+  const notify = useCallback((pesan, tipe = 'ok') => setToast({ pesan, tipe, id: Date.now() }), []);
   useEffect(() => {
     if (!toast) return undefined;
     const t = setTimeout(() => setToast(null), 3400);
@@ -68,370 +54,365 @@ export function AppProvider({ children }) {
   }, [toast]);
 
   const user = useMemo(() => db.users.find((u) => u.id === sesiId) ?? null, [db.users, sesiId]);
-  const notify = useCallback((pesan, tipe = 'ok') => setToast({ pesan, tipe, id: Date.now() }), []);
-
-  // Semua peserta beserta peran turunannya (calon-bantara, calon-laksana, calon-garuda)
   const daftarPeserta = useMemo(() => pesertaDenganPeran(db.progress, db.users), [db.progress, db.users]);
   const peranUser = useMemo(
     () => (user?.role === 'peserta' ? daftarPeserta.find((p) => p.id === user.id)?.peran ?? null : null),
     [daftarPeserta, user]
   );
 
-  /* ---------- Autentikasi (prototipe: PIN teks biasa) ---------- */
-  const lepasKunci = (userId) =>
-    setKunci((k) => {
-      const { [userId]: _hapus, ...sisa } = k;
-      return sisa;
-    });
+  /* ------------------------- Memuat dan menyegarkan ------------------------- */
+  const api = () => apiRef.current;
 
-  const login = (userId, pin) => {
-    const u = db.users.find((x) => x.id === userId);
-    if (!u) return { ok: false, pesan: 'Pilih nama Anda terlebih dulu.' };
-    const k = statusKunci(kunci[userId]);
-    if (k.terkunci) {
-      return { ok: false, pesan: `Terlalu banyak percobaan salah. Coba lagi ${k.sisaMenit} menit lagi, atau minta reset PIN.` };
-    }
-    if (u.pin !== pin) {
-      const baru = catatGagal(kunci[userId]);
-      setKunci((s) => ({ ...s, [userId]: { n: baru.n, sampai: baru.sampai } }));
-      return {
-        ok: false,
-        pesan: baru.sisa > 0
-          ? `PIN tidak sesuai. Sisa ${baru.sisa} percobaan sebelum akun dikunci sementara.`
-          : `PIN salah ${MAKS_GAGAL} kali. Akun dikunci sementara, coba lagi beberapa menit lagi atau minta reset PIN.`,
-      };
-    }
-    lepasKunci(userId);
-    setSesiId(u.id);
+  const sesiBerakhir = useCallback(async () => {
+    await api()?.keluar();
+    setSesiId(null);
+    setDb(DB_KOSONG);
+    notify('Sesi berakhir. Masuk kembali.', 'err');
+  }, [notify]);
+
+  /** Memuat seluruh data yang boleh dibaca pengguna ini. */
+  const muatSemua = useCallback(async () => {
+    const a = api();
+    const [u, p, ab, pf, m] = await Promise.all([a.muatProfil(), a.muatProgress(), a.muatAbsensi(), a.muatPortofolio(), a.muatMateri()]);
+    const gagal = [u, p, ab, pf, m].find((r) => !r.ok);
+    if (gagal) return gagal;
+    setDb({ users: u.data, progress: p.data, absensi: ab.data, portofolio: pf.data, materi: m.data });
+    terakhirMuat.current = Date.now();
     return { ok: true };
-  };
-  const logout = () => setSesiId(null);
-  const cekPin = (userId, pin) => db.users.find((u) => u.id === userId)?.pin === pin;
+  }, []);
 
-  /* ---------- Kelola PIN ---------- */
-  /**
-   * Ganti PIN milik pengguna yang sedang masuk (dipakai untuk penggantian wajib dan sukarela).
-   * Galat dikembalikan untuk ditampilkan pada formulir, bukan sebagai toast.
-   */
-  const gantiPin = ({ pinLama, pinBaru, ulangi }) => {
+  const mulaiSesi = useCallback(async (id) => {
+    const r = await muatSemua();
+    if (!r.ok) {
+      await api().keluar();
+      return r;
+    }
+    setSesiId(id);
+    return { ok: true };
+  }, [muatSemua]);
+
+  useEffect(() => {
+    let batal = false;
+    (async () => {
+      try {
+        const { klien, lokal } = await ambilKlien();
+        apiRef.current = buatApi(klien);
+        lokalRef.current = lokal;
+        const id = await apiRef.current.sesiSaatIni();
+        if (id) {
+          const r = await mulaiSesi(id);
+          if (!r.ok && !r.sesiBerakhir && !batal) notify(r.pesan, 'err');
+        }
+        if (!batal) setStatus('siap');
+      } catch (e) {
+        if (batal) return;
+        setGalatMuat(e?.message ?? String(e));
+        setStatus(e?.message === GALAT_KONFIGURASI ? 'konfigurasi' : 'galat');
+      }
+    })();
+    return () => { batal = true; };
+  }, [mulaiSesi, notify]);
+
+  // Data pengguna lain berubah tanpa sepengetahuan kita: muat ulang saat kembali ke halaman ini.
+  useEffect(() => {
+    if (!sesiId) return undefined;
+    const saatTampil = () => {
+      if (document.visibilityState === 'visible' && Date.now() - terakhirMuat.current > JEDA_SEGARKAN_MS) muatSemua();
+    };
+    document.addEventListener('visibilitychange', saatTampil);
+    window.addEventListener('focus', saatTampil);
+    return () => {
+      document.removeEventListener('visibilitychange', saatTampil);
+      window.removeEventListener('focus', saatTampil);
+    };
+  }, [sesiId, muatSemua]);
+
+  // Penyegaran sebagian. Bila gagal (mis. koneksi), data lama dipertahankan.
+  const segarkan = useMemo(() => {
+    const terapkan = async (janji, fn) => {
+      const r = await janji;
+      if (r.ok) setDb(fn(r.data));
+      else if (r.sesiBerakhir) await sesiBerakhir();
+      else notify(r.pesan, 'err');
+    };
+    return {
+      users: () => terapkan(api().muatProfil(), (users) => (d) => ({ ...d, users })),
+      progress: (pid) => terapkan(api().muatProgress(pid), (p) => (d) => ({ ...d, progress: pid ? { ...d.progress, [pid]: p[pid] ?? {} } : p })),
+      portofolio: (pid) => terapkan(api().muatPortofolio(pid), (p) => (d) => ({ ...d, portofolio: pid ? { ...d.portofolio, [pid]: p[pid] ?? {} } : p })),
+      hadir: (tanggal) => terapkan(api().muatHadirTanggal(tanggal), (h) => (d) => ({ ...d, absensi: { ...d.absensi, hadir: { ...d.absensi.hadir, [tanggal]: h } } })),
+      materi: () => terapkan(api().muatMateri(), (materi) => (d) => ({ ...d, materi })),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notify, sesiBerakhir]);
+
+  /** Menjalankan aksi ke server; galat ditampilkan sebagai toast, keberhasilan menyegarkan data. */
+  const aksi = async (janji, { sukses, sesudah } = {}) => {
+    const r = await janji;
+    if (!r.ok) {
+      if (r.sesiBerakhir) {
+        await sesiBerakhir();
+        return { ok: false, pesan: r.pesan };
+      }
+      return ditolak(notify, r.pesan);
+    }
+    if (sesudah) await sesudah(r);
+    if (sukses) notify(sukses);
+    return r;
+  };
+
+  /* --------------------------------- Sesi --------------------------------- */
+  const login = async (username, pin) => {
+    const r = await api().masuk(username, pin);
+    if (!r.ok) return r; // pesan ditampilkan di formulir masuk
+    const m = await mulaiSesi(r.id);
+    return m.ok ? { ok: true } : { ok: false, pesan: m.pesan };
+  };
+
+  const logout = async () => {
+    await api()?.keluar();
+    setSesiId(null);
+    setDb(DB_KOSONG);
+  };
+
+  /* ------------------------------ Kelola PIN ------------------------------ */
+  /** Ganti PIN milik pengguna yang sedang masuk. Galat dikembalikan untuk formulir, bukan toast. */
+  const gantiPin = async ({ pinLama, pinBaru, ulangi }) => {
     if (!user) return { ok: false, pesan: 'Sesi berakhir. Masuk kembali.' };
-    if (user.pin !== pinLama) return { ok: false, pesan: 'PIN lama tidak sesuai.' };
     const galat = validasiPinBaru(pinBaru, pinLama, ulangi);
     if (galat) return { ok: false, pesan: galat };
-    setDb((d) => ({
-      ...d,
-      users: d.users.map((u) =>
-        u.id === user.id ? { ...u, pin: pinBaru, wajibGantiPin: false, pinDiubah: new Date().toISOString() } : u
-      ),
-    }));
+    const r = await api().gantiPin({ pinLama, pinBaru, ulangi });
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    // Selama PIN belum diganti server hanya melayani profil sendiri, jadi seluruh data dimuat ulang sekarang.
+    const m = await muatSemua();
+    if (!m.ok && m.sesiBerakhir) await sesiBerakhir();
     notify('PIN berhasil diganti. Gunakan PIN baru pada login berikutnya.');
     return { ok: true };
   };
 
-  /**
-   * Reset PIN oleh pengurus. Menghasilkan PIN acak baru (angka saja) yang dikembalikan sekali
-   * kepada pengreset untuk disampaikan; pemilik akun wajib menggantinya saat login pertama.
-   */
-  const resetPin = (targetId) => {
+  /** Reset PIN oleh pengurus: PIN acak baru dikembalikan satu kali untuk disampaikan ke pemilik akun. */
+  const resetPin = async (targetId) => {
     const target = db.users.find((u) => u.id === targetId);
     if (!target) return ditolak(notify, 'Anggota tidak ditemukan.');
     if (!bolehResetPin(user, target)) return ditolak(notify, 'Anda tidak berwenang mereset PIN anggota ini.');
-    const pinBaru = buatPinAcak();
-    setDb((d) => ({
-      ...d,
-      users: d.users.map((u) =>
-        u.id === targetId ? { ...u, pin: pinBaru, wajibGantiPin: true, pinDireset: { oleh: user.id, waktu: new Date().toISOString() } } : u
-      ),
-    }));
-    lepasKunci(targetId);
-    return { ok: true, pin: pinBaru, nama: target.nama };
+    return aksi(api().resetPin(targetId), { sesudah: () => segarkan.users() });
   };
 
-  /* ---------- Aksi progres SKU ---------- */
-  const ubahProgress = (fn, pesanSukses) => {
-    try {
-      setDb({ ...db, progress: fn(db.progress) });
-      if (pesanSukses) notify(pesanSukses);
-      return { ok: true };
-    } catch (e) {
-      notify(e.message, 'err');
-      return { ok: false, pesan: e.message };
-    }
-  };
-
+  /* ------------------------------ Progres SKU ------------------------------ */
   const ajukan = (data) =>
-    ubahProgress((p) => ajukanPengujian(p, { ...data, peserta: user }), 'Pengajuan terkirim ke penguji.');
+    aksi(api().ajukan(data), { sukses: 'Pengajuan terkirim ke penguji.', sesudah: () => segarkan.progress(user.id) });
 
   const batalkanAjuan = (skuId) =>
-    ubahProgress((p) => batalkanPengajuan(p, { pesertaId: user.id, skuId }), 'Pengajuan dibatalkan.');
+    aksi(api().batalkanAjuan(skuId), { sukses: 'Pengajuan dibatalkan.', sesudah: () => segarkan.progress(user.id) });
 
-  /** Hanya penguji (Pembina atau Dewan Ambalan). Wajib memasukkan PIN sebagai verifikasi digital. */
+  /** Hanya penguji. PIN penguji diverifikasi di server (verifikasi digital). */
   const catatHasil = ({ pin, pesertaId, ...data }) => {
-    if (user?.role !== 'penguji') return ditolak(notify, 'Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.');
-    if (!cekPin(user.id, pin)) return ditolak(notify, 'PIN verifikasi salah. Hasil belum disimpan.');
-    const peserta = db.users.find((u) => u.id === pesertaId);
-    if (!peserta) return ditolak(notify, 'Peserta tidak ditemukan.');
+    if (user?.role !== 'penguji') return Promise.resolve(ditolak(notify, 'Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.'));
     const pesanBerhasil = {
       lulus: 'Poin dinyatakan lulus dan terverifikasi.',
       ulang: 'Poin ditandai perlu diulang.',
       proses: 'Pengujian ditandai sedang berjalan.',
       reset: 'Status poin dikembalikan.',
     }[data.hasil];
-    return ubahProgress((p) => catatHasilUji(p, { ...data, peserta, pengujiId: user.id }), pesanBerhasil);
+    return aksi(api().catatHasil({ pin, pesertaId, ...data }), { sukses: pesanBerhasil, sesudah: () => segarkan.progress(pesertaId) });
   };
 
-  /* ---------- Pencalonan Penegak Garuda ---------- */
-  const daftarCalonGaruda = () => {
-    if (user?.role !== 'peserta') return ditolak(notify, 'Hanya peserta yang dapat mencalonkan diri.');
-    if (!layakGaruda(db.progress, user))
-      return ditolak(notify, 'Seluruh butir SKU Bantara dan Laksana harus lulus lebih dulu.');
-    setDb({ ...db, users: db.users.map((u) => (u.id === user.id ? { ...u, calonGaruda: hariIni() } : u)) });
-    notify('Anda terdaftar sebagai Penegak Calon Garuda. Mulai siapkan portofolio.');
-    return { ok: true };
-  };
+  /* ------------------------ Pencalonan Penegak Garuda ------------------------ */
+  const daftarCalonGaruda = () =>
+    aksi(api().daftarCalonGaruda(), {
+      sukses: 'Anda terdaftar sebagai Penegak Calon Garuda. Mulai siapkan portofolio.',
+      sesudah: () => segarkan.users(),
+    });
 
-  /* ---------- Jurnal portofolio Garuda ---------- */
-  const ubahPortofolio = (itemId, patch) => {
-    if (peranUser !== 'calon-garuda') return ditolak(notify, 'Jurnal portofolio khusus Penegak Calon Garuda.');
-    const ubah = (portofolio) => ubahItemPortofolio(portofolio, { pesertaId: user.id, itemId, patch, oleh: user.id });
-    try {
-      ubah(db.portofolio); // uji dulu: kesalahan dilaporkan di sini, bukan saat pembaruan state
-    } catch (e) {
-      return ditolak(notify, e.message);
-    }
-    setDb((d) => ({ ...d, portofolio: ubah(d.portofolio) }));
-    return { ok: true };
-  };
+  /* ------------------------- Jurnal portofolio Garuda ------------------------- */
+  const ubahPortofolio = (itemId, patch) => aksi(api().ubahPortofolio(itemId, patch), { sesudah: () => segarkan.portofolio(user.id) });
 
-  const catatPortofolioPenguji = (pesertaId, itemId, catatan) => {
-    if (user?.role !== 'penguji') return ditolak(notify, 'Hanya Pembina atau Dewan Ambalan yang dapat memberi catatan.');
-    setDb((d) => ({
-      ...d,
-      portofolio: catatPengujiPortofolio(d.portofolio, { pesertaId, itemId, catatan, oleh: user.id }),
-    }));
-    notify('Catatan tersimpan.');
-    return { ok: true };
-  };
+  const catatPortofolioPenguji = (pesertaId, itemId, catatan) =>
+    aksi(api().catatPortofolioPenguji(pesertaId, itemId, catatan), { sukses: 'Catatan tersimpan.', sesudah: () => segarkan.portofolio(pesertaId) });
 
-  /* ---------- Absensi latihan Jumat ---------- */
+  /* ------------------------------ Absensi Jumat ------------------------------ */
   const bolehKelolaAbsen = user?.role === 'penguji' || user?.role === 'admin';
+  const ubahHadir = (tanggal, fn) =>
+    setDb((d) => ({ ...d, absensi: { ...d.absensi, hadir: { ...d.absensi.hadir, [tanggal]: fn({ ...(d.absensi.hadir[tanggal] ?? {}) }) } } }));
 
-  const ubahAbsensi = (fn) => setDb((d) => ({ ...d, absensi: fn(d.absensi) }));
-
-  const buatSesiAbsen = (tanggal) => {
+  const buatSesiAbsen = async (tanggal) => {
     if (!bolehKelolaAbsen) return ditolak(notify, 'Hanya Dewan Ambalan, Pembina, atau admin yang dapat mencatat absensi.');
     if (!tanggalValid(tanggal)) return ditolak(notify, 'Tanggal tidak valid.');
     if (!adalahJumat(tanggal)) return ditolak(notify, 'Latihan rutin hanya dicatat pada hari Jumat.');
     if (tanggal > hariIni()) return ditolak(notify, 'Sesi belum bisa dibuat untuk tanggal yang belum tiba.');
     if (db.absensi.sesi[tanggal]) return { ok: true };
-    ubahAbsensi((a) => ({
-      ...a,
-      sesi: { ...a.sesi, [tanggal]: { tanggal, dibuatOleh: user.id, dibuatPada: new Date().toISOString() } },
-      hadir: { ...a.hadir, [tanggal]: a.hadir[tanggal] ?? {} },
-    }));
-    notify('Sesi absensi dibuat.');
-    return { ok: true };
-  };
-  const setStatusAbsen = (tanggal, pesertaId, status) => {
-    if (!bolehKelolaAbsen) return ditolak(notify, 'Tidak diizinkan.');
-    if (status && !KODE_STATUS.includes(status)) return ditolak(notify, 'Status absensi tidak dikenal.');
-    ubahAbsensi((a) => {
-      const hariItu = { ...(a.hadir[tanggal] ?? {}) };
-      if (status) hariItu[pesertaId] = { status, waktu: new Date().toISOString(), oleh: user.id };
-      else delete hariItu[pesertaId];
-      return { ...a, hadir: { ...a.hadir, [tanggal]: hariItu } };
+    return aksi(api().buatSesiAbsen(tanggal), {
+      sukses: 'Sesi absensi dibuat.',
+      sesudah: () =>
+        setDb((d) => ({
+          ...d,
+          absensi: {
+            sesi: { ...d.absensi.sesi, [tanggal]: { tanggal, dibuatOleh: user.id, dibuatPada: new Date().toISOString() } },
+            hadir: { ...d.absensi.hadir, [tanggal]: d.absensi.hadir[tanggal] ?? {} },
+          },
+        })),
     });
-    return { ok: true };
+  };
+
+  const setStatusAbsen = (tanggal, pesertaId, status) => {
+    if (!bolehKelolaAbsen) return Promise.resolve(ditolak(notify, 'Tidak diizinkan.'));
+    if (status && !KODE_STATUS.includes(status)) return Promise.resolve(ditolak(notify, 'Status absensi tidak dikenal.'));
+    return aksi(api().setStatusAbsen(tanggal, pesertaId, status), {
+      sesudah: () =>
+        ubahHadir(tanggal, (h) => {
+          if (status) h[pesertaId] = { status, waktu: new Date().toISOString(), oleh: user.id };
+          else delete h[pesertaId];
+          return h;
+        }),
+    });
   };
 
   /** Tandai banyak peserta sekaligus. `hanyaKosong` = jangan timpa yang sudah tercatat. */
   const tandaiBanyakAbsen = (tanggal, pesertaIds, status, hanyaKosong = true) => {
-    if (!bolehKelolaAbsen) return ditolak(notify, 'Tidak diizinkan.');
-    ubahAbsensi((a) => {
-      const hariItu = { ...(a.hadir[tanggal] ?? {}) };
-      for (const id of pesertaIds) {
-        if (hanyaKosong && hariItu[id]) continue;
-        hariItu[id] = { status, waktu: new Date().toISOString(), oleh: user.id };
-      }
-      return { ...a, hadir: { ...a.hadir, [tanggal]: hariItu } };
-    });
-    return { ok: true };
+    if (!bolehKelolaAbsen) return Promise.resolve(ditolak(notify, 'Tidak diizinkan.'));
+    return aksi(api().tandaiBanyakAbsen(tanggal, pesertaIds, status, hanyaKosong), { sesudah: () => segarkan.hadir(tanggal) });
   };
 
   const hapusSesiAbsen = (tanggal) => {
-    if (!bolehKelolaAbsen) return ditolak(notify, 'Tidak diizinkan.');
-    ubahAbsensi((a) => {
-      const { [tanggal]: _s, ...sisaSesi } = a.sesi;
-      const { [tanggal]: _h, ...sisaHadir } = a.hadir;
-      return { sesi: sisaSesi, hadir: sisaHadir };
+    if (!bolehKelolaAbsen) return Promise.resolve(ditolak(notify, 'Tidak diizinkan.'));
+    return aksi(api().hapusSesiAbsen(tanggal), {
+      sukses: 'Sesi absensi dihapus.',
+      sesudah: () =>
+        setDb((d) => {
+          const { [tanggal]: _s, ...sisaSesi } = d.absensi.sesi;
+          const { [tanggal]: _h, ...sisaHadir } = d.absensi.hadir;
+          return { ...d, absensi: { sesi: sisaSesi, hadir: sisaHadir } };
+        }),
     });
-    notify('Sesi absensi dihapus.');
-    return { ok: true };
   };
 
-  /* ---------- Manajemen anggota (admin) ---------- */
-  const simpanAnggota = ({ peran: _turunan, ...data }) => {
-    // `peran` dihitung dari progres, tidak pernah disimpan pada data pengguna
+  /* ------------------------- Manajemen anggota (admin) ------------------------- */
+  /**
+   * Tambah (tanpa id) atau ubah (dengan id) satu anggota. Anggota baru mengembalikan `akun` = { username, pin, nama }
+   * yang harus ditampilkan sekali kepada admin. Kelas/sangga disamakan penulisannya oleh server.
+   */
+  const simpanAnggota = async ({ peran: _turunan, ...data }) => {
+    if (user?.role !== 'admin') return { ok: false, pesan: 'Hanya Admin Gudep yang dapat mengelola anggota.' };
     const nama = data.nama?.trim();
     if (!nama) return { ok: false, pesan: 'Nama wajib diisi.' };
-    // PIN hanya diisi saat anggota baru dibuat (PIN awal). Untuk anggota yang sudah ada,
-    // PIN diubah lewat "Reset PIN" atau "Ganti PIN" di menu Akun.
-    if (!data.id && !formatPinSah(data.pin)) return { ok: false, pesan: 'PIN awal harus 4 sampai 6 angka.' };
 
-    const bersih = { ...data, nama };
-    if (data.role === 'peserta') {
-      const peserta = db.users.filter((u) => u.role === 'peserta');
-      bersih.kelas = kanon(data.kelas, peserta.map((u) => u.kelas).filter(Boolean));
-      bersih.sangga = kanon(data.sangga, peserta.map((u) => u.sangga).filter(Boolean));
-      if (!bersih.kelas || !bersih.sangga) return { ok: false, pesan: 'Kelas dan sangga peserta wajib diisi.' };
-      if (!data.agama) return { ok: false, pesan: 'Agama wajib diisi. Butir 1 SKU menyesuaikan agama peserta.' };
-      if (data.calonGaruda) {
-        const lama = db.users.find((u) => u.id === data.id);
-        if (lama?.calonGaruda) bersih.calonGaruda = lama.calonGaruda; // sudah terdaftar, jangan diubah
-        else if (lama && layakGaruda(db.progress, { ...lama, agama: bersih.agama })) bersih.calonGaruda = hariIni();
-        else return { ok: false, pesan: 'Status Calon Garuda hanya untuk peserta yang seluruh SKU Bantara dan Laksana-nya lulus.' };
-      } else {
-        delete bersih.calonGaruda;
-      }
-    }
-
-    if (data.id) {
-      // PIN dan statusnya selalu dipertahankan dari data tersimpan, bukan dari isian formulir.
-      // calonGaruda ditulis eksplisit agar pencalonan yang dicabut benar-benar hilang.
-      setDb((d) => ({
-        ...d,
-        users: d.users.map((u) =>
-          u.id === data.id
-            ? { ...u, ...bersih, pin: u.pin, wajibGantiPin: u.wajibGantiPin, calonGaruda: bersih.calonGaruda }
-            : u
-        ),
-      }));
-      notify('Data anggota diperbarui.');
-    } else {
-      setDb((d) => ({ ...d, users: [...d.users, { ...bersih, id: buatId('u'), dibuat: hariIni(), wajibGantiPin: true }] }));
+    if (!data.id) {
+      const r = await api().buatAkun(KELOMPOK_DARI_DATA(data), [{
+        no: 1, nama, nis: data.nis, kelas: data.kelas, sangga: data.sangga, agama: data.agama, username: data.username, pin: data.pin,
+      }]);
+      if (!r.ok) return { ok: false, pesan: r.pesan };
+      const baris = r.hasil?.[0];
+      if (!baris?.ok) return { ok: false, pesan: baris?.pesan ?? 'Akun belum dapat dibuat.' };
+      await segarkan.users();
       notify('Anggota baru ditambahkan. PIN awal wajib diganti saat login pertama.');
+      return { ok: true, akun: { nama: baris.nama, username: baris.username, pin: baris.pin } };
     }
+
+    const lama = db.users.find((u) => u.id === data.id);
+    const usernameBaru = String(data.username ?? '').trim().toLowerCase();
+    if (lama && usernameBaru && usernameBaru !== lama.username) {
+      const u = await api().ubahUsername(data.id, usernameBaru);
+      if (!u.ok) return { ok: false, pesan: u.pesan };
+    }
+    const r = await api().ubahAnggota({ ...data, nama });
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    await segarkan.users();
+    notify('Data anggota diperbarui.');
     return { ok: true };
   };
 
   /**
-   * Impor banyak anggota sekaligus (dari Excel). `baris` = hasil bacaExcelAnggota, `kelompok` =
-   * 'peserta' (Penegak), 'dewan' (Dewan Ambalan), atau 'pembina'. Admin Gudep tidak diimpor.
-   * Baris yang tidak lolos pemeriksaan dilewati. PIN awal yang kosong dibuat acak.
-   * Mengembalikan daftar anggota baru beserta PIN awalnya (hanya tersedia saat ini).
+   * Impor banyak anggota dari Excel. `baris` = hasil bacaExcelAnggota, `kelompok` = 'peserta' | 'dewan' | 'pembina'.
+   * Baris yang tidak lolos pemeriksaan dilewati. Dikirim per rombongan. Mengembalikan daftar akun baru beserta
+   * PIN awalnya (hanya tersedia saat ini) dan daftar baris yang ditolak server.
    */
-  const imporAnggota = (baris, kelompok = 'peserta') => {
+  const imporAnggota = async (baris, kelompok = 'peserta', kemajuan = null) => {
     if (user?.role !== 'admin') return ditolak(notify, 'Hanya Admin Gudep yang dapat mengimpor anggota.');
-    const k = kelompokDari(kelompok);
-    if (!k || !KELOMPOK_IMPOR.includes(kelompok)) return ditolak(notify, 'Kelompok anggota ini tidak dapat diimpor.');
     const siap = periksaBaris(baris, db.users, kelompok).filter((r) => r.siap);
     if (!siap.length) return ditolak(notify, 'Tidak ada baris yang dapat diimpor.');
 
-    if (kelompok !== 'peserta') {
-      const baru = siap.map(({ data }) => ({
-        id: buatId('u'), role: k.role, jabatan: k.jabatan, nama: data.nama,
-        pin: formatPinSah(data.pin) ? data.pin : buatPinAcak(), dibuat: hariIni(), wajibGantiPin: true,
-      }));
-      setDb((d) => ({ ...d, users: [...d.users, ...baru] }));
-      notify(`${baru.length} ${k.label} berhasil diimpor.`);
-      return { ok: true, daftar: baru.map(({ nama, pin }) => ({ nama, pin })) };
+    const kirim = siap.map(({ no, data }) => ({
+      no, nama: data.nama, nis: data.nis, kelas: data.kelas, sangga: data.sangga, agama: data.agama, username: data.username, pin: data.pin,
+    }));
+    const daftar = [];
+    const ditolakServer = [];
+    let galatBerhenti = null;
+    for (let i = 0; i < kirim.length; i += UKURAN_ROMBONGAN) {
+      const r = await api().buatAkun(kelompok, kirim.slice(i, i + UKURAN_ROMBONGAN));
+      if (!r.ok) { galatBerhenti = r.pesan; break; }
+      for (const h of r.hasil) (h.ok ? daftar : ditolakServer).push(h);
+      kemajuan?.(Math.min(i + UKURAN_ROMBONGAN, kirim.length), kirim.length);
     }
-
-    const peserta = db.users.filter((u) => u.role === 'peserta');
-    const kelasAda = peserta.map((u) => u.kelas).filter(Boolean);
-    const sanggaAda = peserta.map((u) => u.sangga).filter(Boolean);
-    const baru = siap.map(({ data }) => {
-      const kelas = kanon(data.kelas, kelasAda);
-      const sangga = kanon(data.sangga, sanggaAda);
-      kelasAda.push(kelas); // baris berikutnya memakai penulisan yang sama
-      sanggaAda.push(sangga);
-      return {
-        id: buatId('u'), role: 'peserta', nama: data.nama, nis: data.nis, kelas, sangga, agama: data.agama,
-        pin: formatPinSah(data.pin) ? data.pin : buatPinAcak(), dibuat: hariIni(), wajibGantiPin: true,
-      };
-    });
-    setDb((d) => ({ ...d, users: [...d.users, ...baru] }));
-    notify(`${baru.length} anggota berhasil diimpor.`);
-    return { ok: true, daftar: baru.map(({ nama, nis, kelas, sangga, agama, pin }) => ({ nama, nis, kelas, sangga, agama, pin })) };
+    if (daftar.length) await segarkan.users();
+    if (!daftar.length) return ditolak(notify, galatBerhenti ?? ditolakServer[0]?.pesan ?? 'Tidak ada akun yang berhasil dibuat.');
+    notify(`${daftar.length} anggota berhasil diimpor.`);
+    return { ok: true, daftar, ditolakServer, galatBerhenti };
   };
 
-  const hapusAnggota = (id) => {
-    if (id === user?.id) {
-      notify('Anda tidak bisa menghapus akun yang sedang dipakai.', 'err');
-      return;
-    }
-    const { [id]: _p, ...sisaProgress } = db.progress;
-    const { [id]: _f, ...sisaPortofolio } = db.portofolio;
-    const hadir = Object.fromEntries(
-      Object.entries(db.absensi.hadir).map(([tgl, peta]) => {
-        const { [id]: _a, ...sisa } = peta;
-        return [tgl, sisa];
-      })
-    );
-    setDb({
-      ...db, // koleksi lain (mis. materi) tetap terbawa
-      users: db.users.filter((u) => u.id !== id),
-      progress: sisaProgress,
-      portofolio: sisaPortofolio,
-      absensi: { ...db.absensi, hadir },
+  const hapusAnggota = async (id) => {
+    if (id === user?.id) return ditolak(notify, 'Anda tidak bisa menghapus akun yang sedang dipakai.');
+    return aksi(api().hapusAkun(id), {
+      sukses: 'Anggota dihapus beserta seluruh datanya.',
+      sesudah: () =>
+        setDb((d) => {
+          const { [id]: _p, ...progress } = d.progress;
+          const { [id]: _f, ...portofolio } = d.portofolio;
+          const hadir = Object.fromEntries(Object.entries(d.absensi.hadir).map(([t, peta]) => {
+            const { [id]: _a, ...sisa } = peta;
+            return [t, sisa];
+          }));
+          return { ...d, users: d.users.filter((u) => u.id !== id), progress, portofolio, absensi: { ...d.absensi, hadir } };
+        }),
     });
-    notify('Anggota dihapus beserta seluruh datanya.');
   };
 
-  /* ---------- Materi SKU (Pembina dan Admin Gudep) ---------- */
+  /* ---------------------- Materi SKU (Pembina dan Admin Gudep) ---------------------- */
   const izinMateri = bolehKelolaMateri(user);
   const MSG_MATERI = 'Hanya Pembina dan Admin Gudep yang dapat mengelola materi.';
 
-  /** Tambah (tanpa id) atau ubah (dengan id) satu materi. Galat validasi dikembalikan untuk ditampilkan di formulir. */
-  const simpanMateri = (data) => {
+  /** Tambah (tanpa id) atau ubah (dengan id) satu materi. Galat validasi dikembalikan untuk formulir. */
+  const simpanMateri = async (data) => {
     if (!izinMateri) return ditolak(notify, MSG_MATERI);
-    const daftar = db.materi ?? [];
-    if (data.id && !daftar.some((m) => m.id === data.id)) return { ok: false, pesan: 'Materi tidak ditemukan. Mungkin sudah dihapus.' };
-    const r = validasiMateri(data, daftar);
-    if (!r.ok) return { ok: false, pesan: r.pesan };
-
-    if (data.id) {
-      setDb((d) => ({ ...d, materi: d.materi.map((m) => (m.id === data.id ? { ...m, ...r.materi, diubah: hariIni() } : m)) }));
-      notify('Materi diperbarui.');
-      return { ok: true, id: data.id };
+    if (data.id && !db.materi.some((m) => m.id === data.id)) return { ok: false, pesan: 'Materi tidak ditemukan. Mungkin sudah dihapus.' };
+    const v = validasiMateri(data, db.materi);
+    if (!v.ok) return { ok: false, pesan: v.pesan };
+    const r = await api().simpanMateri({ id: data.id, ...v.materi });
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
     }
-    const id = buatId('m');
-    setDb((d) => ({ ...d, materi: [...(d.materi ?? []), { ...r.materi, id, dibuat: hariIni(), dibuatOleh: user.id }] }));
-    notify('Materi ditambahkan. Materi langsung tampil di menu Materi semua pengguna.');
-    return { ok: true, id };
+    await segarkan.materi();
+    notify(data.id ? 'Materi diperbarui.' : 'Materi ditambahkan. Materi langsung tampil di menu Materi semua pengguna.');
+    return { ok: true, id: r.data };
   };
 
-  const hapusMateri = (id) => {
-    if (!izinMateri) return ditolak(notify, MSG_MATERI);
-    setDb((d) => ({ ...d, materi: (d.materi ?? []).filter((m) => m.id !== id) }));
-    notify('Materi dihapus (file di Google Drive tidak terpengaruh).');
-    return { ok: true };
-  };
+  const hapusMateri = (id) =>
+    izinMateri
+      ? aksi(api().hapusMateri(id), { sukses: 'Materi dihapus (file di Google Drive tidak terpengaruh).', sesudah: () => segarkan.materi() })
+      : Promise.resolve(ditolak(notify, MSG_MATERI));
 
-  const geserUrutanMateri = (id, arah) => {
-    if (!izinMateri) return ditolak(notify, MSG_MATERI);
-    setDb((d) => ({ ...d, materi: geserMateri(d.materi ?? [], id, arah) }));
-    return { ok: true };
-  };
-
-  const resetDemo = () => {
-    setDb(buatSeed());
-    setSesiId(null);
-  };
+  const geserUrutanMateri = (id, arah) =>
+    izinMateri ? aksi(api().geserMateri(id, arah), { sesudah: () => segarkan.materi() }) : Promise.resolve(ditolak(notify, MSG_MATERI));
 
   const value = {
+    status, galatMuat, lokal: LOKAL ? { aktif: true, reset: () => lokalRef.current?.reset() } : { aktif: false },
     db, user, users: db.users, progress: db.progress, absensi: db.absensi, portofolio: db.portofolio,
-    materi: db.materi ?? [], bolehKelolaMateri: izinMateri, simpanMateri, hapusMateri, geserUrutanMateri,
+    materi: db.materi, bolehKelolaMateri: izinMateri, simpanMateri, hapusMateri, geserUrutanMateri,
     daftarPeserta, peranUser, bolehKelolaAbsen,
-    login, logout, cekPin,
+    login, logout,
     ajukan, batalkanAjuan, catatHasil,
     daftarCalonGaruda, ubahPortofolio, catatPortofolioPenguji,
     buatSesiAbsen, setStatusAbsen, tandaiBanyakAbsen, hapusSesiAbsen,
     gantiPin, resetPin,
-    simpanAnggota, imporAnggota, hapusAnggota, resetDemo,
+    simpanAnggota, imporAnggota, hapusAnggota,
+    muatUlang: muatSemua,
     notify, toast,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
-

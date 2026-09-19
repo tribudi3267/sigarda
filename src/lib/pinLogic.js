@@ -1,7 +1,7 @@
 /**
  * ATURAN PIN (murni, tanpa React)
  *
- * - PIN = 4 sampai 6 angka.
+ * - PIN = tepat 6 angka (Supabase Auth menolak kata sandi kurang dari 6 karakter).
  * - PIN awal dari admin dan PIN hasil reset wajib diganti pengguna pada login pertama
  *   (ditandai user.wajibGantiPin).
  * - Reset PIN menghasilkan PIN acak baru, bukan pilihan pengreset.
@@ -10,16 +10,16 @@
  *              Dewan Ambalan -> Penegak.
  *   PIN Admin tidak dapat direset peran lain. Tidak ada yang dapat mereset dirinya sendiri
  *   (gunakan menu Ganti PIN di Akun).
- * - 5 kali salah berturut-turut mengunci login akun itu selama 5 menit.
+ *
+ * Aturan ini juga diterapkan di SERVER (supabase/functions/sigarda/index.ts). Versi di sini hanya untuk
+ * umpan balik cepat di formulir dan untuk menyaring daftar; server tidak pernah memercayai klien.
+ * Pembatasan percobaan masuk (5 kali salah = kunci 5 menit) berlaku di server.
  */
-export const PIN_MIN = 4;
-export const PIN_MAX = 6;
-export const MAKS_GAGAL = 5;
-export const KUNCI_MENIT = 5;
+export const PIN_PANJANG = 6;
 
-export const formatPinSah = (pin) => /^\d{4,6}$/.test(pin ?? '');
+export const formatPinSah = (pin) => /^\d{6}$/.test(pin ?? '');
 
-/** Semua angka sama (1111) atau berurutan naik/turun (1234, 4321) dianggap terlalu mudah ditebak. */
+/** Semua angka sama (111111) atau berurutan naik/turun (123456, 654321) dianggap terlalu mudah ditebak. */
 export function pinLemah(pin) {
   if (!/^\d+$/.test(pin ?? '')) return false;
   const d = [...pin].map(Number);
@@ -30,15 +30,15 @@ export function pinLemah(pin) {
 
 /** Mengembalikan pesan galat, atau null bila PIN baru dapat dipakai. */
 export function validasiPinBaru(pinBaru, pinLama, ulangi) {
-  if (!formatPinSah(pinBaru)) return `PIN baru harus ${PIN_MIN} sampai ${PIN_MAX} angka.`;
+  if (!formatPinSah(pinBaru)) return `PIN baru harus ${PIN_PANJANG} angka.`;
   if (pinLemah(pinBaru)) return 'PIN terlalu mudah ditebak (angka sama semua atau berurutan). Pilih kombinasi lain.';
   if (pinBaru === pinLama) return 'PIN baru tidak boleh sama dengan PIN lama.';
   if (ulangi !== undefined && pinBaru !== ulangi) return 'Konfirmasi PIN baru tidak sama.';
   return null;
 }
 
-/** PIN acak berupa angka saja, tanpa pola yang mudah ditebak. */
-export function buatPinAcak(panjang = PIN_MAX) {
+/** PIN acak berupa angka saja, tanpa pola yang mudah ditebak (dipakai sebagai usulan PIN awal di formulir). */
+export function buatPinAcak(panjang = PIN_PANJANG) {
   const cadangan = () => Array.from({ length: panjang }, () => Math.floor(Math.random() * 10)).join('');
   for (let percobaan = 0; percobaan < 50; percobaan += 1) {
     let pin = '';
@@ -75,21 +75,4 @@ export function siapaBisaReset(user) {
   if (user.role === 'penguji' && user.jabatan === 'Dewan Ambalan') return 'Pembina atau Admin Gudep';
   if (user.role === 'penguji') return 'Admin Gudep';
   return null;
-}
-
-/* ---------- Penguncian login ---------- */
-
-export function statusKunci(catatan, sekarang = Date.now()) {
-  if (catatan?.sampai && catatan.sampai > sekarang) {
-    return { terkunci: true, sisaMenit: Math.ceil((catatan.sampai - sekarang) / 60000) };
-  }
-  return { terkunci: false, sisaMenit: 0 };
-}
-
-/** Catatan baru setelah satu kali salah. `sisa` = percobaan yang masih tersedia. */
-export function catatGagal(catatan, sekarang = Date.now()) {
-  const berlaku = catatan?.sampai && catatan.sampai <= sekarang ? 0 : catatan?.n ?? 0;
-  const n = berlaku + 1;
-  if (n >= MAKS_GAGAL) return { n: 0, sampai: sekarang + KUNCI_MENIT * 60000, sisa: 0 };
-  return { n, sampai: 0, sisa: MAKS_GAGAL - n };
 }

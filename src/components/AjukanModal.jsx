@@ -12,9 +12,14 @@ export default function AjukanModal({ poin, onTutup }) {
   const [pengujiId, setPengujiId] = useState(daftarPenguji[0]?.id ?? '');
   const [catatan, setCatatan] = useState('');
   const [galat, setGalat] = useState('');
+  const [sibuk, setSibuk] = useState(false);
 
-  const kirim = () => {
-    const hasil = ajukan({ skuId: poin.id, jadwal, pengujiId, catatan });
+  const kirim = async () => {
+    if (sibuk) return;
+    setSibuk(true);
+    setGalat('');
+    const hasil = await ajukan({ skuId: poin.id, jadwal, pengujiId, catatan });
+    setSibuk(false);
     if (hasil.ok) onTutup();
     else setGalat(hasil.pesan);
   };
@@ -27,7 +32,7 @@ export default function AjukanModal({ poin, onTutup }) {
       aksi={
         <>
           <button className="btn btn-outline" onClick={onTutup}>Batal</button>
-          <button className="btn btn-primary" onClick={kirim}>Kirim pengajuan</button>
+          <button className="btn btn-primary" onClick={kirim} disabled={sibuk}>{sibuk ? 'Mengirim...' : 'Kirim pengajuan'}</button>
         </>
       }
     >

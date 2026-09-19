@@ -1,12 +1,23 @@
-﻿# SIGARDA, Gudep SMAN 1 Bukateja
+# SIGARDA, Gudep SMAN 1 Bukateja
 
 **SIGARDA** = **S**istem **I**nformasi **Gar**uda dan SKU Penegak. Aplikasi web yang menjadi wadah pengujian
-SKU Bantara dan Laksana serta penyusunan portofolio Penegak Garuda, ditambah absensi latihan Jumat.
-Dibangun dengan React 18, Vite, dan Tailwind CSS. Versi ini memakai `localStorage` sebagai prototipe.
+SKU Bantara dan Laksana serta penyusunan portofolio Penegak Garuda, ditambah absensi latihan Jumat dan materi SKU.
+
+Dibangun dengan React 18, Vite, dan Tailwind CSS. Data disimpan di **Supabase** (Postgres + Auth + Edge Functions) sehingga
+seluruh pengguna melihat data yang sama. Tanpa akun Supabase, aplikasi dapat dicoba dengan **mode lokal**
+(`npm run dev:lokal`, Postgres yang berjalan di dalam browser).
 
 Lambang SIGARDA: perisai cokelat-emas berisi elang bersayap tiga tingkat (Bantara, Laksana, Garuda) dengan
 tanda centang lulus di dada. Berkas: `src/components/LogoMark.jsx` dan `public/favicon.svg`.
 Nama dan tagline diatur di `APP` pada `src/config.js`.
+
+## Daftar isi
+1. [Peran dan fitur](#peran-dan-fitur)
+2. [Menjalankan](#menjalankan)
+3. [Menghubungkan ke Supabase](#menghubungkan-ke-supabase) (langkah demi langkah)
+4. [Menerbitkan ke GitHub Pages](#menerbitkan-ke-github-pages)
+5. [Keamanan: cara kerja dan batasnya](#keamanan-cara-kerja-dan-batasnya)
+6. [Struktur folder](#struktur-folder) dan [pengujian](#pengujian)
 
 ## Peran dan fitur
 
@@ -29,15 +40,18 @@ Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Adm
 | Absensi | Riwayat kehadiran sendiri (dicatat pengurus) | Catat absensi, rekap, unduh Excel | Sama dengan penguji |
 | Portofolio | (di dashboard Garuda) isi status, catatan, tautan | Tinjau dan beri catatan, rekap, unduh Excel | Rekap, unduh Excel |
 | Anggota | | | Tambah, ubah, hapus anggota; import Excel dan unduh template (Penegak, Dewan Ambalan, Pembina) |
-| Reset PIN | | Sesuai kewenangan (lihat "PIN dan keamanan akun") | Semua kecuali Admin |
+| Reset PIN | | Sesuai kewenangan (lihat di bawah) | Semua kecuali Admin |
 | Akun (ikon di header) | Ganti PIN sendiri | Ganti PIN sendiri | Ganti PIN sendiri |
 | Cetak | Kartu SKU, Surat Tanda Lulus | Idem | Idem |
 
-### PIN dan keamanan akun
-- **PIN awal** dibuat admin saat menambah anggota (atau otomatis saat import Excel) lalu dibagikan langsung.
-  Pada login pertama, layar **Buat PIN baru** menahan pengguna sampai PIN diganti. Tidak bisa dilewati, juga setelah muat ulang.
+### Masuk, nama pengguna, dan PIN
+- **Nama pengguna** untuk masuk: Penegak memakai **NIS**; Dewan Ambalan, Pembina, dan Admin memakai nama pengguna yang
+  ditetapkan admin (dibuat otomatis dari nama bila dikosongkan, mis. `budi.santoso`). Halaman masuk tidak menampilkan daftar nama.
+- **PIN = tepat 6 angka**, tidak boleh angka sama semua atau berurutan (111111, 123456), dan tidak boleh sama dengan PIN lama.
+- **PIN awal** dibuat admin saat menambah anggota (atau otomatis saat import Excel) lalu dibagikan langsung. Pada login pertama,
+  layar **Buat PIN baru** menahan pengguna sampai PIN diganti. Ini **ditegakkan di server**: selama PIN belum diganti, server hanya
+  melayani pembacaan profil sendiri dan penggantian PIN.
 - **Ganti PIN** sukarela: ikon Akun di header, isi PIN lama dan PIN baru.
-- **Aturan PIN baru**: 4 sampai 6 angka, tidak boleh angka sama semua atau berurutan (1111, 1234), tidak boleh sama dengan PIN lama.
 - **Reset PIN** membuat PIN acak 6 angka baru yang tampil satu kali kepada pengreset. Pemilik akun wajib menggantinya
   lagi saat login pertama. Siapa boleh mereset siapa:
 
@@ -47,9 +61,9 @@ Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Adm
   | Pembina | Penegak, Dewan Ambalan |
   | Dewan Ambalan | Penegak |
 
-  PIN Admin tidak dapat direset peran lain, dan tidak ada yang bisa mereset dirinya sendiri (pakai Ganti PIN).
-- **Penguncian**: 5 kali salah berturut-turut mengunci login akun itu 5 menit. Reset PIN melepas kunci.
-- Catatan: pada prototipe PIN tersimpan di `localStorage` tanpa enkripsi. Keamanan sungguhan memerlukan Supabase Auth (lihat bagian bawah).
+  PIN Admin tidak dapat direset peran lain di aplikasi (lihat [Lupa PIN Admin](#lupa-pin-admin)), dan tidak ada yang bisa mereset dirinya sendiri.
+- **Penguncian**: 5 kali salah berturut-turut mengunci nama pengguna itu 5 menit (dihitung di server). Reset PIN melepas kunci.
+- Penguji memasukkan PIN lagi saat menyimpan hasil uji sebagai verifikasi digital; PIN diperiksa di server.
 
 ### Import anggota dari Excel
 Import tersedia untuk **Penegak, Dewan Ambalan, dan Pembina** (hanya Admin Gudep yang dapat mengimpor; akun Admin tidak diimpor).
@@ -57,14 +71,13 @@ Buka **Anggota**, pilih tab kelompoknya, lalu **Unduh template Excel**. Setiap k
 
 | Kelompok | Kolom template |
 |---|---|
-| Penegak | Nama Lengkap, NIS, Kelas, Sangga, Agama, PIN Awal (opsional) |
-| Dewan Ambalan, Pembina | Nama Lengkap, PIN Awal (opsional) |
+| Penegak | Nama Lengkap, **NIS (wajib, menjadi nama pengguna)**, Kelas, Sangga, Agama, PIN Awal (opsional) |
+| Dewan Ambalan, Pembina | Nama Lengkap, Nama Pengguna (opsional), PIN Awal (opsional) |
 
-Setelah diisi, klik **Import Excel**. Aplikasi menampilkan pratinjau per baris (siap atau dilewati beserta alasannya: isian kosong,
-agama tidak dikenal, PIN bukan 4 sampai 6 angka, data ganda). Data ganda: Penegak berdasarkan NIS (atau nama dan kelas bila NIS kosong);
-Dewan Ambalan dan Pembina berdasarkan nama pada jabatan yang sama. File dari template kelompok lain ditolak dengan pesan yang jelas.
-Penulisan sangga dan kelas disamakan dengan data yang ada. Setelah impor, daftar PIN awal tampil satu kali dan dapat diunduh
-sebagai Excel. Maksimal 500 baris per impor. Tab Dewan Ambalan dan Pembina di menu Anggota dan Reset PIN memiliki kolom cari nama.
+Setelah diisi, klik **Import Excel**. Aplikasi menampilkan pratinjau per baris (siap atau dilewati beserta alasannya). Baris yang
+lolos dikirim ke server per 25 akun; server memeriksa ulang dan bisa menolak baris tertentu. Penulisan kelas dan sangga disamakan
+dengan data yang ada. Setelah impor, daftar **nama pengguna dan PIN awal** tampil satu kali dan dapat diunduh sebagai Excel.
+Maksimal 500 baris per impor.
 
 ### Materi SKU dari Google Drive
 Pembina dan Admin Gudep melampirkan **tautan berbagi** file PDF di Google Drive; aplikasi tidak menyimpan file, hanya tautannya.
@@ -73,310 +86,190 @@ Pembina dan Admin Gudep melampirkan **tautan berbagi** file PDF di Google Drive;
 **"Siapa saja yang memiliki link"** dengan peran **Pelihat**, lalu **Salin link**. Tanpa pengaturan ini, pratinjau akan
 meminta izin masuk akun Google.
 
-**Menambah materi** (menu Kelola Materi > Tambah materi):
-1. Isi **judul materi** (tampil di daftar isi) dan tempel tautan Drive. Bentuk `drive.google.com/file/d/.../view`, `open?id=...`,
-   dan `uc?id=...` dikenali; tautan folder atau situs lain ditolak. **Tes pratinjau** menampilkan file langsung di formulir
-   sehingga pengaturan berbagi bisa dicek sebelum disimpan.
-2. Pilih **butir SKU terkait** (Bantara dan/atau Laksana; boleh kosong untuk materi umum).
-3. Isi **daftar isi** materi (judul bagian dan nomor halaman, opsional). Tersedia "Tempel banyak sekaligus": satu baris satu
-   bagian dengan format `Judul | halaman`.
-
-**Tampilan**: menu **Materi** (semua peran) berisi daftar isi bernomor di sisi kiri (di ponsel: tombol lipat) dan tiap materi
-sebagai bagian halaman dengan pratinjau PDF (iframe `drive.google.com/file/d/{ID}/preview`, sama seperti melampirkan PDF Drive
-di Google Site), tombol **Buka file lengkap di Google Drive**, saringan tingkat/butir, dan pencarian. Pada daftar butir SKU
-(Poin SKU Penegak, dan rincian peserta untuk Dewan Ambalan/Pembina/Admin) muncul tombol **Materi (n)** pada butir yang punya
-materi; tombol itu membuka halaman Materi yang sudah tersaring pada butir tersebut.
-
-**Catatan**: nomor halaman pada daftar isi hanya penunjuk letak; pratinjau Google Drive tidak menyediakan cara resmi untuk
-melompat ke halaman tertentu, jadi pembaca menggulir sendiri. Alamat iframe selalu dibentuk dari ID file yang divalidasi.
-Tidak ada materi contoh bawaan (data contoh tidak memuat tautan Drive palsu).
-
-### Halaman masuk: pencarian nama
-Kolom Nama tidak menampilkan seluruh daftar. Pengguna memilih peran, mengetik beberapa huruf nama, lalu memilih dari
-paling banyak 8 nama yang paling relevan (awalan nama, awalan kata, huruf di tengah kata; huruf yang hilang pun ditoleransi).
-Ini menjaga halaman tetap ringan walau anggota dari tahun ke tahun mencapai ribuan (diuji 3.400 pengguna: 1 sampai 9 ms per ketikan),
-dan daftar nama tidak terbuka sebelum pengguna mengetik. Mendukung keyboard (panah, Enter, Esc) dan pembaca layar.
+**Menambah materi** (menu Kelola Materi > Tambah materi): isi judul dan tempel tautan Drive (bentuk `file/d/.../view`,
+`open?id=...`, `uc?id=...` dikenali; folder atau situs lain ditolak; **Tes pratinjau** memeriksa pengaturan berbagi sebelum
+disimpan), pilih butir SKU terkait (boleh kosong), dan isi daftar isi (judul bagian dan nomor halaman; tersedia tempel banyak
+sekaligus dengan format `Judul | halaman`). Menu **Materi** menampilkan daftar isi bernomor dan pratinjau PDF
+(iframe `drive.google.com/file/d/{ID}/preview`, sama seperti PDF Drive pada Google Site). Pada daftar butir SKU muncul tombol
+**Materi (n)** untuk butir yang punya materi. Nomor halaman hanya penunjuk letak; pratinjau Drive tidak dapat melompat ke halaman tertentu.
 
 ### SKU resmi Kwarnas
 Butir SKU mengikuti Keputusan Kwarnas No. 198 Tahun 2011, Lampiran III (Bantara 23 butir, Laksana 22 butir).
 Butir 1 (agama) diuraikan per sub-butir sesuai agama peserta: Islam, Katolik, Protestan, Hindu, Buddha.
 Dokumen resmi tidak merinci Khonghucu, sehingga peserta Khonghucu mendapat satu butir pengganti yang
-materinya ditetapkan Pembina.
-Sebuah butir lulus bila seluruh sub-butirnya lulus. Persentase dihitung per butir.
+materinya ditetapkan Pembina. Sebuah butir lulus bila seluruh sub-butirnya lulus. Persentase dihitung per butir.
 
-Aturan: butir Laksana baru bisa diajukan dan diuji setelah seluruh butir Bantara lulus.
-Setiap kelulusan menghasilkan kode verifikasi digital (`VRF-XXXXXXX`) yang tercetak di kartu SKU.
+Aturan (diterapkan di server): butir Laksana baru bisa diajukan dan diuji setelah seluruh butir Bantara lulus.
+Setiap kelulusan menghasilkan kode verifikasi digital (`VRF-XXXXXXX`) yang dibuat server dan tercetak di kartu SKU.
 
 ### Absensi latihan Jumat
 - **Hanya pengurus** (Dewan Ambalan, Pembina, Admin) yang mencatat. Penegak hanya melihat riwayat kehadirannya.
-- **Catat absensi** memakai date picker. Pilih tanggal (hanya Jumat yang diterima; tanggal lain menawarkan Jumat terdekat),
-  atau pakai tombol Jumat sebelumnya, Jumat berikutnya, Jumat terakhir. Hari, tanggal, bulan, tahun, tahun ajaran, dan
-  semester terbaca otomatis dari tanggal, sehingga berlaku untuk tahun ajaran berapa pun (2000 sampai 2100),
-  termasuk pengisian susulan. Tanggal yang belum tiba tidak dapat dicatat.
-- Tahun ajaran: Semester Ganjil Juli sampai Desember, Genap Januari sampai Juni. Rekap dapat ditampilkan per semester atau
-  satu tahun ajaran; pilihan tahun ajaran mencakup 3 tahun ke belakang, 2 tahun ke depan, dan semua tahun yang punya data.
-- Anggota yang belum dicatat pada sebuah sesi berstatus "belum dicatat" dan tidak dihitung; catat Alpa secara eksplisit.
+- **Catat absensi** memakai date picker. Hanya Jumat yang diterima; tanggal yang belum tiba tidak dapat dicatat ("hari ini"
+  dihitung menurut WIB). Tahun ajaran: Semester Ganjil Juli sampai Desember, Genap Januari sampai Juni; berlaku untuk tahun berapa pun.
+- Anggota yang belum dicatat berstatus "belum dicatat" dan tidak dihitung; catat Alpa secara eksplisit.
   Kehadiran di bawah 75% ditandai merah (ubah `AMBANG_HADIR` di `src/config.js`).
-- Rekap punya pencarian nama atau NIS, filter sangga, kelas, dan peran, serta tombol **Unduh Excel (.xlsx)**
-  (lembar Rekap, Per Jumat, Keterangan). Hasil unduhan mengikuti filter yang sedang aktif.
+- Rekap punya pencarian, filter sangga, kelas, dan peran, serta tombol **Unduh Excel (.xlsx)**.
 
 ### Portofolio Penegak Garuda
 Daftar 26 lampiran dari file "03.01. Tabel Cek List Lampiran Berkas Dokumen Portofolio Garuda". Setiap dokumen
-berstatus Belum siap, Sedang disiapkan, atau Siap (Ada), dengan catatan, tautan berkas, dan jurnal perubahan.
-Rekap (jumlah siap, belum siap, persentase) tampil di dashboard Dewan Ambalan, Pembina, dan Admin, dan dapat
-diunduh sebagai Excel.
+berstatus Belum siap, Sedang disiapkan, atau Siap (Ada), dengan catatan, tautan berkas (harus diawali http/https), dan jurnal perubahan.
+Rekap tampil di dashboard Dewan Ambalan, Pembina, dan Admin, dan dapat diunduh sebagai Excel.
 
 ### Filter dinamis
-Semua filter (sangga, kelas, peran, agama, tahun ajaran) dibangun dari data yang ada. Menambah anggota dengan
-sangga atau kelas baru langsung memunculkan pilihan baru di semua filter. Pada form anggota, sangga dan kelas
-diketik bebas dengan saran otomatis.
+Semua filter (sangga, kelas, peran, agama, tahun ajaran) dibangun dari data yang ada.
 
-Akun demo (data fiktif), PIN awal: penegak `1111`, Pembina `2222`, Dewan Ambalan `3333`, admin `1234`. Semua wajib diganti saat login pertama; `Kembalikan data contoh` di halaman masuk mengulang dari awal.
+## Menjalankan
+
+Prasyarat: Node.js 18 atau lebih baru.
+
+```bash
+npm install
+npm run dev:lokal    # mode lokal: TANPA Supabase, data di browser ini saja, akun contoh tampil di halaman masuk
+npm run dev          # memakai Supabase (butuh .env.local, lihat bagian berikutnya)
+npm run build        # hasil produksi di folder dist/
+npm run skema        # membuat ulang supabase/skema.sql dari supabase/sumber/inti.sql + data butir SKU
+```
+
+**Mode lokal** menjalankan Postgres sungguhan (PGlite) di dalam browser dengan skema SQL, aturan akses, dan Edge Function
+yang sama dengan Supabase, dan diisi data contoh. Cocok untuk mencoba semua peran dan alur tanpa akun Supabase. Data tersimpan di
+IndexedDB browser dan tidak dibagikan antar perangkat. Kode mode lokal tidak ikut ke hasil build produksi.
+
+## Menghubungkan ke Supabase
+
+Lakukan sekali, berurutan.
+
+### 1. Buat skema database
+Supabase > **SQL Editor** > **New query**, tempel seluruh isi [`supabase/skema.sql`](supabase/skema.sql), lalu **Run**.
+**Peringatan:** berkas ini menghapus tabel SIGARDA yang sudah ada (termasuk dari versi README lama) lalu membuatnya ulang. Aman pada proyek yang masih kosong.
+
+### 2. Kunci pendaftaran sendiri
+**Authentication > Sign In / Providers** (nama menu dapat sedikit berbeda menurut versi dashboard):
+matikan **Allow new users to sign up**, dan pada penyedia **Email** matikan **Confirm email**. Semua akun dibuat oleh Admin.
+
+### 3. Buat akun Admin pertama
+1. **Authentication > Users > Add user > Create new user**: email `admin@sigarda.invalid`, password = PIN 6 angka pilihan Anda
+   (bukan angka sama semua atau berurutan), centang **Auto Confirm User**.
+2. Jalankan [`supabase/admin_pertama.sql`](supabase/admin_pertama.sql) di SQL Editor. Harus menampilkan 1 baris.
+
+Akun login memakai email tiruan `NAMAPENGGUNA@sigarda.invalid`; domain `.invalid` tidak pernah dapat menerima email, sehingga tidak ada
+pihak luar yang bisa mengambil alih akun lewat "lupa kata sandi". Pengguna tidak pernah melihat email ini.
+
+### 4. Pasang Edge Function `sigarda`
+Edge Function menangani hal-hal yang tidak boleh dilakukan browser: login dengan pembatasan percobaan, membuat/mereset/menghapus akun,
+ganti PIN, dan verifikasi PIN penguji.
+1. **Edge Functions > Deploy a new function > Via Editor**. Nama fungsi: `sigarda` (persis).
+2. Ganti seluruh isi editor dengan isi [`supabase/functions/sigarda/index.ts`](supabase/functions/sigarda/index.ts), lalu **Deploy**.
+3. Buka pengaturan fungsi `sigarda` dan **matikan "Verify JWT"** (Enforce JWT Verification). Pemeriksaan sesi dilakukan di kode fungsi;
+   kunci API baru Supabase bukan JWT sehingga pemeriksaan bawaan akan menolak semua permintaan.
+
+Dengan CLI: `supabase functions deploy sigarda --no-verify-jwt`.
+
+**Nama fungsi.** Deploy lewat editor dashboard kadang memberi alamat dengan nama acak (mis. `hello-world`), walau Anda mengetik `sigarda`.
+Buka fungsi itu, tab **Details**, lihat **Endpoint URL** (`https://KODE.supabase.co/functions/v1/NAMA`). Bila `NAMA` bukan `sigarda`,
+tambahkan `VITE_NAMA_FUNGSI=NAMA` pada `.env.local` (dan variabel repositori GitHub dengan nama yang sama), lalu jalankan ulang `npm run dev`.
+
+Secrets opsional (Edge Functions > Secrets), hanya bila perlu:
+
+| Secret | Kapan |
+|---|---|
+| `SIGARDA_ANON_KEY` | Jika fungsi mengeluh kunci anon tidak tersedia: isi dengan kunci anon/publishable yang sama dengan `VITE_SUPABASE_ANON_KEY` |
+| `SIGARDA_EMAIL_DOMAIN` | Jika Supabase menolak email berakhiran `.invalid` (lihat di bawah) |
+
+### 5. Hubungkan aplikasi
+Salin `.env.example` menjadi `.env.local`, isi `VITE_SUPABASE_URL` dan `VITE_SUPABASE_ANON_KEY` (Project Settings > API Keys:
+**Project URL** dan kunci **anon / publishable**). **Jangan pernah** mengisi kunci `service_role` / `secret` di aplikasi atau GitHub.
+Lalu `npm run dev`, masuk dengan `admin` dan PIN Anda; aplikasi langsung meminta PIN baru.
+
+### 6. Uji cepat setelah pemasangan
+1. Masuk sebagai `admin` -> diminta PIN baru -> masuk.
+2. **Anggota > Tambah anggota**: buat satu Pembina dan satu Penegak (catat nama pengguna dan PIN yang tampil).
+3. Masuk sebagai Penegak (NIS + PIN awal) -> diminta PIN baru. Ajukan satu butir SKU.
+4. Masuk sebagai Pembina -> Antrian -> Nilai -> lulus (PIN diminta).
+5. Kembali sebagai Penegak: butir tampil lulus dengan kode `VRF-...`.
+
+### Bila email `.invalid` ditolak
+Jika langkah 3 menampilkan galat email tidak valid: pilih domain lain yang tidak akan Anda miliki emailnya (mis. `sigarda.example`),
+buat akun admin dengan domain itu, dan isi secret `SIGARDA_EMAIL_DOMAIN` dengan domain yang sama, lalu jalankan `admin_pertama.sql`
+setelah mengganti email di dalamnya. Domain ini harus sama untuk seluruh akun.
+
+### Lupa PIN Admin
+Peran lain tidak dapat mereset Admin. Pengelola proyek Supabase dapat memulihkannya lewat [`supabase/pulihkan_pin_admin.sql`](supabase/pulihkan_pin_admin.sql)
+(SQL Editor). Untuk akun lain, gunakan menu Reset PIN.
+
+## Menerbitkan ke GitHub Pages
+
+Berkas `.github/workflows/deploy.yml` membangun dan menerbitkan otomatis setiap `git push` ke `main`.
+1. Di repositori GitHub: **Settings > Secrets and variables > Actions > tab Variables > New repository variable**, buat dua variabel:
+   `VITE_SUPABASE_URL` dan `VITE_SUPABASE_ANON_KEY` (nilai sama dengan `.env.local`). Gunakan **Variables**, bukan Secrets.
+2. **Settings > Pages > Source: GitHub Actions**.
+3. `git push`. Pantau tab **Actions**. Bila variabel belum diisi, proses berhenti dengan pesan yang jelas (situs lama tetap tampil).
+4. Alamat situs: `https://NAMAAKUN.github.io/NAMAREPO/`.
+
+Kunci anon memang terlihat di browser; ini aman karena semua data dilindungi aturan akses (RLS) di database.
+
+## Keamanan: cara kerja dan batasnya
+
+**Yang ditegakkan di server** (bukan hanya tampilan): peran dan hak akses per tabel (RLS), tidak ada penulisan langsung ke tabel oleh pengguna mana pun
+(semua lewat fungsi `sg_*`), aturan SKU (Bantara sebelum Laksana, hanya penguji yang menilai, PIN penguji diverifikasi, kode verifikasi),
+hak reset PIN, pembatasan percobaan masuk, dan kewajiban ganti PIN awal. Fungsi `*_internal` hanya dapat dipanggil Edge Function.
+Tautan Drive divalidasi dan tautan portofolio harus `http(s)://` (mencegah `javascript:`).
+
+**Batas percobaan masuk.** Semua login lewat satu Edge Function, sehingga bagi Supabase Auth semuanya berasal dari satu alamat IP dan batas bawaan
+percobaan masuk per IP dapat tercapai bila banyak orang masuk bersamaan (mis. seluruh anggota membuka aplikasi dalam beberapa menit). Bila itu terjadi,
+pengguna melihat "Server sedang menerima terlalu banyak percobaan masuk" (bukan salah PIN, dan tidak dihitung sebagai percobaan salah). Naikkan batasnya di
+**Authentication > Rate Limits** bila tersedia pada paket Anda.
+
+**Data pribadi.** Nama, NIS, kelas, dan agama anggota (sebagian besar di bawah umur) tersimpan di server Supabase. Pastikan pihak sekolah atau Pembina mengetahui dan menyetujuinya.
+Paket gratis Supabase menonaktifkan proyek yang tidak dipakai sekitar 1 minggu (dapat dihidupkan lagi dari dashboard) dan tidak menyediakan cadangan harian otomatis: unduh rekap Excel secara berkala.
+
+**Yang belum ditangani:** data dimuat penuh saat masuk (dibaca per 1000 baris); untuk ribuan Penegak aktif, pemuatan awal akan melambat dan perlu penyaringan per tahun ajaran.
 
 ## Struktur folder
 
 ```
 sku-bukateja/
 ├── index.html  package.json  vite.config.js  tailwind.config.js  postcss.config.js
+├── .env.example  .env.lokal            contoh variabel; .env.lokal untuk npm run dev:lokal
+├── .github/workflows/deploy.yml        terbit otomatis ke GitHub Pages
+├── scripts/buat-skema.mjs              membuat supabase/skema.sql (menyisipkan katalog butir dari src/data)
+├── supabase/
+│   ├── skema.sql                       (dibuat otomatis) tabel, RLS, fungsi sg_*, katalog. Dijalankan di SQL Editor
+│   ├── sumber/inti.sql                 sumber skema tanpa katalog (EDIT DI SINI, lalu npm run skema)
+│   ├── admin_pertama.sql               profil admin pertama
+│   ├── pulihkan_pin_admin.sql          pemulihan PIN admin oleh pengelola Supabase
+│   ├── functions/sigarda/index.ts      Edge Function tunggal (login, akun, PIN, verifikasi penguji)
+│   └── lokal/stub.sql                  tiruan peran/skema auth Supabase, khusus mode lokal dan pengujian
 ├── public/favicon.svg
 └── src/
-    ├── main.jsx                 titik masuk React
-    ├── App.jsx                  menu per peran, navigasi
-    ├── index.css                Tailwind, komponen gaya, aturan cetak
-    ├── config.js                nama aplikasi (SIGARDA), identitas Gudep, ambang absensi, kelompok pengguna
-    ├── data/
-    │   ├── skuData.js           butir SKU resmi Bantara dan Laksana (EDIT DI SINI)
-    │   ├── portofolioData.js    26 dokumen portofolio Garuda (EDIT DI SINI)
-    │   └── seed.js              data contoh awal
+    ├── main.jsx  App.jsx  index.css  config.js
+    ├── data/                           skuData.js (butir resmi), portofolioData.js, seed.js (data contoh mode lokal)
     ├── lib/
-    │   ├── skuLogic.js          status, progres, peran, pengajuan, penilaian, rekap
-    │   ├── absensiLogic.js      sesi Jumat, tanggal, semester, tahun ajaran, rekap kehadiran
-    │   ├── pinLogic.js          aturan PIN, PIN acak, hak reset, penguncian login
-    │   ├── importAnggota.js     template, pembaca, dan pemeriksaan import Excel (Penegak, Dewan, Pembina)
-    │   ├── cariNama.js          pencarian nama untuk halaman masuk (indeks, peringkat relevansi)
-    │   ├── materiLogic.js       tautan Drive, validasi materi, saringan, katalog butir, hak kelola
-    │   ├── portofolioLogic.js   jurnal dan rekap kesiapan portofolio
-    │   ├── exportXlsx.js        pembuat file .xlsx (ExcelJS, dimuat saat diunduh)
-    │   ├── exportLaporan.js     susunan lembar Excel absensi dan portofolio
-    │   ├── storage.js           lapisan penyimpanan (localStorage)
-    │   └── format.js            tanggal, id, kode verifikasi, urutan
-    ├── context/AppContext.jsx   state global, login, semua aksi
-    ├── components/
-    │   ├── Layout  Footer  Login  LogoMark (lambang SIGARDA)  ui
-    │   ├── FormGantiPin         ganti PIN (wajib dan sukarela)
-    │   ├── PencarianNama        kolom nama dengan saran (combobox) di halaman masuk
-    │   ├── PratinjauDrive  ChipButir   pratinjau PDF Google Drive, lencana butir SKU
-    │   ├── ImportAnggotaModal   import Excel: pilih, periksa, hasil
-    │   ├── FilterBar            filter dinamis dari data
-    │   ├── SkuChecklist         butir SKU, butir 1 dengan sub-butir
-    │   ├── PortofolioChecklist  cek list 26 dokumen
-    │   ├── RekapKesiapan        progress bar, peta dokumen, jurnal
-    │   ├── RingkasanGudep       ringkasan untuk dashboard pengurus
-    │   ├── PilihPeriode         tahun ajaran dan semester
-    │   ├── AjukanModal  UjiModal  TingkatTabs  DokumenSku
-    └── pages/
-        ├── PesertaBeranda  PesertaSku  GarudaDashboard  Absensi
-        ├── Akun  ResetPin  GantiPinWajib  Materi  KelolaMateri
-        ├── PengujiDashboard  PesertaDetail  Portofolio
-        ├── AdminDashboard  AdminAnggota
-        └── CetakDokumen
+    │   ├── supabaseClient.js           klien Supabase (atau lokal)
+    │   ├── api.js                      satu-satunya lapisan yang berbicara ke Supabase (tabel, sg_*, Edge Function)
+    │   ├── mapDb.js                    tabel server -> bentuk data yang dipakai halaman
+    │   ├── skuLogic.js  absensiLogic.js  portofolioLogic.js  materiLogic.js  pinLogic.js  importAnggota.js  cariNama.js
+    │   └── exportXlsx.js  exportLaporan.js  format.js
+    ├── lokal/                          backend lokal: klien tiruan di atas PGlite, data contoh (bukan produksi)
+    ├── context/AppContext.jsx          state global (salinan data sesuai izin) dan semua aksi
+    ├── components/                     Layout, Footer, Login, FormGantiPin, ImportAnggotaModal, SkuChecklist, PratinjauDrive, ...
+    └── pages/                          PesertaBeranda, PesertaSku, Materi, KelolaMateri, Absensi, ResetPin, AdminAnggota, ...
 ```
 
-## Menjalankan di komputer
+## Pengujian
 
-Prasyarat: Node.js 18 atau lebih baru.
-
-```bash
-cd sku-bukateja
-npm install
-npm run dev          # buka alamat yang tampil, biasanya http://localhost:5173
-npm run build        # hasil produksi di folder dist/
-npm run preview      # uji hasil build secara lokal
-```
+Skema SQL dan logika Edge Function dijalankan pada Postgres sungguhan (PGlite) dengan klien tiruan yang meniru peran Supabase, RLS, dan batas 1000 baris.
+Yang diuji: siapa boleh membaca apa, penulisan langsung ditolak untuk semua peran, semua fungsi `sg_*` (aturan SKU, absensi, portofolio, materi, anggota),
+hak reset PIN, pembatasan login, kewajiban ganti PIN, dan pemetaan data ke bentuk yang dipakai halaman.
+Yang **tidak** dapat diuji tanpa proyek Supabase sungguhan: perilaku GoTrue (mis. penerimaan email `.invalid`), PostgREST, dan runtime Deno. Gunakan "Uji cepat" di atas setelah pemasangan.
 
 ## Menyesuaikan untuk Gudep
 
 1. **Identitas dan tanda tangan**: ubah `src/config.js` (nomor gudep, nama Pembina, Pradana).
-2. **Butir SKU**: `src/data/skuData.js` sudah berisi butir resmi. Jangan mengubah `id` setelah ada data progres.
-3. **Dokumen portofolio**: ubah `src/data/portofolioData.js` bila tabel cek list berubah. Jumlah dan persentase menyesuaikan.
-4. **Anggota**: tambah lewat menu Anggota (Admin). Isi agama dengan benar karena menentukan sub-butir butir 1.
-5. **Logo**: taruh logo resmi di `public/logo-gudep.png`, lalu ganti isi `src/components/LogoMark.jsx`.
-6. **Warna**: palet ada di `tailwind.config.js` (`pramuka` = cokelat, `emas` = aksen).
+2. **Butir SKU**: `src/data/skuData.js` sudah berisi butir resmi. Jangan mengubah `id` setelah ada data progres. Setelah mengubah data butir/portofolio, jalankan `npm run skema` dan jalankan ulang bagian katalog di database.
+3. **Anggota**: tambah lewat menu Anggota (Admin). Isi agama dengan benar karena menentukan sub-butir butir 1.
+4. **Logo**: ganti isi `src/components/LogoMark.jsx`. **Warna**: `tailwind.config.js` (`pramuka` = cokelat, `emas` = aksen).
 
 ## Mencetak dan PDF
 
-Menu Cetak menampilkan pratinjau. Klik "Cetak atau simpan PDF", lalu pada dialog cetak browser pilih
-"Simpan sebagai PDF". Kartu SKU dicetak A4 potret, Surat Tanda Lulus A4 lanskap.
-Aktifkan opsi "Grafik latar belakang" bila warna tidak muncul.
-
-## Publikasi
-
-### Vercel (paling mudah)
-1. Unggah proyek ke repositori GitHub.
-2. Di vercel.com pilih **Add New > Project**, impor repositori. Framework terdeteksi sebagai Vite.
-3. Build command `npm run build`, output directory `dist`. Klik **Deploy**.
-
-### Netlify
-Impor repositori, build command `npm run build`, publish directory `dist`.
-
-### GitHub Pages
-```bash
-VITE_BASE=/nama-repositori/ npm run build
-```
-Lalu publikasikan isi folder `dist/` (mis. dengan paket `gh-pages` atau GitHub Actions).
-
-## Penting: data localStorage hanya ada di satu browser
-
-Pada versi prototipe, data tersimpan di browser masing-masing perangkat. Peserta di ponsel dan penguji
-di laptop TIDAK saling melihat data. Untuk pemakaian nyata lintas perangkat, pindahkan ke Supabase
-atau Firebase (bagian berikut). PIN pada prototipe juga tersimpan tanpa enkripsi, jadi jangan dipakai
-untuk data sungguhan.
-
-Struktur data v2 (kunci `sku_bukateja_db_v2`). Akun yang dibuat sebelum fitur PIN dianggap masih memakai PIN awal dan
-wajib menggantinya pada login berikutnya. Gunakan "Kembalikan data contoh" untuk mengulang dari awal.
-
-## Pindah ke Supabase
-
-1. Buat proyek di supabase.com, lalu jalankan skema ini di SQL Editor:
-
-```sql
-create table profiles (
-  id uuid primary key references auth.users on delete cascade,
-  role text not null check (role in ('peserta','penguji','admin')),
-  nama text not null,
-  nis text, kelas text, sangga text, agama text, jabatan text,
-  calon_garuda date,                       -- tanggal mendaftar Calon Garuda
-  wajib_ganti_pin boolean not null default true,   -- PIN awal/hasil reset wajib diganti (pakai Supabase Auth untuk kata sandi)
-  dibuat date default current_date,
-  created_at timestamptz default now()
-);
-
-create table sku_progress (
-  peserta_id uuid references profiles(id) on delete cascade,
-  sku_id text not null,                    -- mis. BAN-05 atau BAN-01-ISL-1
-  status text not null default 'belum'
-    check (status in ('belum','diajukan','proses','ulang','lulus')),
-  jadwal date,
-  penguji_id uuid references profiles(id),
-  tanggal_uji date,
-  nilai text, catatan text, catatan_peserta text,
-  verifikasi text, diverifikasi_pada timestamptz,
-  updated_at timestamptz default now(),
-  primary key (peserta_id, sku_id)
-);
-
-create table sku_riwayat (
-  id bigint generated always as identity primary key,
-  peserta_id uuid references profiles(id) on delete cascade,
-  sku_id text not null,
-  waktu timestamptz default now(),
-  teks text not null,
-  oleh uuid references profiles(id)
-);
-
-create table absensi_sesi (
-  tanggal date primary key check (extract(dow from tanggal) = 5),   -- hanya Jumat
-  dibuat_oleh uuid references profiles(id),
-  dibuat_pada timestamptz default now()
-);
-
-create table absensi_hadir (
-  tanggal date references absensi_sesi(tanggal) on delete cascade,
-  peserta_id uuid references profiles(id) on delete cascade,
-  status text not null check (status in ('H','I','S','A')),
-  oleh uuid references profiles(id),
-  waktu timestamptz default now(),
-  primary key (tanggal, peserta_id)
-);
-
-create table portofolio (
-  peserta_id uuid references profiles(id) on delete cascade,
-  item_id text not null,                   -- PF-01 sampai PF-26
-  status text not null default 'belum' check (status in ('belum','proses','siap')),
-  catatan text, tautan text, catatan_penguji text,
-  diperbarui timestamptz default now(),
-  primary key (peserta_id, item_id)
-);
-
-create table portofolio_jurnal (
-  id bigint generated always as identity primary key,
-  peserta_id uuid references profiles(id) on delete cascade,
-  item_id text not null,
-  waktu timestamptz default now(),
-  teks text not null,
-  oleh uuid references profiles(id)
-);
-
--- Materi SKU: hanya tautan ke file PDF di Google Drive (file tidak disimpan di sini)
-create table materi (
-  id uuid primary key default gen_random_uuid(),
-  urutan int not null,                     -- urutan pada daftar isi halaman Materi
-  judul text not null check (char_length(judul) <= 120),
-  deskripsi text check (char_length(deskripsi) <= 400),
-  tautan text not null,                    -- tautan berbagi asli yang ditempel pengelola
-  file_id text not null unique,            -- ID file Drive; satu-satunya bagian yang dipakai untuk iframe
-  resource_key text,
-  butir text[] not null default '{}',      -- id butir SKU, mis. {'BAN-05','LAK-12'}; kosong = materi umum
-  bagian jsonb not null default '[]',      -- daftar isi: [{ "judul": "...", "halaman": "3-5" }]
-  dibuat date default current_date,
-  dibuat_oleh uuid references profiles(id)
-);
-
-create function peran() returns text language sql security definer stable as
-$$ select role from profiles where id = auth.uid() $$;
-
-alter table profiles enable row level security;
-alter table sku_progress enable row level security;
-alter table sku_riwayat enable row level security;
-alter table absensi_sesi enable row level security;
-alter table absensi_hadir enable row level security;
-alter table portofolio enable row level security;
-alter table portofolio_jurnal enable row level security;
-alter table materi enable row level security;
-
-create policy "baca profil" on profiles for select to authenticated using (true);
-create policy "admin kelola profil" on profiles for all to authenticated
-  using (peran() = 'admin') with check (peran() = 'admin');
-
-create policy "baca progres" on sku_progress for select to authenticated
-  using (peserta_id = auth.uid() or peran() in ('penguji','admin'));
-create policy "baca riwayat" on sku_riwayat for select to authenticated
-  using (peserta_id = auth.uid() or peran() in ('penguji','admin'));
-
-create policy "baca sesi" on absensi_sesi for select to authenticated using (true);
-create policy "baca absensi" on absensi_hadir for select to authenticated
-  using (peserta_id = auth.uid() or peran() in ('penguji','admin'));
-
-create policy "baca portofolio" on portofolio for select to authenticated
-  using (peserta_id = auth.uid() or peran() in ('penguji','admin'));
-create policy "baca jurnal portofolio" on portofolio_jurnal for select to authenticated
-  using (peserta_id = auth.uid() or peran() in ('penguji','admin'));
-
--- Materi dibaca semua pengguna; hanya Admin dan Pembina yang boleh mengubah
--- (jabatan Pembina perlu kolom jabatan pada profiles, atau peran khusus 'pembina')
-create policy "baca materi" on materi for select to authenticated using (true);
-create policy "kelola materi" on materi for all to authenticated
-  using (peran() = 'admin' or (select jabatan from profiles where id = auth.uid()) = 'Pembina')
-  with check (peran() = 'admin' or (select jabatan from profiles where id = auth.uid()) = 'Pembina');
-```
-
-2. Perubahan data sebaiknya lewat fungsi Postgres (`rpc`) bergaya `security definer`, mis. `ajukan_uji`, `catat_hasil`
-   (menerapkan aturan yang sama dengan `src/lib/skuLogic.js`, termasuk cek Bantara sebelum Laksana dan pembuatan kode
-   verifikasi di server), `catat_absensi`, `reset_pin` (hak reset sesuai tabel di atas), dan `ubah_portofolio`. Penulisan langsung ke tabel
-   oleh peserta tidak boleh dibuka lewat RLS.
-3. `npm i @supabase/supabase-js`, buat `.env.local` berisi `VITE_SUPABASE_URL` dan `VITE_SUPABASE_ANON_KEY`.
-4. Ganti `storage.js` dan aksi di `AppContext.jsx` menjadi pemanggilan Supabase yang asinkron. Ganti login PIN dengan
-   Supabase Auth (email atau nomor telepon). Halaman dan komponen lain hanya membaca data dari konteks.
-
-Firebase memakai pola yang sama: koleksi `users`, `progress/{pesertaId}/{skuId}`, `absensi/{tanggal}`, dan
-`portofolio/{pesertaId}/{itemId}`, dengan Security Rules berdasarkan peran.
-
-
-
-
-
-
-
-
-
-
+Menu Cetak menampilkan pratinjau. Klik "Cetak atau simpan PDF", lalu pada dialog cetak browser pilih "Simpan sebagai PDF".
+Kartu SKU dicetak A4 potret, Surat Tanda Lulus A4 lanskap. Aktifkan opsi "Grafik latar belakang" bila warna tidak muncul.

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { APP, GUDEP, KELOMPOK_PENGGUNA, cocokKelompok } from '../config';
-import { PERAN } from '../lib/skuLogic';
+import { APP, GUDEP } from '../config';
+import { PIN_PANJANG } from '../lib/pinLogic';
+import { LOKAL } from '../lib/supabaseClient';
+import { PIN_DEMO } from '../lokal/pinDemo';
 import { FooterRingkas } from './Footer';
 import LogoMark from './LogoMark';
-import PencarianNama from './PencarianNama';
 import { Icon } from './ui';
 
 const LANGKAH = [
@@ -14,28 +15,21 @@ const LANGKAH = [
 ];
 
 export default function Login() {
-  const { users, daftarPeserta, login, resetDemo } = useApp();
-  const [peran, setPeran] = useState('peserta');
-  const [userId, setUserId] = useState('');
+  const { login, lokal } = useApp();
+  const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [galat, setGalat] = useState('');
+  const [sibuk, setSibuk] = useState(false);
 
-  const aktif = KELOMPOK_PENGGUNA.find((p) => p.id === peran);
-  const daftar = useMemo(() => users.filter((u) => cocokKelompok(aktif, u)), [users, aktif]);
-  const peranDari = useMemo(() => new Map(daftarPeserta.map((p) => [p.id, p.peran])), [daftarPeserta]);
-
-  const keterangan = (u) =>
-    u.role === 'peserta' ? `Kelas ${u.kelas}, ${u.sangga}, ${PERAN[peranDari.get(u.id)]?.singkat ?? ''}` : u.jabatan;
-
-  useEffect(() => {
-    setUserId('');
-    setGalat('');
-  }, [peran]);
-
-  const kirim = (e) => {
+  const kirim = async (e) => {
     e.preventDefault();
-    if (!userId) return setGalat('Ketik nama Anda, lalu pilih dari daftar yang muncul.');
-    const hasil = login(userId, pin);
+    if (sibuk) return;
+    if (!username.trim()) return setGalat('Isi NIS atau nama pengguna Anda.');
+    if (pin.length !== PIN_PANJANG) return setGalat(`PIN terdiri dari ${PIN_PANJANG} angka.`);
+    setSibuk(true);
+    setGalat('');
+    const hasil = await login(username.trim().toLowerCase(), pin);
+    setSibuk(false);
     if (!hasil.ok) {
       setGalat(hasil.pesan);
       setPin('');
@@ -68,38 +62,24 @@ export default function Login() {
         </section>
 
         <section className="flex items-center justify-center bg-pramuka-50 px-5 py-10">
-          <form onSubmit={kirim} className="panel animasi-naik w-full max-w-sm p-6">
+          <form onSubmit={kirim} className="panel animasi-naik w-full max-w-sm p-6" noValidate>
             <h2 className="text-xl font-bold text-pramuka-900">Masuk</h2>
 
-            <div className="mt-4 grid grid-cols-2 gap-1 rounded-lg bg-pramuka-100 p-1" role="tablist" aria-label="Peran">
-              {KELOMPOK_PENGGUNA.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={peran === p.id}
-                  onClick={() => setPeran(p.id)}
-                  className={`rounded-md px-2 py-2 text-sm font-semibold transition-colors ${
-                    peran === p.id ? 'bg-pramuka-800 text-pramuka-50' : 'text-pramuka-700 hover:bg-pramuka-200'
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-
             <div className="mt-5">
-              <label htmlFor="nama" className="label">Nama</label>
-              <PencarianNama
-                key={peran}
-                id="nama"
-                daftar={daftar}
-                nilai={userId}
-                onPilih={(id) => { setUserId(id); setGalat(''); }}
-                keterangan={keterangan}
-                namaKelompok={aktif.label}
+              <label htmlFor="username" className="label">NIS atau nama pengguna</label>
+              <input
+                id="username"
+                className="input"
+                type="text"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                maxLength={32}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Penegak: NIS. Lainnya: nama pengguna"
               />
-              <p className="mt-1 text-xs text-pramuka-500">Ketik beberapa huruf nama Anda, lalu pilih dari daftar.</p>
             </div>
 
             <div className="mt-4">
@@ -110,36 +90,45 @@ export default function Login() {
                 type="password"
                 inputMode="numeric"
                 autoComplete="current-password"
-                maxLength={6}
+                maxLength={PIN_PANJANG}
                 value={pin}
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                placeholder="4 sampai 6 angka"
+                placeholder={`${PIN_PANJANG} angka`}
               />
             </div>
 
             {galat && <p role="alert" className="mt-3 text-sm font-medium text-red-700">{galat}</p>}
 
-            <button type="submit" className="btn btn-gold mt-5 w-full">Masuk</button>
+            <button type="submit" className="btn btn-gold mt-5 w-full" disabled={sibuk}>{sibuk ? 'Memeriksa...' : 'Masuk'}</button>
 
             <p className="mt-4 flex gap-2 text-xs leading-relaxed text-pramuka-600">
               <Icon nama="perisai" className="mt-0.5 h-4 w-4 shrink-0 text-pramuka-500" />
               <span>
                 Masuk pertama kali dengan PIN awal dari admin, lalu buat PIN baru milik Anda sendiri.
                 Lupa PIN? Minta reset kepada Dewan Ambalan, Pembina, atau Admin Gudep.
+                Salah PIN 5 kali mengunci akun selama 5 menit.
               </span>
             </p>
 
-            <div className="mt-4 rounded-md bg-pramuka-100 px-3 py-2.5 text-xs leading-relaxed text-pramuka-700">
-              <p className="font-semibold">Mode prototipe</p>
-              <p>PIN awal demo: penegak 1111, Pembina 2222, Dewan Ambalan 3333, admin 1234 (wajib diganti saat masuk).</p>
-              <button
-                type="button"
-                onClick={() => window.confirm('Kembalikan semua data ke contoh awal?') && resetDemo()}
-                className="mt-1 font-semibold text-pramuka-800 underline"
-              >
-                Kembalikan data contoh
-              </button>
-            </div>
+            {LOKAL && lokal.aktif && (
+              <div className="mt-4 rounded-md bg-pramuka-100 px-3 py-2.5 text-xs leading-relaxed text-pramuka-700">
+                <p className="font-semibold">Mode lokal (tanpa Supabase)</p>
+                <p>Data disimpan di browser ini saja. Akun contoh (wajib ganti PIN saat masuk):</p>
+                <ul className="mt-1 space-y-0.5 font-mono">
+                  <li>Penegak: 10231, PIN {PIN_DEMO.penegak}</li>
+                  <li>Pembina: pembina, PIN {PIN_DEMO.pembina}</li>
+                  <li>Dewan Ambalan: dewan, PIN {PIN_DEMO.dewan}</li>
+                  <li>Admin Gudep: admin, PIN {PIN_DEMO.admin}</li>
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => window.confirm('Hapus semua data lokal dan kembalikan ke data contoh?') && lokal.reset()}
+                  className="mt-1.5 font-semibold text-pramuka-800 underline"
+                >
+                  Kembalikan data contoh
+                </button>
+              </div>
+            )}
           </form>
         </section>
       </div>

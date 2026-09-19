@@ -2,14 +2,20 @@
  * IMPORT ANGGOTA DARI EXCEL (.xlsx)
  *
  * Tiga kelompok dapat diimpor: Penegak (peserta), Dewan Ambalan, dan Pembina. Admin Gudep tidak
- * diimpor. Penegak memakai kolom lengkap; Dewan Ambalan dan Pembina cukup nama (dan PIN awal).
+ * diimpor. Penegak memakai kolom lengkap dan NIS WAJIB (NIS menjadi nama pengguna untuk masuk);
+ * Dewan Ambalan dan Pembina cukup nama, dengan nama pengguna dan PIN awal opsional (dibuat otomatis).
  *
  * Alur: unduh template -> isi -> unggah -> pratinjau dan pemeriksaan -> impor.
  * `periksaBaris` murni (mudah diuji); pembaca dan pembuat template memuat ExcelJS saat dipakai.
+ * Pemeriksaan ini hanya untuk umpan balik cepat; server memeriksa ulang setiap baris.
  */
 import { KELOMPOK_PENGGUNA, cocokKelompok } from '../config';
 import { AGAMA } from '../data/skuData';
-import { formatPinSah } from './pinLogic';
+import { formatPinSah, pinLemah } from './pinLogic';
+
+export const POLA_USERNAME = /^[a-z0-9][a-z0-9._-]{2,31}$/;
+const PESAN_PIN = 'PIN awal harus 6 angka dan tidak boleh sama semua atau berurutan';
+const pinAwalSah = (pin) => formatPinSah(pin) && !pinLemah(pin);
 
 export const MAKS_BARIS = 500;
 export const NAMA_LEMBAR = 'Anggota';
@@ -29,6 +35,7 @@ const KOLOM_PENEGAK = [
 ];
 const KOLOM_PENGURUS = [
   { header: 'Nama Lengkap', key: 'nama', lebar: 40 },
+  { header: 'Nama Pengguna (opsional)', key: 'username', lebar: 26 },
   { header: 'PIN Awal (opsional)', key: 'pin', lebar: 22 },
 ];
 
@@ -54,6 +61,7 @@ export function normalisasiAgama(teks) {
 
 function petaHeader(teks) {
   const k = hurufSaja(teks);
+  if (k.startsWith('namapengguna') || k === 'username') return 'username';
   if (k === 'nama' || k === 'namalengkap' || k === 'namasiswa') return 'nama';
   if (k === 'nis' || k === 'nisn') return 'nis';
   if (k === 'kelas') return 'kelas';
@@ -124,8 +132,11 @@ export async function bacaExcelAnggota(buffer, kelompok = 'peserta') {
   for (let r = barisJudul + 1; r <= ws.rowCount; r += 1) {
     const row = ws.getRow(r);
     const ambil = (k) => (kolom[k] ? teksSel(row.getCell(kolom[k]).value) : '');
-    const item = { no: r, nama: ambil('nama'), nis: ambil('nis'), kelas: ambil('kelas'), sangga: ambil('sangga'), agama: ambil('agama'), pin: ambil('pin') };
-    if (!item.nama && !item.nis && !item.kelas && !item.sangga && !item.agama) continue; // baris kosong
+    const item = {
+      no: r, nama: ambil('nama'), nis: ambil('nis'), kelas: ambil('kelas'), sangga: ambil('sangga'), agama: ambil('agama'),
+      username: ambil('username'), pin: ambil('pin'),
+    };
+    if (!item.nama && !item.nis && !item.kelas && !item.sangga && !item.agama && !item.username) continue; // baris kosong
     baris.push(item);
     if (baris.length > MAKS_BARIS) throw new Error(`Maksimal ${MAKS_BARIS} baris per impor. Bagi file menjadi beberapa bagian.`);
   }
@@ -138,49 +149,55 @@ export async function bacaExcelAnggota(buffer, kelompok = 'peserta') {
 /**
  * Menilai setiap baris. Hasil: [{ no, data, galat: [pesan], siap }].
  * Baris tidak siap bila ada isian wajib yang kosong/keliru, atau anggota sudah terdaftar, baik pada
- * data yang ada maupun di file. Penegak: NIS sama, atau bila NIS kosong nama dan kelas sama.
- * Dewan Ambalan dan Pembina: nama sama pada jabatan yang sama.
+ * data yang ada maupun di file.
+ *   Penegak: NIS wajib dan unik (NIS = nama pengguna untuk masuk).
+ *   Dewan Ambalan dan Pembina: nama pengguna (bila diisi) unik; bila tidak diisi, nama yang sama pada
+ *   jabatan yang sama dianggap data ganda (nama pengguna dibuat otomatis oleh server).
  */
 export function periksaBaris(baris, users, kelompok = 'peserta') {
   if (kelompok !== 'peserta') return periksaPengurus(baris, users, kelompok);
-  const peserta = users.filter((u) => u.role === 'peserta');
-  const nisAda = new Set(peserta.map((u) => (u.nis ?? '').trim()).filter(Boolean));
-  const namaKelasAda = new Set(peserta.map((u) => `${u.nama.toLowerCase()}|${(u.kelas ?? '').toLowerCase()}`));
+  const dipakai = new Set(users.flatMap((u) => [u.username, u.nis]).filter(Boolean).map((x) => String(x).toLowerCase()));
 
   return baris.map((b) => {
     const galat = [];
     const agama = normalisasiAgama(b.agama);
+    const nis = String(b.nis ?? '').trim().toLowerCase();
     if (!b.nama) galat.push('Nama kosong');
+    if (!nis) galat.push('NIS kosong (NIS dipakai untuk masuk)');
+    else if (!POLA_USERNAME.test(nis)) galat.push('NIS harus 3 sampai 32 karakter huruf atau angka');
+    else if (dipakai.has(nis)) galat.push('NIS sudah terdaftar');
     if (!b.kelas) galat.push('Kelas kosong');
     if (!b.sangga) galat.push('Sangga kosong');
     if (!b.agama) galat.push('Agama kosong');
     else if (!agama) galat.push(`Agama "${b.agama}" tidak dikenal (pilih: ${AGAMA.join(', ')})`);
-    if (b.pin && !formatPinSah(b.pin)) galat.push('PIN awal harus 4 sampai 6 angka');
+    if (b.pin && !pinAwalSah(b.pin)) galat.push(PESAN_PIN);
 
-    const kunciNama = `${b.nama.toLowerCase()}|${b.kelas.toLowerCase()}`;
-    if (b.nama && b.nis && nisAda.has(b.nis)) galat.push('NIS sudah terdaftar');
-    else if (b.nama && !b.nis && namaKelasAda.has(kunciNama)) galat.push('Nama dan kelas sudah terdaftar');
-
-    if (!galat.length) {
-      // Daftarkan agar duplikat di dalam file yang sama ikut terdeteksi
-      if (b.nis) nisAda.add(b.nis);
-      namaKelasAda.add(kunciNama);
-    }
-    return { no: b.no, data: { ...b, agama, agamaAsli: b.agama }, galat, siap: galat.length === 0 };
+    if (!galat.length) dipakai.add(nis); // duplikat di dalam file yang sama ikut terdeteksi
+    return { no: b.no, data: { ...b, nis: b.nis ? String(b.nis).trim() : '', agama, agamaAsli: b.agama }, galat, siap: galat.length === 0 };
   });
 }
 
 function periksaPengurus(baris, users, kelompok) {
   const k = kelompokDari(kelompok);
-  const ada = new Set(users.filter((u) => cocokKelompok(k, u)).map((u) => u.nama.trim().toLowerCase()));
+  const namaAda = new Set(users.filter((u) => cocokKelompok(k, u)).map((u) => u.nama.trim().toLowerCase()));
+  const dipakai = new Set(users.map((u) => u.username).filter(Boolean).map((x) => x.toLowerCase()));
 
   return baris.map((b) => {
     const galat = [];
-    const kunci = b.nama.toLowerCase();
+    const username = String(b.username ?? '').trim().toLowerCase();
+    const nama = (b.nama ?? '').trim().toLowerCase();
     if (!b.nama) galat.push('Nama kosong');
-    else if (ada.has(kunci)) galat.push(`Nama sudah terdaftar sebagai ${k.label}`);
-    if (b.pin && !formatPinSah(b.pin)) galat.push('PIN awal harus 4 sampai 6 angka');
-    if (!galat.length) ada.add(kunci); // duplikat di dalam file yang sama ikut terdeteksi
+    if (username) {
+      if (!POLA_USERNAME.test(username)) galat.push('Nama pengguna harus 3 sampai 32 karakter: huruf kecil, angka, titik, garis bawah, atau strip');
+      else if (dipakai.has(username)) galat.push('Nama pengguna sudah dipakai');
+    } else if (b.nama && namaAda.has(nama)) {
+      galat.push(`Nama sudah terdaftar sebagai ${k.label}. Isi kolom Nama Pengguna bila memang orang yang berbeda`);
+    }
+    if (b.pin && !pinAwalSah(b.pin)) galat.push(PESAN_PIN);
+    if (!galat.length) { // duplikat di dalam file yang sama ikut terdeteksi
+      if (username) dipakai.add(username);
+      else namaAda.add(nama);
+    }
     return { no: b.no, data: { ...b, agama: '', agamaAsli: '' }, galat, siap: galat.length === 0 };
   });
 }
@@ -191,12 +208,12 @@ const PETUNJUK_PENEGAK = (label) => [
   [`Petunjuk pengisian template import ${label} SIGARDA`, ''],
   ['', ''],
   ['1. Isi data pada lembar "Anggota"', 'Satu baris satu penegak, mulai baris 2 (di bawah judul kolom). Jangan mengubah atau menghapus judul kolom.'],
-  ['2. Kolom wajib', 'Nama Lengkap, Kelas, Sangga, Agama. NIS dianjurkan (dipakai untuk mendeteksi data ganda).'],
+  ['2. Kolom wajib', 'Nama Lengkap, NIS, Kelas, Sangga, Agama. NIS WAJIB dan tidak boleh sama dengan anggota lain: NIS menjadi nama pengguna untuk masuk ke aplikasi.'],
   ['3. Agama', `Pilih dari daftar: ${AGAMA.join(', ')}. Agama menentukan sub-butir pada butir 1 SKU.`],
   ['4. Kelas dan Sangga', 'Bebas diketik (mis. X, XI, XII, atau nama sangga baru). Penulisan akan disamakan dengan data yang sudah ada.'],
-  ['5. PIN Awal (opsional)', 'Isi 4 sampai 6 angka. Jika dikosongkan, aplikasi membuat PIN acak. Setiap anggota WAJIB mengganti PIN saat login pertama.'],
-  ['6. Batas', `Maksimal ${MAKS_BARIS} baris per impor. Data ganda (NIS sama, atau nama dan kelas sama) dilewati.`],
-  ['7. Setelah impor', 'Daftar PIN awal tampil satu kali dan dapat diunduh. Bagikan ke masing-masing anggota secara langsung.'],
+  ['5. PIN Awal (opsional)', 'Isi tepat 6 angka (tidak boleh sama semua atau berurutan). Jika dikosongkan, aplikasi membuat PIN acak. Setiap anggota WAJIB mengganti PIN saat login pertama.'],
+  ['6. Batas', `Maksimal ${MAKS_BARIS} baris per impor. Baris dengan NIS yang sudah terdaftar dilewati.`],
+  ['7. Setelah impor', 'Daftar NIS dan PIN awal tampil satu kali dan dapat diunduh. Bagikan ke masing-masing anggota secara langsung.'],
   ['', ''],
   ['Contoh isian', ''],
   ['Nama Lengkap | NIS | Kelas | Sangga | Agama', 'Andi Pratama | 10301 | X | Sangga Elang | Islam'],
@@ -208,12 +225,13 @@ const PETUNJUK_PENGURUS = (label) => [
   ['', ''],
   ['1. Isi data pada lembar "Anggota"', `Satu baris satu orang, mulai baris 2 (di bawah judul kolom). Semua yang diimpor didaftarkan sebagai ${label}. Jangan mengubah atau menghapus judul kolom.`],
   ['2. Kolom wajib', 'Nama Lengkap. Gelar boleh ditulis (mis. Budi Santoso, S.Pd.).'],
-  ['3. PIN Awal (opsional)', 'Isi 4 sampai 6 angka. Jika dikosongkan, aplikasi membuat PIN acak. Setiap orang WAJIB mengganti PIN saat login pertama.'],
-  ['4. Batas', `Maksimal ${MAKS_BARIS} baris per impor. Nama yang sudah terdaftar sebagai ${label} dilewati. Dua orang bernama sama ditulis dengan pembeda (mis. tambahan gelar atau inisial).`],
-  ['5. Setelah impor', 'Daftar PIN awal tampil satu kali dan dapat diunduh. Bagikan ke masing-masing orang secara langsung.'],
+  ['3. Nama Pengguna (opsional)', 'Dipakai untuk masuk. 3 sampai 32 karakter: huruf kecil, angka, titik, garis bawah, atau strip. Jika dikosongkan dibuat otomatis dari nama (mis. budi.santoso).'],
+  ['4. PIN Awal (opsional)', 'Isi tepat 6 angka (tidak boleh sama semua atau berurutan). Jika dikosongkan, aplikasi membuat PIN acak. Setiap orang WAJIB mengganti PIN saat login pertama.'],
+  ['5. Batas', `Maksimal ${MAKS_BARIS} baris per impor. Nama yang sudah terdaftar sebagai ${label} dilewati, kecuali kolom Nama Pengguna diisi (untuk dua orang yang kebetulan bernama sama).`],
+  ['6. Setelah impor', 'Daftar nama pengguna dan PIN awal tampil satu kali dan dapat diunduh. Bagikan ke masing-masing orang secara langsung.'],
   ['', ''],
   ['Contoh isian', ''],
-  ['Nama Lengkap | PIN Awal', 'Budi Santoso, S.Pd. | (kosong, PIN dibuat acak)'],
+  ['Nama Lengkap | Nama Pengguna | PIN Awal', 'Budi Santoso, S.Pd. | budi.santoso | (kosong, PIN dibuat acak)'],
 ];
 
 export async function buatTemplateAnggota(kelompok = 'peserta') {
@@ -238,6 +256,7 @@ export async function buatTemplateAnggota(kelompok = 'peserta') {
   // Kolom NIS dan PIN berformat teks agar angka 0 di depan tidak hilang
   for (let r = 2; r <= MAKS_BARIS + 1; r += 1) {
     ws.getCell(r, nomorKolom('pin')).numFmt = '@';
+    if (!penegak) ws.getCell(r, nomorKolom('username')).numFmt = '@';
     if (penegak) {
       ws.getCell(r, nomorKolom('nis')).numFmt = '@';
       ws.getCell(r, nomorKolom('agama')).dataValidation = {

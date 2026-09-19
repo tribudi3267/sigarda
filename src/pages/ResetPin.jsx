@@ -74,9 +74,13 @@ export default function ResetPin() {
 
   const namaOrang = (id) => users.find((u) => u.id === id)?.nama ?? '-';
 
-  const reset = (u) => {
+  const [sibuk, setSibuk] = useState(false);
+  const reset = async (u) => {
+    if (sibuk) return;
     if (!window.confirm(`Reset PIN ${u.nama}? PIN lama tidak berlaku lagi dan dibuatkan PIN baru otomatis.`)) return;
-    const r = resetPin(u.id);
+    setSibuk(true);
+    const r = await resetPin(u.id);
+    setSibuk(false);
     if (r.ok) setHasil({ nama: r.nama, pin: r.pin });
   };
 
@@ -91,7 +95,7 @@ export default function ResetPin() {
       <h1 className="mb-1 text-2xl font-bold">Reset PIN</h1>
       <p className="mb-1 text-sm text-pramuka-600">{aturan}</p>
       <p className="mb-4 text-sm text-pramuka-600">
-        Reset membuat PIN baru berupa 6 angka secara otomatis. Pemilik akun wajib menggantinya saat login pertama.
+        Reset membuat PIN baru berupa 6 angka secara otomatis dan membuka kunci akun. Pemilik akun wajib menggantinya saat login pertama.
       </p>
 
       {kelompokBoleh.length > 1 && (
@@ -151,7 +155,7 @@ export default function ResetPin() {
                   </p>
                 </div>
               </div>
-              <button className="btn btn-outline btn-sm" onClick={() => reset(u)}>
+              <button className="btn btn-outline btn-sm" onClick={() => reset(u)} disabled={sibuk}>
                 <Icon nama="reset" className="h-3.5 w-3.5" /> Reset PIN
               </button>
             </li>

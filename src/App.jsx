@@ -18,6 +18,7 @@ import GantiPinWajib from './pages/GantiPinWajib';
 import Materi from './pages/Materi';
 import KelolaMateri from './pages/KelolaMateri';
 import { bolehKelolaMateri } from './lib/materiLogic';
+import LogoMark from './components/LogoMark';
 
 /**
  * Menu per peran.
@@ -84,8 +85,30 @@ function Toast() {
   );
 }
 
+/** Layar penuh untuk keadaan sebelum aplikasi siap: memuat, konfigurasi belum diisi, atau galat sambungan. */
+function LayarStatus({ status, galat }) {
+  const isi = {
+    memuat: { judul: 'Memuat SIGARDA...', teks: 'Menyiapkan aplikasi dan menghubungkan ke server.' },
+    konfigurasi: {
+      judul: 'Sambungan ke Supabase belum diatur',
+      teks: 'Isi VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY pada berkas .env.local (untuk komputer sendiri) atau pada Variables repositori GitHub (untuk situs terbit), lalu bangun ulang. Panduannya ada di README, bagian "Menghubungkan ke Supabase". Untuk mencoba tanpa Supabase, jalankan npm run dev:lokal.',
+    },
+    galat: { judul: 'Aplikasi belum dapat dimulai', teks: `Terjadi galat saat menghubungkan ke server. ${galat ?? ''}` },
+  }[status];
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-pramuka-800 px-6 text-center text-pramuka-50">
+      <LogoMark size={64} />
+      <h1 className="mt-5 font-display text-2xl font-bold tracking-wide">{isi.judul}</h1>
+      <p className="mt-2 max-w-lg text-sm leading-relaxed text-pramuka-200" role={status === 'memuat' ? 'status' : 'alert'}>{isi.teks}</p>
+      {status !== 'memuat' && (
+        <button className="btn btn-gold mt-5" onClick={() => window.location.reload()}>Muat ulang</button>
+      )}
+    </div>
+  );
+}
+
 function Shell() {
-  const { user, peranUser } = useApp();
+  const { user, peranUser, status, galatMuat } = useApp();
   const [tab, setTab] = useState(null);
   const [fokusId, setFokusId] = useState(null); // peserta yang sedang dibuka penguji/admin
   const [tingkat, setTingkat] = useState('Bantara');
@@ -99,6 +122,7 @@ function Shell() {
     setKelolaId(null);
   }, [user?.id]);
 
+  if (status !== 'siap') return <LayarStatus status={status} galat={galatMuat} />;
   if (!user) return <Login />;
   // PIN awal dari admin atau PIN hasil reset wajib diganti sebelum aplikasi dapat dipakai
   if (user.wajibGantiPin) return <GantiPinWajib />;

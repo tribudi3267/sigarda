@@ -152,8 +152,13 @@ function FormMateri({ awal, onTutup }) {
 
   const tautan = f.tautan.trim() ? ambilTautanDrive(f.tautan) : null;
 
-  const kirim = () => {
-    const r = simpanMateri(f);
+  const [sibuk, setSibuk] = useState(false);
+  const kirim = async () => {
+    if (sibuk) return;
+    setSibuk(true);
+    setGalat('');
+    const r = await simpanMateri(f);
+    setSibuk(false);
     if (r.ok) onTutup();
     else setGalat(r.pesan);
   };
@@ -167,7 +172,7 @@ function FormMateri({ awal, onTutup }) {
       aksi={
         <>
           <button className="btn btn-outline" onClick={onTutup}>Batal</button>
-          <button className="btn btn-primary" onClick={kirim}>Simpan materi</button>
+          <button className="btn btn-primary" onClick={kirim} disabled={sibuk}>{sibuk ? 'Menyimpan...' : 'Simpan materi'}</button>
         </>
       }
     >

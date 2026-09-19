@@ -11,6 +11,7 @@ export default function Akun() {
   const bantuan = siapaBisaReset(user);
 
   const info = [
+    ['Nama pengguna (untuk masuk)', user.username],
     user.role === 'peserta' && ['NIS', user.nis || '-'],
     user.role === 'peserta' && ['Kelas', user.kelas],
     user.role === 'peserta' && ['Sangga', user.sangga],
@@ -53,7 +54,7 @@ export default function Akun() {
             <p className="mt-1">
               {bantuan
                 ? `Jika lupa PIN, minta reset kepada ${bantuan}. PIN baru dibuat otomatis dan wajib Anda ganti saat masuk.`
-                : 'PIN Admin tidak dapat direset peran lain. Simpan PIN dengan baik dan jangan dibagikan.'}
+                : 'PIN Admin tidak dapat direset peran lain di aplikasi. Bila lupa, PIN hanya dapat dipulihkan oleh pengelola proyek Supabase (lihat README, "Lupa PIN Admin"). Simpan PIN dengan baik dan jangan dibagikan.'}
             </p>
           </div>
         </section>

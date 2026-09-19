@@ -5,15 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:lokal": "vite --mode lokal",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "skema": "node scripts/buat-skema.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.109.0",
     "exceljs": "^4.4.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.47",

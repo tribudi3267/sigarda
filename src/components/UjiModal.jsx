@@ -24,14 +24,22 @@ export default function UjiModal({ pesertaId, poin, onTutup }) {
   const [catatan, setCatatan] = useState('');
   const [pin, setPin] = useState('');
   const [galat, setGalat] = useState('');
+  const [sibuk, setSibuk] = useState(false);
 
   const pilihan = PILIHAN.filter((p) => p.id !== 'reset' || entry.status !== 'belum');
   const perluCatatan = hasil === 'ulang' || hasil === 'reset';
 
-  const simpan = () => {
-    const r = catatHasil({ pesertaId, skuId: poin.id, hasil, tanggalUji, nilai, catatan, pin });
+  const simpan = async () => {
+    if (sibuk) return;
+    setSibuk(true);
+    setGalat('');
+    const r = await catatHasil({ pesertaId, skuId: poin.id, hasil, tanggalUji: hasil === 'reset' ? null : tanggalUji, nilai: hasil === 'lulus' ? nilai : null, catatan, pin });
+    setSibuk(false);
     if (r.ok) onTutup();
-    else setGalat(r.pesan);
+    else {
+      setGalat(r.pesan);
+      setPin('');
+    }
   };
 
   return (
@@ -42,8 +50,8 @@ export default function UjiModal({ pesertaId, poin, onTutup }) {
       aksi={
         <>
           <button className="btn btn-outline" onClick={onTutup}>Batal</button>
-          <button className="btn btn-primary" onClick={simpan} disabled={pin.length < 4}>
-            Simpan dan verifikasi
+          <button className="btn btn-primary" onClick={simpan} disabled={pin.length < 6 || sibuk}>
+            {sibuk ? 'Memverifikasi...' : 'Simpan dan verifikasi'}
           </button>
         </>
       }

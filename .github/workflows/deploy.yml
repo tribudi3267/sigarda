@@ -13,12 +13,26 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Isi di GitHub: Settings > Secrets and variables > Actions > tab Variables (bukan Secrets).
+      # Nilainya (URL proyek dan kunci anon/publishable) memang terlihat di browser; keamanan data dijaga oleh
+      # Row Level Security di database. JANGAN isi kunci service_role di sini.
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      # Opsional: hanya diisi bila nama Edge Function di Supabase bukan "sigarda".
+      VITE_NAMA_FUNGSI: ${{ vars.VITE_NAMA_FUNGSI }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+      - name: Periksa variabel Supabase
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "::error::Variabel VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY belum diisi. Isi di Settings > Secrets and variables > Actions > Variables, lalu jalankan ulang."
+            exit 1
+          fi
       - run: npm ci
       - run: npm run build
         env:

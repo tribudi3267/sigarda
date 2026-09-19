@@ -5,18 +5,48 @@ import { AGAMA } from '../data/skuData';
 import { layakGaruda } from '../lib/skuLogic';
 import { urutAlami, urutTeks } from '../lib/format';
 import { normalisasiNama } from '../lib/cariNama';
-import { buatPinAcak } from '../lib/pinLogic';
+import { PIN_PANJANG, buatPinAcak } from '../lib/pinLogic';
 import { KELOMPOK_IMPOR, unduhTemplateAnggota } from '../lib/importAnggota';
 import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
 import ImportAnggotaModal from '../components/ImportAnggotaModal';
+import { LOKAL } from '../lib/supabaseClient';
 import { Avatar, BadgePeran, Field, Icon, Kosong, Modal } from '../components/ui';
 
-const BARU = { role: 'peserta', nama: '', nis: '', kelas: '', sangga: '', agama: AGAMA[0], jabatan: '', pin: '' };
+const BARU = { role: 'peserta', nama: '', nis: '', username: '', kelas: '', sangga: '', agama: AGAMA[0], jabatan: '', pin: '' };
 
-function FormAnggota({ awal, onTutup }) {
+/** Menampilkan nama pengguna dan PIN awal akun baru satu kali, agar admin dapat menyampaikannya. */
+function AkunBaru({ akun, onTutup }) {
+  const [tersalin, setTersalin] = useState(false);
+  const salin = async () => {
+    try {
+      await navigator.clipboard.writeText(`Nama pengguna: ${akun.username}\nPIN awal: ${akun.pin}`);
+      setTersalin(true);
+    } catch {
+      setTersalin(false);
+    }
+  };
+  return (
+    <Modal buka tutup={onTutup} judul="Akun dibuat" aksi={<button className="btn btn-primary" onClick={onTutup}>Selesai</button>}>
+      <p className="text-sm text-pramuka-700">
+        Akun untuk <span className="font-semibold">{akun.nama}</span> berhasil dibuat. Catat data masuk berikut. PIN hanya tampil sekali.
+      </p>
+      <dl className="mt-3 divide-y divide-pramuka-100 rounded-lg border border-pramuka-200 text-sm">
+        <div className="flex justify-between gap-3 px-3 py-2"><dt className="text-pramuka-600">Nama pengguna</dt><dd className="font-mono font-bold">{akun.username}</dd></div>
+        <div className="flex justify-between gap-3 px-3 py-2"><dt className="text-pramuka-600">PIN awal</dt><dd className="font-mono font-bold tracking-widest">{akun.pin}</dd></div>
+      </dl>
+      <button className="btn btn-outline btn-sm mt-3" onClick={salin}><Icon nama="salin" className="h-4 w-4" /> {tersalin ? 'Tersalin' : 'Salin'}</button>
+      <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-950">
+        Bagikan langsung kepada yang bersangkutan. Saat masuk pertama kali, PIN ini wajib diganti dengan PIN pilihannya sendiri.
+      </p>
+    </Modal>
+  );
+}
+
+function FormAnggota({ awal, onTutup, onAkunBaru }) {
   const { simpanAnggota, users, progress } = useApp();
   const [f, setF] = useState(awal);
   const [galat, setGalat] = useState('');
+  const [sibuk, setSibuk] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   const baru = !f.id;
@@ -38,10 +68,20 @@ function FormAnggota({ awal, onTutup }) {
   const layak = !baru && f.role === 'peserta' && layakGaruda(progress, f);
   const agamaBerubah = !baru && f.role === 'peserta' && users.find((u) => u.id === f.id)?.agama !== f.agama;
 
-  const kirim = () => {
-    const r = simpanAnggota(f);
-    if (r.ok) onTutup();
-    else setGalat(r.pesan);
+  const kirim = async () => {
+    if (sibuk) return;
+    setSibuk(true);
+    setGalat('');
+    // Penegak masuk memakai NIS, jadi NIS = nama pengguna
+    const data = f.role === 'peserta' ? { ...f, username: (f.nis ?? '').trim().toLowerCase() } : f;
+    const r = await simpanAnggota(data);
+    setSibuk(false);
+    if (!r.ok) {
+      setGalat(r.pesan);
+      return;
+    }
+    if (r.akun) onAkunBaru(r.akun);
+    onTutup();
   };
 
   return (
@@ -52,7 +92,7 @@ function FormAnggota({ awal, onTutup }) {
       aksi={
         <>
           <button className="btn btn-outline" onClick={onTutup}>Batal</button>
-          <button className="btn btn-primary" onClick={kirim}>Simpan</button>
+          <button className="btn btn-primary" onClick={kirim} disabled={sibuk}>{sibuk ? 'Menyimpan...' : 'Simpan'}</button>
         </>
       }
     >
@@ -71,8 +111,8 @@ function FormAnggota({ awal, onTutup }) {
 
       {f.role === 'peserta' && (
         <>
-          <Field label="NIS" htmlFor="f-nis">
-            <input id="f-nis" className="input" inputMode="numeric" value={f.nis ?? ''} onChange={set('nis')} />
+          <Field label="NIS" htmlFor="f-nis" bantuan="Wajib dan tidak boleh sama dengan anggota lain. NIS menjadi nama pengguna untuk masuk ke aplikasi.">
+            <input id="f-nis" className="input" inputMode="numeric" autoComplete="off" maxLength={32} value={f.nis ?? ''} onChange={set('nis')} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Kelas" htmlFor="f-kelas" bantuan="Pilih dari saran atau ketik baru.">
@@ -121,10 +161,22 @@ function FormAnggota({ awal, onTutup }) {
         </>
       )}
 
+      {f.role !== 'peserta' && (
+        <Field
+          label="Nama pengguna"
+          htmlFor="f-username"
+          bantuan={baru
+            ? 'Dipakai untuk masuk. Kosongkan agar dibuat otomatis dari nama. Huruf kecil, angka, titik, garis bawah, atau strip (3 sampai 32 karakter).'
+            : 'Mengubah nama pengguna mengubah cara orang ini masuk. PIN tidak berubah.'}
+        >
+          <input id="f-username" className="input font-mono" autoComplete="off" autoCapitalize="none" maxLength={32} value={f.username ?? ''} onChange={(e) => setF({ ...f, username: e.target.value.toLowerCase() })} />
+        </Field>
+      )}
+
       {baru ? (
-        <Field label="PIN awal" htmlFor="f-pin" bantuan="4 sampai 6 angka, dibuat otomatis (boleh diubah). Bagikan ke anggota; PIN ini wajib diganti saat login pertama.">
+        <Field label="PIN awal" htmlFor="f-pin" bantuan={`Tepat ${PIN_PANJANG} angka, dibuat otomatis (boleh diubah, tidak boleh sama semua atau berurutan). Bagikan ke anggota; PIN ini wajib diganti saat login pertama.`}>
           <div className="flex gap-2">
-            <input id="f-pin" className="input font-mono tracking-widest" inputMode="numeric" maxLength={6} value={f.pin} onChange={(e) => setF({ ...f, pin: e.target.value.replace(/\D/g, '') })} />
+            <input id="f-pin" className="input font-mono tracking-widest" inputMode="numeric" maxLength={PIN_PANJANG} value={f.pin} onChange={(e) => setF({ ...f, pin: e.target.value.replace(/\D/g, '') })} />
             <button type="button" className="btn btn-outline shrink-0" onClick={() => setF({ ...f, pin: buatPinAcak() })}>Acak ulang</button>
           </div>
         </Field>
@@ -140,12 +192,13 @@ function FormAnggota({ awal, onTutup }) {
 }
 
 export default function AdminAnggota() {
-  const { users, daftarPeserta, hapusAnggota, user, resetDemo } = useApp();
+  const { users, daftarPeserta, hapusAnggota, user, lokal } = useApp();
   const [filter, setFilter] = useState(FILTER_AWAL);
   const [kelompok, setKelompok] = useState('peserta');
   const [form, setForm] = useState(null);
   const [impor, setImpor] = useState(false);
   const [cari, setCari] = useState('');
+  const [akunBaru, setAkunBaru] = useState(null);
 
   const aktif = KELOMPOK_PENGGUNA.find((k) => k.id === kelompok);
   const daftar = useMemo(() => {
@@ -232,8 +285,8 @@ export default function AdminAnggota() {
                       NIS {u.nis || '-'}, kelas {u.kelas}, {u.sangga}, {u.agama} <BadgePeran peran={u.peran} singkat />
                     </>
                   )}
-                  {u.role === 'penguji' && u.jabatan}
-                  {u.role === 'admin' && 'Admin Gudep'}
+                  {u.role === 'penguji' && <>{u.jabatan}, pengguna <span className="font-mono">{u.username}</span></>}
+                  {u.role === 'admin' && <>Admin Gudep, pengguna <span className="font-mono">{u.username}</span></>}
                 </p>
               </div>
               <button className="rounded-md p-2 text-pramuka-600 hover:bg-pramuka-100" aria-label={`Ubah ${u.nama}`} onClick={() => setForm(u)}>
@@ -252,18 +305,18 @@ export default function AdminAnggota() {
         </ul>
       )}
 
-      <div className="mt-8 rounded-lg border border-pramuka-200 bg-white p-4">
-        <p className="text-sm font-semibold">Data contoh</p>
-        <p className="mt-1 text-sm text-pramuka-600">Mengembalikan semua data ke contoh awal akan menghapus data yang sudah Anda masukkan.</p>
-        <button
-          className="btn btn-danger btn-sm mt-3"
-          onClick={() => window.confirm('Kembalikan seluruh data ke contoh awal?') && resetDemo()}
-        >
-          Kembalikan data contoh
-        </button>
-      </div>
+      {LOKAL && lokal.aktif && (
+        <div className="mt-8 rounded-lg border border-pramuka-200 bg-white p-4">
+          <p className="text-sm font-semibold">Data contoh (mode lokal)</p>
+          <p className="mt-1 text-sm text-pramuka-600">Mengembalikan semua data ke contoh awal akan menghapus data yang sudah Anda masukkan di browser ini.</p>
+          <button className="btn btn-danger btn-sm mt-3" onClick={() => window.confirm('Kembalikan seluruh data ke contoh awal?') && lokal.reset()}>
+            Kembalikan data contoh
+          </button>
+        </div>
+      )}
 
-      {form && <FormAnggota awal={form} onTutup={() => setForm(null)} />}
+      {form && <FormAnggota awal={form} onTutup={() => setForm(null)} onAkunBaru={setAkunBaru} />}
+      {akunBaru && <AkunBaru akun={akunBaru} onTutup={() => setAkunBaru(null)} />}
       {impor && <ImportAnggotaModal key={kelompok} kelompok={kelompok} onTutup={() => setImpor(false)} />}
     </div>
   );

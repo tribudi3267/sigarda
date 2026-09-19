@@ -34,12 +34,19 @@ export default function PortofolioChecklist({ pesertaId, mode }) {
     setForm({ id: it.id, catatan: item.catatan ?? '', tautan: item.tautan ?? '', catatanPenguji: item.catatanPenguji ?? '' });
   };
 
-  const simpanPeserta = () => {
-    const r = ubahPortofolio(form.id, { catatan: form.catatan, tautan: form.tautan });
+  const [sibuk, setSibuk] = useState(false);
+  const simpanPeserta = async () => {
+    if (sibuk) return;
+    setSibuk(true);
+    const r = await ubahPortofolio(form.id, { catatan: form.catatan, tautan: form.tautan });
+    setSibuk(false);
     if (r.ok) setForm(null);
   };
-  const simpanPenguji = () => {
-    const r = catatPortofolioPenguji(pesertaId, form.id, form.catatanPenguji);
+  const simpanPenguji = async () => {
+    if (sibuk) return;
+    setSibuk(true);
+    const r = await catatPortofolioPenguji(pesertaId, form.id, form.catatanPenguji);
+    setSibuk(false);
     if (r.ok) setForm(null);
   };
 
@@ -160,7 +167,7 @@ export default function PortofolioChecklist({ pesertaId, mode }) {
                         />
                       </div>
                       <div className="flex gap-2">
-                        <button className="btn btn-primary btn-sm" onClick={simpanPeserta}>Simpan</button>
+                        <button className="btn btn-primary btn-sm" onClick={simpanPeserta} disabled={sibuk}>Simpan</button>
                         <button className="btn btn-outline btn-sm" onClick={() => setForm(null)}>Batal</button>
                       </div>
                     </div>
@@ -177,7 +184,7 @@ export default function PortofolioChecklist({ pesertaId, mode }) {
                         onChange={(e) => setForm({ ...form, catatanPenguji: e.target.value })}
                       />
                       <div className="flex gap-2">
-                        <button className="btn btn-primary btn-sm" onClick={simpanPenguji}>Simpan catatan</button>
+                        <button className="btn btn-primary btn-sm" onClick={simpanPenguji} disabled={sibuk}>Simpan catatan</button>
                         <button className="btn btn-outline btn-sm" onClick={() => setForm(null)}>Batal</button>
                       </div>
                     </div>

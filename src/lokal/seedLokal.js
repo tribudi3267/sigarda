@@ -1,0 +1,75 @@
+/**
+ * Mengisi backend lokal dengan data contoh (fiktif) dari src/data/seed.js.
+ * Hanya dipakai `npm run dev:lokal` dan pengujian; TIDAK dipakai pada Supabase sungguhan.
+ *
+ * Semua akun contoh diberi wajib-ganti-PIN, sehingga alur login pertama dapat dicoba.
+ */
+import { buatSeed } from '../data/seed';
+import { buatDepsEdge } from './klienFake';
+import { emailDari } from '../../supabase/functions/sigarda/index.ts';
+import { PIN_DEMO } from './pinDemo';
+
+
+const usernameContoh = (u) => {
+  if (u.role === 'peserta') return u.nis;
+  if (u.role === 'admin') return 'admin';
+  return u.jabatan === 'Pembina' ? 'pembina' : 'dewan';
+};
+const pinContoh = (u) => (u.role === 'peserta' ? PIN_DEMO.penegak : u.role === 'admin' ? PIN_DEMO.admin : u.jabatan === 'Pembina' ? PIN_DEMO.pembina : PIN_DEMO.dewan);
+
+export async function isiDataContoh(pg) {
+  const deps = buatDepsEdge(pg);
+  const seed = buatSeed();
+  const uuid = {};
+
+  for (const u of seed.users) {
+    const username = usernameContoh(u);
+    const akun = await deps.admin.buatAkun(emailDari(username), pinContoh(u));
+    uuid[u.id] = akun.id;
+    const { error } = await deps.db.rpc('sg_profil_buat_internal', {
+      p_id: akun.id, p_username: username, p_role: u.role, p_nama: u.nama, p_nis: u.nis ?? '', p_kelas: u.kelas ?? '',
+      p_sangga: u.sangga ?? '', p_agama: u.agama ?? '', p_jabatan: u.jabatan ?? '',
+    });
+    if (error) throw new Error(`Data contoh gagal (${username}): ${error.message}`);
+    await pg.query('update public.profiles set dibuat = coalesce($2::date, dibuat), calon_garuda = $3::date where id = $1', [akun.id, u.dibuat ?? null, u.calonGaruda ?? null]);
+  }
+  const p = (id) => uuid[id] ?? null;
+  const sekarang = new Date().toISOString();
+
+  const progress = [];
+  const riwayat = [];
+  for (const [pid, entri] of Object.entries(seed.progress)) {
+    for (const [sku, e] of Object.entries(entri)) {
+      progress.push({
+        peserta_id: p(pid), sku_id: sku, status: e.status, jadwal: e.jadwal ?? null, penguji_id: p(e.pengujiId),
+        tanggal_uji: e.tanggalUji ?? null, nilai: e.nilai ?? null, catatan: e.catatan ?? '', catatan_peserta: e.catatanPeserta ?? '',
+        verifikasi: e.verifikasi ?? null, diverifikasi_pada: e.diverifikasiPada ?? null, diubah: sekarang,
+      });
+      for (const w of e.riwayat ?? []) riwayat.push({ peserta_id: p(pid), sku_id: sku, waktu: w.waktu, teks: w.teks, oleh: p(w.oleh) });
+    }
+  }
+  await pg.query('insert into public.sku_progress select * from json_populate_recordset(null::public.sku_progress, $1::json)', [JSON.stringify(progress)]);
+  await pg.query('insert into public.sku_riwayat (peserta_id, sku_id, waktu, teks, oleh) select peserta_id, sku_id, waktu, teks, oleh from json_populate_recordset(null::public.sku_riwayat, $1::json)', [JSON.stringify(riwayat)]);
+
+  const sesi = Object.values(seed.absensi.sesi).map((s) => ({ tanggal: s.tanggal, dibuat_oleh: p(s.dibuatOleh), dibuat_pada: s.dibuatPada }));
+  const hadir = Object.entries(seed.absensi.hadir).flatMap(([tanggal, peta]) =>
+    Object.entries(peta).map(([pid, h]) => ({ tanggal, peserta_id: p(pid), status: h.status, oleh: p(h.oleh), waktu: h.waktu }))
+  );
+  await pg.query('insert into public.absensi_sesi select * from json_populate_recordset(null::public.absensi_sesi, $1::json)', [JSON.stringify(sesi)]);
+  await pg.query('insert into public.absensi_hadir select * from json_populate_recordset(null::public.absensi_hadir, $1::json)', [JSON.stringify(hadir)]);
+
+  const pembina = uuid['u-penguji-1'];
+  const pf = [];
+  const jurnal = [];
+  for (const [pid, items] of Object.entries(seed.portofolio)) {
+    for (const [itemId, e] of Object.entries(items)) {
+      pf.push({
+        peserta_id: p(pid), item_id: itemId, status: e.status, catatan: e.catatan ?? '', tautan: e.tautan ?? '',
+        catatan_penguji: e.catatanPenguji ?? '', catatan_penguji_oleh: e.catatanPenguji ? pembina : null, diperbarui: e.diperbarui,
+      });
+      for (const w of e.riwayat ?? []) jurnal.push({ peserta_id: p(pid), item_id: itemId, waktu: w.waktu, teks: w.teks, oleh: p(w.oleh) });
+    }
+  }
+  await pg.query('insert into public.portofolio select * from json_populate_recordset(null::public.portofolio, $1::json)', [JSON.stringify(pf)]);
+  await pg.query('insert into public.portofolio_jurnal (peserta_id, item_id, waktu, teks, oleh) select peserta_id, item_id, waktu, teks, oleh from json_populate_recordset(null::public.portofolio_jurnal, $1::json)', [JSON.stringify(jurnal)]);
+}

@@ -1,0 +1,116 @@
+/**
+ * PEMETAAN DATA SERVER -> BENTUK DATA APLIKASI (murni, tanpa React)
+ *
+ * Server menyimpan data dalam tabel (snake_case). Seluruh halaman aplikasi memakai bentuk data
+ * bersarang berikut, sehingga lapisan ini menjembataninya:
+ *
+ *   users[]                        { id, username, role, nama, nis, kelas, sangga, agama, jabatan, calonGaruda,
+ *                                    wajibGantiPin, pinDireset:{oleh,waktu}, pinDiubah, dibuat }
+ *   progress[pesertaId][skuId]     { status, jadwal, pengujiId, tanggalUji, nilai, catatan, catatanPeserta,
+ *                                    verifikasi, diverifikasiPada, riwayat:[{waktu,teks,oleh}] }
+ *   absensi                        { sesi:{[tgl]:{tanggal,dibuatOleh,dibuatPada}}, hadir:{[tgl]:{[id]:{status,waktu,oleh}}} }
+ *   portofolio[pesertaId][itemId]  { status, catatan, tautan, catatanPenguji, catatanPengujiOleh, diperbarui, riwayat }
+ *   materi[]                       { id, urutan, judul, deskripsi, tautan, fileId, resourceKey, butir, bagian, dibuat, dibuatOleh }
+ */
+
+const atau = (v) => (v === null ? undefined : v);
+const tgl = (v) => (v ? String(v).slice(0, 10) : v ?? null);
+
+export function petaProfil(r) {
+  return {
+    id: r.id,
+    username: r.username,
+    role: r.role,
+    nama: r.nama,
+    nis: atau(r.nis),
+    kelas: atau(r.kelas),
+    sangga: atau(r.sangga),
+    agama: atau(r.agama),
+    jabatan: atau(r.jabatan),
+    calonGaruda: r.calon_garuda ? tgl(r.calon_garuda) : undefined,
+    wajibGantiPin: r.wajib_ganti_pin !== false,
+    pinDireset: r.pin_direset_pada ? { oleh: r.pin_direset_oleh ?? null, waktu: r.pin_direset_pada } : undefined,
+    pinDiubah: atau(r.pin_diubah),
+    dibuat: tgl(r.dibuat),
+  };
+}
+
+const urutWaktu = (a, b) => String(a.waktu).localeCompare(String(b.waktu)) || (a.urut ?? 0) - (b.urut ?? 0);
+
+/** baris sku_progress + sku_riwayat -> progress bersarang. */
+export function susunProgress(baris = [], riwayat = []) {
+  const hasil = {};
+  for (const r of baris) {
+    (hasil[r.peserta_id] ??= {})[r.sku_id] = {
+      status: r.status,
+      jadwal: tgl(r.jadwal),
+      pengujiId: r.penguji_id ?? null,
+      tanggalUji: tgl(r.tanggal_uji),
+      nilai: r.nilai ?? null,
+      catatan: r.catatan ?? '',
+      catatanPeserta: r.catatan_peserta ?? '',
+      verifikasi: r.verifikasi ?? null,
+      diverifikasiPada: r.diverifikasi_pada ?? null,
+      riwayat: [],
+    };
+  }
+  for (const w of [...riwayat].sort((a, b) => urutWaktu({ ...a, urut: a.id }, { ...b, urut: b.id }))) {
+    const e = hasil[w.peserta_id]?.[w.sku_id];
+    if (e) e.riwayat.push({ waktu: w.waktu, teks: w.teks, oleh: w.oleh ?? null });
+  }
+  return hasil;
+}
+
+export function susunAbsensi(sesi = [], hadir = []) {
+  const hasil = { sesi: {}, hadir: {} };
+  for (const s of sesi) {
+    const t = tgl(s.tanggal);
+    hasil.sesi[t] = { tanggal: t, dibuatOleh: s.dibuat_oleh ?? null, dibuatPada: s.dibuat_pada };
+    hasil.hadir[t] = {};
+  }
+  for (const h of hadir) {
+    const t = tgl(h.tanggal);
+    if (!hasil.hadir[t]) continue; // sesi sudah dihapus
+    hasil.hadir[t][h.peserta_id] = { status: h.status, waktu: h.waktu, oleh: h.oleh ?? null };
+  }
+  return hasil;
+}
+
+export function susunPortofolio(baris = [], jurnal = []) {
+  const hasil = {};
+  for (const r of baris) {
+    (hasil[r.peserta_id] ??= {})[r.item_id] = {
+      status: r.status,
+      catatan: r.catatan ?? '',
+      tautan: r.tautan ?? '',
+      catatanPenguji: r.catatan_penguji ?? '',
+      catatanPengujiOleh: r.catatan_penguji_oleh ?? undefined,
+      diperbarui: r.diperbarui,
+      riwayat: [],
+    };
+  }
+  for (const w of [...jurnal].sort((a, b) => urutWaktu({ ...a, urut: a.id }, { ...b, urut: b.id }))) {
+    const e = hasil[w.peserta_id]?.[w.item_id];
+    if (e) e.riwayat.push({ waktu: w.waktu, teks: w.teks, oleh: w.oleh ?? null });
+  }
+  return hasil;
+}
+
+export function petaMateri(r) {
+  const bagian = Array.isArray(r.bagian) ? r.bagian : [];
+  return {
+    id: r.id,
+    urutan: r.urutan,
+    judul: r.judul,
+    deskripsi: r.deskripsi ?? '',
+    tautan: r.tautan,
+    fileId: r.file_id,
+    resourceKey: r.resource_key ?? '',
+    butir: r.butir ?? [],
+    bagian: bagian.map((b, i) => ({ id: b.id ?? `b${i}`, judul: b.judul ?? '', halaman: b.halaman ?? '' })),
+    dibuat: tgl(r.dibuat),
+    dibuatOleh: r.dibuat_oleh ?? null,
+  };
+}
+
+export const susunMateri = (baris = []) => baris.map(petaMateri).sort((a, b) => a.urutan - b.urutan);
