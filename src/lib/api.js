@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaProfil, susunAbsensi, susunMateri, susunPortofolio, susunProgress } from './mapDb';
+import { petaProfil, susunHadir, susunMateri, susunPortofolio, susunProgress, susunSesi } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -34,12 +34,15 @@ export function pesanGalat(error) {
 const sesiBerakhir = (error) => /jwt|not authenticated|invalid token/i.test(String(error?.message ?? ''));
 
 export function buatApi(klien) {
-  /** Membaca seluruh baris sebuah tabel, per halaman 1000. `filter` = [[kolom, nilai], ...]. */
+  /**
+   * Membaca seluruh baris sebuah tabel, per halaman 1000.
+   * `filter` = [[kolom, nilai], ...] (sama dengan) atau [kolom, 'gte' | 'lte', nilai] (rentang).
+   */
   async function ambilSemua(tabel, { urut = [], filter = [] } = {}) {
     const semua = [];
     for (let dari = 0; ; dari += UKURAN_HALAMAN) {
       let q = klien.from(tabel).select('*');
-      for (const [k, v] of filter) q = q.eq(k, v);
+      for (const f of filter) q = f.length === 3 ? q[f[1] === 'lte' ? 'lte' : 'gte'](f[0], f[2]) : q.eq(f[0], f[1]);
       for (const k of urut) q = q.order(k);
       const { data, error } = await q.range(dari, dari + UKURAN_HALAMAN - 1);
       if (error) throw error;
@@ -114,20 +117,24 @@ export function buatApi(klien) {
         return susunProgress(baris, riwayat);
       }),
 
-    muatAbsensi: () =>
-      muat(async () => {
-        const [sesi, hadir] = await Promise.all([
-          ambilSemua('absensi_sesi', { urut: ['tanggal'] }),
-          ambilSemua('absensi_hadir', { urut: ['tanggal', 'peserta_id'] }),
-        ]);
-        return susunAbsensi(sesi, hadir);
-      }),
+    /** Daftar sesi (satu baris per Jumat, kecil): dimuat seluruhnya agar daftar tahun ajaran diketahui. */
+    muatSesiAbsen: () => muat(async () => susunSesi(await ambilSemua('absensi_sesi', { urut: ['tanggal'] }))),
+
+    /**
+     * Kehadiran pada rentang tanggal [mulai, akhir] (ISO). Inilah bagian absensi yang besar, jadi dimuat per semester
+     * dan hanya bila diperlukan. Hasil: { [tanggal]: { [pesertaId]: {...} } }, hanya tanggal yang punya catatan.
+     */
+    muatHadirRentang: (mulai, akhir) =>
+      muat(async () => susunHadir(await ambilSemua('absensi_hadir', {
+        filter: [['tanggal', 'gte', mulai], ['tanggal', 'lte', akhir]],
+        urut: ['tanggal', 'peserta_id'],
+      }))),
 
     /** Kehadiran satu tanggal saja (pembaruan cepat setelah mencatat). */
     muatHadirTanggal: (tanggal) =>
       muat(async () => {
         const hadir = await ambilSemua('absensi_hadir', { filter: [['tanggal', tanggal]], urut: ['peserta_id'] });
-        return susunAbsensi([{ tanggal }], hadir).hadir[tanggal] ?? {};
+        return susunHadir(hadir)[tanggal] ?? {};
       }),
 
     muatPortofolio: (pesertaId = null) =>

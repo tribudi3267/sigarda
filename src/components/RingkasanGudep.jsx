@@ -7,7 +7,8 @@ import {
 } from '../lib/absensiLogic';
 import { rekapPortofolio, ringkasPortofolio } from '../lib/portofolioLogic';
 import { hariIni } from '../lib/format';
-import { Icon, ProgressBar } from './ui';
+import useAbsensiPeriode from '../hooks/useAbsensiPeriode';
+import { Icon, MuatAbsensi, ProgressBar } from './ui';
 
 /**
  * Ringkasan lintas fitur untuk dashboard Dewan Ambalan, Pembina, dan Admin Gudep:
@@ -19,6 +20,7 @@ export default function RingkasanGudep({ onNav }) {
 
   const ta = tahunAjaranDari(hariIni());
   const periode = periodeDari(hariIni());
+  const abs = useAbsensiPeriode(ta, periode); // semester berjalan sudah dimuat saat masuk; ini menjaga bila semester berganti
 
   const absen = useMemo(() => {
     const sesi = sesiPeriode(absensi, ta, periode);
@@ -62,6 +64,7 @@ export default function RingkasanGudep({ onNav }) {
             <Icon nama="absensi" className="h-4 w-4" /> Rekap lengkap dan Excel
           </button>
         </div>
+        {!abs.siap ? <MuatAbsensi galat={abs.galat} coba={abs.coba} /> : (<>
         <div className="panel grid grid-cols-2 divide-pramuka-100 md:grid-cols-4 md:divide-x">
           <div className="p-4">
             <p className="font-display text-3xl font-bold text-pramuka-800">{absen.pertemuan}</p>
@@ -97,6 +100,7 @@ export default function RingkasanGudep({ onNav }) {
             </ul>
           </div>
         )}
+        </>)}
       </section>
 
       <section aria-label="Rekap portofolio Garuda">

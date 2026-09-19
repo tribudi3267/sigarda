@@ -4,6 +4,7 @@ import { AMBANG_HADIR } from '../config';
 import { cariPoin, hitungProgres, laksanaTerbuka, layakGaruda, PERAN, tingkatSelesai } from '../lib/skuLogic';
 import { periodeDari, rekapAbsensi, sesiPeriode, tahunAjaranDari, PERIODE } from '../lib/absensiLogic';
 import { fmtTanggal, hariIni } from '../lib/format';
+import useAbsensiPeriode from '../hooks/useAbsensiPeriode';
 import { Badge, Icon, Kosong, Lencana, ProgressBar, TeksPoin } from '../components/ui';
 
 export default function PesertaBeranda({ setTab, setTingkat }) {
@@ -31,6 +32,7 @@ export default function PesertaBeranda({ setTab, setTingkat }) {
     const sesi = sesiPeriode(absensi, ta, periode);
     return { ta, periode, ...rekapAbsensi(absensi, [user], sesi)[0] };
   }, [absensi, user]);
+  const abs = useAbsensiPeriode(saya.ta, saya.periode); // semester berjalan sudah dimuat saat masuk
 
   const lihat = (tingkat) => {
     setTingkat(tingkat);
@@ -108,14 +110,14 @@ export default function PesertaBeranda({ setTab, setTingkat }) {
           <div>
             <h2 className="text-lg font-bold">Kehadiran latihan Jumat</h2>
             <p className="text-sm text-pramuka-600">
-              {PERIODE[saya.periode]} {saya.ta}: {saya.total ? `${saya.H} hadir dari ${saya.total} pertemuan` : 'belum ada pertemuan tercatat'}
+              {PERIODE[saya.periode]} {saya.ta}: {!abs.siap ? 'memuat kehadiran...' : saya.total ? `${saya.H} hadir dari ${saya.total} pertemuan` : 'belum ada pertemuan tercatat'}
             </p>
           </div>
           <button className="btn btn-outline btn-sm" onClick={() => setTab('absensi')}>
             <Icon nama="absensi" className="h-4 w-4" /> Lihat absensi
           </button>
         </div>
-        {saya.persen !== null && (
+        {abs.siap && saya.persen !== null && (
           <div className="mt-3">
             <div className="mb-1 flex justify-between text-sm">
               <span className={saya.persen < AMBANG_HADIR ? 'font-semibold text-red-700' : 'text-pramuka-700'}>

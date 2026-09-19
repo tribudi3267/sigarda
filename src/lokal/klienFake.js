@@ -33,13 +33,17 @@ const dariJson = (v) => (typeof v === 'string' ? JSON.parse(v) : v);
 
 async function jalankan(pg, konteks, sql, params = []) {
   if (!PERAN.has(konteks.role)) throw new Error(`peran tidak sah: ${konteks.role}`);
-  return pg.transaction(async (tx) => {
+  const hasil = await pg.transaction(async (tx) => {
     await tx.query("select set_config('request.jwt.claims', $1, true)", [
       JSON.stringify(konteks.sub ? { sub: konteks.sub, role: konteks.role } : { role: konteks.role }),
     ]);
     await tx.query(`set local role ${konteks.role}`);
     return tx.query(sql, params);
   });
+  // Penyimpanan idb:// milik PGlite menyimpan sebuah transaksi baru pada operasi berikutnya, sehingga tulisan terakhir
+  // sebelum halaman dimuat ulang bisa hilang. Sinkronkan sekarang (tidak berbuat apa-apa pada database di memori).
+  await pg.syncToFs?.();
+  return hasil;
 }
 
 const galat = (e) => ({ message: String(e?.message ?? e).replace(/^error:\s*/i, ''), code: e?.code });
@@ -56,6 +60,8 @@ class Bangun {
   }
   update(nilai) { this.op = 'update'; this.nilai = nilai; return this; }
   eq(k, v) { this.p.push(v); this.w.push(`${this.#id(k)} = $${this.p.length}`); return this; }
+  gte(k, v) { this.p.push(v); this.w.push(`${this.#id(k)} >= $${this.p.length}`); return this; }
+  lte(k, v) { this.p.push(v); this.w.push(`${this.#id(k)} <= $${this.p.length}`); return this; }
   in(k, arr) { this.p.push(parameter(arr)); this.w.push(`${this.#id(k)}::text = any($${this.p.length}::text[])`); return this; }
   order(k, { ascending = true } = {}) { this.urut.push(`${this.#id(k)} ${ascending ? 'asc' : 'desc'}`); return this; }
   range(a, b) { this.a = a; this.b = b; return this; }
@@ -77,7 +83,10 @@ class Bangun {
     const batas = ` limit ${Math.min(diminta, MAKS_BARIS_POSTGREST)} offset ${this.a ?? 0}`;
     const sql = `select coalesce(json_agg(t), '[]'::json) as data from (select ${this.kolom} from public.${this.tabel}${where}${urut}${batas}) t`;
     const res = await jalankan(this.pg, this.konteks, sql, this.p);
-    return dariJson(res.rows[0].data);
+    const baris = dariJson(res.rows[0].data);
+    // Catatan kueri untuk pengujian (mis. memastikan tahun lama tidak ikut dimuat). Hanya ada di backend lokal.
+    (globalThis.__kueriLokal ??= []).push({ tabel: this.tabel, p: [...this.p], dari: this.a ?? 0, n: baris.length });
+    return baris;
   }
 
   then(selesai, tolak) {
@@ -125,8 +134,10 @@ async function rpc(pg, konteks, nama, args = {}) {
     const sql = `select public.${nama}(${kunci.map((k, i) => `${IDENT.test(k) ? k : (() => { throw new Error('argumen tidak sah'); })()} => $${i + 1}`).join(', ')}) as hasil`;
     const res = await jalankan(pg, konteks, sql, kunci.map((k) => parameterRpc(args[k], tipe[k])));
     const nilai = res.rows[0]?.hasil;
+    (globalThis.__kueriLokal ??= []).push({ tabel: `rpc:${nama}`, p: kunci.map((k) => args[k]), n: 0 });
     return { data: nilai === '' || nilai === undefined ? null : nilai, error: null };
   } catch (e) {
+    (globalThis.__kueriLokal ??= []).push({ tabel: `rpc:${nama}`, p: kunci.map((k) => args[k]), n: -1, galat: String(e?.message ?? e) });
     return { data: null, error: galat(e) };
   }
 }
@@ -208,8 +219,9 @@ export function buatKlienFake(pg, penyimpan = null) {
     from: (tabel) => new Bangun(pg, konteks(), tabel),
     rpc: (nama, args) => rpc(pg, konteks(), nama, args),
     functions: {
-      async invoke(nama, { body } = {}) {
-        if (nama !== 'sigarda') return { data: null, error: { message: 'Fungsi tidak ditemukan' } };
+      // Backend lokal hanya punya satu fungsi, jadi nama apa pun dilayani. Nama sengaja tidak dicek: .env.local
+      // (VITE_NAMA_FUNGSI=nama-acak-dari-dashboard) ikut terbaca di mode lokal dan tidak boleh membuat login gagal.
+      async invoke(_nama, { body } = {}) {
         const hasil = await tangani(JSON.parse(JSON.stringify(body ?? {})), sesi?.access_token ? `Bearer ${sesi.access_token}` : 'Bearer anon', deps);
         return { data: JSON.parse(JSON.stringify(hasil)), error: null };
       },

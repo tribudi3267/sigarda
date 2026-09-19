@@ -199,6 +199,22 @@ export function Kosong({ judul, teks, children }) {
   );
 }
 
+/** Pengganti isi halaman selagi kehadiran satu periode dimuat dari server (lihat useAbsensiPeriode), atau bila gagal dimuat. */
+export function MuatAbsensi({ galat, coba }) {
+  if (galat) {
+    return (
+      <Kosong judul="Data absensi belum dapat dimuat" teks={galat}>
+        <button className="btn btn-primary btn-sm" onClick={coba}>Coba lagi</button>
+      </Kosong>
+    );
+  }
+  return (
+    <div role="status" aria-live="polite">
+      <Kosong judul="Memuat data absensi..." teks="Mengambil kehadiran periode yang dipilih dari server." />
+    </div>
+  );
+}
+
 export function Avatar({ nama, ukuran = 'h-10 w-10' }) {
   return (
     <span className={`inline-flex ${ukuran} shrink-0 items-center justify-center rounded-full bg-pramuka-700 text-sm font-bold text-emas-light`}>

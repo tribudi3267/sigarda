@@ -228,7 +228,20 @@ Klik dua kali [`Cadangkan-SIGARDA.bat`](Cadangkan-SIGARDA.bat) (tanpa Docker; ha
 Hasilnya di `%USERPROFILE%\Cadangan-SIGARDA\TAHUN-BULAN-TANGGAL_JAMMENIT\`: `sigarda-cadangan.sql` (akun login berikut hash PIN, dan seluruh data) serta `BACA-SAYA.txt`
 (cara memulihkan). Koneksi hanya-baca. Berkas ini rahasia: jangan diunggah ke GitHub. Sumber kode: [`scripts/cadangan/cadangkan.mjs`](scripts/cadangan/cadangkan.mjs).
 
-**Yang belum ditangani:** data dimuat penuh saat masuk (dibaca per 1000 baris); untuk ribuan Penegak aktif, pemuatan awal akan melambat dan perlu penyaringan per tahun ajaran.
+### Pemuatan data bertahap (agar tetap ringan)
+Absensi adalah data terbesar (satu baris per anggota per Jumat, ribuan baris per tahun). Karena itu saat masuk hanya dimuat **daftar sesi** (satu baris per Jumat, kecil)
+dan **kehadiran semester yang sedang berjalan**. Kehadiran tahun ajaran atau semester lain baru diminta ke server ketika pengguna memilihnya pada filter periode
+(tampil "Memuat data absensi..." sebentar), lalu disimpan di memori sehingga pilihan yang sama tidak diminta lagi. Berlaku untuk semua peran; Penegak hanya menerima barisnya sendiri.
+Periode tanpa satu pun sesi (mis. masa depan) tidak menghubungi server. Rincian: `useAbsensiPeriode` dan `pastikanAbsensi` di `src/hooks` dan `src/context/AppContext.jsx`.
+
+**Yang masih dimuat penuh saat masuk pengurus:** daftar anggota, progres SKU, dan portofolio (bukan data per tahun ajaran, jadi tidak bisa disaring per semester). Untuk ratusan sampai sekitar seribu Penegak ini masih wajar;
+bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota saat detailnya dibuka.
+
+### Memperbarui database yang sudah berjalan (migrasi)
+**Jangan menjalankan `supabase/skema.sql` ulang pada database yang sudah berisi data**: berkas itu menghapus semua tabel. Perubahan skema untuk database berjalan ada di folder
+[`supabase/migrasi/`](supabase/migrasi), dijalankan satu per satu di SQL Editor (aman diulang, tidak menyentuh data):
+- [`2026-09-rls-ringan.sql`](supabase/migrasi/2026-09-rls-ringan.sql): aturan baca (RLS) dihitung sekali per kueri, bukan sekali per baris. Pada 20 ribu baris progres, membaca milik sendiri turun dari sekitar 1 detik menjadi sekitar 7 milidetik (diukur di PGlite; angka di Supabase berbeda, arahnya sama).
+Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 
 ## Struktur folder
 
@@ -241,6 +254,7 @@ sku-bukateja/
 ├── supabase/
 │   ├── skema.sql                       (dibuat otomatis) tabel, RLS, fungsi sg_*, katalog. Dijalankan di SQL Editor
 │   ├── sumber/inti.sql                 sumber skema tanpa katalog (EDIT DI SINI, lalu npm run skema)
+│   ├── migrasi/                        perubahan skema untuk database yang SUDAH berisi data (jalankan berurutan, aman diulang)
 │   ├── admin_pertama.sql               profil admin pertama
 │   ├── pulihkan_pin_admin.sql          pemulihan PIN admin oleh pengelola Supabase
 │   ├── functions/sigarda/index.ts      Edge Function tunggal (login, akun, PIN, verifikasi penguji)
@@ -257,6 +271,7 @@ sku-bukateja/
     │   └── exportXlsx.js  exportLaporan.js  format.js
     ├── lokal/                          backend lokal: klien tiruan di atas PGlite, data contoh (bukan produksi)
     ├── context/AppContext.jsx          state global (salinan data sesuai izin) dan semua aksi
+    ├── hooks/useAbsensiPeriode.js      memuat kehadiran semester yang dipilih saat filter periode diubah
     ├── components/                     Layout, Footer, Login, FormGantiPin, ImportAnggotaModal, SkuChecklist, PratinjauDrive, ...
     └── pages/                          PesertaBeranda, PesertaSku, Materi, KelolaMateri, Absensi, ResetPin, AdminAnggota, ...
 ```

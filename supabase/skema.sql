@@ -237,25 +237,30 @@ alter table public.login_gagal enable row level security;   -- tanpa kebijakan: 
 
 -- Penegak melihat dirinya sendiri dan daftar penguji/admin; pengurus melihat semua.
 -- Profil sendiri selalu terbaca (aplikasi perlu tahu apakah PIN wajib diganti); selebihnya hanya setelah PIN diganti.
+--
+-- PERFORMA: fungsi peran dibungkus (select ...) supaya Postgres menghitungnya SEKALI per kueri (InitPlan),
+-- bukan sekali per baris. Tanpa pembungkus, pengurus yang membaca puluhan ribu baris memicu puluhan ribu
+-- panggilan fungsi plpgsql (masing-masing satu pencarian profil). Hasilnya identik, hanya jauh lebih murah.
+-- Perubahan ini ada juga sebagai migrasi mandiri di supabase/migrasi/2026-09-rls-ringan.sql (untuk database yang sudah berisi data).
 create policy baca_profil on public.profiles for select to authenticated
-  using (id = auth.uid() or role in ('penguji','admin') or sigarda.pengurus());
+  using (id = (select auth.uid()) or role in ('penguji','admin') or (select sigarda.pengurus()));
 
-create policy baca_katalog_butir on public.sku_butir for select to authenticated using (sigarda.aktif());
-create policy baca_katalog_unit on public.sku_unit for select to authenticated using (sigarda.aktif());
-create policy baca_katalog_pf on public.pf_item for select to authenticated using (sigarda.aktif());
-create policy baca_materi on public.materi for select to authenticated using (sigarda.aktif());
-create policy baca_sesi on public.absensi_sesi for select to authenticated using (sigarda.aktif());
+create policy baca_katalog_butir on public.sku_butir for select to authenticated using ((select sigarda.aktif()));
+create policy baca_katalog_unit on public.sku_unit for select to authenticated using ((select sigarda.aktif()));
+create policy baca_katalog_pf on public.pf_item for select to authenticated using ((select sigarda.aktif()));
+create policy baca_materi on public.materi for select to authenticated using ((select sigarda.aktif()));
+create policy baca_sesi on public.absensi_sesi for select to authenticated using ((select sigarda.aktif()));
 
 create policy baca_progres on public.sku_progress for select to authenticated
-  using (sigarda.aktif() and (peserta_id = auth.uid() or sigarda.pengurus()));
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
 create policy baca_riwayat on public.sku_riwayat for select to authenticated
-  using (sigarda.aktif() and (peserta_id = auth.uid() or sigarda.pengurus()));
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
 create policy baca_absensi on public.absensi_hadir for select to authenticated
-  using (sigarda.aktif() and (peserta_id = auth.uid() or sigarda.pengurus()));
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
 create policy baca_portofolio on public.portofolio for select to authenticated
-  using (sigarda.aktif() and (peserta_id = auth.uid() or sigarda.pengurus()));
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
 create policy baca_jurnal on public.portofolio_jurnal for select to authenticated
-  using (sigarda.aktif() and (peserta_id = auth.uid() or sigarda.pengurus()));
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
 
 -- ---------------------------------------------------------------------------
 -- 4. Fungsi aksi (RPC). Semua memeriksa peran di server.

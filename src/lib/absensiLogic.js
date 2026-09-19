@@ -64,6 +64,40 @@ export function rentangPeriode(tahunAjaran, periode) {
   return { mulai: ganjil.mulai, akhir: genap.akhir };
 }
 
+/* ---------------------- Pemuatan kehadiran per semester ----------------------
+ * Daftar sesi (satu baris per Jumat) selalu dimuat penuh, tetapi catatan kehadiran (satu baris per anggota per Jumat,
+ * jadi ribuan baris per tahun) dimuat per SEMESTER dan hanya bila diperlukan. Sebuah semester dikenali dengan kunci
+ * "2026/2027|ganjil". absensi.hadir[tanggal] hanya ada untuk tanggal pada semester yang sudah dimuat.
+ */
+export const kunciSemester = (tahunAjaran, periode) => `${tahunAjaran}|${periode}`;
+
+/** Kunci semester yang memuat tanggal ini. */
+export const semesterDari = (iso) => kunciSemester(tahunAjaranDari(iso), periodeDari(iso));
+
+/** Semester yang harus dimuat untuk sebuah pilihan periode ('setahun' = ganjil dan genap). */
+export function daftarSemester(tahunAjaran, periode) {
+  const daftar = periode === 'setahun' ? ['ganjil', 'genap'] : [periode];
+  return daftar.map((p) => kunciSemester(tahunAjaran, p));
+}
+
+export function rentangKunci(kunci) {
+  const [ta, periode] = kunci.split('|');
+  return rentangPeriode(ta, periode);
+}
+
+/**
+ * Menyusun absensi baru: `sesi` diganti seluruhnya, kehadiran pada semester-semester `daftarKunci` diganti dengan
+ * `hadirBaru`, kehadiran semester lain dibiarkan. Tanggal sesi pada semester itu tanpa catatan menjadi {}.
+ */
+export function gabungHadirSemester(absensi, sesiBaru, daftarKunci, hadirBaru) {
+  const rentang = daftarKunci.map(rentangKunci);
+  const dalam = (t) => rentang.some((r) => t >= r.mulai && t <= r.akhir);
+  const hadir = {};
+  for (const [t, v] of Object.entries(absensi?.hadir ?? {})) if (!dalam(t) && sesiBaru[t]) hadir[t] = v;
+  for (const t of Object.keys(sesiBaru)) if (dalam(t)) hadir[t] = hadirBaru[t] ?? {};
+  return { sesi: sesiBaru, hadir };
+}
+
 /** Hari Jumat terakhir pada atau sebelum tanggal ini. */
 export function jumatTerakhir(iso) {
   const d = new Date(`${iso}T00:00:00`);

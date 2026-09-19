@@ -9,7 +9,8 @@ import { unduhAbsensiXlsx } from '../lib/exportLaporan';
 import { fmtHariTanggal, fmtTglPendek, hariIni } from '../lib/format';
 import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
 import PilihPeriode, { periodeAwal } from '../components/PilihPeriode';
-import { Avatar, BadgeAbsen, BadgePeran, Icon, Kosong, ProgressBar } from '../components/ui';
+import useAbsensiPeriode from '../hooks/useAbsensiPeriode';
+import { Avatar, BadgeAbsen, BadgePeran, Icon, Kosong, MuatAbsensi, ProgressBar } from '../components/ui';
 
 const KOTAK = 'inline-flex h-6 w-6 items-center justify-center rounded text-xs font-bold ring-1 ring-inset';
 
@@ -28,6 +29,7 @@ function Angka({ nilai, label, ket }) {
 export function AbsensiPeserta() {
   const { user, absensi } = useApp();
   const [per, setPer] = useState(periodeAwal);
+  const abs = useAbsensiPeriode(per.ta, per.periode);
 
   const sesi = sesiPeriode(absensi, per.ta, per.periode);
   const saya = rekapAbsensi(absensi, [user], sesi)[0];
@@ -42,6 +44,7 @@ export function AbsensiPeserta() {
         <PilihPeriode nilai={per} ubah={setPer} />
       </div>
 
+      {!abs.siap ? <MuatAbsensi galat={abs.galat} coba={abs.coba} /> : (<>
       <section className="panel mb-5 grid grid-cols-2 divide-pramuka-100 md:grid-cols-5 md:divide-x">
         <Angka nilai={saya.H} label="Hadir" />
         <Angka nilai={saya.I} label="Izin" />
@@ -74,6 +77,7 @@ export function AbsensiPeserta() {
           ))}
         </ul>
       )}
+      </>)}
     </div>
   );
 }
@@ -102,6 +106,7 @@ function InputAbsensi() {
   // Tahun ajaran dan semester dihitung dari tanggal, sehingga berlaku untuk tahun berapa pun
   const ta = valid ? tahunAjaranDari(tanggal) : '';
   const periode = valid ? periodeDari(tanggal) : '';
+  const abs = useAbsensiPeriode(ta, periode); // kehadiran semester dari tanggal terpilih (tahun lama dimuat saat dipilih)
   const tanggalLain = valid && !jumat ? { sebelum: jumatBerdekatan(tanggal, -1), sesudah: jumatBerdekatan(tanggal, 1) } : null;
   const jumatBerikut = valid ? jumatBerdekatan(tanggal, 1) : '';
 
@@ -215,7 +220,9 @@ function InputAbsensi() {
         </Kosong>
       )}
 
-      {bisaCatat && sesi && (
+      {bisaCatat && sesi && !abs.siap && <MuatAbsensi galat={abs.galat} coba={abs.coba} />}
+
+      {bisaCatat && sesi && abs.siap && (
         <>
           <section className="panel mb-4 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -295,6 +302,7 @@ function RekapAbsensi() {
   const [filter, setFilter] = useState(FILTER_AWAL);
   const [tampil, setTampil] = useState('ringkas');
   const [mengunduh, setMengunduh] = useState(false);
+  const abs = useAbsensiPeriode(per.ta, per.periode);
 
   const sesiList = useMemo(() => sesiPeriode(absensi, per.ta, per.periode), [absensi, per]);
   const rekap = useMemo(() => {
@@ -321,12 +329,13 @@ function RekapAbsensi() {
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <PilihPeriode nilai={per} ubah={setPer} />
-        <button className="btn btn-gold btn-sm" onClick={unduh} disabled={mengunduh || rekap.length === 0}>
+        <button className="btn btn-gold btn-sm" onClick={unduh} disabled={mengunduh || !abs.siap || rekap.length === 0}>
           <Icon nama="unduh" className="h-4 w-4" /> {mengunduh ? 'Menyiapkan...' : 'Unduh Excel (.xlsx)'}
         </button>
       </div>
       <div className="mb-4"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} /></div>
 
+      {!abs.siap ? <MuatAbsensi galat={abs.galat} coba={abs.coba} /> : (<>
       <section className="panel mb-4 grid grid-cols-2 divide-pramuka-100 md:grid-cols-4 md:divide-x">
         <Angka nilai={ringkas.pertemuan} label="Pertemuan terlaksana" ket={`${PERIODE[per.periode]} ${per.ta}`} />
         <Angka nilai={ringkas.rata === null ? '-' : `${ringkas.rata}%`} label="Rata-rata kehadiran" />
@@ -437,6 +446,7 @@ function RekapAbsensi() {
       <p className="mt-2 text-xs text-pramuka-500">
         H hadir, I izin, S sakit, A alpa, ? belum dicatat pengurus (tidak dihitung pada persentase).
       </p>
+      </>)}
     </div>
   );
 }

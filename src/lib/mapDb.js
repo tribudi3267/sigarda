@@ -9,6 +9,7 @@
  *   progress[pesertaId][skuId]     { status, jadwal, pengujiId, tanggalUji, nilai, catatan, catatanPeserta,
  *                                    verifikasi, diverifikasiPada, riwayat:[{waktu,teks,oleh}] }
  *   absensi                        { sesi:{[tgl]:{tanggal,dibuatOleh,dibuatPada}}, hadir:{[tgl]:{[id]:{status,waktu,oleh}}} }
+ *                                  sesi = semua tanggal; hadir[tgl] hanya ada untuk semester yang sudah dimuat (lihat AppContext)
  *   portofolio[pesertaId][itemId]  { status, catatan, tautan, catatanPenguji, catatanPengujiOleh, diperbarui, riwayat }
  *   materi[]                       { id, urutan, judul, deskripsi, tautan, fileId, resourceKey, butir, bagian, dibuat, dibuatOleh }
  */
@@ -61,19 +62,30 @@ export function susunProgress(baris = [], riwayat = []) {
   return hasil;
 }
 
-export function susunAbsensi(sesi = [], hadir = []) {
-  const hasil = { sesi: {}, hadir: {} };
+/** baris absensi_sesi -> { [tanggal]: { tanggal, dibuatOleh, dibuatPada } } */
+export function susunSesi(sesi = []) {
+  const hasil = {};
   for (const s of sesi) {
     const t = tgl(s.tanggal);
-    hasil.sesi[t] = { tanggal: t, dibuatOleh: s.dibuat_oleh ?? null, dibuatPada: s.dibuat_pada };
-    hasil.hadir[t] = {};
-  }
-  for (const h of hadir) {
-    const t = tgl(h.tanggal);
-    if (!hasil.hadir[t]) continue; // sesi sudah dihapus
-    hasil.hadir[t][h.peserta_id] = { status: h.status, waktu: h.waktu, oleh: h.oleh ?? null };
+    hasil[t] = { tanggal: t, dibuatOleh: s.dibuat_oleh ?? null, dibuatPada: s.dibuat_pada };
   }
   return hasil;
+}
+
+/** baris absensi_hadir -> { [tanggal]: { [pesertaId]: { status, waktu, oleh } } } (hanya tanggal yang punya baris) */
+export function susunHadir(hadir = []) {
+  const hasil = {};
+  for (const h of hadir) {
+    (hasil[tgl(h.tanggal)] ??= {})[h.peserta_id] = { status: h.status, waktu: h.waktu, oleh: h.oleh ?? null };
+  }
+  return hasil;
+}
+
+/** Sesi dan seluruh kehadirannya sekaligus (dipakai pengujian dan data awal). */
+export function susunAbsensi(sesi = [], hadir = []) {
+  const s = susunSesi(sesi);
+  const h = susunHadir(hadir);
+  return { sesi: s, hadir: Object.fromEntries(Object.keys(s).map((t) => [t, h[t] ?? {}])) };
 }
 
 export function susunPortofolio(baris = [], jurnal = []) {

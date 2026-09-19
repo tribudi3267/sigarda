@@ -2,7 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { ambilKlien, GALAT_KONFIGURASI, LOKAL } from '../lib/supabaseClient';
 import { buatApi } from '../lib/api';
 import { pesertaDenganPeran } from '../lib/skuLogic';
-import { adalahJumat, tanggalValid, KODE_STATUS } from '../lib/absensiLogic';
+import {
+  adalahJumat, daftarSemester, gabungHadirSemester, KODE_STATUS, rentangKunci, semesterDari, tanggalValid,
+} from '../lib/absensiLogic';
 import { bolehResetPin, validasiPinBaru } from '../lib/pinLogic';
 import { periksaBaris } from '../lib/importAnggota';
 import { bolehKelolaMateri, validasiMateri } from '../lib/materiLogic';
@@ -16,6 +18,11 @@ import { hariIni } from '../lib/format';
  *   db = { users, progress, absensi, portofolio, materi }   (lihat src/lib/mapDb.js)
  * Setiap aksi memanggil server lebih dulu, lalu menyegarkan bagian data yang terpengaruh.
  * Aksi mengembalikan { ok, pesan, ... } dan tidak pernah melempar galat ke halaman.
+ *
+ * KEHADIRAN DIMUAT BERTAHAP. Saat masuk hanya daftar sesi (kecil) dan kehadiran SEMESTER AKTIF yang dimuat. Semester lain
+ * (tahun ajaran sebelumnya, atau semester yang tidak sedang berjalan) dimuat ketika halaman memintanya lewat
+ * pastikanAbsensi(tahunAjaran, periode), biasanya dari hook useAbsensiPeriode. `semesterSiap` mencatat semester yang sudah
+ * dimuat; halaman tidak boleh menghitung rekap untuk semester yang belum siap (hasilnya menyesatkan: semua "belum dicatat").
  */
 const Ctx = createContext(null);
 
@@ -41,10 +48,16 @@ export function AppProvider({ children }) {
   const [galatMuat, setGalatMuat] = useState('');
   const [sesiId, setSesiId] = useState(null);
   const [db, setDb] = useState(DB_KOSONG);
+  const [semesterSiap, setSemesterSiap] = useState({}); // { 'TA|periode': true } = kehadiran semester itu sudah dimuat
   const [toast, setToast] = useState(null);
   const apiRef = useRef(null);
   const lokalRef = useRef(null);
   const terakhirMuat = useRef(0);
+  const semesterRef = useRef(new Set());        // salinan semesterSiap yang selalu mutakhir (untuk dipakai di dalam callback)
+  const semesterSedangMuat = useRef(new Map()); // kunci -> janji, agar permintaan yang sama tidak diulang bersamaan
+  const generasi = useRef(0);                   // naik tiap keluar/sesi berakhir; hasil muat lama diabaikan
+  const sesiRef = useRef({});                   // daftar sesi terkini (untuk dipakai di dalam callback)
+  sesiRef.current = db.absensi.sesi;
 
   const notify = useCallback((pesan, tipe = 'ok') => setToast({ pesan, tipe, id: Date.now() }), []);
   useEffect(() => {
@@ -63,23 +76,85 @@ export function AppProvider({ children }) {
   /* ------------------------- Memuat dan menyegarkan ------------------------- */
   const api = () => apiRef.current;
 
+  /** Mengosongkan seluruh salinan data (keluar atau sesi berakhir). */
+  const kosongkan = useCallback(() => {
+    generasi.current += 1;
+    semesterRef.current = new Set();
+    semesterSedangMuat.current = new Map();
+    setSemesterSiap({});
+    setDb(DB_KOSONG);
+  }, []);
+
   const sesiBerakhir = useCallback(async () => {
     await api()?.keluar();
     setSesiId(null);
-    setDb(DB_KOSONG);
+    kosongkan();
     notify('Sesi berakhir. Masuk kembali.', 'err');
-  }, [notify]);
+  }, [notify, kosongkan]);
 
-  /** Memuat seluruh data yang boleh dibaca pengguna ini. */
+  const tandaiSiap = (daftarKunci) => {
+    for (const k of daftarKunci) semesterRef.current.add(k);
+    setSemesterSiap(Object.fromEntries([...semesterRef.current].map((k) => [k, true])));
+  };
+
+  /**
+   * Memuat data yang boleh dibaca pengguna ini. Kehadiran hanya untuk semester aktif ditambah semester yang sebelumnya
+   * sudah dibuka (agar penyegaran tidak membuat data yang sedang dilihat kembali kosong).
+   */
   const muatSemua = useCallback(async () => {
     const a = api();
-    const [u, p, ab, pf, m] = await Promise.all([a.muatProfil(), a.muatProgress(), a.muatAbsensi(), a.muatPortofolio(), a.muatMateri()]);
-    const gagal = [u, p, ab, pf, m].find((r) => !r.ok);
+    const mulaiGenerasi = generasi.current;
+    const daftarKunci = [...new Set([semesterDari(hariIni()), ...semesterRef.current])];
+    const [u, p, sesi, pf, m, ...hadir] = await Promise.all([
+      a.muatProfil(), a.muatProgress(), a.muatSesiAbsen(), a.muatPortofolio(), a.muatMateri(),
+      ...daftarKunci.map((k) => { const r = rentangKunci(k); return a.muatHadirRentang(r.mulai, r.akhir); }),
+    ]);
+    const gagal = [u, p, sesi, pf, m, ...hadir].find((r) => !r.ok);
     if (gagal) return gagal;
-    setDb({ users: u.data, progress: p.data, absensi: ab.data, portofolio: pf.data, materi: m.data });
+    if (mulaiGenerasi !== generasi.current) return { ok: true }; // pengguna sudah keluar selagi memuat
+    const hadirGabung = Object.assign({}, ...hadir.map((h) => h.data));
+    setDb((d) => ({
+      users: u.data, progress: p.data, portofolio: pf.data, materi: m.data,
+      absensi: gabungHadirSemester(d.absensi, sesi.data, daftarKunci, hadirGabung),
+    }));
+    tandaiSiap(daftarKunci);
     terakhirMuat.current = Date.now();
     return { ok: true };
   }, []);
+
+  /**
+   * Memastikan kehadiran untuk tahun ajaran dan periode ini sudah dimuat (permintaan berikutnya sesudah pilihan filter).
+   * Idempoten: semester yang sudah siap tidak diminta lagi, dan permintaan yang sedang berjalan dipakai bersama.
+   */
+  const pastikanAbsensi = useCallback(async (tahunAjaran, periode) => {
+    const belum = daftarSemester(tahunAjaran, periode).filter((k) => !semesterRef.current.has(k));
+    if (!belum.length) return { ok: true };
+    // Semester tanpa satu pun sesi (mis. masa depan) tidak punya kehadiran: tidak perlu bertanya ke server.
+    const adaSesi = (k) => { const r = rentangKunci(k); return Object.keys(sesiRef.current).some((t) => t >= r.mulai && t <= r.akhir); };
+    const kosong = belum.filter((k) => !adaSesi(k));
+    if (kosong.length) tandaiSiap(kosong);
+    const perluMuat = belum.filter(adaSesi);
+    if (!perluMuat.length) return { ok: true };
+    const mulaiGenerasi = generasi.current;
+    const hasil = await Promise.all(perluMuat.map((k) => {
+      if (!semesterSedangMuat.current.has(k)) {
+        const r = rentangKunci(k);
+        const janji = api().muatHadirRentang(r.mulai, r.akhir).then((res) => {
+          semesterSedangMuat.current.delete(k);
+          if (res.ok && mulaiGenerasi === generasi.current) {
+            setDb((d) => ({ ...d, absensi: gabungHadirSemester(d.absensi, d.absensi.sesi, [k], res.data) }));
+            tandaiSiap([k]);
+          }
+          return res;
+        });
+        semesterSedangMuat.current.set(k, janji);
+      }
+      return semesterSedangMuat.current.get(k);
+    }));
+    const gagal = hasil.find((r) => !r.ok);
+    if (gagal?.sesiBerakhir) await sesiBerakhir();
+    return gagal ?? { ok: true };
+  }, [sesiBerakhir]);
 
   const mulaiSesi = useCallback(async (id) => {
     const r = await muatSemua();
@@ -171,7 +246,7 @@ export function AppProvider({ children }) {
   const logout = async () => {
     await api()?.keluar();
     setSesiId(null);
-    setDb(DB_KOSONG);
+    kosongkan();
   };
 
   /* ------------------------------ Kelola PIN ------------------------------ */
@@ -407,7 +482,7 @@ export function AppProvider({ children }) {
     login, logout,
     ajukan, batalkanAjuan, catatHasil,
     daftarCalonGaruda, ubahPortofolio, catatPortofolioPenguji,
-    buatSesiAbsen, setStatusAbsen, tandaiBanyakAbsen, hapusSesiAbsen,
+    buatSesiAbsen, setStatusAbsen, tandaiBanyakAbsen, hapusSesiAbsen, semesterSiap, pastikanAbsensi,
     gantiPin, resetPin,
     simpanAnggota, imporAnggota, hapusAnggota,
     muatUlang: muatSemua,
