@@ -1,0 +1,149 @@
+import { useMemo, useState } from 'react';
+import { useApp } from '../context/AppContext';
+import { antrianPengujian, hitungProgres } from '../lib/skuLogic';
+import { fmtTanggal } from '../lib/format';
+import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
+import RingkasanGudep from '../components/RingkasanGudep';
+import UjiModal from '../components/UjiModal';
+import { Avatar, Badge, BadgePeran, Icon, Kosong, ProgressBar, TeksPoin } from '../components/ui';
+
+function Dashboard({ onNav }) {
+  const { user, users, progress } = useApp();
+  const antrian = antrianPengujian(progress, users, user.id);
+  const menunggu = antrian.filter((a) => a.entry.status === 'diajukan').length;
+
+  return (
+    <div className="animasi-naik">
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold">Dashboard {user.jabatan}</h1>
+        <p className="text-sm text-pramuka-600">Ringkasan SKU, absensi latihan Jumat, dan jurnal portofolio Garuda.</p>
+      </div>
+
+      <section className="jahitan mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white p-4">
+        <div>
+          <p className="font-semibold text-pramuka-900">Antrian pengujian SKU</p>
+          <p className="text-sm text-pramuka-600">
+            {menunggu} menunggu, {antrian.length - menunggu} sedang diuji (ditujukan kepada Anda)
+          </p>
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={() => onNav('antrian')}>Buka antrian</button>
+      </section>
+
+      <RingkasanGudep onNav={onNav} />
+    </div>
+  );
+}
+
+function Antrian({ onBuka }) {
+  const { user, users, progress } = useApp();
+  const [semua, setSemua] = useState(false);
+  const [uji, setUji] = useState(null);
+
+  const antrian = antrianPengujian(progress, users, semua ? null : user.id);
+  const menunggu = antrian.filter((a) => a.entry.status === 'diajukan').length;
+
+  return (
+    <div className="animasi-naik">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Antrian pengujian</h1>
+          <p className="text-sm text-pramuka-600">
+            {menunggu} menunggu, {antrian.length - menunggu} sedang diuji
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-sm font-medium text-pramuka-700">
+          <input type="checkbox" className="h-4 w-4 accent-pramuka-800" checked={semua} onChange={(e) => setSemua(e.target.checked)} />
+          Tampilkan semua penguji
+        </label>
+      </div>
+
+      {antrian.length === 0 ? (
+        <Kosong judul="Antrian kosong" teks="Belum ada peserta yang mengajukan pengujian kepada Anda." />
+      ) : (
+        <ul className="panel divide-y divide-pramuka-100">
+          {antrian.map(({ peserta, poin, entry }) => (
+            <li key={`${peserta.id}-${poin.id}`} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 flex-1 gap-3">
+                <Avatar nama={peserta.nama} />
+                <div className="min-w-0">
+                  <p className="font-semibold">{peserta.nama}</p>
+                  <p className="text-xs text-pramuka-500">Kelas {peserta.kelas}, {peserta.sangga}, SKU {poin.tingkat}</p>
+                  <div className="mt-1"><TeksPoin poin={poin} /></div>
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-pramuka-600">
+                    <Badge status={entry.status} />
+                    <Icon nama="kalender" className="h-3.5 w-3.5" />
+                    {fmtTanggal(entry.jadwal ?? entry.tanggalUji)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button className="btn btn-primary btn-sm" onClick={() => setUji({ pesertaId: peserta.id, poin })}>Nilai</button>
+                <button className="btn btn-outline btn-sm" onClick={() => onBuka(peserta.id)}>Lihat peserta</button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {uji && <UjiModal pesertaId={uji.pesertaId} poin={uji.poin} onTutup={() => setUji(null)} />}
+    </div>
+  );
+}
+
+function DaftarPeserta({ onBuka }) {
+  const { daftarPeserta, progress } = useApp();
+  const [filter, setFilter] = useState(FILTER_AWAL);
+
+  const daftar = useMemo(
+    () => terapkanFilter(daftarPeserta, filter).sort((a, b) => a.nama.localeCompare(b.nama, 'id')),
+    [daftarPeserta, filter]
+  );
+
+  return (
+    <div className="animasi-naik">
+      <h1 className="mb-1 text-2xl font-bold">Peserta</h1>
+      <p className="mb-4 text-sm text-pramuka-600">{daftar.length} peserta ditemukan</p>
+      <div className="mb-4"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'peran', 'agama']} /></div>
+
+      {daftar.length === 0 ? (
+        <Kosong judul="Tidak ada peserta" teks="Ubah kata kunci, sangga, kelas, peran, atau agama pada filter." />
+      ) : (
+        <ul className="panel divide-y divide-pramuka-100">
+          {daftar.map((u) => {
+            const b = hitungProgres(progress, u, 'Bantara');
+            const l = hitungProgres(progress, u, 'Laksana');
+            return (
+              <li key={u.id}>
+                <button onClick={() => onBuka(u.id)} className="flex w-full items-center gap-3 p-4 text-left hover:bg-pramuka-50">
+                  <Avatar nama={u.nama} />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold">{u.nama}</p>
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-pramuka-500">
+                      Kelas {u.kelas}, {u.sangga}, {u.agama} <BadgePeran peran={u.peran} singkat />
+                    </p>
+                    <div className="mt-2 grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="mb-1 text-xs text-pramuka-600">Bantara {b.lulus}/{b.total} ({b.persen}%)</p>
+                        <ProgressBar persen={b.persen} label={`Bantara ${u.nama}`} />
+                      </div>
+                      <div>
+                        <p className="mb-1 text-xs text-pramuka-600">Laksana {l.lulus}/{l.total} ({l.persen}%)</p>
+                        <ProgressBar persen={l.persen} label={`Laksana ${u.nama}`} />
+                      </div>
+                    </div>
+                  </div>
+                  <Icon nama="panah" className="h-5 w-5 shrink-0 text-pramuka-400" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export default function PengujiDashboard({ mode, onBuka, onNav }) {
+  if (mode === 'dashboard') return <Dashboard onNav={onNav} />;
+  return mode === 'antrian' ? <Antrian onBuka={onBuka} /> : <DaftarPeserta onBuka={onBuka} />;
+}

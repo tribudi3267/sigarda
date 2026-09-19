@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-pramuka-50 font-sans text-pramuka-900 antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-lg border border-pramuka-200 bg-white;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emas focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+  .btn-primary {
+    @apply bg-pramuka-800 text-pramuka-50 hover:bg-pramuka-900;
+  }
+  .btn-gold {
+    @apply bg-emas text-pramuka-900 hover:bg-emas-light;
+  }
+  .btn-outline {
+    @apply border border-pramuka-300 bg-white text-pramuka-800 hover:bg-pramuka-100;
+  }
+  .btn-danger {
+    @apply bg-red-700 text-white hover:bg-red-800;
+  }
+  .input {
+    @apply w-full rounded-lg border border-pramuka-300 bg-white px-3.5 py-2.5 text-sm placeholder:text-pramuka-400 focus:border-emas focus:outline-none focus:ring-2 focus:ring-emas/40;
+  }
+  .label {
+    @apply mb-1 block text-sm font-semibold text-pramuka-700;
+  }
+  /* Garis jahitan emas: motif jahitan seragam Pramuka */
+  .jahitan {
+    @apply border border-dashed border-emas/70;
+  }
+}
+
+.print-only {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes naik {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animasi-naik {
+  animation: naik 0.22s ease-out;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  .print-area {
+    min-width: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
