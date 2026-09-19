@@ -36,7 +36,9 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
-          VITE_BASE: /${{ github.event.repository.name }}/
+          # Situs dilayani dari akar domain khusus (sigarda.smabukateja.sch.id), jadi base "/".
+          # Tanpa domain khusus (tribudi3267.github.io/sigarda/) ganti menjadi: /${{ github.event.repository.name }}/
+          VITE_BASE: /
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

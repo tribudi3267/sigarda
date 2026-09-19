@@ -205,6 +205,11 @@ Berkas `.github/workflows/deploy.yml` membangun dan menerbitkan otomatis setiap 
 3. `git push`. Pantau tab **Actions**. Bila variabel belum diisi, proses berhenti dengan pesan yang jelas (situs lama tetap tampil).
 4. Alamat situs: `https://NAMAAKUN.github.io/NAMAREPO/`.
 
+**Domain khusus** (mis. `sigarda.smabukateja.sch.id`): di **Settings > Pages > Custom domain** isi domainnya dan centang **Enforce HTTPS**; di DNS domain buat rekaman
+`CNAME` untuk subdomain itu yang menunjuk ke `NAMAAKUN.github.io`. Situs lalu dilayani dari akar domain, sehingga `VITE_BASE` di `deploy.yml` harus `/`
+(bukan `/NAMAREPO/`). Bila keliru, halaman tampil **putih kosong** karena berkas JS/CSS dicari di `/NAMAREPO/assets/...` yang tidak ada di domain khusus.
+Setelah domain khusus aktif, alamat `github.io/NAMAREPO/` otomatis dialihkan ke domain khusus.
+
 Kunci anon memang terlihat di browser; ini aman karena semua data dilindungi aturan akses (RLS) di database.
 
 ## Keamanan: cara kerja dan batasnya
