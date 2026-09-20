@@ -8,7 +8,8 @@
     "dev:lokal": "vite --mode lokal",
     "build": "vite build",
     "preview": "vite preview",
-    "skema": "node scripts/buat-skema.mjs"
+    "skema": "node scripts/buat-skema.mjs",
+    "uji": "node uji/jalankan.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",
@@ -21,6 +22,7 @@
     "@electric-sql/pglite": "^0.5.8",
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
+    "esbuild": "^0.21.5",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
     "vite": "^5.4.10"

@@ -359,6 +359,9 @@ sku-bukateja/
 ├── .github/workflows/deploy.yml        terbit otomatis ke GitHub Pages
 ├── scripts/buat-skema.mjs              membuat supabase/skema.sql (menyisipkan katalog butir dari src/data)
 ├── scripts/instrumen-ke-sql.mjs        Excel instrumen penilaian -> SQL pemuat isi (isinya sendiri TIDAK di repositori)
+├── scripts/migrasi/                    penyusun berkas migrasi dari blok bermarka di inti.sql (bantu.mjs + contoh 2026-09-iuran.mjs)
+├── uji/                                pengujian otomatis (npm run uji), Postgres sungguhan lewat PGlite
+├── CLAUDE.md                           panduan singkat untuk asisten pemrograman (aturan kerja, arsitektur, konvensi)
 ├── supabase/
 │   ├── skema.sql                       (dibuat otomatis) tabel, RLS, fungsi sg_*, katalog. Dijalankan di SQL Editor
 │   ├── sumber/inti.sql                 sumber skema tanpa katalog (EDIT DI SINI, lalu npm run skema)
@@ -391,6 +394,7 @@ sku-bukateja/
 Skema SQL dan logika Edge Function dijalankan pada Postgres sungguhan (PGlite) dengan klien tiruan yang meniru peran Supabase, RLS, dan batas 1000 baris.
 Yang diuji: siapa boleh membaca apa, penulisan langsung ditolak untuk semua peran, semua fungsi `sg_*` (aturan SKU, absensi, portofolio, materi, anggota),
 hak reset PIN, pembatasan login, kewajiban ganti PIN, dan pemetaan data ke bentuk yang dipakai halaman.
+Jalankan semuanya dengan `npm run uji` (atau sebagian: `npm run uji -- iuran api`; `PENUH=40` menampilkan 40 baris terakhir keluaran). Berkas pengujian ada di [`uji/`](uji); pengujian migrasi memakai skema lama dari riwayat git. Pengujian `instrumen` dilewati kecuali `ISI_INSTRUMEN` menunjuk berkas SQL isi instrumen (rahasia, tidak ada di repositori).
 Yang **tidak** dapat diuji tanpa proyek Supabase sungguhan: perilaku GoTrue (mis. penerimaan email `.invalid`), PostgREST, dan runtime Deno. Gunakan "Uji cepat" di atas setelah pemasangan.
 
 ### Data demo untuk pengujian di Supabase
