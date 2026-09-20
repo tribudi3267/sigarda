@@ -102,6 +102,8 @@ create table public.sku_progress (
   primary key (peserta_id, sku_id)
 );
 create unique index on public.sku_progress (verifikasi_token) where verifikasi_token is not null;
+-- Pencarian kode pendek VRF- pada halaman verifikasi publik (sg_verifikasi_kode). Tidak unik: kode 28 bit berasal dari hash dan dapat kembar.
+create index sku_progress_verifikasi_idx on public.sku_progress (verifikasi) where verifikasi is not null;
 create table public.sku_riwayat (
   id bigint generated always as identity primary key,
   peserta_id uuid not null references public.profiles(id) on delete cascade,
