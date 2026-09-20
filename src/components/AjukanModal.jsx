@@ -6,7 +6,8 @@ import { Field, Modal, TeksPoin } from './ui';
 /** Peserta mengagendakan setoran/pengujian satu poin SKU. */
 export default function AjukanModal({ poin, onTutup }) {
   const { users, ajukan } = useApp();
-  const daftarPenguji = users.filter((u) => u.role === 'penguji');
+  // Butir agama hanya diuji Pembina (aturan yang sama ditegakkan di server)
+  const daftarPenguji = users.filter((u) => u.role === 'penguji' && (!poin.agama || u.jabatan === 'Pembina'));
 
   const [jadwal, setJadwal] = useState(hariIni());
   const [pengujiId, setPengujiId] = useState(daftarPenguji[0]?.id ?? '');
@@ -44,7 +45,7 @@ export default function AjukanModal({ poin, onTutup }) {
         <input id="jadwal" type="date" className="input" min={hariIni()} value={jadwal} onChange={(e) => setJadwal(e.target.value)} />
       </Field>
 
-      <Field label="Penguji (Pembina atau Dewan Ambalan)" htmlFor="penguji">
+      <Field label={poin.agama ? 'Penguji (Pembina)' : 'Penguji (Pembina atau Dewan Ambalan)'} htmlFor="penguji" bantuan={poin.agama ? 'Butir agama hanya diuji oleh Pembina.' : undefined}>
         <select id="penguji" className="input" value={pengujiId} onChange={(e) => setPengujiId(e.target.value)}>
           {daftarPenguji.map((u) => (
             <option key={u.id} value={u.id}>{u.nama}{u.jabatan ? `, ${u.jabatan}` : ''}</option>

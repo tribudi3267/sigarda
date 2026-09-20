@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { antrianPengujian, hitungProgres } from '../lib/skuLogic';
+import { PESAN_BUTIR_AGAMA, antrianPengujian, bolehMenilaiPoin, hitungProgres } from '../lib/skuLogic';
 import { fmtTanggal } from '../lib/format';
 import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
 import RingkasanGudep from '../components/RingkasanGudep';
@@ -77,7 +77,14 @@ function Antrian({ onBuka }) {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button className="btn btn-primary btn-sm" onClick={() => setUji({ pesertaId: peserta.id, poin })}>Nilai</button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  disabled={!bolehMenilaiPoin(user, poin)}
+                  title={bolehMenilaiPoin(user, poin) ? undefined : PESAN_BUTIR_AGAMA}
+                  onClick={() => setUji({ pesertaId: peserta.id, poin })}
+                >
+                  Nilai
+                </button>
                 <button className="btn btn-outline btn-sm" onClick={() => onBuka(peserta.id)}>Lihat peserta</button>
               </div>
             </li>

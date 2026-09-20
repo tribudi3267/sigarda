@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { hitungProgres, laksanaTerbuka } from '../lib/skuLogic';
+import { bolehMenilaiPoin, hitungProgres, laksanaTerbuka } from '../lib/skuLogic';
 import SkuChecklist from '../components/SkuChecklist';
 import TingkatTabs from '../components/TingkatTabs';
 import UjiModal from '../components/UjiModal';
@@ -21,6 +21,7 @@ export default function PesertaDetail({ pesertaId, onKembali, onCetak, onBukaPor
 
   const renderAksi = (poin, entry) => {
     if (!bisaMenguji) return null;
+    if (!bolehMenilaiPoin(user, poin)) return <span className="text-xs font-semibold text-pramuka-500">Butir agama dinilai Pembina</span>;
     const terkunci = poin.tingkat === 'Laksana' && !laksanaBuka && entry.status !== 'lulus';
     return (
       <button

@@ -129,7 +129,7 @@ from demo_id d
 join public.sku_unit u on (u.agama is null or u.agama = d.agama)
 cross join demo_penguji pj
 cross join lateral (
-  select case when u.butir_no % 2 = 0 then coalesce(pj.pembina, pj.dewan) else coalesce(pj.dewan, pj.pembina) end as penguji,
+  select case when u.agama is not null or u.butir_no % 2 = 0 then coalesce(pj.pembina, pj.dewan) else coalesce(pj.dewan, pj.pembina) end as penguji,
          case u.tingkat when 'Bantara' then date '2026-01-05' + u.butir_no * 6 else date '2026-06-01' + u.butir_no * 4 end as tgl,
          (array['Sangat baik', 'Baik', 'Cukup'])[1 + (u.butir_no + coalesce(u.sub, 0)) % 3] as nilai
 ) x

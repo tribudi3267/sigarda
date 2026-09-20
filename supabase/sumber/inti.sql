@@ -636,6 +636,10 @@ begin
   if p_penguji_id is null or not exists (select 1 from public.profiles where id = p_penguji_id and role = 'penguji') then
     raise exception 'Pilih penguji terlebih dulu.';
   end if;
+  -- Butir agama (sub-butir Butir 1) hanya dinilai Pembina, jadi hanya Pembina yang dapat dipilih sebagai penguji
+  if v_u.agama is not null and not exists (select 1 from public.profiles where id = p_penguji_id and role = 'penguji' and jabatan = 'Pembina') then
+    raise exception 'Butir agama hanya dapat diuji oleh Pembina. Pilih Pembina sebagai penguji.';
+  end if;
   if char_length(coalesce(p_catatan, '')) > 500 then raise exception 'Catatan maksimal 500 karakter.'; end if;
 
   insert into public.sku_progress (peserta_id, sku_id, status, jadwal, penguji_id, catatan_peserta, diubah)
@@ -681,6 +685,11 @@ begin
   if not found then raise exception 'Peserta tidak ditemukan.'; end if;
   if not exists (select 1 from public.sku_unit where id = p_sku_id and (agama is null or agama = v_p.agama)) then
     raise exception 'Poin SKU tidak ditemukan.';
+  end if;
+  -- Butir agama (sub-butir Butir 1) hanya dinilai Pembina, untuk semua hasil (mulai uji, lulus, perlu diulang, dikembalikan)
+  if exists (select 1 from public.sku_unit where id = p_sku_id and agama is not null)
+     and not exists (select 1 from public.profiles where id = p_oleh and role = 'penguji' and jabatan = 'Pembina') then
+    raise exception 'Butir agama hanya dapat dinilai oleh Pembina.';
   end if;
   if p_hasil not in ('proses','lulus','ulang','reset') then raise exception 'Hasil pengujian tidak dikenal.'; end if;
   -- Butir dengan instrumen ditetapkan hanya boleh dinilai lewat sg_sku_catat_rubrik_internal (yang menyalakan penanda ini)

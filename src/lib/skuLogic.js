@@ -97,6 +97,13 @@ export const tingkatSelesai = (progress, peserta, tingkat) => {
 
 export const laksanaTerbuka = (progress, peserta) => tingkatSelesai(progress, peserta, 'Bantara');
 
+/**
+ * Butir agama (sub-butir Butir 1, `poin.agama` terisi) hanya dinilai Pembina; butir lain dinilai Pembina atau Dewan Ambalan.
+ * Aturan yang sama ditegakkan di server (sg_sku_catat_internal dan sg_sku_ajukan); ini hanya untuk menyembunyikan aksi yang pasti ditolak.
+ */
+export const PESAN_BUTIR_AGAMA = 'Butir agama hanya dapat dinilai oleh Pembina.';
+export const bolehMenilaiPoin = (user, poin) => user?.role === 'penguji' && (!poin?.agama || user.jabatan === 'Pembina');
+
 /** Memenuhi syarat mencalonkan diri: seluruh SKU Bantara dan Laksana lulus. */
 export const layakGaruda = (progress, peserta) =>
   tingkatSelesai(progress, peserta, 'Bantara') && tingkatSelesai(progress, peserta, 'Laksana');

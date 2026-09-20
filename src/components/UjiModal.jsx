@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import useInstrumen from '../hooks/useInstrumen';
 import { NILAI } from '../config';
 import { hitungSkorInstrumen } from '../lib/instrumenLogic';
-import { getEntry } from '../lib/skuLogic';
+import { PESAN_BUTIR_AGAMA, bolehMenilaiPoin, getEntry } from '../lib/skuLogic';
 import { hariIni } from '../lib/format';
 import InstrumenNilai from './InstrumenNilai';
 import { Badge, Field, Modal, TeksPoin } from './ui';
@@ -189,7 +189,15 @@ function IsiUji({ pesertaId, poin, instr, pengaturan, tanggalAwal, onTutup }) {
 
 /** Penguji menilai satu poin. PIN penguji berfungsi sebagai verifikasi digital. Butir berinstrumen ditetapkan dinilai lewat instrumen. */
 export default function UjiModal({ pesertaId, poin, tanggalAwal = null, onTutup }) {
+  const { user } = useApp();
   const { instrumen, siap, pengaturan } = useInstrumen();
+  if (!bolehMenilaiPoin(user, poin)) {
+    return (
+      <Modal buka tutup={onTutup} judul="Penilaian poin SKU" aksi={<button className="btn btn-outline" onClick={onTutup}>Tutup</button>}>
+        <p role="alert" className="py-4 text-sm text-pramuka-800">{PESAN_BUTIR_AGAMA} Minta Pembina menilai butir ini.</p>
+      </Modal>
+    );
+  }
   if (!siap) {
     return (
       <Modal buka tutup={onTutup} judul="Penilaian poin SKU" aksi={<button className="btn btn-outline" onClick={onTutup}>Batal</button>}>
