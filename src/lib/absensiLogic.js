@@ -158,7 +158,8 @@ export function rekapAbsensi(absensi, daftarPeserta, sesiList) {
       if (st in hitung) hitung[st] += 1;
     }
     const total = hitung.H + hitung.I + hitung.S + hitung.A;
-    return { user: u, ...hitung, total, persen: total ? Math.round((hitung.H / total) * 100) : null, perSesi };
+    // pembulatan setengah ke atas dengan bilangan bulat (Math.round(H/total*100) meleset pada 29/200 = 14,499999...); sama dengan raport
+    return { user: u, ...hitung, total, persen: total ? Math.floor((hitung.H * 200 + total) / (2 * total)) : null, perSesi };
   });
 }
 

@@ -101,6 +101,17 @@
   .overflow-x-auto {
     overflow: visible !important;
   }
+  /* Nilai raport: satu Penegak per halaman */
+  .raport-lembar {
+    margin: 0 !important;
+    padding: 0 !important;
+    break-after: page;
+    page-break-after: always;
+  }
+  .raport-lembar:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
   * {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;

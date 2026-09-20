@@ -7,6 +7,7 @@ import { ITEM_PORTOFOLIO } from '../data/portofolioData';
 import { PERAN } from './skuLogic';
 import { PERIODE, STATUS_ABSEN } from './absensiLogic';
 import { getItem } from './portofolioLogic';
+import { PREDIKAT } from './raportLogic';
 import { fmtTanggal, fmtTglPendek, hariIni } from './format';
 import { unduhXlsx } from './exportXlsx';
 
@@ -107,6 +108,113 @@ export const namaFileAbsensi = (tahunAjaran, periode) =>
 
 export const unduhAbsensiXlsx = (data) =>
   unduhXlsx({ namaFile: namaFileAbsensi(data.tahunAjaran, data.periode), sheets: susunAbsensiXlsx(data) });
+
+/* ------------------------- NILAI RAPORT EKSTRAKURIKULER ------------------------- */
+
+const KUNING_DRAF = 'FFFEF3C7';
+const ABU_BELUM = 'FFE7E5E4';
+
+/** Nama lembar Excel: maksimal 31 karakter dan tanpa \ / ? * [ ] : */
+const namaLembar = (teks, cadangan) => (String(teks || '').replace(/[\\/?*[\]:]/g, '-').trim().slice(0, 31) || cadangan);
+
+const STATUS_RAPORT = { final: 'Final', draf: 'DRAF (belum final)', belum: 'Belum dinilai' };
+
+/**
+ * Nilai raport per kelas: satu lembar untuk setiap kelas (atau satu lembar bila filter sudah memilih satu kelas), ditambah
+ * lembar keterangan. `baris` = keluaran susunBaris() (yang sudah difilter). Baris yang belum final diberi status dan warna
+ * kuning agar tidak ikut diserahkan ke sekolah tanpa disadari.
+ */
+export function susunRaportXlsx({ tahunAjaran, semester, baris, filter, pengaturan }) {
+  const jumlahFinal = baris.filter((b) => b.status === 'final').length;
+  const judul = [
+    'Nilai Ekstrakurikuler Pramuka Penegak',
+    `${GUDEP.nama}. Tahun Ajaran ${tahunAjaran}, ${PERIODE[semester]}`,
+    `Filter: ${teksFilter(filter)}. Final: ${jumlahFinal} dari ${baris.length}. Dicetak ${fmtTanggal(hariIni())}`,
+    ...(jumlahFinal < baris.length ? ['PERHATIAN: baris berwarna kuning belum final (hanya saran) dan belum boleh diserahkan ke sekolah.'] : []),
+  ];
+  const kolom = [
+    { header: 'No', key: 'no', lebar: 6, rata: 'center' },
+    { header: 'NIS', key: 'nis', lebar: 12 },
+    { header: 'Nama', key: 'nama', lebar: 30 },
+    { header: 'Kelas', key: 'kelas', lebar: 9, rata: 'center' },
+    { header: 'Predikat', key: 'huruf', lebar: 10, rata: 'center' },
+    { header: 'Keterangan Predikat', key: 'label', lebar: 16 },
+    { header: 'Deskripsi Capaian', key: 'deskripsi', lebar: 90 },
+    { header: 'Status', key: 'status', lebar: 20 },
+    { header: 'Skor', key: 'skor', lebar: 8, rata: 'center' },
+    { header: 'Kehadiran (%)', key: 'kehadiran', lebar: 12, rata: 'center' },
+    { header: 'Capaian SKU', key: 'capaian', lebar: 14, rata: 'center' },
+    { header: 'Tingkat SKU', key: 'tingkat', lebar: 12, rata: 'center' },
+    { header: 'Sikap (1-5)', key: 'sikap', lebar: 10, rata: 'center' },
+    { header: 'SKK', key: 'skk', lebar: 7, rata: 'center' },
+    { header: 'Catatan Perubahan Predikat', key: 'catatan', lebar: 34 },
+  ];
+  const warna = (b, key) => {
+    if (b.statusKode === 'draf') return KUNING_DRAF;
+    if (b.statusKode === 'belum') return ABU_BELUM;
+    return key === 'status' ? 'FFD1FAE5' : undefined;
+  };
+  const isiBaris = (b, i) => {
+    const lengkap = b.sikap != null && b.predikat;
+    const p = lengkap ? PREDIKAT[b.predikat] : null;
+    return {
+      no: i + 1,
+      nis: b.peserta.nis ?? '',
+      nama: b.peserta.nama,
+      kelas: b.peserta.kelas ?? '',
+      huruf: p?.huruf ?? '',
+      label: p?.label ?? '',
+      deskripsi: b.deskripsi,
+      status: STATUS_RAPORT[b.status],
+      statusKode: b.status,
+      skor: lengkap ? b.skor : '',
+      kehadiran: b.kehadiran ?? '',
+      capaian: `${b.lulus} dari ${b.target} butir`,
+      tingkat: b.tingkat,
+      sikap: b.sikap ?? '',
+      skk: b.skk ?? '',
+      catatan: b.predikatAkhir ? `Diubah dari ${b.predikatHitung} ke ${b.predikatAkhir}: ${b.catatanPredikat}` : '',
+    };
+  };
+
+  const urutNama = (a, b) => a.peserta.nama.localeCompare(b.peserta.nama, 'id');
+  const perKelas = new Map();
+  for (const b of baris) {
+    const k = b.peserta.kelas || 'Tanpa kelas';
+    if (!perKelas.has(k)) perKelas.set(k, []);
+    perKelas.get(k).push(b);
+  }
+  const daftarKelas = [...perKelas.keys()].sort((a, b) => a.localeCompare(b, 'id', { numeric: true }));
+  const dipakai = new Set();
+  const lembar = daftarKelas.map((k, n) => {
+    let nama = namaLembar(k === 'Tanpa kelas' ? k : `Kelas ${k}`, `Kelas ${n + 1}`);
+    while (dipakai.has(nama.toLowerCase())) nama = `${nama.slice(0, 28)} ${n + 1}`;
+    dipakai.add(nama.toLowerCase());
+    return { nama, judul: [...judul, k === 'Tanpa kelas' ? 'Kelas: belum diisi' : `Kelas: ${k}`], kolom, baris: perKelas.get(k).sort(urutNama).map(isiBaris), warna };
+  });
+
+  const { bobot, pita, target } = pengaturan;
+  const keterangan = {
+    nama: 'Keterangan',
+    judul: ['Keterangan perhitungan nilai ekstrakurikuler'],
+    kolom: [{ header: 'Hal', key: 'a', lebar: 28 }, { header: 'Isi', key: 'b', lebar: 100 }],
+    baris: [
+      { a: 'Skor (0-100)', b: `Kehadiran ${bobot.kehadiran}% + capaian SKU ${bobot.capaian}% + sikap ${bobot.sikap}%. Bila kehadiran atau sikap belum ada, bobotnya dialihkan ke komponen lain.` },
+      { a: 'Kehadiran', b: 'Persentase hadir pada latihan Jumat semester ini (hadir dibagi hadir, izin, sakit, dan alpa yang dicatat).' },
+      { a: 'Capaian SKU', b: `Butir SKU yang lulus pada semester ini dibagi target (Bantara ${target.Bantara}, Laksana ${target.Laksana} butir per semester), maksimal 100%.` },
+      { a: 'Sikap', b: 'Penilaian Pembina skala 1-5, dikalikan 20.' },
+      { a: 'Predikat', b: `A Sangat Baik: ${pita.sangatBaik} ke atas. B Baik: ${pita.baik}-${pita.sangatBaik - 1}. C Cukup: ${pita.cukup}-${pita.baik - 1}. D Kurang: di bawah ${pita.cukup}.` },
+      { a: 'Status', b: 'Final = keputusan akhir Pembina. DRAF = deskripsi dan predikat baru berupa saran dan belum boleh diserahkan ke sekolah.' },
+      { a: 'Predikat diubah Pembina', b: 'Bila predikat akhir berbeda dari hasil hitung, alasannya dicatat pada kolom Catatan Perubahan Predikat.' },
+    ],
+  };
+  return lembar.length ? [...lembar, keterangan] : [{ nama: 'Nilai Raport', judul, kolom, baris: [], warna }, keterangan];
+}
+
+export const namaFileRaport = (tahunAjaran, semester) => `nilai-ekstrakurikuler-${tahunAjaran.replace('/', '-')}-${semester}.xlsx`;
+
+export const unduhRaportXlsx = (data) =>
+  unduhXlsx({ namaFile: namaFileRaport(data.tahunAjaran, data.semester), sheets: susunRaportXlsx(data) });
 
 /* -------------------------------- PORTOFOLIO ------------------------------- */
 

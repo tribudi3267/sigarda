@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunHadir, susunMateri, susunPortofolio, susunProgress, susunSesi } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunHadir, susunMateri, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -28,8 +28,8 @@ export function pesanGalat(error) {
   }
   if (/jwt|not authenticated|invalid token|session/i.test(m)) return 'Sesi berakhir. Masuk kembali.';
   if (/permission denied|row-level security/i.test(m)) return 'Anda tidak memiliki izin untuk tindakan ini.';
-  if (/could not find the function|schema cache|function [\w.]+\(.*\) does not exist/i.test(m)) {
-    return 'Basis data belum diperbarui (fungsi tidak ditemukan). Jalankan migrasi terbaru dari folder supabase/migrasi di SQL Editor Supabase. Jangan menjalankan skema.sql pada database yang sudah berisi data.';
+  if (/could not find the (function|table)|schema cache|function [\w.]+\(.*\) does not exist|relation "[\w."]+" does not exist/i.test(m)) {
+    return 'Basis data belum diperbarui (tabel atau fungsi tidak ditemukan). Jalankan migrasi terbaru dari folder supabase/migrasi di SQL Editor Supabase. Jangan menjalankan skema.sql pada database yang sudah berisi data.';
   }
   return m || 'Terjadi galat yang tidak dikenal.';
 }
@@ -164,6 +164,13 @@ export function buatApi(klien) {
       return r.ok || r.sesiBerakhir ? r : { ok: true, data: {} };
     },
 
+    /** Nilai raport satu semester (hanya Pembina dan Admin yang menerima baris): { [pesertaId]: baris }. Dimuat saat halaman Raport dibuka. */
+    muatRaport: (tahunAjaran, semester) =>
+      muat(async () => susunRaport(await ambilSemua('raport', {
+        filter: [['tahun_ajaran', tahunAjaran], ['semester', semester]],
+        urut: ['peserta_id'],
+      }))),
+
     /* ----------------------------- SKU ----------------------------- */
     ajukan: ({ skuId, jadwal, pengujiId, catatan }) =>
       rpc('sg_sku_ajukan', { p_sku_id: skuId, p_jadwal: jadwal || null, p_penguji_id: pengujiId || null, p_catatan: catatan ?? '' }),
@@ -222,5 +229,16 @@ export function buatApi(klien) {
     hapusSidang: (id) => rpc('sg_sidang_hapus', { p_id: id }),
     aturUrutSidang: (tahun, berikutnya) => rpc('sg_sidang_urut_atur', { p_tahun: tahun, p_berikutnya: berikutnya }),
     simpanPengaturan: (kunci, nilai) => rpc('sg_pengaturan_simpan', { p_kunci: kunci, p_nilai: nilai }),
+
+    /* ------------------------- Nilai raport ekstrakurikuler ------------------------- */
+    simpanRaport: (d) =>
+      rpc('sg_raport_simpan', {
+        p_peserta_id: d.pesertaId, p_tahun_ajaran: d.tahunAjaran, p_semester: d.semester, p_tingkat: d.tingkat,
+        p_sikap: d.sikap ?? null, p_karakter: d.karakter ?? [], p_skk: d.skk ?? null,
+        p_predikat_akhir: d.predikatAkhir || null, p_catatan: d.catatanPredikat ?? '', p_deskripsi: d.deskripsi ?? '', p_final: !!d.final,
+      }),
+    hapusRaport: (pesertaId, tahunAjaran, semester) =>
+      rpc('sg_raport_hapus', { p_peserta_id: pesertaId, p_tahun_ajaran: tahunAjaran, p_semester: semester }),
+    simpanPengaturanRaport: (nilai) => rpc('sg_raport_pengaturan_simpan', { p_nilai: nilai }),
   };
 }

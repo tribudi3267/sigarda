@@ -152,5 +152,33 @@ export function petaSidang(r) {
   };
 }
 
-/** Baris tabel pengaturan -> { [kunci]: nilai teks } */
-export const petaPengaturan = (baris = []) => Object.fromEntries(baris.map((r) => [r.kunci, typeof r.nilai === 'string' ? r.nilai : String(r.nilai ?? '')]));
+/** Baris tabel pengaturan -> { [kunci]: nilai }. Nilai teks tetap teks; objek (mis. pengaturan raport) dipertahankan. */
+export const petaPengaturan = (baris = []) =>
+  Object.fromEntries(baris.map((r) => [r.kunci, typeof r.nilai === 'string' || (r.nilai && typeof r.nilai === 'object') ? r.nilai : String(r.nilai ?? '')]));
+
+export function petaRaport(r) {
+  return {
+    pesertaId: r.peserta_id,
+    tahunAjaran: r.tahun_ajaran,
+    semester: r.semester,
+    tingkat: r.tingkat,
+    sikap: r.sikap ?? null,
+    karakter: Array.isArray(r.karakter) ? r.karakter : [],
+    skk: r.skk ?? null,
+    kehadiranPersen: r.kehadiran_persen ?? null,
+    hadir: r.hadir ?? null,
+    pertemuan: r.pertemuan ?? null,
+    capaianLulus: r.capaian_lulus,
+    capaianTarget: r.capaian_target,
+    skor: r.skor,
+    predikatHitung: r.predikat_hitung,
+    predikatAkhir: r.predikat_akhir ?? null,
+    catatanPredikat: r.catatan_predikat ?? '',
+    deskripsi: r.deskripsi ?? '',
+    status: r.status,
+    diubahPada: r.diubah_pada,
+  };
+}
+
+/** Baris raport satu semester -> { [pesertaId]: baris } */
+export const susunRaport = (baris = []) => Object.fromEntries(baris.map((r) => [r.peserta_id, petaRaport(r)]));

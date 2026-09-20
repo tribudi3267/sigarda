@@ -40,6 +40,7 @@ Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Adm
 | Absensi | Riwayat kehadiran sendiri (dicatat pengurus) | Catat absensi, rekap, unduh Excel | Sama dengan penguji |
 | Portofolio | (di dashboard Garuda) isi status, catatan, tautan | Tinjau dan beri catatan, rekap, unduh Excel | Rekap, unduh Excel |
 | Sidang | | Antrian sidang, lembar sidang (Layak dan Lulus / Ditunda-Remedi), riwayat, cetak Berita Acara, pengaturan nomor dan ketua. Hapus catatan: hanya Pembina | Sama dengan penguji, termasuk hapus |
+| Raport | | Hanya **Pembina**: nilai ekstrakurikuler per semester, cetak per Penegak, Excel per kelas, pengaturan | Sama dengan Pembina |
 | Anggota | | | Tambah, ubah, hapus anggota; import Excel dan unduh template (Penegak, Dewan Ambalan, Pembina) |
 | Reset PIN | | Sesuai kewenangan (lihat di bawah) | Semua kecuali Admin |
 | Akun (ikon di header) | Ganti PIN sendiri | Ganti PIN sendiri | Ganti PIN sendiri |
@@ -130,6 +131,22 @@ Menu **Sidang** (Dewan Ambalan, Pembina, Admin) untuk keputusan Lulus atau Tidak
   - Nama Ketua Dewan Penegak (kosong = garis tanda tangan) dan sebutan jabatan (bawaan "Ketua Dewan Penegak / Pemangku Adat").
 - Catatan sidang hanya terbaca pengurus; semua penulisan lewat fungsi server `sg_sidang_simpan`, `sg_sidang_hapus`, `sg_pengaturan_simpan`.
 - Belum termasuk: kolom NTA pada import Excel dan formulir Admin (NTA saat ini diisi di lembar sidang).
+
+### Nilai Raport Ekstrakurikuler
+Menu **Raport** (hanya Pembina dan Admin; Dewan Ambalan dan Penegak tidak melihatnya) untuk nilai Pramuka di raport sekolah, per **semester** (Ganjil: Juli sampai Desember, Genap: Januari sampai Juni).
+- **Skor 0-100** = 40% kehadiran + 40% capaian SKU + 20% sikap (bobot dapat diatur).
+  - *Kehadiran*: persen hadir pada latihan Jumat semester itu (hadir dibagi hadir + izin + sakit + alpa yang dicatat; yang belum dicatat tidak dihitung).
+  - *Capaian SKU*: butir yang **lulus pada semester itu** dibagi target per semester (bawaan Bantara 12, Laksana 11), maksimal 100%. Butir agama dihitung bila seluruh sub-butirnya lulus, pada tanggal uji terakhirnya.
+  - *Sikap*: penilaian Pembina 1-5 (dikali 20), ditambah karakter yang menonjol dan jumlah SKK (SKK hanya keterangan).
+  - Bila kehadiran atau sikap belum ada, bobotnya dialihkan ke komponen lain dan skor ditandai sementara; predikat baru tampil setelah sikap dinilai.
+  - Contoh: hadir 92%, capaian 10 dari 12 butir (83%), sikap 4 (80) menghasilkan skor 86, predikat **B Baik**.
+- **Predikat** (batas dapat diatur): A Sangat Baik mulai 90, B Baik mulai 75, C Cukup mulai 60, D Kurang di bawahnya. Pembina boleh mengubah predikat akhir dengan **catatan alasan wajib**; hasil hitung asli tetap tersimpan.
+- **Deskripsi capaian** dibuat otomatis dari templat sebagai **saran** (keaktifan latihan, butir SKU tertinggi yang sudah lulus, karakter, dan konsistensi sikap), lalu disunting Pembina. Status **Draf (saran)** atau **Final**: keputusan akhir ada pada Pembina.
+  Nilai final tidak ikut berubah bila absensi, progres SKU, atau pengaturan berubah; baris ditandai "Data berubah" dan baru diperbarui bila Pembina membukanya dan menyimpan ulang.
+- **Cetak** per Penegak (A4, satu lembar per halaman) dan **Excel per kelas** (satu lembar per kelas: NIS, nama, kelas, predikat, deskripsi, status, dan rincian nilai). Yang belum final diberi tanda DRAF di cetakan dan berwarna kuning di Excel.
+- **Pengaturan**: batas predikat, bobot (harus berjumlah 100), dan target butir per semester.
+- Server menghitung ulang kehadiran, capaian, skor, dan predikat dari data absensi dan progres SKU saat menyimpan (`sg_raport_simpan`), jadi angka tidak bisa dipalsukan dari layar. Rumus di `src/lib/raportLogic.js` dan di SQL sama persis (pembulatan setengah ke atas dengan bilangan bulat) dan dijaga oleh pengujian.
+- Penulisan hanya lewat fungsi server `sg_raport_simpan`, `sg_raport_hapus`, `sg_raport_pengaturan_simpan`; tabel `raport` hanya terbaca Pembina dan Admin.
 
 ### Filter dinamis
 Semua filter (sangga, kelas, peran, agama, tahun ajaran) dibangun dari data yang ada.
@@ -266,6 +283,8 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
   **Wajib dijalankan sebelum menerbitkan kode Sidang**, karena halaman Sidang membaca tabel baru itu. Jalankan setelah `2026-09-rls-ringan.sql`.
 - [`2026-09-sidang-format-nomor.sql`](supabase/migrasi/2026-09-sidang-format-nomor.sql): kode nomor `{no2}`-`{no6}` (nomor 4 angka dan seterusnya), penghitung nomor urut dapat dibaca pengurus, dan fungsi `sg_sidang_urut_atur`.
   Jalankan **setelah** `2026-09-sidang-dk.sql`. Catatan sidang dan pengaturan yang sudah ada tidak berubah.
+- [`2026-09-raport.sql`](supabase/migrasi/2026-09-raport.sql): Nilai Raport Ekstrakurikuler. Hanya menambah tabel `raport`, fungsi hitung di server, dan fungsi `sg_raport_simpan`, `sg_raport_hapus`, `sg_raport_pengaturan_simpan`.
+  Jalankan **setelah** `2026-09-sidang-dk.sql` dan `2026-09-sidang-format-nomor.sql` (bila belum, migrasi ini berhenti dengan pesan yang menuntun dan tidak mengubah apa pun). **Wajib dijalankan sebelum menerbitkan kode Raport**; sebelum itu menu Raport hanya menampilkan pesan bahwa basis data belum diperbarui, halaman lain tidak terpengaruh.
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 
 ## Struktur folder
@@ -293,13 +312,13 @@ sku-bukateja/
     │   ├── supabaseClient.js           klien Supabase (atau lokal)
     │   ├── api.js                      satu-satunya lapisan yang berbicara ke Supabase (tabel, sg_*, Edge Function)
     │   ├── mapDb.js                    tabel server -> bentuk data yang dipakai halaman
-    │   ├── skuLogic.js  absensiLogic.js  portofolioLogic.js  materiLogic.js  sidangLogic.js  pinLogic.js  importAnggota.js  cariNama.js
+    │   ├── skuLogic.js  absensiLogic.js  portofolioLogic.js  materiLogic.js  sidangLogic.js  raportLogic.js  pinLogic.js  importAnggota.js  cariNama.js
     │   └── exportXlsx.js  exportLaporan.js  format.js
     ├── lokal/                          backend lokal: klien tiruan di atas PGlite, data contoh (bukan produksi)
     ├── context/AppContext.jsx          state global (salinan data sesuai izin) dan semua aksi
     ├── hooks/useAbsensiPeriode.js      memuat kehadiran semester yang dipilih saat filter periode diubah
-    ├── components/                     Layout, Footer, Login, FormGantiPin, ImportAnggotaModal, SkuChecklist, PratinjauDrive, BeritaAcaraSidang, ...
-    └── pages/                          PesertaBeranda, PesertaSku, Materi, KelolaMateri, Absensi, Sidang, ResetPin, AdminAnggota, ...
+    ├── components/                     Layout, Footer, Login, FormGantiPin, ImportAnggotaModal, SkuChecklist, PratinjauDrive, BeritaAcaraSidang, CetakRaport, ...
+    └── pages/                          PesertaBeranda, PesertaSku, Materi, KelolaMateri, Absensi, Sidang, Raport, ResetPin, AdminAnggota, ...
 ```
 
 ## Pengujian

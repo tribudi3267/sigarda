@@ -3,7 +3,7 @@ import { ambilKlien, GALAT_KONFIGURASI, LOKAL } from '../lib/supabaseClient';
 import { buatApi } from '../lib/api';
 import { pesertaDenganPeran } from '../lib/skuLogic';
 import {
-  adalahJumat, daftarSemester, gabungHadirSemester, KODE_STATUS, rentangKunci, semesterDari, tanggalValid,
+  adalahJumat, daftarSemester, gabungHadirSemester, KODE_STATUS, kunciSemester, rentangKunci, semesterDari, tanggalValid,
 } from '../lib/absensiLogic';
 import { bolehResetPin, validasiPinBaru } from '../lib/pinLogic';
 import { periksaBaris } from '../lib/importAnggota';
@@ -32,7 +32,7 @@ export function useApp() {
   return ctx;
 }
 
-const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {} };
+const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {} };
 const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi waktu Edge Function)
 const JEDA_SEGARKAN_MS = 30000;
 
@@ -225,6 +225,8 @@ export function AppProvider({ children }) {
         else notify(gagal.pesan, 'err');
       },
       pengaturan: () => terapkan(api().muatPengaturan(), (pengaturan) => (d) => ({ ...d, pengaturan })),
+      raport: (tahunAjaran, semester) =>
+        terapkan(api().muatRaport(tahunAjaran, semester), (r) => (d) => ({ ...d, raport: { ...d.raport, [kunciSemester(tahunAjaran, semester)]: r } })),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notify, sesiBerakhir]);
@@ -415,6 +417,41 @@ export function AppProvider({ children }) {
     return aksi(api().aturUrutSidang(tahun, berikutnya), { sukses: `Nomor urut berikutnya untuk tahun ${tahun} diatur menjadi ${berikutnya}.`, sesudah: () => segarkan.sidang() });
   };
 
+  /* --------------- Nilai raport ekstrakurikuler (Pembina dan Admin) --------------- */
+  const bolehRaport = bolehHapusSidang; // aturan sama: Pembina dan Admin Gudep
+  const MSG_RAPORT = 'Hanya Pembina dan Admin Gudep yang dapat mengelola nilai raport.';
+
+  /** Memuat nilai raport satu semester dan pengaturan (dipanggil halaman Raport saat dibuka atau saat semester diganti). */
+  const muatRaport = useCallback(async (tahunAjaran, semester) => {
+    const a = api();
+    const [r, p] = await Promise.all([a.muatRaport(tahunAjaran, semester), a.muatPengaturan()]);
+    const gagal = [r, p].find((x) => !x.ok);
+    if (gagal) {
+      if (gagal.sesiBerakhir) await sesiBerakhir();
+      return gagal;
+    }
+    setDb((d) => ({ ...d, pengaturan: p.data, raport: { ...d.raport, [kunciSemester(tahunAjaran, semester)]: r.data } }));
+    return { ok: true };
+  }, [sesiBerakhir]);
+
+  const simpanRaport = (data) => {
+    if (!bolehRaport) return Promise.resolve(ditolak(notify, MSG_RAPORT));
+    return aksi(api().simpanRaport(data), {
+      sukses: data.final ? 'Nilai raport ditandai final.' : 'Nilai raport tersimpan sebagai draf.',
+      sesudah: () => segarkan.raport(data.tahunAjaran, data.semester),
+    });
+  };
+
+  const hapusRaport = (pesertaId, tahunAjaran, semester) =>
+    bolehRaport
+      ? aksi(api().hapusRaport(pesertaId, tahunAjaran, semester), { sukses: 'Nilai raport dihapus.', sesudah: () => segarkan.raport(tahunAjaran, semester) })
+      : Promise.resolve(ditolak(notify, MSG_RAPORT));
+
+  const simpanPengaturanRaport = (nilai) =>
+    bolehRaport
+      ? aksi(api().simpanPengaturanRaport(nilai), { sukses: 'Pengaturan raport tersimpan.', sesudah: () => segarkan.pengaturan() })
+      : Promise.resolve(ditolak(notify, MSG_RAPORT));
+
   /* ------------------------- Manajemen anggota (admin) ------------------------- */
   /**
    * Tambah (tanpa id) atau ubah (dengan id) satu anggota. Anggota baru mengembalikan `akun` = { username, pin, nama }
@@ -535,6 +572,7 @@ export function AppProvider({ children }) {
     materi: db.materi, bolehKelolaMateri: izinMateri, simpanMateri, hapusMateri, geserUrutanMateri,
     sidang: db.sidang, sidangUrut: db.sidangUrut, pengaturan: db.pengaturan, bolehSidang, bolehHapusSidang, muatSidang, simpanSidang, hapusSidang,
     simpanPengaturan, aturUrutSidang,
+    raport: db.raport, bolehRaport, muatRaport, simpanRaport, hapusRaport, simpanPengaturanRaport,
     daftarPeserta, peranUser, bolehKelolaAbsen,
     login, logout,
     ajukan, batalkanAjuan, catatHasil,

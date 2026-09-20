@@ -11,12 +11,13 @@ import { Icon } from './ui';
  * jadi ambangnya dipilih menurut jumlah menu. Nama kelas ditulis utuh karena Tailwind tidak membaca nama kelas yang dirangkai.
  */
 const TAMPILAN_HEADER = {
+  11: { label: 'hidden min-[1680px]:inline', labelSr: 'sr-only min-[1680px]:hidden', nama: 'hidden', wadah: 'max-w-[110rem]' },
   10: { label: 'hidden min-[1560px]:inline', labelSr: 'sr-only min-[1560px]:hidden', nama: 'hidden', wadah: 'max-w-[100rem]' },
   9: { label: 'hidden min-[1460px]:inline', labelSr: 'sr-only min-[1460px]:hidden', nama: 'hidden min-[1640px]:block', wadah: 'max-w-[100rem]' },
   8: { label: 'hidden min-[1360px]:inline', labelSr: 'sr-only min-[1360px]:hidden', nama: 'hidden min-[1540px]:block', wadah: 'max-w-[100rem]' },
   0: { label: 'hidden xl:inline', labelSr: 'sr-only xl:hidden', nama: 'hidden xl:block', wadah: 'max-w-6xl' },
 };
-const tampilanHeader = (jumlahMenu) => TAMPILAN_HEADER[jumlahMenu >= 10 ? 10 : jumlahMenu >= 8 ? jumlahMenu : 0];
+const tampilanHeader = (jumlahMenu) => TAMPILAN_HEADER[jumlahMenu >= 11 ? 11 : jumlahMenu >= 8 ? jumlahMenu : 0];
 
 export default function Layout({ nav, tab, setTab, children }) {
   const { user, peranUser, logout } = useApp();
