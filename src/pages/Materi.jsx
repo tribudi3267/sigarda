@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { DAFTAR_TINGKAT } from '../data/skuData';
 import { INDEKS_BUTIR, KATALOG_BUTIR, hitungMateriPerButir, labelButir, saringMateri } from '../lib/materiLogic';
-import ChipButir from '../components/ChipButir';
+import TerkaitButir from '../components/TerkaitButir';
 import PratinjauDrive from '../components/PratinjauDrive';
 import { Icon, Kosong } from '../components/ui';
 
@@ -223,10 +223,7 @@ export default function Materi({ butirAwal = null, onKelola }) {
                     </div>
 
                     {m.butir.length > 0 ? (
-                      <p className="mt-2 flex flex-wrap items-center gap-1.5">
-                        <span className="text-xs text-pramuka-500">Terkait butir:</span>
-                        {m.butir.map((id) => <ChipButir key={id} id={id} aktif={id === butir} onKlik={pilihButir} />)}
-                      </p>
+                      <TerkaitButir ids={m.butir} aktif={butir} onKlik={pilihButir} />
                     ) : (
                       <p className="mt-2 text-xs text-pramuka-500">Materi umum, tidak terkait butir tertentu.</p>
                     )}

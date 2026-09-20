@@ -22,6 +22,13 @@
 }
 
 @layer components {
+  /* Pembungkus tabel yang dapat digeser ke samping harus menjadi acuan posisi bagi isinya. Tanpa ini, elemen `absolute` di dalamnya
+     (mis. teks `sr-only` pada kolom Aksi) tidak terpotong pembungkus, lolos ke luar, dan melebarkan halaman: di ponsel halaman jadi
+     bisa dipan ke samping dan menu bawah ikut bergeser. Kelas utilitas Tailwind (fixed, sticky, absolute) tetap menang atas aturan ini. */
+  .overflow-x-auto,
+  .overflow-auto {
+    position: relative;
+  }
   .panel {
     @apply rounded-lg border border-pramuka-200 bg-white;
   }
