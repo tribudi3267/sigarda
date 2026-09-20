@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { DAFTAR_TINGKAT } from '../data/skuData';
 import { INDEKS_BUTIR, KATALOG_BUTIR, hitungMateriPerButir, labelButir, saringMateri } from '../lib/materiLogic';
@@ -67,6 +67,7 @@ export default function Materi({ butirAwal = null, onKelola }) {
   const [q, setQ] = useState('');
   const [tocBuka, setTocBuka] = useState(false);
   const [aktifId, setAktifId] = useState(null);
+  const asideRef = useRef(null);
 
   const daftar = useMemo(() => saringMateri(materi, { tingkat, butir, q }), [materi, tingkat, butir, q]);
   const perButir = useMemo(() => hitungMateriPerButir(materi), [materi]);
@@ -86,11 +87,22 @@ export default function Materi({ butirAwal = null, onKelola }) {
         const tampak = entri.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
         if (tampak[0]) setAktifId(tampak[0].target.dataset.materiId);
       },
-      { rootMargin: '-90px 0px -60% 0px' }
+      // di ponsel bilah daftar isi melayang di bawah header, jadi batas atas area baca lebih rendah
+      { rootMargin: `-${window.matchMedia?.('(min-width: 1024px)').matches ? 90 : 140}px 0px -60% 0px` }
     );
     el.forEach((e) => io.observe(e));
     return () => io.disconnect();
   }, [daftar]);
+
+  // Daftar isi ponsel yang terbuka ditutup dengan mengetuk di luarnya atau menekan Esc
+  useEffect(() => {
+    if (!tocBuka) return undefined;
+    const luar = (e) => { if (!asideRef.current?.contains(e.target)) setTocBuka(false); };
+    const esc = (e) => { if (e.key === 'Escape') setTocBuka(false); };
+    document.addEventListener('pointerdown', luar);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('pointerdown', luar); document.removeEventListener('keydown', esc); };
+  }, [tocBuka]);
 
   const pilihTingkat = (t) => {
     setTingkat(t);
@@ -187,20 +199,22 @@ export default function Materi({ butirAwal = null, onKelola }) {
             </Kosong>
           ) : (
             <div className="lg:grid lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-6">
-              <aside className="mb-4 lg:mb-0">
-                <div className="lg:sticky lg:top-24">
+              {/* Ponsel: bilah daftar isi melayang, menempel tepat di bawah header saat halaman digulir ke mana pun (sticky terhadap
+                  seluruh daftar materi). Tablet, laptop, dan PC: kolom samping yang ikut menggulir seperti semula. */}
+              <aside ref={asideRef} className="sticky top-[3.75rem] z-30 -mx-4 mb-4 bg-pramuka-50/95 px-4 py-2 backdrop-blur-sm lg:static lg:z-auto lg:mx-0 lg:mb-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+                <div className="relative lg:sticky lg:top-24">
                   <button
-                    className="btn btn-outline flex w-full items-center justify-between lg:hidden"
+                    className={`btn btn-outline flex w-full items-center justify-between !border-emas/70 lg:hidden ${tocBuka ? 'glow-emas-tetap' : 'glow-emas'}`}
                     aria-expanded={tocBuka}
                     aria-controls="daftar-isi-materi"
                     onClick={() => setTocBuka((b) => !b)}
                   >
-                    <span className="flex items-center gap-2"><Icon nama="daftar" className="h-4 w-4" /> Daftar isi ({daftar.length} materi)</span>
+                    <span className="flex items-center gap-2"><Icon nama="daftar" className="h-4 w-4 text-emas-dark" /> Daftar isi ({daftar.length} materi)</span>
                     <Icon nama={tocBuka ? 'panahAtas' : 'panahBawah'} className="h-4 w-4" />
                   </button>
                   <div
                     id="daftar-isi-materi"
-                    className={`${tocBuka ? 'mt-2 block' : 'hidden'} panel max-h-[70vh] overflow-y-auto p-3 lg:mt-0 lg:block lg:max-h-[calc(100vh-8rem)]`}
+                    className={`${tocBuka ? 'block' : 'hidden'} panel absolute inset-x-0 top-full z-10 mt-2 max-h-[calc(100vh-14rem)] overflow-y-auto p-3 shadow-lg lg:static lg:mt-0 lg:block lg:max-h-[calc(100vh-8rem)] lg:shadow-none`}
                   >
                     <p className="mb-2 hidden px-2 font-display text-sm font-bold uppercase tracking-wide text-pramuka-700 lg:block">Daftar isi</p>
                     <DaftarIsi daftar={daftar} aktifId={aktifId} onPilih={pilihDariDaftar} />
@@ -210,7 +224,7 @@ export default function Materi({ butirAwal = null, onKelola }) {
 
               <div className="space-y-6">
                 {daftar.map((m, i) => (
-                  <article key={m.id} id={idMateri(m.id)} data-materi-id={m.id} className="panel scroll-mt-24 p-4 sm:p-5">
+                  <article key={m.id} id={idMateri(m.id)} data-materi-id={m.id} className="panel scroll-mt-36 p-4 sm:p-5 lg:scroll-mt-24">
                     <div className="flex items-start justify-between gap-3">
                       <h2 className="text-xl font-bold leading-snug text-pramuka-900">
                         <span className="mr-2 text-pramuka-400">{i + 1}.</span>{m.judul}
@@ -235,7 +249,7 @@ export default function Materi({ butirAwal = null, onKelola }) {
                         <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-pramuka-600">Isi materi</p>
                         <ol className="space-y-1 text-sm">
                           {m.bagian.map((b, k) => (
-                            <li key={b.id} id={idBagian(b.id)} className="flex scroll-mt-24 items-baseline justify-between gap-3">
+                            <li key={b.id} id={idBagian(b.id)} className="flex scroll-mt-36 items-baseline justify-between gap-3 lg:scroll-mt-24">
                               <span className="min-w-0 text-pramuka-800"><span className="mr-1.5 text-pramuka-400">{k + 1}.</span>{b.judul}</span>
                               {b.halaman && (
                                 <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-xs font-semibold text-pramuka-700 ring-1 ring-inset ring-pramuka-200">

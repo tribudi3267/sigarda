@@ -75,11 +75,14 @@ export default function MenuBawah({ nav, tab, setTab }) {
               <button
                 onClick={() => setTab(n.id)}
                 aria-current={tab === n.id ? 'page' : undefined}
-                className={`flex w-full flex-col items-center gap-0.5 border-t-2 py-2 text-[11px] font-semibold ${
-                  tab === n.id ? 'border-emas text-pramuka-800' : 'border-transparent text-pramuka-500'
+                className={`flex w-full flex-col items-center gap-0.5 border-t-2 pb-1 pt-2.5 text-[11px] font-semibold ${
+                  tab === n.id ? 'border-emas text-pramuka-900' : 'border-transparent text-pramuka-500'
                 }`}
               >
-                <Icon nama={n.ikon} className="h-5 w-5" />
+                {/* Menu yang sedang dibuka: ikon dibayangi cahaya emas yang berdenyut, senada dengan panah geser */}
+                <span className={`flex h-6 w-10 items-center justify-center rounded-full ${tab === n.id ? 'ikon-aktif text-pramuka-900' : ''}`}>
+                  <Icon nama={n.ikon} className="h-5 w-5" />
+                </span>
                 {n.label}
               </button>
             </li>
