@@ -3,6 +3,8 @@ import { GUDEP } from '../config';
 import { TINGKAT, hurufSub } from '../data/skuData';
 import { PERAN, butirPeserta, getEntry, hitungProgres, tanggalLulusTingkat } from '../lib/skuLogic';
 import { fmtTanggal, hariIni, kodeVerifikasi } from '../lib/format';
+import { alamatDasar, urlVerifikasi } from '../lib/verifikasiLogic';
+import KodeQr from './KodeQr';
 import LogoMark from './LogoMark';
 
 export function KopSurat() {
@@ -45,13 +47,20 @@ export function KartuSku({ peserta, tingkat }) {
     const e = getEntry(progress, peserta.id, p.id);
     const lulus = e.status === 'lulus';
     return (
-      <tr key={p.id}>
+      <tr key={p.id} className="break-inside-avoid">
         <td className={`${SEL} text-center`}>{no}</td>
         <td className={SEL}>{p.teks}</td>
         <td className={`${SEL} font-semibold`}>{lulus ? 'Lulus' : e.status === 'belum' ? 'Belum' : 'Proses'}</td>
         <td className={SEL}>{lulus ? fmtTanggal(e.tanggalUji) : '-'}</td>
         <td className={SEL}>{lulus ? namaPenguji(e.pengujiId) : '-'}</td>
-        <td className={`${SEL} font-mono`}>{lulus ? e.verifikasi : '-'}</td>
+        <td className={SEL}>
+          {lulus ? (
+            <span className="flex items-center gap-2">
+              {e.token && <KodeQr teks={urlVerifikasi(e.token)} ukuran={56} label={`QR verifikasi butir ${no}`} className="border border-pramuka-200" />}
+              <span className="font-mono">{e.verifikasi}</span>
+            </span>
+          ) : '-'}
+        </td>
       </tr>
     );
   };
@@ -74,7 +83,7 @@ export function KartuSku({ peserta, tingkat }) {
       <table className="mt-4 w-full border-collapse text-[11px]">
         <thead>
           <tr className="bg-pramuka-100">
-            {['No', 'Butir SKU', 'Status', 'Tanggal uji', 'Penguji', 'Kode verifikasi'].map((k) => (
+            {['No', 'Butir SKU', 'Status', 'Tanggal uji', 'Penguji', 'QR dan kode verifikasi'].map((k) => (
               <th key={k} className="border border-pramuka-400 px-2 py-1 text-left font-semibold">{k}</th>
             ))}
           </tr>
@@ -92,7 +101,10 @@ export function KartuSku({ peserta, tingkat }) {
         </tbody>
       </table>
 
-      <div className="mt-8 flex justify-end">
+      <div className="mt-8 flex items-end justify-between gap-6 break-inside-avoid">
+        <p className="max-w-xs text-[10px] leading-snug text-pramuka-600">
+          Periksa keaslian butir yang lulus dengan memindai QR pada tabel atau membuka {alamatDasar()}?v= lalu mengetik kode verifikasinya.
+        </p>
         <BlokTtd orang={GUDEP.pembina} tanggal={hariIni()} />
       </div>
     </article>
@@ -111,8 +123,11 @@ function FragmenAgama({ no, agama, children }) {
   );
 }
 
-/** Surat Tanda Lulus (A4 landscape). Hanya boleh dicetak bila seluruh butir lulus. */
-export function SuratTandaLulus({ peserta, tingkat }) {
+/**
+ * Surat Tanda Lulus (A4 landscape). Hanya boleh dicetak bila seluruh butir lulus.
+ * `token` = token QR surat (dari sg_sertifikat_tingkat); tanpa token surat tetap tercetak tanpa QR.
+ */
+export function SuratTandaLulus({ peserta, tingkat, token = null }) {
   const { progress } = useApp();
   const t = TINGKAT[tingkat];
   const tglLulus = tanggalLulusTingkat(progress, peserta, tingkat);
@@ -139,8 +154,15 @@ export function SuratTandaLulus({ peserta, tingkat }) {
           tanggal {fmtTanggal(tglLulus)}.
         </p>
 
-        <div className="mt-8 grid grid-cols-2 gap-8">
+        <div className={`mt-8 grid items-end gap-8 ${token ? 'grid-cols-[1fr_auto_1fr]' : 'grid-cols-2'}`}>
           <BlokTtd orang={GUDEP.ketuaAmbalan} tanggal={tglLulus} />
+          {token && (
+            <div className="flex flex-col items-center text-[10px] leading-snug text-pramuka-600">
+              <KodeQr teks={urlVerifikasi(token)} ukuran={96} label={`QR verifikasi Surat Tanda Lulus ${tingkat}`} className="border border-pramuka-200" />
+              <p className="mt-1 font-semibold text-pramuka-800">Pindai untuk memeriksa keaslian</p>
+              <p>{alamatDasar().replace(/^https?:\/\//, '').replace(/\/$/, '')}</p>
+            </div>
+          )}
           <BlokTtd orang={GUDEP.pembina} />
         </div>
       </div>

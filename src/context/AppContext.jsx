@@ -32,7 +32,7 @@ export function useApp() {
   return ctx;
 }
 
-const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '' };
+const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '' };
 const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi waktu Edge Function)
 const JEDA_SEGARKAN_MS = 30000;
 
@@ -53,6 +53,10 @@ export function AppProvider({ children }) {
   const instrumenMuat = useRef(null);                       // janji pemuatan yang sedang berjalan
   const instrumenSiapRef = useRef(false);                   // salinan instrumenSiap yang selalu mutakhir (untuk callback)
   instrumenSiapRef.current = instrumenSiap;
+  const [sesiUjianSiap, setSesiUjianSiap] = useState(false); // daftar sesi ujian sudah dimuat (lazy, sekali per sesi login)
+  const sesiUjianMuat = useRef(null);
+  const sesiUjianSiapRef = useRef(false);
+  sesiUjianSiapRef.current = sesiUjianSiap;
   const [toast, setToast] = useState(null);
   const apiRef = useRef(null);
   const lokalRef = useRef(null);
@@ -88,6 +92,8 @@ export function AppProvider({ children }) {
     setSemesterSiap({});
     setInstrumenSiap(false);
     instrumenMuat.current = null;
+    setSesiUjianSiap(false);
+    sesiUjianMuat.current = null;
     setDb(DB_KOSONG);
   }, []);
 
@@ -365,6 +371,62 @@ export function AppProvider({ children }) {
       ? aksi(api().simpanPengaturanInstrumen(nilai), { sukses: 'Pengaturan instrumen tersimpan.', sesudah: () => segarkan.pengaturan() })
       : Promise.resolve(ditolak(notify, MSG_INSTRUMEN));
 
+  /* ------------------ Sesi ujian dan QR Surat Tanda Lulus ------------------ */
+  const MSG_SESI = 'Hanya Dewan Ambalan, Pembina, dan Admin Gudep yang dapat mengelola sesi ujian.';
+  const pengurus = user?.role === 'penguji' || user?.role === 'admin';
+  const bolehHapusSesi = user?.role === 'admin' || (user?.role === 'penguji' && user?.jabatan === 'Pembina');
+
+  /** Memuat daftar sesi ujian bila belum, atau ulang bila `paksa` (papan sesi memakainya untuk penyegaran berkala). */
+  const pastikanSesiUjian = useCallback(async (paksa = false) => {
+    if (!paksa && sesiUjianSiapRef.current) return { ok: true };
+    if (sesiUjianMuat.current) return sesiUjianMuat.current;
+    const mulaiGenerasi = generasi.current;
+    const janji = (async () => {
+      const r = await api().muatSesiUjian();
+      sesiUjianMuat.current = null;
+      if (mulaiGenerasi !== generasi.current) return { ok: true };
+      if (!r.ok) {
+        if (r.sesiBerakhir) await sesiBerakhir();
+        return r;
+      }
+      setDb((d) => ({ ...d, sesiUjian: r.data, sesiUjianGalat: r.galat ?? '' }));
+      sesiUjianSiapRef.current = true;
+      setSesiUjianSiap(true);
+      return { ok: true };
+    })();
+    sesiUjianMuat.current = janji;
+    return janji;
+  }, [sesiBerakhir]);
+
+  /** Data sesi: { id?, nama, tanggal, tempat, catatan, status, butir: [id], peserta: [uuid] }. Mengembalikan { ok, data: id }. */
+  const simpanSesiUjian = (data) =>
+    pengurus
+      ? aksi(api().simpanSesi(data), { sukses: data.id ? 'Sesi ujian diperbarui.' : 'Sesi ujian dibuat.', sesudah: () => pastikanSesiUjian(true) })
+      : Promise.resolve(ditolak(notify, MSG_SESI));
+
+  const ubahStatusSesiUjian = (id, status) =>
+    pengurus
+      ? aksi(api().statusSesi(id, status), {
+        sukses: { berlangsung: 'Sesi dimulai. Penguji dapat menilai dari papan sesi.', selesai: 'Sesi diselesaikan.', terjadwal: 'Sesi dikembalikan ke terjadwal.' }[status],
+        sesudah: () => pastikanSesiUjian(true),
+      })
+      : Promise.resolve(ditolak(notify, MSG_SESI));
+
+  const hapusSesiUjian = (id) =>
+    bolehHapusSesi
+      ? aksi(api().hapusSesi(id), { sukses: 'Sesi ujian dihapus (hasil penilaian tidak terpengaruh).', sesudah: () => pastikanSesiUjian(true) })
+      : Promise.resolve(ditolak(notify, 'Hanya Pembina dan Admin Gudep yang dapat menghapus sesi ujian.'));
+
+  /** Menyegarkan progres seluruh peserta yang boleh dilihat (papan sesi). Galat hanya ditampilkan sebagai toast. */
+  const muatUlangProgress = () => segarkan.progress();
+
+  /** Token QR Surat Tanda Lulus satu tingkat (dibuat bila belum ada). Hasil: { ok, data: token } atau { ok: false, pesan }, tanpa toast. */
+  const tokenSuratTingkat = async (pesertaId, tingkat) => {
+    const r = await api().sertifikatTingkat(pesertaId, tingkat);
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  };
+
   /* ------------------------ Pencalonan Penegak Garuda ------------------------ */
   const daftarCalonGaruda = () =>
     aksi(api().daftarCalonGaruda(), {
@@ -634,6 +696,8 @@ export function AppProvider({ children }) {
     simpanPengaturan, aturUrutSidang,
     raport: db.raport, bolehRaport, muatRaport, simpanRaport, hapusRaport, simpanPengaturanRaport,
     instrumen: db.instrumen, instrumenGalat: db.instrumenGalat, instrumenSiap, bolehKelolaInstrumen, pastikanInstrumen, simpanInstrumen, statusInstrumen, simpanPengaturanInstrumen,
+    sesiUjian: db.sesiUjian, sesiUjianGalat: db.sesiUjianGalat, sesiUjianSiap, pastikanSesiUjian, simpanSesiUjian, ubahStatusSesiUjian, hapusSesiUjian, bolehHapusSesi,
+    muatUlangProgress, tokenSuratTingkat,
     daftarPeserta, peranUser, bolehKelolaAbsen,
     login, logout,
     ajukan, batalkanAjuan, catatHasil,

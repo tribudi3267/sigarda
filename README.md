@@ -43,6 +43,7 @@ Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Adm
 | Portofolio | (di dashboard Garuda) isi status, catatan, tautan | Tinjau dan beri catatan, rekap, unduh Excel | Rekap, unduh Excel |
 | Sidang | | Antrian sidang, lembar sidang (Layak dan Lulus / Ditunda-Remedi), riwayat, cetak Berita Acara, pengaturan nomor dan ketua. Hapus catatan: hanya Pembina | Sama dengan penguji, termasuk hapus |
 | Raport | | Hanya **Pembina**: nilai ekstrakurikuler per semester, cetak per Penegak, Excel per kelas, pengaturan | Sama dengan Pembina |
+| Sesi ujian | Melihat jadwal ujian bersama yang mencantumkannya (di Beranda) | Buat jadwal, pilih butir dan peserta, pantau papan sesi, dan menilai langsung dari papan (Dewan Ambalan dan Pembina) | Buat dan pantau (tidak menilai). Hapus sesi: Pembina dan Admin |
 | Instrumen | Melihat daftar kriteria penilaian per butir (pada butir yang instrumennya ditetapkan) | Menilai dengan instrumen (skor 1-5 per kriteria) di lembar penilaian | Hanya **Pembina** dan Admin: kelola instrumen, tetapkan, pengaturan |
 | Anggota | | | Tambah, ubah, hapus anggota; import Excel dan unduh template (Penegak, Dewan Ambalan, Pembina) |
 | Reset PIN (menu akun) | | Sesuai kewenangan (lihat di bawah) | Semua kecuali Admin |
@@ -163,6 +164,21 @@ Tiap unit SKU (butir; butir agama per sub-butir, total 90 unit) dapat punya **in
   node scripts/instrumen-ke-sql.mjs <keluaran.sql> <berkas.xlsx | folder> ... [--mode=baru|perbarui-draf|timpa-semua]
   ```
   Format Excel sama dengan berkas tinjauan. Mode `baru` (bawaan) hanya menambah butir yang belum punya instrumen; `perbarui-draf` mengganti isi instrumen yang masih draf; `timpa-semua` mengganti semuanya (suntingan Pembina ikut tertimpa). Jangan memasukkan SQL hasilnya ke repositori. Mode lokal hanya memuat 3 instrumen CONTOH fiktif.
+
+### Sesi ujian bersama
+Menu **Sesi ujian** (Dewan Ambalan, Pembina, Admin) menjadwalkan ujian untuk banyak Penegak sekaligus: nama, tanggal, tempat, **butir** yang diuji, dan **daftar peserta** (tombol "Ambil dari pengajuan" mengisi peserta dan butir dari pengajuan yang menunggu).
+- **Papan sesi**: satu baris per peserta dengan satu chip per butir (butir agama per sub-butir, mis. B1a). Warna chip: Menunggu, Sedang diuji, Lulus, Perlu diulang, Sudah lulus sebelumnya (tidak dihitung sebagai tugas sesi), Bantara belum selesai (butir Laksana terkunci). Ringkasan dan progres dihitung di layar dan diperbarui otomatis tiap 15 detik selama sesi belum selesai.
+- **Status papan diturunkan dari progres SKU**, bukan disimpan terpisah: hasil pada atau sesudah tanggal sesi dihitung untuk sesi itu. Karena itu penilaian tetap satu jalur (lembar instrumen, PIN penguji, kode verifikasi) dan tidak ada data ganda.
+- **Menilai dari papan**: sesi berstatus **Berlangsung** (tombol "Mulai sesi") dan pengguna Dewan Ambalan atau Pembina; klik chip membuka lembar penilaian dengan tanggal uji terisi tanggal sesi. Admin Gudep memantau saja (server hanya menerima penilaian dari penguji).
+- Penegak hanya melihat sesi yang mencantumkannya (kartu "Jadwal ujian bersama" di Beranda). Menghapus sesi tidak menghapus hasil penilaian.
+
+### Verifikasi keaslian dokumen (QR)
+Kartu SKU mencetak **satu QR per butir yang lulus** dan Surat Tanda Lulus mencetak **satu QR per tingkat**; kode pendek `VRF-` tetap tercetak di Kartu SKU. QR berisi alamat `https://<alamat aplikasi>/?v=<token>`; pemindai membuka halaman verifikasi **tanpa login**.
+- **Token QR**: 32 heksadesimal acak (128 bit) yang dibuat server, tidak bisa ditebak. Token butir dibuat baru setiap butir dinyatakan lulus dan dihapus bila butir tidak lagi lulus (diulang, dikembalikan), sehingga kartu lama otomatis tidak sah. Token surat sah selama seluruh butir tingkat itu masih lulus.
+- **Yang tampil bagi pemegang token**: nama lengkap, butir (atau tingkat), tanggal uji, dan penguji. Tidak ada NIS, kelas, sangga, agama, atau data akun lain. Jawaban untuk token yang tidak sah selalu sama (`{ditemukan:false}`), tidak membedakan "tidak ada" dari "salah format".
+- **Kode `VRF-`** (28 bit, dapat ditebak) hanya dapat ditanyakan di halaman yang sama dan hanya menjawab **sah atau tidak** beserta tingkat, butir, dan tanggal, **tanpa nama**.
+- Fungsi publik `sg_verifikasi_token` dan `sg_verifikasi_kode` hanya membaca dan diberi hak `anon`; tabel `sertifikat_tingkat` tidak terbaca siapa pun secara langsung. Halaman verifikasi tidak diindeks mesin pencari (`noindex`).
+- **Batasnya**: Supabase tidak membatasi laju panggilan fungsi publik ini secara bawaan. Token acak 128 bit tidak dapat ditebak, tetapi seseorang dapat mengulang pertanyaan kode `VRF-` (hanya sah/tidak, tanpa nama). Alamat pada QR mengikuti alamat aplikasi yang sedang dibuka saat mencetak: cetak dari alamat terbit (bukan `localhost`).
 
 ### Filter dinamis
 Semua filter (sangga, kelas, peran, agama, tahun ajaran) dibangun dari data yang ada.
@@ -296,7 +312,7 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
 
 ### Memperbarui database yang sudah berjalan (migrasi)
 **Jangan menjalankan `supabase/skema.sql` ulang pada database yang sudah berisi data**: berkas itu menghapus semua tabel. Perubahan skema untuk database berjalan ada di folder
-[`supabase/migrasi/`](supabase/migrasi), dijalankan satu per satu di SQL Editor (aman diulang, tidak menyentuh data):
+[`supabase/migrasi/`](supabase/migrasi), dijalankan satu per satu di SQL Editor, **berurutan dan sekali saja** (tidak menyentuh data). Jangan mengulang migrasi lama sesudah migrasi yang lebih baru dijalankan: sebagian memperbarui fungsi yang sama (mis. 2026-09-instrumen.sql menulis ulang sg_sku_catat_internal, yang kemudian diperbarui lagi oleh 2026-09-verifikasi-sesi.sql):
 - [`2026-09-rls-ringan.sql`](supabase/migrasi/2026-09-rls-ringan.sql): aturan baca (RLS) dihitung sekali per kueri, bukan sekali per baris. Pada 20 ribu baris progres, membaca milik sendiri turun dari sekitar 1 detik menjadi sekitar 7 milidetik (diukur di PGlite; angka di Supabase berbeda, arahnya sama).
 - [`2026-09-sidang-dk.sql`](supabase/migrasi/2026-09-sidang-dk.sql): Sidang Dewan Kehormatan dan Pengaturan. Hanya menambah 3 tabel (`pengaturan`, `sidang_dk`, `sidang_urut`), kolom `profiles.nta`, dan fungsi baru.
   **Wajib dijalankan sebelum menerbitkan kode Sidang**, karena halaman Sidang membaca tabel baru itu. Jalankan setelah `2026-09-rls-ringan.sql`.
@@ -306,6 +322,8 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
   Jalankan **setelah** `2026-09-sidang-dk.sql` dan `2026-09-sidang-format-nomor.sql` (bila belum, migrasi ini berhenti dengan pesan yang menuntun dan tidak mengubah apa pun). **Wajib dijalankan sebelum menerbitkan kode Raport**; sebelum itu menu Raport hanya menampilkan pesan bahwa basis data belum diperbarui, halaman lain tidak terpengaruh.
 - [`2026-09-instrumen.sql`](supabase/migrasi/2026-09-instrumen.sql): instrumen penilaian SKU. Menambah 5 tabel (`instrumen`, `instrumen_kriteria`, `instrumen_penguji`, `instrumen_panduan`, `sku_penilaian`), fungsi hitung skor, `sg_sku_catat_rubrik_internal`, `sg_instrumen_simpan`, `sg_instrumen_status`, `sg_instrumen_pengaturan_simpan`, dan memperbarui `sg_sku_catat_internal`.
   Jalankan **setelah** migrasi Sidang dan Raport. Tidak mengubah data; tanpa isi instrumen alur penilaian yang berjalan tidak berubah. Setelah itu (1) muat isi instrumen (SQL dari `scripts/instrumen-ke-sql.mjs`, lihat di atas), (2) **pasang ulang Edge Function** (lihat langkah 4), lalu (3) `git push`. Instrumen baru berstatus draf sampai Pembina menetapkannya di menu Instrumen.
+- [`2026-09-verifikasi-sesi.sql`](supabase/migrasi/2026-09-verifikasi-sesi.sql): verifikasi QR dan sesi ujian. Menambah kolom `sku_progress.verifikasi_token` (butir yang **sudah lulus diberi token**), tabel `sertifikat_tingkat`, `sesi_ujian`, `sesi_ujian_butir`, `sesi_ujian_peserta`, fungsi `sg_verifikasi_token`, `sg_verifikasi_kode` (dapat dipanggil tanpa login), `sg_sertifikat_tingkat`, `sg_sesi_simpan`, `sg_sesi_status`, `sg_sesi_hapus`, dan memperbarui `sg_sku_catat_internal` (token dibuat saat lulus).
+  Jalankan **setelah** kelima migrasi di atas (bila belum, berhenti dengan pesan yang menuntun dan tidak mengubah apa pun). **Edge Function tidak berubah** untuk fitur ini. Sebelum migrasi ini dijalankan, aplikasi baru tetap berjalan: Kartu SKU tercetak tanpa QR, menu Sesi ujian menampilkan pesan bahwa basis data belum diperbarui, dan Surat Tanda Lulus tercetak tanpa QR dengan peringatan.
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 
 ## Struktur folder
@@ -334,13 +352,13 @@ sku-bukateja/
     │   ├── supabaseClient.js           klien Supabase (atau lokal)
     │   ├── api.js                      satu-satunya lapisan yang berbicara ke Supabase (tabel, sg_*, Edge Function)
     │   ├── mapDb.js                    tabel server -> bentuk data yang dipakai halaman
-    │   ├── skuLogic.js  absensiLogic.js  portofolioLogic.js  materiLogic.js  sidangLogic.js  raportLogic.js  instrumenLogic.js  pinLogic.js  importAnggota.js  cariNama.js
+    │   ├── skuLogic.js  absensiLogic.js  portofolioLogic.js  materiLogic.js  sidangLogic.js  raportLogic.js  instrumenLogic.js  sesiLogic.js  verifikasiLogic.js  pinLogic.js  importAnggota.js  cariNama.js
     │   └── exportXlsx.js  exportLaporan.js  format.js
     ├── lokal/                          backend lokal: klien tiruan di atas PGlite, data contoh (bukan produksi)
     ├── context/AppContext.jsx          state global (salinan data sesuai izin) dan semua aksi
     ├── hooks/useAbsensiPeriode.js      memuat kehadiran semester yang dipilih saat filter periode diubah
-    ├── components/                     Layout, Footer, Login, FormGantiPin, ImportAnggotaModal, SkuChecklist, PratinjauDrive, BeritaAcaraSidang, CetakRaport, ...
-    └── pages/                          PesertaBeranda, PesertaSku, Materi, KelolaMateri, Absensi, Sidang, Raport, ResetPin, AdminAnggota, ...
+    ├── components/                     Layout, Footer, Login, FormGantiPin, ImportAnggotaModal, SkuChecklist, PratinjauDrive, BeritaAcaraSidang, CetakRaport, KodeQr, HalamanVerifikasi, ...
+    └── pages/                          PesertaBeranda, PesertaSku, Materi, KelolaMateri, Absensi, Sidang, Raport, SesiUjian, ResetPin, AdminAnggota, ...
 ```
 
 ## Pengujian
@@ -353,7 +371,7 @@ Yang **tidak** dapat diuji tanpa proyek Supabase sungguhan: perilaku GoTrue (mis
 ### Data demo untuk pengujian di Supabase
 [`supabase/demo/data_demo_penegak.sql`](supabase/demo/data_demo_penegak.sql) membuat 8 Penegak demo (NIS `990001`-`990008`, PIN `352817`, langsung bisa masuk) dengan kemajuan SKU yang beragam:
 Bantara penuh, Bantara dan Laksana penuh, Laksana sebagian, butir menunggu/diuji/diulang, butir agama lulus sebagian (menguji blokir "Layak" pada Sidang), Calon Garuda dengan portofolio, dan Khonghucu.
-Jalankan di SQL Editor; aman diulang (akun tidak digandakan, data SKU demo direset). Tidak menyentuh anggota asli. Setelah selesai menguji, jalankan
+Jalankan di SQL Editor **sesudah semua migrasi** (skrip ini mengisi kolom token QR); aman diulang (akun tidak digandakan, data SKU demo direset). Tidak menyentuh anggota asli. Setelah selesai menguji, jalankan
 [`supabase/demo/hapus_data_demo.sql`](supabase/demo/hapus_data_demo.sql), yang menghapus hanya akun ber-NIS `9900xx` dengan nama berawalan "Demo " beserta seluruh datanya.
 Skrip membuat akun langsung di `auth.users`; bila gagal di proyek Anda, buat 8 akun itu lewat Anggota > Import Excel lalu jalankan skrip lagi (akun yang sudah ada dilewati, datanya tetap diisi).
 

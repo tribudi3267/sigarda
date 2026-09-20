@@ -121,10 +121,10 @@ create temp table demo_penguji on commit drop as
 -- ---------------------------------------------------------------------------
 -- 3. Butir yang LULUS (Bantara sepanjang Jan-Mei 2026, Laksana Jun-Agu 2026; nilai bergantian)
 -- ---------------------------------------------------------------------------
-insert into public.sku_progress (peserta_id, sku_id, status, penguji_id, tanggal_uji, nilai, catatan, verifikasi, diverifikasi_pada, diubah)
+insert into public.sku_progress (peserta_id, sku_id, status, penguji_id, tanggal_uji, nilai, catatan, verifikasi, diverifikasi_pada, diubah, verifikasi_token)
 select d.id, u.id, 'lulus', x.penguji, x.tgl, x.nilai, 'Data demo',
        sigarda.kode_verifikasi(array[d.id::text, u.id, x.penguji::text, x.tgl::text]),
-       x.tgl::timestamptz + interval '3 hours', x.tgl::timestamptz + interval '3 hours'
+       x.tgl::timestamptz + interval '3 hours', x.tgl::timestamptz + interval '3 hours', sigarda.token_acak()
 from demo_id d
 join public.sku_unit u on (u.agama is null or u.agama = d.agama)
 cross join demo_penguji pj

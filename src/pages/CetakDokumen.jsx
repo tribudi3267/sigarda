@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { hitungProgres, tingkatSelesai } from '../lib/skuLogic';
 import { KartuSku, SuratTandaLulus } from '../components/DokumenSku';
@@ -10,19 +10,35 @@ import { Icon, Kosong } from '../components/ui';
  * PDF: klik "Cetak", lalu pilih "Simpan sebagai PDF" pada dialog cetak browser.
  */
 export default function CetakDokumen({ pesertaId: idAwal, bolehPilih }) {
-  const { daftarPeserta, progress } = useApp();
+  const { daftarPeserta, progress, tokenSuratTingkat } = useApp();
   const daftar = [...daftarPeserta].sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
 
   const [id, setId] = useState(idAwal ?? daftar[0]?.id);
   const [jenis, setJenis] = useState('kartu');
   const [tingkat, setTingkat] = useState('Bantara');
+  const [surat, setSurat] = useState({ kunci: '', token: null, galat: '' }); // token QR Surat Tanda Lulus untuk peserta dan tingkat `kunci`
 
   const peserta = daftarPeserta.find((u) => u.id === id);
+  const selesai = peserta ? tingkatSelesai(progress, peserta, tingkat) : false;
+  const kunciSurat = `${peserta?.id}|${tingkat}`;
+
+  // Surat Tanda Lulus memuat QR: token surat diminta (dan dibuat bila belum ada) begitu surat dibuka.
+  useEffect(() => {
+    if (jenis !== 'stl' || !peserta || !selesai) return undefined;
+    let batal = false;
+    tokenSuratTingkat(peserta.id, tingkat).then((r) => {
+      if (!batal) setSurat({ kunci: kunciSurat, token: r.ok ? r.data : null, galat: r.ok ? '' : r.pesan });
+    });
+    return () => { batal = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jenis, kunciSurat, selesai]);
+
   if (!peserta) return <Kosong judul="Belum ada peserta" teks="Tambahkan data peserta lebih dulu." />;
 
-  const selesai = tingkatSelesai(progress, peserta, tingkat);
   const h = hitungProgres(progress, peserta, tingkat);
+  const suratSiap = surat.kunci === kunciSurat; // hasil permintaan token sudah untuk pilihan yang tampil sekarang
   const bisaCetak = jenis === 'kartu' || selesai;
+  const menungguToken = jenis === 'stl' && selesai && !suratSiap;
 
   return (
     <div className="animasi-naik">
@@ -54,7 +70,7 @@ export default function CetakDokumen({ pesertaId: idAwal, bolehPilih }) {
             ))}
           </div>
 
-          <button className="btn btn-gold ml-auto" disabled={!bisaCetak} onClick={() => window.print()}>
+          <button className="btn btn-gold ml-auto" disabled={!bisaCetak || menungguToken} onClick={() => window.print()}>
             <Icon nama="cetak" className="h-4 w-4" /> Cetak atau simpan PDF
           </button>
         </div>
@@ -64,13 +80,19 @@ export default function CetakDokumen({ pesertaId: idAwal, bolehPilih }) {
             Surat Tanda Lulus {tingkat} baru bisa dicetak setelah seluruh butir lulus. Saat ini {h.lulus} dari {h.total} butir lulus.
           </p>
         )}
+
+        {jenis === 'stl' && selesai && suratSiap && surat.galat && (
+          <p role="alert" className="mt-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-300">
+            Kode QR untuk surat ini belum dapat dibuat, jadi surat tercetak tanpa QR. {surat.galat}
+          </p>
+        )}
       </div>
 
       {bisaCetak && (
         <div className="overflow-x-auto pb-4">
           {jenis === 'kartu'
             ? <KartuSku peserta={peserta} tingkat={tingkat} />
-            : <SuratTandaLulus peserta={peserta} tingkat={tingkat} />}
+            : <SuratTandaLulus peserta={peserta} tingkat={tingkat} token={suratSiap ? surat.token : null} />}
         </div>
       )}
     </div>

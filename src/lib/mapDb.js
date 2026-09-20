@@ -53,6 +53,7 @@ export function susunProgress(baris = [], riwayat = []) {
       catatanPeserta: r.catatan_peserta ?? '',
       verifikasi: r.verifikasi ?? null,
       diverifikasiPada: r.diverifikasi_pada ?? null,
+      token: r.verifikasi_token ?? null,
       riwayat: [],
     };
   }
@@ -197,6 +198,20 @@ export function susunInstrumen(instrumen = [], kriteria = [], penguji = [], pand
     });
   }
   return hasil;
+}
+
+/** Sesi ujian: [{ id, nama, tanggal, tempat, catatan, status, dibuatOleh, butir: [butirId], peserta: [pesertaId] }], tanggal terbaru dulu. */
+export function susunSesiUjian(sesi = [], butir = [], peserta = []) {
+  const b = new Map();
+  const p = new Map();
+  for (const r of butir) (b.get(r.sesi_id) ?? b.set(r.sesi_id, []).get(r.sesi_id)).push(r.butir_id);
+  for (const r of peserta) (p.get(r.sesi_id) ?? p.set(r.sesi_id, []).get(r.sesi_id)).push(r.peserta_id);
+  return sesi
+    .map((s) => ({
+      id: s.id, nama: s.nama, tanggal: tgl(s.tanggal), tempat: s.tempat ?? '', catatan: s.catatan ?? '', status: s.status,
+      dibuatOleh: s.dibuat_oleh ?? null, butir: b.get(s.id) ?? [], peserta: p.get(s.id) ?? [],
+    }))
+    .sort((x, y) => y.tanggal.localeCompare(x.tanggal) || y.id - x.id);
 }
 
 /** Baris raport satu semester -> { [pesertaId]: baris } */

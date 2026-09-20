@@ -1,14 +1,19 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { AMBANG_HADIR } from '../config';
 import { cariPoin, hitungProgres, laksanaTerbuka, layakGaruda, PERAN, tingkatSelesai } from '../lib/skuLogic';
 import { periodeDari, rekapAbsensi, sesiPeriode, tahunAjaranDari, PERIODE } from '../lib/absensiLogic';
-import { fmtTanggal, hariIni } from '../lib/format';
+import { fmtHariTanggal, fmtTanggal, hariIni } from '../lib/format';
+import { ringkasButirSesi, sesiUntukPeserta } from '../lib/sesiLogic';
 import useAbsensiPeriode from '../hooks/useAbsensiPeriode';
 import { Badge, Icon, Kosong, Lencana, ProgressBar, TeksPoin } from '../components/ui';
 
 export default function PesertaBeranda({ setTab, setTingkat }) {
-  const { user, users, progress, absensi, peranUser, batalkanAjuan, daftarCalonGaruda } = useApp();
+  const { user, users, progress, absensi, peranUser, batalkanAjuan, daftarCalonGaruda, sesiUjian, pastikanSesiUjian } = useApp();
+
+  // Jadwal ujian bersama yang mencantumkan saya (kosong bila belum ada atau basis data belum dimigrasi: bagian ini disembunyikan).
+  useEffect(() => { pastikanSesiUjian(); }, [pastikanSesiUjian]);
+  const jadwalSesi = sesiUntukPeserta(sesiUjian, user.id);
 
   const bantara = hitungProgres(progress, user, 'Bantara');
   const laksana = hitungProgres(progress, user, 'Laksana');
@@ -129,6 +134,30 @@ export default function PesertaBeranda({ setTab, setTingkat }) {
           </div>
         )}
       </section>
+
+      {jadwalSesi.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-lg font-bold">Jadwal ujian bersama</h2>
+          <ul className="panel divide-y divide-pramuka-100">
+            {jadwalSesi.map((s) => (
+              <li key={s.id} className="p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="font-semibold">{s.nama}</p>
+                  {s.status === 'berlangsung' && <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-900 ring-1 ring-inset ring-emerald-300">Sedang berlangsung</span>}
+                </div>
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-pramuka-700">
+                  <Icon nama="kalender" className="h-4 w-4 shrink-0" />
+                  {fmtHariTanggal(s.tanggal)}{s.tempat ? `, ${s.tempat}` : ''}
+                </p>
+                <p className="mt-1 text-xs text-pramuka-600">
+                  Butir yang diuji: {ringkasButirSesi(s.butir)}
+                </p>
+                {s.catatan && <p className="mt-1 text-xs text-pramuka-600">{s.catatan}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section>
         <h2 className="mb-2 text-lg font-bold">Agenda pengujian</h2>

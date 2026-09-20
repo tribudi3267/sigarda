@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { APP, GUDEP } from '../config';
 import { PIN_PANJANG } from '../lib/pinLogic';
 import { LOKAL } from '../lib/supabaseClient';
+import { alamatDasar } from '../lib/verifikasiLogic';
 import { PIN_DEMO } from '../lokal/pinDemo';
 import { FooterRingkas } from './Footer';
 import LogoMark from './LogoMark';
@@ -109,6 +110,10 @@ export default function Login() {
                 Salah PIN 5 kali mengunci akun selama 5 menit.
               </span>
             </p>
+
+            <a href={`${alamatDasar()}?v=`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-pramuka-800 underline">
+              <Icon nama="cek" className="h-3.5 w-3.5" />Periksa keaslian dokumen SKU
+            </a>
 
             {LOKAL && lokal.aktif && (
               <div className="mt-4 rounded-md bg-pramuka-100 px-3 py-2.5 text-xs leading-relaxed text-pramuka-700">

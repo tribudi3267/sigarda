@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunHadir, susunInstrumen, susunMateri, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunHadir, susunInstrumen, susunMateri, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -189,6 +189,27 @@ export function buatApi(klien) {
       return r.ok || r.sesiBerakhir ? r : { ok: true, data: {}, galat: r.pesan };
     },
 
+    /**
+     * Sesi ujian (pengurus: semua; Penegak: hanya yang mencantumkan dirinya). Bila database belum dimigrasi, dianggap kosong dengan galat.
+     */
+    muatSesiUjian: async () => {
+      const r = await muat(async () => {
+        const [a, b, c] = await Promise.all([
+          ambilSemua('sesi_ujian', { urut: ['tanggal', 'id'] }),
+          ambilSemua('sesi_ujian_butir', { urut: ['sesi_id', 'butir_id'] }),
+          ambilSemua('sesi_ujian_peserta', { urut: ['sesi_id', 'peserta_id'] }),
+        ]);
+        return susunSesiUjian(a, b, c);
+      });
+      return r.ok || r.sesiBerakhir ? r : { ok: true, data: [], galat: r.pesan };
+    },
+
+    /**
+     * Verifikasi keaslian dokumen. DAPAT DIPANGGIL TANPA LOGIN (peran anon). Mengembalikan { ok, data: { ditemukan, ... } }.
+     */
+    verifikasiToken: (token) => rpc('sg_verifikasi_token', { p_token: token }),
+    verifikasiKode: (kode) => rpc('sg_verifikasi_kode', { p_kode: kode }),
+
     /* ----------------------------- SKU ----------------------------- */
     ajukan: ({ skuId, jadwal, pengujiId, catatan }) =>
       rpc('sg_sku_ajukan', { p_sku_id: skuId, p_jadwal: jadwal || null, p_penguji_id: pengujiId || null, p_catatan: catatan ?? '' }),
@@ -265,6 +286,16 @@ export function buatApi(klien) {
         p_sku_id: d.skuId, p_cara_uji: d.caraUji ?? '', p_instruksi: d.instruksi ?? '', p_status: d.status,
         p_kriteria: d.kriteria.map((k) => ({ id: k.id ?? null, jenis: k.jenis, teks: k.teks, bobot: k.bobot, wajib: !!k.wajib, panduan: k.panduan ?? '' })),
       }),
+    /* ------------------- QR Surat Tanda Lulus dan sesi ujian ------------------- */
+    sertifikatTingkat: (pesertaId, tingkat) => rpc('sg_sertifikat_tingkat', { p_peserta_id: pesertaId, p_tingkat: tingkat }),
+    simpanSesi: (d) =>
+      rpc('sg_sesi_simpan', {
+        p_id: d.id ?? null, p_nama: d.nama, p_tanggal: d.tanggal, p_tempat: d.tempat ?? '', p_catatan: d.catatan ?? '', p_status: d.status ?? 'terjadwal',
+        p_butir: d.butir, p_peserta: d.peserta,
+      }),
+    statusSesi: (id, status) => rpc('sg_sesi_status', { p_id: id, p_status: status }),
+    hapusSesi: (id) => rpc('sg_sesi_hapus', { p_id: id }),
+
     statusInstrumen: (skuIds, status) => rpc('sg_instrumen_status', { p_sku_ids: skuIds, p_status: status }),
     simpanPengaturanInstrumen: (nilai) => rpc('sg_instrumen_pengaturan_simpan', { p_nilai: nilai }),
   };

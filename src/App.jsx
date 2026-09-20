@@ -20,13 +20,16 @@ import KelolaMateri from './pages/KelolaMateri';
 import Sidang from './pages/Sidang';
 import Raport from './pages/Raport';
 import KelolaInstrumen from './pages/KelolaInstrumen';
+import SesiUjian from './pages/SesiUjian';
+import HalamanVerifikasi from './components/HalamanVerifikasi';
+import { parameterVerifikasi } from './lib/verifikasiLogic';
 import { bolehKelolaMateri } from './lib/materiLogic';
 import LogoMark from './components/LogoMark';
 
 /**
  * Menu per peran, dikelompokkan menurut fungsinya (tampil sebagai kelompok di menu samping, dan berurutan di menu bawah ponsel).
  *  Utama            : Dashboard (Penegak: Beranda atau Garuda)
- *  Pengujian SKU    : Penegak: Poin SKU, Cetak. Dewan/Pembina: Antrian, Peserta, Instrumen (Pembina), Sidang, Cetak. Admin: Instrumen, Sidang, Cetak
+ *  Pengujian SKU    : Penegak: Poin SKU, Cetak. Dewan/Pembina: Antrian, Peserta, Sesi, Instrumen (Pembina), Sidang, Cetak. Admin: Sesi, Instrumen, Sidang, Cetak
  *  Kegiatan Ambalan : Absensi, Portofolio (pengurus), Raport (Pembina dan Admin)
  *  Materi           : Materi, Kelola Materi (Pembina dan Admin)
  *  Pengelolaan      : Anggota (Admin)
@@ -40,6 +43,7 @@ function buatNav(user, peran) {
   const absensi = { id: 'absensi', label: 'Absensi', ikon: 'absensi' };
   const portofolio = { id: 'portofolio', label: 'Portofolio', ikon: 'portofolio' };
   const sidang = { id: 'sidang', label: 'Sidang', ikon: 'sidang' };
+  const sesi = { id: 'sesi', label: 'Sesi ujian', ikon: 'sesi' };
   const cetak = { id: 'cetak', label: 'Cetak', ikon: 'cetak' };
   const kelolaBoleh = bolehKelolaMateri(user);
 
@@ -54,14 +58,14 @@ function buatNav(user, peran) {
   if (user.role === 'penguji') {
     return [
       { judul: 'Utama', item: [{ id: 'dashboard', label: 'Dashboard', ikon: 'dashboard' }] },
-      { judul: 'Pengujian SKU', item: [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }, { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, ...(kelolaBoleh ? [instrumen] : []), sidang, cetak] },
+      { judul: 'Pengujian SKU', item: [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }, { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, sesi, ...(kelolaBoleh ? [instrumen] : []), sidang, cetak] },
       { judul: 'Kegiatan Ambalan', item: [absensi, portofolio, ...(kelolaBoleh ? [raport] : [])] },
       { judul: 'Materi', item: [materi, ...(kelolaBoleh ? [kelola] : [])] },
     ];
   }
   return [
     { judul: 'Utama', item: [{ id: 'rekap', label: 'Dashboard', ikon: 'dashboard' }] },
-    { judul: 'Pengujian SKU', item: [instrumen, sidang, cetak] },
+    { judul: 'Pengujian SKU', item: [sesi, instrumen, sidang, cetak] },
     { judul: 'Kegiatan Ambalan', item: [absensi, portofolio, raport] },
     { judul: 'Materi', item: [materi, kelola] },
     { judul: 'Pengelolaan', item: [{ id: 'anggota', label: 'Anggota', ikon: 'anggota' }] },
@@ -163,6 +167,8 @@ function Shell() {
     isi = <ResetPin />;
   } else if (tabAktif === 'sidang' && user.role !== 'peserta') {
     isi = <Sidang />;
+  } else if (tabAktif === 'sesi' && user.role !== 'peserta') {
+    isi = <SesiUjian />;
   } else if (tabAktif === 'raport' && bolehKelolaMateri(user)) {
     isi = <Raport />;
   } else if (tabAktif === 'instrumen' && bolehKelolaMateri(user)) {
@@ -219,6 +225,9 @@ function Shell() {
 }
 
 export default function App() {
+  // Alamat dari QR dokumen (/?v=...) membuka halaman verifikasi publik: tanpa login dan tanpa memuat data aplikasi.
+  const verifikasi = parameterVerifikasi(window.location.search);
+  if (verifikasi !== null) return <HalamanVerifikasi awal={verifikasi} />;
   return (
     <AppProvider>
       <Shell />

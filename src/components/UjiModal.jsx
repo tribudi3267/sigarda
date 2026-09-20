@@ -20,13 +20,14 @@ const PILIHAN_INSTRUMEN = [
   PILIHAN[3],
 ];
 
-function IsiUji({ pesertaId, poin, instr, pengaturan, onTutup }) {
+function IsiUji({ pesertaId, poin, instr, pengaturan, tanggalAwal, onTutup }) {
   const { users, progress, catatHasil } = useApp();
   const peserta = users.find((u) => u.id === pesertaId);
   const entry = getEntry(progress, pesertaId, poin.id);
 
   const [hasil, setHasil] = useState(entry.status === 'lulus' ? 'reset' : instr ? 'nilai' : 'lulus');
-  const [tanggalUji, setTanggalUji] = useState(entry.tanggalUji ?? hariIni());
+  // Dari papan sesi ujian: tanggal awal = tanggal sesi (kecuali hasil tercatat sudah bertanggal sesi atau sesudahnya), agar papan menghitung hasilnya.
+  const [tanggalUji, setTanggalUji] = useState(tanggalAwal && !(entry.tanggalUji && entry.tanggalUji >= tanggalAwal) ? tanggalAwal : entry.tanggalUji ?? hariIni());
   const [nilai, setNilai] = useState(entry.nilai ?? NILAI[1]);
   const [nilaiKriteria, setNilaiKriteria] = useState({});
   const [hasilPilih, setHasilPilih] = useState(null); // null = ikuti saran
@@ -187,7 +188,7 @@ function IsiUji({ pesertaId, poin, instr, pengaturan, onTutup }) {
 }
 
 /** Penguji menilai satu poin. PIN penguji berfungsi sebagai verifikasi digital. Butir berinstrumen ditetapkan dinilai lewat instrumen. */
-export default function UjiModal({ pesertaId, poin, onTutup }) {
+export default function UjiModal({ pesertaId, poin, tanggalAwal = null, onTutup }) {
   const { instrumen, siap, pengaturan } = useInstrumen();
   if (!siap) {
     return (
@@ -197,5 +198,5 @@ export default function UjiModal({ pesertaId, poin, onTutup }) {
     );
   }
   const instr = instrumen[poin.id]?.status === 'ditetapkan' && instrumen[poin.id].kriteria.length ? instrumen[poin.id] : null;
-  return <IsiUji pesertaId={pesertaId} poin={poin} instr={instr} pengaturan={pengaturan} onTutup={onTutup} />;
+  return <IsiUji pesertaId={pesertaId} poin={poin} instr={instr} pengaturan={pengaturan} tanggalAwal={tanggalAwal} onTutup={onTutup} />;
 }

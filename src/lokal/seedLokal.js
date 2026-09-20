@@ -49,6 +49,9 @@ export async function isiDataContoh(pg) {
     }
   }
   await pg.query('insert into public.sku_progress select * from json_populate_recordset(null::public.sku_progress, $1::json)', [JSON.stringify(progress)]);
+  // Butir lulus data contoh: token QR, dan kode VRF berformat sama dengan yang dibuat server (7 heksadesimal) agar dapat diperiksa di halaman verifikasi.
+  const punyaToken = (await pg.query("select 1 from information_schema.columns where table_schema = 'public' and table_name = 'sku_progress' and column_name = 'verifikasi_token'")).rows.length > 0; // skema lama (uji migrasi) belum punya
+  if (punyaToken) await pg.query("update public.sku_progress set verifikasi_token = sigarda.token_acak(), verifikasi = sigarda.kode_verifikasi(array[peserta_id::text, sku_id, coalesce(penguji_id::text, ''), coalesce(tanggal_uji::text, '')]) where status = 'lulus'");
   await pg.query('insert into public.sku_riwayat (peserta_id, sku_id, waktu, teks, oleh) select peserta_id, sku_id, waktu, teks, oleh from json_populate_recordset(null::public.sku_riwayat, $1::json)', [JSON.stringify(riwayat)]);
 
   const sesi = Object.values(seed.absensi.sesi).map((s) => ({ tanggal: s.tanggal, dibuat_oleh: p(s.dibuatOleh), dibuat_pada: s.dibuatPada }));
