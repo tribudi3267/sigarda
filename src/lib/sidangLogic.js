@@ -20,15 +20,22 @@ export const KUNCI_PENGATURAN = {
 };
 
 export const KODE_FORMAT = [
-  ['{no}', 'nomor urut (1, 2, 3)'],
-  ['{no3}', 'nomor urut tiga angka (001, 002)'],
-  ['{tahun}', 'tahun sidang'],
-  ['{bulan}', 'bulan sidang dua angka (09)'],
-  ['{romawi}', 'bulan sidang angka Romawi (IX)'],
+  ['{no}', 'nomor urut tanpa nol (2)'],
+  ['{no2}', 'nomor urut 2 angka (02)'],
+  ['{no3}', 'nomor urut 3 angka (002)'],
+  ['{no4}', 'nomor urut 4 angka (0002)'],
+  ['{no5}', 'nomor urut 5 angka (00002)'],
+  ['{no6}', 'nomor urut 6 angka (000002)'],
+  ['{tahun}', 'tahun sidang (2026)'],
+  ['{bulan}', 'bulan sidang 2 angka (08)'],
+  ['{romawi}', 'bulan sidang angka Romawi (VIII)'],
   ['{tingkat}', 'Bantara atau Laksana'],
 ];
 const KODE_SAH = KODE_FORMAT.map(([k]) => k);
 const ROMAWI = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+
+/** Nomor dengan nol di depan sampai selebar `lebar`; angka yang lebih panjang tidak dipotong (sama dengan sigarda.pad_nomor). */
+export const padNomor = (no, lebar) => String(no).padStart(lebar, '0');
 
 export const KEPUTUSAN = {
   layak: { label: 'Layak dan Lulus', kelas: 'bg-emerald-50 text-emerald-800 ring-emerald-300' },
@@ -40,12 +47,12 @@ export const HASIL_TUGAS = { lulus: 'Lulus', tidak: 'Belum lulus' };
 /** Spasi ganda dan tepi dirapikan, sama dengan sigarda.rapikan di SQL. */
 export const rapikan = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
 
-/** Nomor berita acara dari format. Ganti kode {no} {no3} {tahun} {bulan} {romawi} {tingkat}. */
+/** Nomor berita acara dari format. Ganti kode {no} {no2}..{no6} {tahun} {bulan} {romawi} {tingkat}. */
 export function formatNomor(format, { no, tanggal, tingkat }) {
   const [tahun, bulan] = String(tanggal).split('-');
   const sub = (teks, kode, nilai) => teks.split(kode).join(nilai);
   let h = String(format);
-  h = sub(h, '{no3}', String(no).padStart(3, '0'));
+  for (const lebar of [6, 5, 4, 3, 2]) h = sub(h, `{no${lebar}}`, padNomor(no, lebar));
   h = sub(h, '{no}', String(no));
   h = sub(h, '{tahun}', String(Number(tahun)));
   h = sub(h, '{bulan}', String(Number(bulan)).padStart(2, '0'));
@@ -54,19 +61,66 @@ export function formatNomor(format, { no, tanggal, tingkat }) {
   return h;
 }
 
-/** Pesan galat untuk format nomor, atau '' bila sah. Aturan sama dengan sg_pengaturan_simpan di SQL. */
+const KODE_NOMOR = /\{no[2-6]?\}/;
+
+/**
+ * Pesan galat untuk format nomor, atau '' bila sah. Aturan sah/tidak sah sama dengan sg_pengaturan_simpan di SQL;
+ * pesannya di sini lebih menuntun karena dibaca langsung oleh pengguna.
+ */
 export function periksaFormatNomor(format) {
   const v = rapikan(format);
-  if (!v) return 'Format nomor wajib diisi.';
+  if (!v) return 'Format nomor wajib diisi. Contoh: {no4}/DA/{romawi}/{tahun}';
   if (v.length > 80) return 'Format nomor maksimal 80 karakter.';
-  if (!/^[A-Za-z0-9 /._(){}-]+$/.test(v)) return 'Format nomor hanya boleh berisi huruf, angka, spasi, dan tanda / . - _ ( ) serta kode dalam kurung kurawal.';
+  if (/[[\]<>]/.test(v)) return 'Kode ditulis dengan kurung kurawal { }, bukan [ ] atau < >. Contoh: {no4}/DA/{romawi}/{tahun}';
+  const terlarang = [...new Set(v.match(/[^A-Za-z0-9 /._(){}-]/g) ?? [])];
+  if (terlarang.length) return `Karakter ${terlarang.map((c) => `"${c}"`).join(' ')} tidak boleh dipakai. Yang boleh: huruf, angka, spasi, dan tanda / . - _ ( )`;
   for (const k of v.match(/\{[^}]*\}/g) ?? []) {
-    if (!KODE_SAH.includes(k)) return `Kode ${k} tidak dikenal. Kode yang tersedia: ${KODE_SAH.join(' ')}.`;
+    if (KODE_SAH.includes(k)) continue;
+    if (KODE_SAH.includes(k.toLowerCase())) return `Kode ${k} harus ditulis dengan huruf kecil: ${k.toLowerCase()}`;
+    return `Kode ${k} tidak dikenal. Kode yang tersedia: ${KODE_SAH.join(' ')}`;
   }
-  if (/[{}]/.test(v.replace(/\{(no|no3|tahun|bulan|romawi|tingkat)\}/g, ''))) return 'Tanda kurung kurawal pada format nomor tidak lengkap.';
-  if (!v.includes('{no}') && !v.includes('{no3}')) return 'Format nomor harus memuat {no} atau {no3} (nomor urut).';
-  if (!v.includes('{tahun}')) return 'Format nomor harus memuat {tahun} agar nomor tidak sama antar tahun.';
+  if (/[{}]/.test(v.replace(/\{(no|no[2-6]|tahun|bulan|romawi|tingkat)\}/g, ''))) return 'Ada tanda kurung kurawal yang belum lengkap. Setiap kode harus diawali { dan diakhiri }.';
+  if (!KODE_NOMOR.test(v)) return 'Format belum memuat kode nomor urut. Tambahkan {no4} (hasilnya 0002) atau {no} (hasilnya 2).';
+  if (!v.includes('{tahun}')) return 'Format belum memuat {tahun}. Tahun diperlukan agar nomor tidak sama antar tahun.';
   return '';
+}
+
+/* ---------- Pembuat format berbasis pilihan (agar pengguna tidak perlu menulis kode sendiri) ---------- */
+
+export const PEMISAH = [['/', 'Garis miring ( / )'], ['-', 'Strip ( - )'], ['.', 'Titik ( . )']];
+export const OPSI_BULAN = [['tidak', 'Tidak dicantumkan'], ['romawi', 'Angka Romawi (mis. VIII)'], ['angka', 'Angka biasa (mis. 08)']];
+export const OPSI_DIGIT = [1, 2, 3, 4, 5, 6].map((d) => [d, d === 1 ? '1 angka (1, 2, 3)' : `${d} angka (${padNomor(2, d)}, ${padNomor(3, d)})`]);
+
+/** Susunan nomor: nomor urut, kode surat (opsional), tingkat (opsional), bulan (opsional), tahun; dipisah `pemisah`. */
+export function bangunFormat({ digit = 3, kode = '', tingkat = false, bulan = 'tidak', pemisah = '/' } = {}) {
+  const bagian = [digit === 1 ? '{no}' : `{no${digit}}`];
+  const k = rapikan(String(kode).replace(/[{}]/g, ''));
+  if (k) bagian.push(k);
+  if (tingkat) bagian.push('{tingkat}');
+  if (bulan === 'romawi') bagian.push('{romawi}');
+  else if (bulan === 'angka') bagian.push('{bulan}');
+  bagian.push('{tahun}');
+  return bagian.join(pemisah);
+}
+
+/** Kebalikan bangunFormat: mengembalikan pilihan bila format berbentuk baku, atau null bila harus dibuka sebagai teks. */
+export function uraiFormat(format) {
+  const f = rapikan(format);
+  for (const pemisah of ['/', '-', '.']) {
+    const e = pemisah.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const m = new RegExp(`^\\{(no|no[2-6])\\}(?:${e}(.*?))??(?:${e}\\{tingkat\\})?(?:${e}\\{(bulan|romawi)\\})?${e}\\{tahun\\}$`).exec(f);
+    if (!m) continue;
+    const kode = m[2] ?? '';
+    const pilihan = {
+      digit: m[1] === 'no' ? 1 : Number(m[1].slice(2)),
+      kode,
+      tingkat: f.includes('{tingkat}'),
+      bulan: m[3] === 'romawi' ? 'romawi' : m[3] === 'bulan' ? 'angka' : 'tidak',
+      pemisah,
+    };
+    if (!/[{}]/.test(kode) && bangunFormat(pilihan) === f) return pilihan;
+  }
+  return null;
 }
 
 /** Nilai pengaturan sidang dengan bawaan bila belum diatur. */
@@ -79,10 +133,12 @@ export function pengaturanSidang(pengaturan = {}) {
   };
 }
 
-/** Perkiraan nomor urut berikutnya pada tahun itu (server yang memastikan angka finalnya). */
-export function nomorUrutBerikutnya(sidang, tahun) {
-  const semua = sidang.filter((s) => s.nomorUrut != null && String(s.tanggal).startsWith(String(tahun))).map((s) => s.nomorUrut);
-  return (semua.length ? Math.max(...semua) : 0) + 1;
+/**
+ * Nomor urut yang akan dipakai berikutnya pada tahun itu. `urut` = { [tahun]: nomor terakhir yang dipakai }, dibaca dari
+ * penghitung di server (tabel sidang_urut), jadi sama dengan yang akan dipakai server saat menyimpan.
+ */
+export function nomorUrutBerikutnya(urut = {}, tahun) {
+  return (Number(urut[String(tahun)]) || 0) + 1;
 }
 
 /** "Butir 5, Butir 1c" dari daftar id unit SKU. */

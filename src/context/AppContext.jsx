@@ -32,7 +32,7 @@ export function useApp() {
   return ctx;
 }
 
-const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], pengaturan: {} };
+const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {} };
 const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi waktu Edge Function)
 const JEDA_SEGARKAN_MS = 30000;
 
@@ -217,7 +217,13 @@ export function AppProvider({ children }) {
       portofolio: (pid) => terapkan(api().muatPortofolio(pid), (p) => (d) => ({ ...d, portofolio: pid ? { ...d.portofolio, [pid]: p[pid] ?? {} } : p })),
       hadir: (tanggal) => terapkan(api().muatHadirTanggal(tanggal), (h) => (d) => ({ ...d, absensi: { ...d.absensi, hadir: { ...d.absensi.hadir, [tanggal]: h } } })),
       materi: () => terapkan(api().muatMateri(), (materi) => (d) => ({ ...d, materi })),
-      sidang: () => terapkan(api().muatSidang(), (sidang) => (d) => ({ ...d, sidang })),
+      sidang: async () => {
+        const [s, u] = await Promise.all([api().muatSidang(), api().muatSidangUrut()]);
+        const gagal = [s, u].find((r) => !r.ok);
+        if (!gagal) setDb((d) => ({ ...d, sidang: s.data, sidangUrut: u.data }));
+        else if (gagal.sesiBerakhir) await sesiBerakhir();
+        else notify(gagal.pesan, 'err');
+      },
       pengaturan: () => terapkan(api().muatPengaturan(), (pengaturan) => (d) => ({ ...d, pengaturan })),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -374,13 +380,13 @@ export function AppProvider({ children }) {
   /** Memuat catatan sidang dan pengaturan (dipanggil halaman Sidang saat dibuka). */
   const muatSidang = useCallback(async () => {
     const a = api();
-    const [s, p] = await Promise.all([a.muatSidang(), a.muatPengaturan()]);
-    const gagal = [s, p].find((r) => !r.ok);
+    const [s, p, u] = await Promise.all([a.muatSidang(), a.muatPengaturan(), a.muatSidangUrut()]);
+    const gagal = [s, p, u].find((r) => !r.ok);
     if (gagal) {
       if (gagal.sesiBerakhir) await sesiBerakhir();
       return gagal;
     }
-    setDb((d) => ({ ...d, sidang: s.data, pengaturan: p.data }));
+    setDb((d) => ({ ...d, sidang: s.data, pengaturan: p.data, sidangUrut: u.data }));
     return { ok: true };
   }, [sesiBerakhir]);
 
@@ -401,6 +407,12 @@ export function AppProvider({ children }) {
   const simpanPengaturan = (kunci, nilai) => {
     if (!bolehSidang) return Promise.resolve(ditolak(notify, MSG_SIDANG));
     return aksi(api().simpanPengaturan(kunci, nilai), { sesudah: () => segarkan.pengaturan() });
+  };
+
+  /** Atur nomor urut berikutnya untuk satu tahun (melanjutkan nomor yang sudah berjalan). */
+  const aturUrutSidang = (tahun, berikutnya) => {
+    if (!bolehSidang) return Promise.resolve(ditolak(notify, MSG_SIDANG));
+    return aksi(api().aturUrutSidang(tahun, berikutnya), { sukses: `Nomor urut berikutnya untuk tahun ${tahun} diatur menjadi ${berikutnya}.`, sesudah: () => segarkan.sidang() });
   };
 
   /* ------------------------- Manajemen anggota (admin) ------------------------- */
@@ -521,7 +533,8 @@ export function AppProvider({ children }) {
     status, galatMuat, lokal: LOKAL ? { aktif: true, reset: () => lokalRef.current?.reset() } : { aktif: false },
     db, user, users: db.users, progress: db.progress, absensi: db.absensi, portofolio: db.portofolio,
     materi: db.materi, bolehKelolaMateri: izinMateri, simpanMateri, hapusMateri, geserUrutanMateri,
-    sidang: db.sidang, pengaturan: db.pengaturan, bolehSidang, bolehHapusSidang, muatSidang, simpanSidang, hapusSidang, simpanPengaturan,
+    sidang: db.sidang, sidangUrut: db.sidangUrut, pengaturan: db.pengaturan, bolehSidang, bolehHapusSidang, muatSidang, simpanSidang, hapusSidang,
+    simpanPengaturan, aturUrutSidang,
     daftarPeserta, peranUser, bolehKelolaAbsen,
     login, logout,
     ajukan, batalkanAjuan, catatHasil,

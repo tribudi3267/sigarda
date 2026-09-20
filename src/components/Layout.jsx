@@ -5,8 +5,22 @@ import Footer from './Footer';
 import LogoMark from './LogoMark';
 import { Icon } from './ui';
 
+/**
+ * Menu di header (layar md ke atas) selalu menampilkan ikon; TULISAN menu dan NAMA pengguna hanya bila cukup lebar.
+ * Kebutuhan lebar bertambah menurut jumlah menu (terukur: sekitar 108px per menu berlabel, ditambah logo dan tombol akun),
+ * jadi ambangnya dipilih menurut jumlah menu. Nama kelas ditulis utuh karena Tailwind tidak membaca nama kelas yang dirangkai.
+ */
+const TAMPILAN_HEADER = {
+  10: { label: 'hidden min-[1560px]:inline', labelSr: 'sr-only min-[1560px]:hidden', nama: 'hidden', wadah: 'max-w-[100rem]' },
+  9: { label: 'hidden min-[1460px]:inline', labelSr: 'sr-only min-[1460px]:hidden', nama: 'hidden min-[1640px]:block', wadah: 'max-w-[100rem]' },
+  8: { label: 'hidden min-[1360px]:inline', labelSr: 'sr-only min-[1360px]:hidden', nama: 'hidden min-[1540px]:block', wadah: 'max-w-[100rem]' },
+  0: { label: 'hidden xl:inline', labelSr: 'sr-only xl:hidden', nama: 'hidden xl:block', wadah: 'max-w-6xl' },
+};
+const tampilanHeader = (jumlahMenu) => TAMPILAN_HEADER[jumlahMenu >= 10 ? 10 : jumlahMenu >= 8 ? jumlahMenu : 0];
+
 export default function Layout({ nav, tab, setTab, children }) {
   const { user, peranUser, logout } = useApp();
+  const tampil = tampilanHeader(nav.length);
 
   // Peserta: peran turunan (Penegak Calon Bantara/Laksana/Garuda). Penguji: jabatan.
   const labelPeran =
@@ -15,10 +29,10 @@ export default function Layout({ nav, tab, setTab, children }) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="no-print sticky top-0 z-40 border-b-4 border-emas bg-pramuka-800 text-pramuka-50">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+        <div className={`mx-auto flex ${tampil.wadah} items-center gap-3 px-4 py-3`}>
           <button
             onClick={() => setTab(nav[0].id)}
-            className="flex min-w-0 items-center gap-3 text-left"
+            className="flex min-w-0 items-center gap-3 text-left md:shrink-0"
             aria-label={`${APP.nama}, ke halaman utama`}
           >
             <LogoMark size={42} />
@@ -29,20 +43,21 @@ export default function Layout({ nav, tab, setTab, children }) {
             </span>
           </button>
 
-          <nav className="ml-auto hidden gap-1 md:flex" aria-label="Menu utama">
+          {/* min-w-0 + overflow-x-auto: bila ruang kurang, menu yang bergulir ke samping; tidak pernah menimpa logo */}
+          <nav className="ml-auto hidden min-w-0 gap-1 overflow-x-auto md:flex" aria-label="Menu utama">
             {nav.map((n) => (
               <button
                 key={n.id}
                 onClick={() => setTab(n.id)}
                 aria-current={tab === n.id ? 'page' : undefined}
                 title={n.label}
-                className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-2.5 py-2 text-sm font-semibold transition-colors xl:px-3 ${
+                className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-2.5 py-2 text-sm font-semibold transition-colors xl:px-3 ${
                   tab === n.id ? 'bg-pramuka-900 text-emas-light' : 'text-pramuka-200 hover:bg-pramuka-700'
                 }`}
               >
                 <Icon nama={n.ikon} className="h-4 w-4" />
-                <span className="hidden xl:inline">{n.label}</span>
-                <span className="sr-only xl:hidden">{n.label}</span>
+                <span className={tampil.label}>{n.label}</span>
+                <span className={tampil.labelSr}>{n.label}</span>
               </button>
             ))}
           </nav>
@@ -54,7 +69,7 @@ export default function Layout({ nav, tab, setTab, children }) {
               aria-label="Akun saya"
               className={`flex items-center gap-2 rounded-lg p-2 text-left hover:bg-pramuka-700 ${tab === 'akun' ? 'bg-pramuka-900' : ''}`}
             >
-              <span className="hidden max-w-[11rem] text-right leading-tight xl:block">
+              <span className={`max-w-[11rem] text-right leading-tight ${tampil.nama}`}>
                 <span className="block truncate text-sm font-semibold">{user.nama}</span>
                 <span className="block truncate text-xs text-pramuka-300">{labelPeran}</span>
               </span>

@@ -28,7 +28,9 @@ export function pesanGalat(error) {
   }
   if (/jwt|not authenticated|invalid token|session/i.test(m)) return 'Sesi berakhir. Masuk kembali.';
   if (/permission denied|row-level security/i.test(m)) return 'Anda tidak memiliki izin untuk tindakan ini.';
-  if (/could not find the function|schema cache/i.test(m)) return 'Basis data belum disiapkan (fungsi tidak ditemukan). Jalankan skema SQL di Supabase.';
+  if (/could not find the function|schema cache|function [\w.]+\(.*\) does not exist/i.test(m)) {
+    return 'Basis data belum diperbarui (fungsi tidak ditemukan). Jalankan migrasi terbaru dari folder supabase/migrasi di SQL Editor Supabase. Jangan menjalankan skema.sql pada database yang sudah berisi data.';
+  }
   return m || 'Terjadi galat yang tidak dikenal.';
 }
 const sesiBerakhir = (error) => /jwt|not authenticated|invalid token/i.test(String(error?.message ?? ''));
@@ -152,6 +154,15 @@ export function buatApi(klien) {
     /** Catatan sidang (hanya pengurus yang menerima baris) dan pengaturan aplikasi. Dimuat saat halaman Sidang dibuka. */
     muatSidang: () => muat(async () => (await ambilSemua('sidang_dk', { urut: ['id'] })).map(petaSidang)),
     muatPengaturan: () => muat(async () => petaPengaturan(await ambilSemua('pengaturan', { urut: ['kunci'] }))),
+    /**
+     * Penghitung nomor berita acara: { [tahun]: nomor terakhir yang dipakai } (hanya pengurus).
+     * Pada database yang belum menjalankan migrasi 2026-09-sidang-format-nomor.sql tabel ini belum dapat dibaca; halaman Sidang
+     * tetap harus berfungsi, jadi kegagalan selain sesi berakhir dianggap "belum ada penghitung".
+     */
+    muatSidangUrut: async () => {
+      const r = await muat(async () => Object.fromEntries((await ambilSemua('sidang_urut', { urut: ['tahun'] })).map((b) => [String(b.tahun), b.terakhir])));
+      return r.ok || r.sesiBerakhir ? r : { ok: true, data: {} };
+    },
 
     /* ----------------------------- SKU ----------------------------- */
     ajukan: ({ skuId, jadwal, pengujiId, catatan }) =>
@@ -209,6 +220,7 @@ export function buatApi(klien) {
         p_nomor_manual: d.nomorManual || null, p_nta: d.nta || null,
       }),
     hapusSidang: (id) => rpc('sg_sidang_hapus', { p_id: id }),
+    aturUrutSidang: (tahun, berikutnya) => rpc('sg_sidang_urut_atur', { p_tahun: tahun, p_berikutnya: berikutnya }),
     simpanPengaturan: (kunci, nilai) => rpc('sg_pengaturan_simpan', { p_kunci: kunci, p_nilai: nilai }),
   };
 }

@@ -122,8 +122,12 @@ Menu **Sidang** (Dewan Ambalan, Pembina, Admin) untuk keputusan Lulus atau Tidak
 - **Lembar sidang**: capaian dan rincian butir (tanggal dan penguji), elemen manual (masa magang atau tamu ambalan, tugas tambahan adat), NTA (opsional; tersimpan ke profil), keputusan, catatan, nomor berita acara.
   **"Layak dan Lulus" hanya bila seluruh butir tingkat itu lulus** (ditegakkan di server); satu peserta hanya sekali Layak per tingkat.
 - **Berita Acara** siap cetak (A4) mengikuti format Ambalan. Nama ketua dan sebutan jabatannya dicatat saat sidang, jadi berita acara lama tidak berubah bila pengaturan diganti.
-- **Pengaturan sidang** (dapat diubah Dewan Ambalan, Pembina, Admin): format nomor (kode `{no}` `{no3}` `{tahun}` `{bulan}` `{romawi}` `{tingkat}`, bawaan `{no3}/DK/{tahun}`; wajib memuat nomor urut dan `{tahun}`),
-  nama Ketua Dewan Penegak (kosong = garis tanda tangan), sebutan jabatan (bawaan "Ketua Dewan Penegak / Pemangku Adat"). Nomor urut mulai dari 1 tiap tahun dan tidak dipakai ulang setelah catatan dihapus (untuk memakai nomor yang sama, isi nomor manual).
+- **Pengaturan sidang** (dapat diubah Dewan Ambalan, Pembina, Admin):
+  - **Format nomor berita acara**, diatur dengan **pilihan** (panjang nomor urut 1-6 angka, kode surat, bulan Romawi/angka/tanpa bulan, pemisah `/` `-` `.`, tingkat opsional; tahun selalu ada) atau ditulis **manual** dengan kode
+    `{no}` `{no2}` `{no3}` `{no4}` `{no5}` `{no6}` (nomor urut dengan nol di depan sampai 2-6 angka), `{tahun}` `{bulan}` `{romawi}` `{tingkat}`. Contoh: `{no4}/DA/{romawi}/{tahun}` menghasilkan `0002/DA/VIII/2026`.
+    Wajib memuat satu kode nomor urut dan `{tahun}`. Pratinjau memakai nomor urut yang benar-benar akan dipakai berikutnya (dari penghitung di server), dan bulan/tahun mengikuti tanggal sidang.
+  - **Nomor urut berikutnya**: nomor mulai dari 1 tiap tahun dan tidak dipakai ulang setelah catatan dihapus. Untuk melanjutkan nomor yang sudah berjalan di kertas, atur nomor berikutnya (harus lebih besar dari nomor tertinggi yang sudah tercatat pada tahun itu). Nomor juga bisa diisi manual di lembar sidang.
+  - Nama Ketua Dewan Penegak (kosong = garis tanda tangan) dan sebutan jabatan (bawaan "Ketua Dewan Penegak / Pemangku Adat").
 - Catatan sidang hanya terbaca pengurus; semua penulisan lewat fungsi server `sg_sidang_simpan`, `sg_sidang_hapus`, `sg_pengaturan_simpan`.
 - Belum termasuk: kolom NTA pada import Excel dan formulir Admin (NTA saat ini diisi di lembar sidang).
 
@@ -260,6 +264,8 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
 - [`2026-09-rls-ringan.sql`](supabase/migrasi/2026-09-rls-ringan.sql): aturan baca (RLS) dihitung sekali per kueri, bukan sekali per baris. Pada 20 ribu baris progres, membaca milik sendiri turun dari sekitar 1 detik menjadi sekitar 7 milidetik (diukur di PGlite; angka di Supabase berbeda, arahnya sama).
 - [`2026-09-sidang-dk.sql`](supabase/migrasi/2026-09-sidang-dk.sql): Sidang Dewan Kehormatan dan Pengaturan. Hanya menambah 3 tabel (`pengaturan`, `sidang_dk`, `sidang_urut`), kolom `profiles.nta`, dan fungsi baru.
   **Wajib dijalankan sebelum menerbitkan kode Sidang**, karena halaman Sidang membaca tabel baru itu. Jalankan setelah `2026-09-rls-ringan.sql`.
+- [`2026-09-sidang-format-nomor.sql`](supabase/migrasi/2026-09-sidang-format-nomor.sql): kode nomor `{no2}`-`{no6}` (nomor 4 angka dan seterusnya), penghitung nomor urut dapat dibaca pengurus, dan fungsi `sg_sidang_urut_atur`.
+  Jalankan **setelah** `2026-09-sidang-dk.sql`. Catatan sidang dan pengaturan yang sudah ada tidak berubah.
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 
 ## Struktur folder
@@ -274,6 +280,7 @@ sku-bukateja/
 │   ├── skema.sql                       (dibuat otomatis) tabel, RLS, fungsi sg_*, katalog. Dijalankan di SQL Editor
 │   ├── sumber/inti.sql                 sumber skema tanpa katalog (EDIT DI SINI, lalu npm run skema)
 │   ├── migrasi/                        perubahan skema untuk database yang SUDAH berisi data (jalankan berurutan, aman diulang)
+│   ├── demo/                           data demo Penegak untuk pengujian (data_demo_penegak.sql) dan pembersihnya (hapus_data_demo.sql)
 │   ├── admin_pertama.sql               profil admin pertama
 │   ├── pulihkan_pin_admin.sql          pemulihan PIN admin oleh pengelola Supabase
 │   ├── functions/sigarda/index.ts      Edge Function tunggal (login, akun, PIN, verifikasi penguji)
@@ -301,6 +308,13 @@ Skema SQL dan logika Edge Function dijalankan pada Postgres sungguhan (PGlite) d
 Yang diuji: siapa boleh membaca apa, penulisan langsung ditolak untuk semua peran, semua fungsi `sg_*` (aturan SKU, absensi, portofolio, materi, anggota),
 hak reset PIN, pembatasan login, kewajiban ganti PIN, dan pemetaan data ke bentuk yang dipakai halaman.
 Yang **tidak** dapat diuji tanpa proyek Supabase sungguhan: perilaku GoTrue (mis. penerimaan email `.invalid`), PostgREST, dan runtime Deno. Gunakan "Uji cepat" di atas setelah pemasangan.
+
+### Data demo untuk pengujian di Supabase
+[`supabase/demo/data_demo_penegak.sql`](supabase/demo/data_demo_penegak.sql) membuat 8 Penegak demo (NIS `990001`-`990008`, PIN `352817`, langsung bisa masuk) dengan kemajuan SKU yang beragam:
+Bantara penuh, Bantara dan Laksana penuh, Laksana sebagian, butir menunggu/diuji/diulang, butir agama lulus sebagian (menguji blokir "Layak" pada Sidang), Calon Garuda dengan portofolio, dan Khonghucu.
+Jalankan di SQL Editor; aman diulang (akun tidak digandakan, data SKU demo direset). Tidak menyentuh anggota asli. Setelah selesai menguji, jalankan
+[`supabase/demo/hapus_data_demo.sql`](supabase/demo/hapus_data_demo.sql), yang menghapus hanya akun ber-NIS `9900xx` dengan nama berawalan "Demo " beserta seluruh datanya.
+Skrip membuat akun langsung di `auth.users`; bila gagal di proyek Anda, buat 8 akun itu lewat Anggota > Import Excel lalu jalankan skrip lagi (akun yang sudah ada dilewati, datanya tetap diisi).
 
 ## Menyesuaikan untuk Gudep
 

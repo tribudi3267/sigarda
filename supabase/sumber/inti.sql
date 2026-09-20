@@ -244,13 +244,21 @@ create function sigarda.pengaturan_teks(p_kunci text, p_bawaan text) returns tex
 language sql stable security definer set search_path = public as
 $$ select coalesce((select nilai #>> '{}' from public.pengaturan where kunci = p_kunci), p_bawaan) $$;
 
--- Nomor berita acara dari format. Kode: {no} {no3} (tiga angka) {tahun} {bulan} {romawi} {tingkat}.
--- Harus sama dengan formatNomor() di src/lib/sidangLogic.js (dijaga oleh pengujian).
+-- Nomor urut diberi nol di depan sampai selebar p_lebar; angka yang lebih panjang tidak dipotong (lpad memotong!).
+create function sigarda.pad_nomor(p_no int, p_lebar int) returns text language sql immutable as
+$$ select case when char_length(p_no::text) >= p_lebar then p_no::text else lpad(p_no::text, p_lebar, '0') end $$;
+
+-- Nomor berita acara dari format. Kode: {no} {no2} {no3} {no4} {no5} {no6} (nomor urut dengan nol di depan sampai 2-6 angka),
+-- {tahun} {bulan} {romawi} {tingkat}. Harus sama dengan formatNomor() di src/lib/sidangLogic.js (dijaga oleh pengujian).
 create function sigarda.format_nomor(p_format text, p_no int, p_tanggal date, p_tingkat text) returns text
 language sql immutable as
 $$
-  select replace(replace(replace(replace(replace(replace(p_format,
-    '{no3}', case when p_no >= 1000 then p_no::text else lpad(p_no::text, 3, '0') end),
+  select replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(p_format,
+    '{no6}', sigarda.pad_nomor(p_no, 6)),
+    '{no5}', sigarda.pad_nomor(p_no, 5)),
+    '{no4}', sigarda.pad_nomor(p_no, 4)),
+    '{no3}', sigarda.pad_nomor(p_no, 3)),
+    '{no2}', sigarda.pad_nomor(p_no, 2)),
     '{no}', p_no::text),
     '{tahun}', extract(year from p_tanggal)::int::text),
     '{bulan}', lpad(extract(month from p_tanggal)::int::text, 2, '0')),
@@ -302,7 +310,7 @@ alter table public.portofolio_jurnal enable row level security;
 alter table public.materi enable row level security;
 alter table public.pengaturan enable row level security;
 alter table public.sidang_dk enable row level security;
-alter table public.sidang_urut enable row level security;   -- tanpa kebijakan: hanya dipakai fungsi sg_*
+alter table public.sidang_urut enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_*
 alter table public.login_gagal enable row level security;   -- tanpa kebijakan: hanya service_role
 
 -- Penegak melihat dirinya sendiri dan daftar penguji/admin; pengurus melihat semua.
@@ -334,6 +342,7 @@ create policy baca_jurnal on public.portofolio_jurnal for select to authenticate
 
 create policy baca_pengaturan on public.pengaturan for select to authenticated using ((select sigarda.aktif()));
 create policy baca_sidang on public.sidang_dk for select to authenticated using ((select sigarda.pengurus()));
+create policy baca_sidang_urut on public.sidang_urut for select to authenticated using ((select sigarda.pengurus()));
 
 -- ---------------------------------------------------------------------------
 -- 4. Fungsi aksi (RPC). Semua memeriksa peran di server.
@@ -742,14 +751,14 @@ begin
       raise exception 'Format nomor hanya boleh berisi huruf, angka, spasi, dan tanda / . - _ ( ) serta kode dalam kurung kurawal.';
     end if;
     for v_tok in select (regexp_matches(v, '\{[^}]*\}', 'g'))[1] loop
-      if v_tok not in ('{no}', '{no3}', '{tahun}', '{bulan}', '{romawi}', '{tingkat}') then
-        raise exception 'Kode % tidak dikenal. Kode yang tersedia: {no} {no3} {tahun} {bulan} {romawi} {tingkat}.', v_tok;
+      if v_tok not in ('{no}', '{no2}', '{no3}', '{no4}', '{no5}', '{no6}', '{tahun}', '{bulan}', '{romawi}', '{tingkat}') then
+        raise exception 'Kode % tidak dikenal. Kode yang tersedia: {no} {no2} {no3} {no4} {no5} {no6} {tahun} {bulan} {romawi} {tingkat}.', v_tok;
       end if;
     end loop;
-    if regexp_replace(v, '\{(no|no3|tahun|bulan|romawi|tingkat)\}', '', 'g') ~ '[{}]' then
+    if regexp_replace(v, '\{(no|no[2-6]|tahun|bulan|romawi|tingkat)\}', '', 'g') ~ '[{}]' then
       raise exception 'Tanda kurung kurawal pada format nomor tidak lengkap.';
     end if;
-    if position('{no}' in v) = 0 and position('{no3}' in v) = 0 then raise exception 'Format nomor harus memuat {no} atau {no3} (nomor urut).'; end if;
+    if v !~ '\{no[2-6]?\}' then raise exception 'Format nomor harus memuat kode nomor urut, mis. {no4} (0002) atau {no} (2).'; end if;
     if position('{tahun}' in v) = 0 then raise exception 'Format nomor harus memuat {tahun} agar nomor tidak sama antar tahun.'; end if;
   elsif p_kunci = 'sidang.nama_ketua' then
     if char_length(v) > 120 then raise exception 'Nama ketua maksimal 120 karakter.'; end if;
@@ -848,6 +857,25 @@ begin
   return v_id;
 end $$;
 
+-- Mengatur nomor urut berikutnya untuk satu tahun (mis. melanjutkan nomor yang sudah berjalan di kertas). Nomor yang diminta
+-- harus lebih besar dari nomor urut tertinggi yang sudah tercatat pada tahun itu, agar tidak ada nomor ganda.
+create function public.sg_sidang_urut_atur(p_tahun int, p_berikutnya int) returns void
+language plpgsql security definer set search_path = public as
+$$
+declare v_maks int;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pengurus() then raise exception 'Hanya Dewan Ambalan, Pembina, atau Admin Gudep yang dapat mengatur nomor urut.'; end if;
+  if p_tahun is null or p_tahun < 2000 or p_tahun > 2100 then raise exception 'Tahun tidak valid.'; end if;
+  if p_berikutnya is null or p_berikutnya < 1 or p_berikutnya > 999999 then raise exception 'Nomor urut berikutnya harus antara 1 dan 999999.'; end if;
+  select coalesce(max(nomor_urut), 0) into v_maks from public.sidang_dk where nomor_urut is not null and extract(year from tanggal)::int = p_tahun;
+  if p_berikutnya <= v_maks then
+    raise exception 'Nomor % sudah terpakai pada catatan sidang tahun % (nomor urut tertinggi: %). Isi angka yang lebih besar.', p_berikutnya, p_tahun, v_maks;
+  end if;
+  insert into public.sidang_urut (tahun, terakhir) values (p_tahun, p_berikutnya - 1)
+  on conflict (tahun) do update set terakhir = excluded.terakhir;
+end $$;
+
 -- Hanya Pembina dan Admin Gudep yang dapat menghapus catatan sidang (mis. salah isi). Nomor urut tidak dipakai ulang;
 -- gunakan isian nomor manual bila ingin memakai nomor yang sama.
 create function public.sg_sidang_hapus(p_id int) returns void
@@ -918,7 +946,7 @@ $$ begin delete from public.login_gagal where username = p_username; end $$;
 revoke all on all tables in schema public from anon, authenticated;
 grant select on public.profiles, public.sku_butir, public.sku_unit, public.pf_item, public.sku_progress,
   public.sku_riwayat, public.absensi_sesi, public.absensi_hadir, public.portofolio, public.portofolio_jurnal,
-  public.materi, public.pengaturan, public.sidang_dk to authenticated;
+  public.materi, public.pengaturan, public.sidang_dk, public.sidang_urut to authenticated;
 
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function
@@ -930,7 +958,8 @@ grant execute on function
   public.sg_materi_simpan(uuid, text, text, text, text, text, text[], jsonb),
   public.sg_materi_hapus(uuid), public.sg_materi_geser(uuid, int),
   public.sg_pengaturan_simpan(text, jsonb),
-  public.sg_sidang_simpan(uuid, text, date, text, text, text, text, text, text, text), public.sg_sidang_hapus(int)
+  public.sg_sidang_simpan(uuid, text, date, text, text, text, text, text, text, text), public.sg_sidang_hapus(int),
+  public.sg_sidang_urut_atur(int, int)
   to authenticated;
 grant execute on function
   public.sg_sku_catat_internal(uuid, uuid, text, text, date, text, text),

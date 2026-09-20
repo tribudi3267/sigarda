@@ -3,8 +3,9 @@ import { useApp } from '../context/AppContext';
 import { fmtTanggal, hariIni } from '../lib/format';
 import { tingkatSelesai } from '../lib/skuLogic';
 import {
-  antrianSidang, FORMAT_NOMOR_BAWAAN, formatNomor, HASIL_MAGANG, HASIL_TUGAS, KEPUTUSAN, KODE_FORMAT, KUNCI_PENGATURAN,
-  labelButirBelum, lembarKesiapan, nomorUrutBerikutnya, pengaturanSidang, periksaFormatNomor, rapikan, SEBUTAN_KETUA_BAWAAN, sudahLayak,
+  antrianSidang, bangunFormat, formatNomor, HASIL_MAGANG, HASIL_TUGAS, KEPUTUSAN, KODE_FORMAT, KUNCI_PENGATURAN,
+  labelButirBelum, lembarKesiapan, nomorUrutBerikutnya, OPSI_BULAN, OPSI_DIGIT, pengaturanSidang, PEMISAH, periksaFormatNomor, rapikan,
+  SEBUTAN_KETUA_BAWAAN, sudahLayak, uraiFormat,
 } from '../lib/sidangLogic';
 import BeritaAcaraSidang from '../components/BeritaAcaraSidang';
 import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
@@ -51,7 +52,7 @@ function Pilihan({ nilai, ubah, opsi, label, kunci = false }) {
 /* ============================ Lembar sidang (jendela) ============================ */
 
 function LembarSidang({ pesertaId, tingkat, tutup, tersimpan }) {
-  const { daftarPeserta, users, progress, sidang, pengaturan, simpanSidang } = useApp();
+  const { daftarPeserta, users, progress, sidang, sidangUrut, pengaturan, simpanSidang } = useApp();
   const peserta = daftarPeserta.find((u) => u.id === pesertaId);
   const kes = useMemo(() => (peserta ? lembarKesiapan(progress, users, peserta, tingkat) : null), [progress, users, peserta, tingkat]);
   const pn = pengaturanSidang(pengaturan);
@@ -71,7 +72,8 @@ function LembarSidang({ pesertaId, tingkat, tutup, tersimpan }) {
   if (!peserta || !kes) return null;
   const sudah = sudahLayak(sidang, pesertaId, tingkat);
   const tanggalSah = /^\d{4}-\d{2}-\d{2}$/.test(tanggal);
-  const perkiraan = tanggalSah ? formatNomor(pn.format, { no: nomorUrutBerikutnya(sidang, tanggal.slice(0, 4)), tanggal, tingkat }) : '-';
+  // Memakai penghitung nomor urut yang sama dengan server, dan bulan/tahun dari tanggal sidang yang dipilih
+  const perkiraan = tanggalSah ? formatNomor(pn.format, { no: nomorUrutBerikutnya(sidangUrut, tanggal.slice(0, 4)), tanggal, tingkat }) : '-';
 
   const periksa = () => {
     if (!tanggalSah) return 'Isi tanggal sidang.';
@@ -228,7 +230,7 @@ function LembarSidang({ pesertaId, tingkat, tutup, tersimpan }) {
           <span className="text-pramuka-600">Nomor berita acara:</span>{' '}
           <b className="font-mono">{manual ? rapikan(nomorManual) || '(isi di bawah)' : perkiraan}</b>
         </p>
-        {!manual && <p className="text-xs text-pramuka-500">Dibuat otomatis saat disimpan sesuai format di tab Pengaturan; angka urut final ditentukan server.</p>}
+        {!manual && <p className="text-xs text-pramuka-500">Dibuat otomatis saat disimpan, sesuai format dan nomor urut di tab Pengaturan. Bulan dan tahun mengikuti tanggal sidang di atas.</p>}
         <label className="mt-1 flex items-center gap-2 text-xs font-medium text-pramuka-700">
           <input type="checkbox" className="h-4 w-4 accent-pramuka-800" checked={manual} onChange={(e) => setManual(e.target.checked)} />
           Isi nomor secara manual
@@ -423,31 +425,63 @@ function RiwayatSidang({ onCetak }) {
 
 /* ================================= Pengaturan ================================= */
 
+const PILIHAN_AWAL = { digit: 4, kode: 'DK', tingkat: false, bulan: 'romawi', pemisah: '/' };
+
 function PengaturanSidang() {
-  const { pengaturan, simpanPengaturan, notify } = useApp();
+  const { pengaturan, sidangUrut, simpanPengaturan, aturUrutSidang, notify } = useApp();
   const awal = pengaturanSidang(pengaturan);
-  const [format, setFormat] = useState(awal.format);
+  const awalUrai = uraiFormat(awal.format);
+
+  const [mode, setMode] = useState(awalUrai ? 'pilihan' : 'manual');
+  const [pilih, setPilih] = useState(awalUrai ?? PILIHAN_AWAL);
+  const [formatManual, setFormatManual] = useState(awal.format);
   const [namaKetua, setNamaKetua] = useState(awal.namaKetua);
   const [sebutan, setSebutan] = useState(awal.sebutanKetua);
   const [proses, setProses] = useState(false);
+  const tahunIni = Number(hariIni().slice(0, 4));
+  const [tahunUrut, setTahunUrut] = useState(tahunIni);
+  const [urutBaru, setUrutBaru] = useState('');
+  const [prosesUrut, setProsesUrut] = useState(false);
 
   // Isian mengikuti pengaturan tersimpan (mis. setelah disimpan atau dimuat ulang)
   useEffect(() => {
     const p = pengaturanSidang(pengaturan);
-    setFormat(p.format);
+    const u = uraiFormat(p.format);
+    setMode(u ? 'pilihan' : 'manual');
+    if (u) setPilih(u);
+    setFormatManual(p.format);
     setNamaKetua(p.namaKetua);
     setSebutan(p.sebutanKetua);
   }, [pengaturan]);
 
+  const ubahPilih = (bagian) => setPilih((p) => ({ ...p, ...bagian }));
+  const pindahMode = (m) => {
+    if (m === mode) return;
+    if (m === 'manual') setFormatManual(bangunFormat(pilih));
+    else {
+      const u = uraiFormat(formatManual);
+      if (u) setPilih(u); // bila teks tidak berbentuk baku, pilihan terakhir dipakai lagi
+    }
+    setMode(m);
+  };
+
+  const format = mode === 'pilihan' ? bangunFormat(pilih) : rapikan(formatManual);
   const galatFormat = periksaFormatNomor(format);
   const galatSebutan = rapikan(sebutan) ? '' : 'Sebutan jabatan wajib diisi.';
-  const berubah = rapikan(format) !== awal.format || rapikan(namaKetua) !== awal.namaKetua || rapikan(sebutan) !== awal.sebutanKetua;
-  const contoh = galatFormat ? '-' : formatNomor(rapikan(format), { no: 7, tanggal: hariIni(), tingkat: 'Bantara' });
+  const berubah = format !== awal.format || rapikan(namaKetua) !== awal.namaKetua || rapikan(sebutan) !== awal.sebutanKetua;
+
+  // Pratinjau memakai nomor urut SEBENARNYA yang akan dipakai berikutnya (dari penghitung di server) dan tanggal hari ini
+  const tanggalContoh = hariIni();
+  const noBerikut = nomorUrutBerikutnya(sidangUrut, tahunIni);
+  const contoh = galatFormat ? '' : formatNomor(format, { no: noBerikut, tanggal: tanggalContoh, tingkat: 'Bantara' });
+
+  const terakhirTahun = Number(sidangUrut[String(tahunUrut)]) || 0;
+  const urutSah = /^\d{1,6}$/.test(String(urutBaru)) && Number(urutBaru) >= 1;
 
   const simpan = async () => {
     setProses(true);
     const daftar = [
-      [KUNCI_PENGATURAN.format, rapikan(format), awal.format],
+      [KUNCI_PENGATURAN.format, format, awal.format],
       [KUNCI_PENGATURAN.namaKetua, rapikan(namaKetua), awal.namaKetua],
       [KUNCI_PENGATURAN.sebutanKetua, rapikan(sebutan), awal.sebutanKetua],
     ];
@@ -461,6 +495,13 @@ function PengaturanSidang() {
     if (semuaBerhasil) notify('Pengaturan sidang tersimpan.');
   };
 
+  const aturUrut = async () => {
+    setProsesUrut(true);
+    const r = await aturUrutSidang(Number(tahunUrut), Number(urutBaru));
+    setProsesUrut(false);
+    if (r.ok) setUrutBaru('');
+  };
+
   return (
     <div className="max-w-2xl">
       <p className="mb-4 text-sm text-pramuka-600">
@@ -469,24 +510,113 @@ function PengaturanSidang() {
       </p>
 
       <section className="panel mb-4 p-4">
-        <label htmlFor="format-nomor" className="label">Format nomor berita acara</label>
-        <input id="format-nomor" className="input font-mono" value={format} maxLength={80} onChange={(e) => setFormat(e.target.value)} />
-        {galatFormat ? (
-          <p role="alert" className="mt-1 text-xs font-medium text-red-700">{galatFormat}</p>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-bold">Nomor berita acara</h2>
+          <div role="tablist" aria-label="Cara mengatur format" className="inline-flex rounded-lg bg-pramuka-100 p-1 text-xs">
+            {[['pilihan', 'Pilih susunan'], ['manual', 'Tulis manual']].map(([k, v]) => (
+              <button
+                key={k}
+                role="tab"
+                aria-selected={mode === k}
+                onClick={() => pindahMode(k)}
+                className={`rounded-md px-3 py-1.5 font-semibold ${mode === k ? 'bg-pramuka-800 text-pramuka-50' : 'text-pramuka-700 hover:bg-pramuka-200'}`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {mode === 'pilihan' ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="pil-digit" className="label">Panjang nomor urut</label>
+              <select id="pil-digit" className="input" value={pilih.digit} onChange={(e) => ubahPilih({ digit: Number(e.target.value) })}>
+                {OPSI_DIGIT.map(([d, teks]) => <option key={d} value={d}>{teks}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="pil-kode" className="label">Kode surat (huruf tetap)</label>
+              <input id="pil-kode" className="input" value={pilih.kode} maxLength={30} placeholder="mis. DA atau DK" onChange={(e) => ubahPilih({ kode: e.target.value.replace(/[^A-Za-z0-9 ._()-]/g, '') })} />
+            </div>
+            <div>
+              <label htmlFor="pil-bulan" className="label">Bulan</label>
+              <select id="pil-bulan" className="input" value={pilih.bulan} onChange={(e) => ubahPilih({ bulan: e.target.value })}>
+                {OPSI_BULAN.map(([k, teks]) => <option key={k} value={k}>{teks}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="pil-pemisah" className="label">Pemisah antar bagian</label>
+              <select id="pil-pemisah" className="input" value={pilih.pemisah} onChange={(e) => ubahPilih({ pemisah: e.target.value })}>
+                {PEMISAH.map(([k, teks]) => <option key={k} value={k}>{teks}</option>)}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-sm font-medium text-pramuka-700 sm:col-span-2">
+              <input type="checkbox" className="h-4 w-4 accent-pramuka-800" checked={pilih.tingkat} onChange={(e) => ubahPilih({ tingkat: e.target.checked })} />
+              Cantumkan tingkat (Bantara atau Laksana) pada nomor
+            </label>
+            <p className="text-xs text-pramuka-500 sm:col-span-2">Tahun sidang selalu dicantumkan di bagian akhir agar nomor tidak sama antar tahun.</p>
+          </div>
         ) : (
-          <p className="mt-1 text-sm">Contoh hasil: <b className="font-mono">{contoh}</b></p>
+          <div>
+            <label htmlFor="format-nomor" className="label">Format nomor (tulis dengan kode)</label>
+            <input id="format-nomor" className="input font-mono" value={formatManual} maxLength={80} onChange={(e) => setFormatManual(e.target.value)} />
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs font-semibold text-pramuka-700">Kode yang dapat dipakai</summary>
+              <ul className="mt-1 space-y-0.5 text-xs text-pramuka-600">
+                {KODE_FORMAT.map(([k, ket]) => <li key={k}><code className="font-mono font-semibold">{k}</code> {ket}</li>)}
+              </ul>
+              <p className="mt-1 text-xs text-pramuka-500">
+                Wajib memuat satu kode nomor urut (mis. <code className="font-mono">{'{no4}'}</code>) dan <code className="font-mono">{'{tahun}'}</code>.
+                Contoh: <code className="font-mono">{'{no4}/DA/{romawi}/{tahun}'}</code> menghasilkan 0002/DA/VIII/2026. Kode harus huruf kecil.
+              </p>
+            </details>
+          </div>
         )}
-        <details className="mt-2">
-          <summary className="cursor-pointer text-xs font-semibold text-pramuka-700">Kode yang dapat dipakai</summary>
-          <ul className="mt-1 space-y-0.5 text-xs text-pramuka-600">
-            {KODE_FORMAT.map(([k, ket]) => <li key={k}><code className="font-mono font-semibold">{k}</code> {ket}</li>)}
-          </ul>
-          <p className="mt-1 text-xs text-pramuka-500">Wajib memuat {'{no}'} atau {'{no3}'} serta {'{tahun}'}. Bawaan: <code className="font-mono">{FORMAT_NOMOR_BAWAAN}</code>. Nomor urut mulai dari 1 setiap tahun.</p>
-        </details>
+
+        <div className={`mt-4 rounded-lg px-3 py-3 ${galatFormat ? 'bg-red-50 ring-1 ring-inset ring-red-300' : 'bg-pramuka-50'}`} aria-live="polite">
+          {galatFormat ? (
+            <p role="alert" className="text-sm font-medium text-red-800">{galatFormat}</p>
+          ) : (
+            <>
+              <p className="text-xs text-pramuka-500">Nomor berita acara berikutnya akan menjadi</p>
+              <p className="font-mono text-lg font-bold text-pramuka-900">{contoh}</p>
+              <p className="mt-1 text-xs text-pramuka-500">
+                Dihitung dengan nomor urut berikutnya tahun {tahunIni} ({noBerikut}) dan tanggal hari ini. Bulan dan tahun pada nomor asli mengikuti
+                tanggal sidang yang diisi di lembar sidang.
+              </p>
+            </>
+          )}
+        </div>
       </section>
 
       <section className="panel mb-4 p-4">
-        <label htmlFor="nama-ketua" className="label">Nama Ketua Dewan Penegak</label>
+        <h2 className="text-base font-bold">Nomor urut berikutnya</h2>
+        <p className="mt-1 text-sm text-pramuka-600">
+          Nomor urut mulai dari 1 setiap tahun. Gunakan ini bila nomor di kertas sudah berjalan, misalnya isi <b>3</b> agar berita acara berikutnya bernomor urut 3.
+        </p>
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <div>
+            <label htmlFor="urut-tahun" className="label">Tahun</label>
+            <input id="urut-tahun" type="number" className="input w-28" min={2000} max={2100} value={tahunUrut} onChange={(e) => setTahunUrut(e.target.value)} />
+          </div>
+          <div>
+            <label htmlFor="urut-baru" className="label">Nomor urut berikutnya</label>
+            <input id="urut-baru" type="number" className="input w-40" min={1} max={999999} value={urutBaru} placeholder={String(terakhirTahun + 1)} onChange={(e) => setUrutBaru(e.target.value)} />
+          </div>
+          <button className="btn btn-outline" disabled={!urutSah || prosesUrut} onClick={aturUrut}>
+            {prosesUrut ? 'Mengatur...' : 'Atur nomor berikutnya'}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-pramuka-500">
+          Tahun {tahunUrut}: nomor urut terakhir yang dipakai <b>{terakhirTahun || 'belum ada'}</b>, jadi nomor berikutnya saat ini <b>{terakhirTahun + 1}</b>.
+          Angka yang diminta harus lebih besar dari nomor tertinggi yang sudah tercatat pada tahun itu.
+        </p>
+      </section>
+
+      <section className="panel mb-4 p-4">
+        <h2 className="text-base font-bold">Tanda tangan</h2>
+        <label htmlFor="nama-ketua" className="label mt-3">Nama Ketua Dewan Penegak</label>
         <input id="nama-ketua" className="input" value={namaKetua} maxLength={120} onChange={(e) => setNamaKetua(e.target.value)} placeholder="Kosong = dicetak garis untuk tanda tangan" />
         <label htmlFor="sebutan-ketua" className="label mt-3">Sebutan jabatan pada tanda tangan</label>
         <input id="sebutan-ketua" className="input" value={sebutan} maxLength={80} onChange={(e) => setSebutan(e.target.value)} />

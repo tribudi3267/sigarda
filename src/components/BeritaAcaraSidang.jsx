@@ -6,7 +6,16 @@ import { KopSurat } from './DokumenSku';
 // "Ambalan Gajah Mada/..." dipakai apa adanya; bila nama tidak diawali kata Ambalan, kata itu ditambahkan.
 const NAMA_AMBALAN = /^ambalan\b/i.test(GUDEP.singkat) ? GUDEP.singkat : `Ambalan ${GUDEP.singkat}`;
 
-const Kotak = ({ isi }) => <span className="mr-1.5 inline-block w-8 font-mono font-bold">{isi ? '[ X ]' : '[   ]'}</span>;
+// Kotak centang digambar dengan garis tepi (bukan teks "[ X ]") agar tidak pernah terpotong ke baris berikutnya di layar maupun cetakan.
+const Kotak = ({ isi }) => (
+  <span
+    className="mr-2 mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center border-2 border-pramuka-900 text-[12px] font-bold leading-none"
+    role="img"
+    aria-label={isi ? 'Dipilih' : 'Tidak dipilih'}
+  >
+    {isi ? 'X' : ''}
+  </span>
+);
 
 function Ttd({ jabatan, nama, nta }) {
   return (

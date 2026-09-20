@@ -211,6 +211,7 @@ begin
     auth.uid()
   ) returning id into v_id;
 
+  -- NTA yang diisi saat sidang disimpan ke profil agar terisi otomatis pada sidang berikutnya
   if v_nta <> '' and v_nta is distinct from v_p.nta then update public.profiles set nta = v_nta where id = p_peserta_id; end if;
   return v_id;
 end $$;
