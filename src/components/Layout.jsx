@@ -72,7 +72,8 @@ export default function Layout({ nav, tab, setTab, children }) {
       <Footer />
 
       <nav className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-pramuka-200 bg-white md:hidden" aria-label="Menu utama">
-        <ul className="mx-auto flex max-w-lg overflow-x-auto">
+        {/* overscroll-x-contain: bila geseran menu sudah mentok, tidak diteruskan ke halaman (halaman tidak ikut bergeser). */}
+        <ul className="mx-auto flex max-w-lg overflow-x-auto overscroll-x-contain">
           {nav.map((n) => (
             <li key={n.id} className="min-w-[60px] flex-1">
               <button

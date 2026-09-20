@@ -5,9 +5,14 @@
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
+    /* Halaman tidak boleh bergeser ke samping. Di ponsel, satu elemen yang sedikit lebih lebar dari layar membuat browser
+       melebarkan viewport sehingga isi halaman ikut bergeser dan menyisakan ruang kosong. `html` saja tidak cukup; `body`
+       memakai `clip` (bukan `hidden`) agar header `sticky` tetap menempel. Tabel lebar sudah dibungkus overflow-x-auto. */
+    overflow-x: hidden;
   }
   body {
     @apply bg-pramuka-50 font-sans text-pramuka-900 antialiased;
+    overflow-x: clip;
   }
   h1,
   h2,
@@ -85,6 +90,7 @@
   html,
   body {
     background: #fff !important;
+    overflow: visible !important;
   }
   .print-area {
     min-width: 0 !important;
