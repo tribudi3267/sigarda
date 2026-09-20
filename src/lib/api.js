@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaProfil, susunHadir, susunMateri, susunPortofolio, susunProgress, susunSesi } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunHadir, susunMateri, susunPortofolio, susunProgress, susunSesi } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -149,6 +149,10 @@ export function buatApi(klien) {
 
     muatMateri: () => muat(async () => susunMateri(await ambilSemua('materi', { urut: ['urutan'] }))),
 
+    /** Catatan sidang (hanya pengurus yang menerima baris) dan pengaturan aplikasi. Dimuat saat halaman Sidang dibuka. */
+    muatSidang: () => muat(async () => (await ambilSemua('sidang_dk', { urut: ['id'] })).map(petaSidang)),
+    muatPengaturan: () => muat(async () => petaPengaturan(await ambilSemua('pengaturan', { urut: ['kunci'] }))),
+
     /* ----------------------------- SKU ----------------------------- */
     ajukan: ({ skuId, jadwal, pengujiId, catatan }) =>
       rpc('sg_sku_ajukan', { p_sku_id: skuId, p_jadwal: jadwal || null, p_penguji_id: pengujiId || null, p_catatan: catatan ?? '' }),
@@ -196,5 +200,15 @@ export function buatApi(klien) {
       }),
     hapusMateri: (id) => rpc('sg_materi_hapus', { p_id: id }),
     geserMateri: (id, arah) => rpc('sg_materi_geser', { p_id: id, p_arah: arah }),
+
+    /* ------------------------ Sidang Dewan Kehormatan ------------------------ */
+    simpanSidang: (d) =>
+      rpc('sg_sidang_simpan', {
+        p_peserta_id: d.pesertaId, p_tingkat: d.tingkat, p_tanggal: d.tanggal, p_keputusan: d.keputusan,
+        p_magang: d.magang, p_tugas_adat: d.tugasAdat, p_tugas_adat_ket: d.tugasAdatKet ?? '', p_catatan: d.catatan ?? '',
+        p_nomor_manual: d.nomorManual || null, p_nta: d.nta || null,
+      }),
+    hapusSidang: (id) => rpc('sg_sidang_hapus', { p_id: id }),
+    simpanPengaturan: (kunci, nilai) => rpc('sg_pengaturan_simpan', { p_kunci: kunci, p_nilai: nilai }),
   };
 }

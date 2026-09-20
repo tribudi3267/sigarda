@@ -39,6 +39,7 @@ Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Adm
 | Kelola Materi | | Hanya **Pembina**: tambah, ubah, urutkan, hapus | Tambah, ubah, urutkan, hapus |
 | Absensi | Riwayat kehadiran sendiri (dicatat pengurus) | Catat absensi, rekap, unduh Excel | Sama dengan penguji |
 | Portofolio | (di dashboard Garuda) isi status, catatan, tautan | Tinjau dan beri catatan, rekap, unduh Excel | Rekap, unduh Excel |
+| Sidang | | Antrian sidang, lembar sidang (Layak dan Lulus / Ditunda-Remedi), riwayat, cetak Berita Acara, pengaturan nomor dan ketua. Hapus catatan: hanya Pembina | Sama dengan penguji, termasuk hapus |
 | Anggota | | | Tambah, ubah, hapus anggota; import Excel dan unduh template (Penegak, Dewan Ambalan, Pembina) |
 | Reset PIN | | Sesuai kewenangan (lihat di bawah) | Semua kecuali Admin |
 | Akun (ikon di header) | Ganti PIN sendiri | Ganti PIN sendiri | Ganti PIN sendiri |
@@ -114,6 +115,17 @@ Setiap kelulusan menghasilkan kode verifikasi digital (`VRF-XXXXXXX`) yang dibua
 Daftar 26 lampiran dari file "03.01. Tabel Cek List Lampiran Berkas Dokumen Portofolio Garuda". Setiap dokumen
 berstatus Belum siap, Sedang disiapkan, atau Siap (Ada), dengan catatan, tautan berkas (harus diawali http/https), dan jurnal perubahan.
 Rekap tampil di dashboard Dewan Ambalan, Pembina, dan Admin, dan dapat diunduh sebagai Excel.
+
+### Sidang Dewan Kehormatan Ambalan
+Menu **Sidang** (Dewan Ambalan, Pembina, Admin) untuk keputusan Lulus atau Tidak Lulus SKU sebelum pelantikan. SKU pada dasarnya lulus/tidak lulus; predikat (Cukup, Baik, Sangat Baik) bukan ketentuan Kwarnas.
+- **Antrian**: peserta yang seluruh butir tingkatnya lulus dan belum dinyatakan Layak. Peserta lain (capaian belum 100%) dapat dicari untuk keputusan Ditunda / Remedi.
+- **Lembar sidang**: capaian dan rincian butir (tanggal dan penguji), elemen manual (masa magang atau tamu ambalan, tugas tambahan adat), NTA (opsional; tersimpan ke profil), keputusan, catatan, nomor berita acara.
+  **"Layak dan Lulus" hanya bila seluruh butir tingkat itu lulus** (ditegakkan di server); satu peserta hanya sekali Layak per tingkat.
+- **Berita Acara** siap cetak (A4) mengikuti format Ambalan. Nama ketua dan sebutan jabatannya dicatat saat sidang, jadi berita acara lama tidak berubah bila pengaturan diganti.
+- **Pengaturan sidang** (dapat diubah Dewan Ambalan, Pembina, Admin): format nomor (kode `{no}` `{no3}` `{tahun}` `{bulan}` `{romawi}` `{tingkat}`, bawaan `{no3}/DK/{tahun}`; wajib memuat nomor urut dan `{tahun}`),
+  nama Ketua Dewan Penegak (kosong = garis tanda tangan), sebutan jabatan (bawaan "Ketua Dewan Penegak / Pemangku Adat"). Nomor urut mulai dari 1 tiap tahun dan tidak dipakai ulang setelah catatan dihapus (untuk memakai nomor yang sama, isi nomor manual).
+- Catatan sidang hanya terbaca pengurus; semua penulisan lewat fungsi server `sg_sidang_simpan`, `sg_sidang_hapus`, `sg_pengaturan_simpan`.
+- Belum termasuk: kolom NTA pada import Excel dan formulir Admin (NTA saat ini diisi di lembar sidang).
 
 ### Filter dinamis
 Semua filter (sangga, kelas, peran, agama, tahun ajaran) dibangun dari data yang ada.
@@ -246,6 +258,8 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
 **Jangan menjalankan `supabase/skema.sql` ulang pada database yang sudah berisi data**: berkas itu menghapus semua tabel. Perubahan skema untuk database berjalan ada di folder
 [`supabase/migrasi/`](supabase/migrasi), dijalankan satu per satu di SQL Editor (aman diulang, tidak menyentuh data):
 - [`2026-09-rls-ringan.sql`](supabase/migrasi/2026-09-rls-ringan.sql): aturan baca (RLS) dihitung sekali per kueri, bukan sekali per baris. Pada 20 ribu baris progres, membaca milik sendiri turun dari sekitar 1 detik menjadi sekitar 7 milidetik (diukur di PGlite; angka di Supabase berbeda, arahnya sama).
+- [`2026-09-sidang-dk.sql`](supabase/migrasi/2026-09-sidang-dk.sql): Sidang Dewan Kehormatan dan Pengaturan. Hanya menambah 3 tabel (`pengaturan`, `sidang_dk`, `sidang_urut`), kolom `profiles.nta`, dan fungsi baru.
+  **Wajib dijalankan sebelum menerbitkan kode Sidang**, karena halaman Sidang membaca tabel baru itu. Jalankan setelah `2026-09-rls-ringan.sql`.
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 
 ## Struktur folder
@@ -272,13 +286,13 @@ sku-bukateja/
     │   ├── supabaseClient.js           klien Supabase (atau lokal)
     │   ├── api.js                      satu-satunya lapisan yang berbicara ke Supabase (tabel, sg_*, Edge Function)
     │   ├── mapDb.js                    tabel server -> bentuk data yang dipakai halaman
-    │   ├── skuLogic.js  absensiLogic.js  portofolioLogic.js  materiLogic.js  pinLogic.js  importAnggota.js  cariNama.js
+    │   ├── skuLogic.js  absensiLogic.js  portofolioLogic.js  materiLogic.js  sidangLogic.js  pinLogic.js  importAnggota.js  cariNama.js
     │   └── exportXlsx.js  exportLaporan.js  format.js
     ├── lokal/                          backend lokal: klien tiruan di atas PGlite, data contoh (bukan produksi)
     ├── context/AppContext.jsx          state global (salinan data sesuai izin) dan semua aksi
     ├── hooks/useAbsensiPeriode.js      memuat kehadiran semester yang dipilih saat filter periode diubah
-    ├── components/                     Layout, Footer, Login, FormGantiPin, ImportAnggotaModal, SkuChecklist, PratinjauDrive, ...
-    └── pages/                          PesertaBeranda, PesertaSku, Materi, KelolaMateri, Absensi, ResetPin, AdminAnggota, ...
+    ├── components/                     Layout, Footer, Login, FormGantiPin, ImportAnggotaModal, SkuChecklist, PratinjauDrive, BeritaAcaraSidang, ...
+    └── pages/                          PesertaBeranda, PesertaSku, Materi, KelolaMateri, Absensi, Sidang, ResetPin, AdminAnggota, ...
 ```
 
 ## Pengujian

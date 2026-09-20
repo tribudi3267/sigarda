@@ -17,6 +17,7 @@ import ResetPin from './pages/ResetPin';
 import GantiPinWajib from './pages/GantiPinWajib';
 import Materi from './pages/Materi';
 import KelolaMateri from './pages/KelolaMateri';
+import Sidang from './pages/Sidang';
 import { bolehKelolaMateri } from './lib/materiLogic';
 import LogoMark from './components/LogoMark';
 
@@ -24,9 +25,9 @@ import LogoMark from './components/LogoMark';
  * Menu per peran.
  *  Penegak Calon Bantara/Laksana : Beranda, Poin SKU, Materi, Absensi, Cetak
  *  Penegak Calon Garuda          : Dashboard Garuda (jurnal portofolio), Poin SKU, Materi, Absensi, Cetak
- *  Dewan Ambalan                 : Dashboard, Antrian uji, Peserta, Materi, Absensi, Portofolio, Cetak, Reset PIN
+ *  Dewan Ambalan                 : Dashboard, Antrian uji, Peserta, Materi, Absensi, Portofolio, Sidang, Cetak, Reset PIN
  *  Pembina                       : idem Dewan Ambalan, ditambah Kelola Materi
- *  Admin Gudep                   : Dashboard, Anggota, Materi, Kelola Materi, Absensi, Portofolio, Cetak, Reset PIN
+ *  Admin Gudep                   : Dashboard, Anggota, Materi, Kelola Materi, Absensi, Portofolio, Sidang, Cetak, Reset PIN
  *  Semua peran                   : Akun (tombol di header) untuk mengganti PIN sendiri
  */
 function buatNav(user, peran) {
@@ -53,6 +54,7 @@ function buatNav(user, peran) {
       ...(bolehKelolaMateri(user) ? [kelola] : []),
       { id: 'absensi', label: 'Absensi', ikon: 'absensi' },
       { id: 'portofolio', label: 'Portofolio', ikon: 'portofolio' },
+      { id: 'sidang', label: 'Sidang', ikon: 'sidang' },
       { id: 'cetak', label: 'Cetak', ikon: 'cetak' },
       { id: 'resetpin', label: 'Reset PIN', ikon: 'kunci' },
     ];
@@ -64,6 +66,7 @@ function buatNav(user, peran) {
     kelola,
     { id: 'absensi', label: 'Absensi', ikon: 'absensi' },
     { id: 'portofolio', label: 'Portofolio', ikon: 'portofolio' },
+    { id: 'sidang', label: 'Sidang', ikon: 'sidang' },
     { id: 'cetak', label: 'Cetak', ikon: 'cetak' },
     { id: 'resetpin', label: 'Reset PIN', ikon: 'kunci' },
   ];
@@ -161,6 +164,8 @@ function Shell() {
     isi = <Akun />;
   } else if (tabAktif === 'resetpin' && user.role !== 'peserta') {
     isi = <ResetPin />;
+  } else if (tabAktif === 'sidang' && user.role !== 'peserta') {
+    isi = <Sidang />;
   } else if (tabAktif === 'materi') {
     isi = <Materi key={materiButir ?? 'semua'} butirAwal={materiButir} onKelola={bukaKelola} />;
   } else if (tabAktif === 'kelolamateri') {

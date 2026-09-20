@@ -5,7 +5,7 @@ import { PERAN, butirPeserta, getEntry, hitungProgres, tanggalLulusTingkat } fro
 import { fmtTanggal, hariIni, kodeVerifikasi } from '../lib/format';
 import LogoMark from './LogoMark';
 
-function KopSurat() {
+export function KopSurat() {
   return (
     <header className="flex items-center gap-4 border-b-4 border-double border-pramuka-800 pb-3">
       <LogoMark size={64} />

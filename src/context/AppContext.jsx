@@ -32,7 +32,7 @@ export function useApp() {
   return ctx;
 }
 
-const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [] };
+const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], pengaturan: {} };
 const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi waktu Edge Function)
 const JEDA_SEGARKAN_MS = 30000;
 
@@ -114,6 +114,7 @@ export function AppProvider({ children }) {
     if (mulaiGenerasi !== generasi.current) return { ok: true }; // pengguna sudah keluar selagi memuat
     const hadirGabung = Object.assign({}, ...hadir.map((h) => h.data));
     setDb((d) => ({
+      ...d, // sidang dan pengaturan dimuat terpisah (muatSidang) dan tidak boleh hilang saat penyegaran
       users: u.data, progress: p.data, portofolio: pf.data, materi: m.data,
       absensi: gabungHadirSemester(d.absensi, sesi.data, daftarKunci, hadirGabung),
     }));
@@ -216,6 +217,8 @@ export function AppProvider({ children }) {
       portofolio: (pid) => terapkan(api().muatPortofolio(pid), (p) => (d) => ({ ...d, portofolio: pid ? { ...d.portofolio, [pid]: p[pid] ?? {} } : p })),
       hadir: (tanggal) => terapkan(api().muatHadirTanggal(tanggal), (h) => (d) => ({ ...d, absensi: { ...d.absensi, hadir: { ...d.absensi.hadir, [tanggal]: h } } })),
       materi: () => terapkan(api().muatMateri(), (materi) => (d) => ({ ...d, materi })),
+      sidang: () => terapkan(api().muatSidang(), (sidang) => (d) => ({ ...d, sidang })),
+      pengaturan: () => terapkan(api().muatPengaturan(), (pengaturan) => (d) => ({ ...d, pengaturan })),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notify, sesiBerakhir]);
@@ -363,6 +366,43 @@ export function AppProvider({ children }) {
     });
   };
 
+  /* --------------- Sidang Dewan Kehormatan dan pengaturannya --------------- */
+  const bolehSidang = user?.role === 'penguji' || user?.role === 'admin';
+  const bolehHapusSidang = user?.role === 'admin' || (user?.role === 'penguji' && user?.jabatan === 'Pembina');
+  const MSG_SIDANG = 'Hanya Dewan Ambalan, Pembina, atau Admin Gudep yang dapat mengelola sidang.';
+
+  /** Memuat catatan sidang dan pengaturan (dipanggil halaman Sidang saat dibuka). */
+  const muatSidang = useCallback(async () => {
+    const a = api();
+    const [s, p] = await Promise.all([a.muatSidang(), a.muatPengaturan()]);
+    const gagal = [s, p].find((r) => !r.ok);
+    if (gagal) {
+      if (gagal.sesiBerakhir) await sesiBerakhir();
+      return gagal;
+    }
+    setDb((d) => ({ ...d, sidang: s.data, pengaturan: p.data }));
+    return { ok: true };
+  }, [sesiBerakhir]);
+
+  /** Catat keputusan sidang. Mengembalikan { ok, data: id catatan baru }. NTA yang diisi ikut tersimpan ke profil. */
+  const simpanSidang = (data) => {
+    if (!bolehSidang) return Promise.resolve(ditolak(notify, MSG_SIDANG));
+    return aksi(api().simpanSidang(data), {
+      sukses: 'Keputusan sidang tersimpan.',
+      sesudah: () => Promise.all([segarkan.sidang(), segarkan.users()]),
+    });
+  };
+
+  const hapusSidang = (id) =>
+    bolehHapusSidang
+      ? aksi(api().hapusSidang(id), { sukses: 'Catatan sidang dihapus.', sesudah: () => segarkan.sidang() })
+      : Promise.resolve(ditolak(notify, 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan sidang.'));
+
+  const simpanPengaturan = (kunci, nilai) => {
+    if (!bolehSidang) return Promise.resolve(ditolak(notify, MSG_SIDANG));
+    return aksi(api().simpanPengaturan(kunci, nilai), { sesudah: () => segarkan.pengaturan() });
+  };
+
   /* ------------------------- Manajemen anggota (admin) ------------------------- */
   /**
    * Tambah (tanpa id) atau ubah (dengan id) satu anggota. Anggota baru mengembalikan `akun` = { username, pin, nama }
@@ -441,7 +481,10 @@ export function AppProvider({ children }) {
             const { [id]: _a, ...sisa } = peta;
             return [t, sisa];
           }));
-          return { ...d, users: d.users.filter((u) => u.id !== id), progress, portofolio, absensi: { ...d.absensi, hadir } };
+          return {
+            ...d, users: d.users.filter((u) => u.id !== id), progress, portofolio, absensi: { ...d.absensi, hadir },
+            sidang: d.sidang.filter((s) => s.pesertaId !== id),
+          };
         }),
     });
   };
@@ -478,6 +521,7 @@ export function AppProvider({ children }) {
     status, galatMuat, lokal: LOKAL ? { aktif: true, reset: () => lokalRef.current?.reset() } : { aktif: false },
     db, user, users: db.users, progress: db.progress, absensi: db.absensi, portofolio: db.portofolio,
     materi: db.materi, bolehKelolaMateri: izinMateri, simpanMateri, hapusMateri, geserUrutanMateri,
+    sidang: db.sidang, pengaturan: db.pengaturan, bolehSidang, bolehHapusSidang, muatSidang, simpanSidang, hapusSidang, simpanPengaturan,
     daftarPeserta, peranUser, bolehKelolaAbsen,
     login, logout,
     ajukan, batalkanAjuan, catatHasil,

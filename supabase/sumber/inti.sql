@@ -19,7 +19,8 @@ set check_function_bodies = off;
 -- ---------------------------------------------------------------------------
 -- 0. Bersihkan versi lama
 -- ---------------------------------------------------------------------------
-drop table if exists public.materi, public.portofolio_jurnal, public.portofolio,
+drop table if exists public.sidang_dk, public.sidang_urut, public.pengaturan,
+  public.materi, public.portofolio_jurnal, public.portofolio,
   public.absensi_hadir, public.absensi_sesi, public.sku_riwayat, public.sku_progress,
   public.login_gagal, public.sku_unit, public.sku_butir, public.pf_item, public.profiles cascade;
 
@@ -54,6 +55,7 @@ create table public.profiles (
   agama text check (agama in ('Islam','Katolik','Protestan','Hindu','Buddha','Khonghucu')),
   jabatan text check (jabatan in ('Dewan Ambalan','Pembina','Admin Gudep')),
   calon_garuda date,
+  nta text,                                                        -- Nomor Tanda Anggota Pramuka (opsional; diisi saat sidang)
   wajib_ganti_pin boolean not null default true,
   pin_direset_oleh uuid references public.profiles(id) on delete set null,
   pin_direset_pada timestamptz,
@@ -61,7 +63,8 @@ create table public.profiles (
   dibuat date not null default sigarda.hari_ini(),
   constraint profil_peserta check (role <> 'peserta' or (nis is not null and kelas is not null and sangga is not null and agama is not null and jabatan is null)),
   constraint profil_penguji check (role <> 'penguji' or jabatan in ('Dewan Ambalan','Pembina')),
-  constraint profil_admin check (role <> 'admin' or jabatan = 'Admin Gudep')
+  constraint profil_admin check (role <> 'admin' or jabatan = 'Admin Gudep'),
+  constraint profil_nta check (nta is null or nta ~ '^[0-9A-Za-z./ -]{1,40}$')
 );
 
 -- Katalog (diisi otomatis di bagian akhir berkas ini dari data aplikasi)
@@ -156,6 +159,46 @@ create table public.materi (
   dibuat_oleh uuid references public.profiles(id) on delete set null
 );
 
+-- Pengaturan aplikasi (pasangan kunci-nilai). Dibaca semua pengguna aktif; diubah hanya lewat sg_pengaturan_simpan.
+create table public.pengaturan (
+  kunci text primary key check (kunci ~ '^[a-z_]+\.[a-z_0-9]+$'),
+  nilai jsonb not null,
+  diubah_oleh uuid references public.profiles(id) on delete set null,
+  diubah_pada timestamptz not null default now()
+);
+
+-- Sidang Dewan Kehormatan Ambalan: keputusan Lulus/Tidak Lulus SKU (Layak dilantik atau Ditunda/Remedi) per peserta dan tingkat.
+-- Nama ketua dan sebutan jabatan dicatat pada saat sidang agar Berita Acara lama tidak berubah bila pengaturan diubah kelak.
+create table public.sidang_urut (          -- penghitung nomor berita acara per tahun (tidak pernah dipakai ulang)
+  tahun int primary key,
+  terakhir int not null
+);
+create table public.sidang_dk (
+  id int generated always as identity primary key,
+  peserta_id uuid not null references public.profiles(id) on delete cascade,
+  tingkat text not null check (tingkat in ('Bantara','Laksana')),
+  tanggal date not null,
+  keputusan text not null check (keputusan in ('layak','tunda')),
+  magang text not null check (magang in ('memenuhi','tidak')),          -- masa magang / masa tamu ambalan
+  tugas_adat text not null check (tugas_adat in ('lulus','tidak')),     -- tugas tambahan adat ambalan
+  tugas_adat_ket text not null default '' check (char_length(tugas_adat_ket) <= 60),
+  catatan text not null default '' check (char_length(catatan) <= 500),
+  nomor_ba text not null check (char_length(nomor_ba) between 1 and 80),
+  nomor_urut int,                                                        -- kosong bila nomor diisi manual
+  capaian_lulus int not null,
+  capaian_total int not null,
+  butir_belum text[] not null default '{}',                              -- id unit SKU yang belum lulus saat sidang
+  nta text not null default '' check (nta = '' or nta ~ '^[0-9A-Za-z./ -]{1,40}$'),
+  ketua_nama text not null default '',
+  ketua_sebutan text not null default '',
+  dibuat_oleh uuid references public.profiles(id) on delete set null,
+  dibuat_pada timestamptz not null default now()
+);
+create unique index sidang_dk_nomor on public.sidang_dk (nomor_ba);
+create unique index sidang_dk_layak on public.sidang_dk (peserta_id, tingkat) where keputusan = 'layak';
+create index on public.sidang_dk (peserta_id);
+create index on public.sidang_dk (tanggal);
+
 -- Pembatasan percobaan masuk per nama pengguna (hanya dipakai Edge Function)
 create table public.login_gagal (
   username text primary key,
@@ -190,6 +233,30 @@ create function sigarda.kelola_materi() returns boolean language plpgsql stable 
 $$ begin
   return coalesce((select (role = 'admin' or (role = 'penguji' and jabatan = 'Pembina')) and not wajib_ganti_pin from public.profiles where id = auth.uid()), false);
 end $$;
+
+create function sigarda.pembina_atau_admin() returns boolean language plpgsql stable security definer set search_path = public as
+$$ begin
+  return coalesce((select (role = 'admin' or (role = 'penguji' and jabatan = 'Pembina')) and not wajib_ganti_pin from public.profiles where id = auth.uid()), false);
+end $$;
+
+-- Nilai pengaturan bertipe teks; bila belum pernah diatur dipakai nilai bawaan.
+create function sigarda.pengaturan_teks(p_kunci text, p_bawaan text) returns text
+language sql stable security definer set search_path = public as
+$$ select coalesce((select nilai #>> '{}' from public.pengaturan where kunci = p_kunci), p_bawaan) $$;
+
+-- Nomor berita acara dari format. Kode: {no} {no3} (tiga angka) {tahun} {bulan} {romawi} {tingkat}.
+-- Harus sama dengan formatNomor() di src/lib/sidangLogic.js (dijaga oleh pengujian).
+create function sigarda.format_nomor(p_format text, p_no int, p_tanggal date, p_tingkat text) returns text
+language sql immutable as
+$$
+  select replace(replace(replace(replace(replace(replace(p_format,
+    '{no3}', case when p_no >= 1000 then p_no::text else lpad(p_no::text, 3, '0') end),
+    '{no}', p_no::text),
+    '{tahun}', extract(year from p_tanggal)::int::text),
+    '{bulan}', lpad(extract(month from p_tanggal)::int::text, 2, '0')),
+    '{romawi}', (array['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'])[extract(month from p_tanggal)::int]),
+    '{tingkat}', p_tingkat)
+$$;
 
 -- Seluruh unit SKU tingkat ini yang berlaku bagi peserta (sesuai agamanya) sudah lulus.
 create function sigarda.tingkat_selesai(p_peserta uuid, p_tingkat text) returns boolean
@@ -233,6 +300,9 @@ alter table public.absensi_hadir enable row level security;
 alter table public.portofolio enable row level security;
 alter table public.portofolio_jurnal enable row level security;
 alter table public.materi enable row level security;
+alter table public.pengaturan enable row level security;
+alter table public.sidang_dk enable row level security;
+alter table public.sidang_urut enable row level security;   -- tanpa kebijakan: hanya dipakai fungsi sg_*
 alter table public.login_gagal enable row level security;   -- tanpa kebijakan: hanya service_role
 
 -- Penegak melihat dirinya sendiri dan daftar penguji/admin; pengurus melihat semua.
@@ -261,6 +331,9 @@ create policy baca_portofolio on public.portofolio for select to authenticated
   using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
 create policy baca_jurnal on public.portofolio_jurnal for select to authenticated
   using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+
+create policy baca_pengaturan on public.pengaturan for select to authenticated using ((select sigarda.aktif()));
+create policy baca_sidang on public.sidang_dk for select to authenticated using ((select sigarda.pengurus()));
 
 -- ---------------------------------------------------------------------------
 -- 4. Fungsi aksi (RPC). Semua memeriksa peran di server.
@@ -644,6 +717,148 @@ begin
   update public.materi set urutan = case when id = p_id then v_ut else v_u end where id in (p_id, v_tetangga);
 end $$;
 
+-- ===== Pengaturan dan Sidang Dewan Kehormatan =====
+-- Kunci pengaturan yang dikenal (nilai bertipe teks). Bawaan dipakai bila belum diatur:
+--   sidang.format_nomor   {no3}/DK/{tahun}
+--   sidang.nama_ketua     (kosong: dicetak garis untuk tanda tangan)
+--   sidang.sebutan_ketua  Ketua Dewan Penegak / Pemangku Adat
+create function public.sg_pengaturan_simpan(p_kunci text, p_nilai jsonb) returns void
+language plpgsql security definer set search_path = public as
+$$
+declare v text; v_tok text;
+begin
+  perform sigarda.wajib_aktif();
+  if p_kunci is null or p_kunci not in ('sidang.format_nomor', 'sidang.nama_ketua', 'sidang.sebutan_ketua') then
+    raise exception 'Pengaturan tidak dikenal.';
+  end if;
+  if not sigarda.pengurus() then raise exception 'Hanya Dewan Ambalan, Pembina, atau Admin Gudep yang dapat mengubah pengaturan sidang.'; end if;
+  if p_nilai is null or jsonb_typeof(p_nilai) <> 'string' then raise exception 'Nilai pengaturan tidak sah.'; end if;
+  v := sigarda.rapikan(p_nilai #>> '{}');
+
+  if p_kunci = 'sidang.format_nomor' then
+    if v = '' then raise exception 'Format nomor wajib diisi.'; end if;
+    if char_length(v) > 80 then raise exception 'Format nomor maksimal 80 karakter.'; end if;
+    if v !~ '^[A-Za-z0-9 /._(){}-]+$' then
+      raise exception 'Format nomor hanya boleh berisi huruf, angka, spasi, dan tanda / . - _ ( ) serta kode dalam kurung kurawal.';
+    end if;
+    for v_tok in select (regexp_matches(v, '\{[^}]*\}', 'g'))[1] loop
+      if v_tok not in ('{no}', '{no3}', '{tahun}', '{bulan}', '{romawi}', '{tingkat}') then
+        raise exception 'Kode % tidak dikenal. Kode yang tersedia: {no} {no3} {tahun} {bulan} {romawi} {tingkat}.', v_tok;
+      end if;
+    end loop;
+    if regexp_replace(v, '\{(no|no3|tahun|bulan|romawi|tingkat)\}', '', 'g') ~ '[{}]' then
+      raise exception 'Tanda kurung kurawal pada format nomor tidak lengkap.';
+    end if;
+    if position('{no}' in v) = 0 and position('{no3}' in v) = 0 then raise exception 'Format nomor harus memuat {no} atau {no3} (nomor urut).'; end if;
+    if position('{tahun}' in v) = 0 then raise exception 'Format nomor harus memuat {tahun} agar nomor tidak sama antar tahun.'; end if;
+  elsif p_kunci = 'sidang.nama_ketua' then
+    if char_length(v) > 120 then raise exception 'Nama ketua maksimal 120 karakter.'; end if;
+  else
+    if v = '' then raise exception 'Sebutan jabatan wajib diisi.'; end if;
+    if char_length(v) > 80 then raise exception 'Sebutan jabatan maksimal 80 karakter.'; end if;
+  end if;
+
+  insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada) values (p_kunci, to_jsonb(v), auth.uid(), now())
+  on conflict (kunci) do update set nilai = excluded.nilai, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
+end $$;
+
+-- Mencatat keputusan sidang. "Layak" hanya bila seluruh butir tingkat itu lulus (aturan sama dengan tingkat_selesai).
+-- Nomor berita acara dibuat otomatis dari format pengaturan (atau diisi manual). Nama ketua dan sebutannya dicatat saat ini.
+create function public.sg_sidang_simpan(
+  p_peserta_id uuid, p_tingkat text, p_tanggal date, p_keputusan text,
+  p_magang text, p_tugas_adat text, p_tugas_adat_ket text, p_catatan text,
+  p_nomor_manual text default null, p_nta text default null
+) returns int language plpgsql security definer set search_path = public as
+$$
+declare
+  v_p public.profiles; v_lulus int; v_total int; v_belum text[]; v_selesai boolean;
+  v_ket text := sigarda.rapikan(p_tugas_adat_ket); v_cat text := btrim(coalesce(p_catatan, ''));
+  v_manual text := sigarda.rapikan(p_nomor_manual); v_nta text := sigarda.rapikan(p_nta);
+  v_tahun int; v_urut int; v_nomor text; v_id int;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pengurus() then raise exception 'Hanya Dewan Ambalan, Pembina, atau Admin Gudep yang dapat mencatat keputusan sidang.'; end if;
+  select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';
+  if not found then raise exception 'Peserta tidak ditemukan.'; end if;
+  if p_tingkat is null or p_tingkat not in ('Bantara', 'Laksana') then raise exception 'Tingkat SKU tidak dikenal.'; end if;
+  if p_tanggal is null or p_tanggal < date '2000-01-01' or p_tanggal > sigarda.hari_ini() then
+    raise exception 'Tanggal sidang tidak valid (tidak boleh melewati hari ini).';
+  end if;
+  if p_keputusan is null or p_keputusan not in ('layak', 'tunda') then raise exception 'Pilih keputusan sidang.'; end if;
+  if p_magang is null or p_magang not in ('memenuhi', 'tidak') then raise exception 'Pilih hasil pemeriksaan masa magang atau masa tamu ambalan.'; end if;
+  if p_tugas_adat is null or p_tugas_adat not in ('lulus', 'tidak') then raise exception 'Pilih hasil tugas tambahan adat ambalan.'; end if;
+  if char_length(v_ket) > 60 then raise exception 'Jenis tugas adat maksimal 60 karakter.'; end if;
+  if char_length(v_cat) > 500 then raise exception 'Catatan maksimal 500 karakter.'; end if;
+  if v_nta <> '' and v_nta !~ '^[0-9A-Za-z./ -]{1,40}$' then raise exception 'NTA hanya boleh berisi huruf, angka, spasi, dan tanda / . - (maksimal 40 karakter).'; end if;
+
+  select coalesce(array_agg(u.id order by u.id) filter (where coalesce(g.status, 'belum') <> 'lulus'), '{}')
+    into v_belum
+  from public.sku_unit u
+  left join public.sku_progress g on g.sku_id = u.id and g.peserta_id = p_peserta_id
+  where u.tingkat = p_tingkat and (u.agama is null or u.agama = v_p.agama);
+  -- Capaian dihitung per BUTIR (butir agama lulus bila seluruh sub-butirnya lulus), sama dengan hitungProgres di aplikasi
+  select count(*) filter (where b.lulus), count(*) into v_lulus, v_total from (
+    select bool_and(coalesce(g.status, 'belum') = 'lulus') as lulus
+    from public.sku_unit u
+    left join public.sku_progress g on g.sku_id = u.id and g.peserta_id = p_peserta_id
+    where u.tingkat = p_tingkat and (u.agama is null or u.agama = v_p.agama)
+    group by u.butir_id
+  ) b;
+  v_selesai := v_total > 0 and v_lulus = v_total;
+
+  if p_keputusan = 'layak' then
+    if not v_selesai then
+      raise exception 'Belum dapat dinyatakan Layak dan Lulus: capaian SKU % baru % dari % butir.', p_tingkat, v_lulus, v_total;
+    end if;
+    if exists (select 1 from public.sidang_dk where peserta_id = p_peserta_id and tingkat = p_tingkat and keputusan = 'layak') then
+      raise exception 'Peserta ini sudah dinyatakan Layak dan Lulus untuk SKU % pada sidang sebelumnya.', p_tingkat;
+    end if;
+  elsif cardinality(v_belum) = 0 and v_cat = '' then
+    raise exception 'Seluruh butir sudah lulus; isi catatan alasan penundaan.';
+  end if;
+
+  v_tahun := extract(year from p_tanggal)::int;
+  if v_manual <> '' then
+    if char_length(v_manual) > 80 then raise exception 'Nomor berita acara maksimal 80 karakter.'; end if;
+    v_nomor := v_manual;
+    v_urut := null;
+  else
+    insert into public.sidang_urut as s (tahun, terakhir) values (v_tahun, 1)
+    on conflict (tahun) do update set terakhir = s.terakhir + 1
+    returning s.terakhir into v_urut;
+    v_nomor := sigarda.format_nomor(sigarda.pengaturan_teks('sidang.format_nomor', '{no3}/DK/{tahun}'), v_urut, p_tanggal, p_tingkat);
+  end if;
+  if exists (select 1 from public.sidang_dk where nomor_ba = v_nomor) then
+    raise exception 'Nomor berita acara % sudah dipakai.', v_nomor;
+  end if;
+
+  insert into public.sidang_dk (
+    peserta_id, tingkat, tanggal, keputusan, magang, tugas_adat, tugas_adat_ket, catatan, nomor_ba, nomor_urut,
+    capaian_lulus, capaian_total, butir_belum, nta, ketua_nama, ketua_sebutan, dibuat_oleh
+  ) values (
+    p_peserta_id, p_tingkat, p_tanggal, p_keputusan, p_magang, p_tugas_adat, v_ket, v_cat, v_nomor, v_urut,
+    v_lulus, v_total, v_belum, coalesce(nullif(v_nta, ''), coalesce(v_p.nta, '')),
+    sigarda.pengaturan_teks('sidang.nama_ketua', ''),
+    sigarda.pengaturan_teks('sidang.sebutan_ketua', 'Ketua Dewan Penegak / Pemangku Adat'),
+    auth.uid()
+  ) returning id into v_id;
+
+  -- NTA yang diisi saat sidang disimpan ke profil agar terisi otomatis pada sidang berikutnya
+  if v_nta <> '' and v_nta is distinct from v_p.nta then update public.profiles set nta = v_nta where id = p_peserta_id; end if;
+  return v_id;
+end $$;
+
+-- Hanya Pembina dan Admin Gudep yang dapat menghapus catatan sidang (mis. salah isi). Nomor urut tidak dipakai ulang;
+-- gunakan isian nomor manual bila ingin memakai nomor yang sama.
+create function public.sg_sidang_hapus(p_id int) returns void
+language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan sidang.'; end if;
+  delete from public.sidang_dk where id = p_id;
+end $$;
+
 -- ===== Fungsi untuk Edge Function saja (service_role) =====
 
 -- Membuat baris profil untuk akun yang baru dibuat di Supabase Auth. Menyamakan penulisan kelas dan sangga.
@@ -703,7 +918,7 @@ $$ begin delete from public.login_gagal where username = p_username; end $$;
 revoke all on all tables in schema public from anon, authenticated;
 grant select on public.profiles, public.sku_butir, public.sku_unit, public.pf_item, public.sku_progress,
   public.sku_riwayat, public.absensi_sesi, public.absensi_hadir, public.portofolio, public.portofolio_jurnal,
-  public.materi to authenticated;
+  public.materi, public.pengaturan, public.sidang_dk to authenticated;
 
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function
@@ -713,7 +928,9 @@ grant execute on function
   public.sg_absen_set_banyak(date, uuid[], text, boolean), public.sg_absen_hapus_sesi(date),
   public.sg_anggota_ubah(uuid, text, text, text, text, boolean),
   public.sg_materi_simpan(uuid, text, text, text, text, text, text[], jsonb),
-  public.sg_materi_hapus(uuid), public.sg_materi_geser(uuid, int)
+  public.sg_materi_hapus(uuid), public.sg_materi_geser(uuid, int),
+  public.sg_pengaturan_simpan(text, jsonb),
+  public.sg_sidang_simpan(uuid, text, date, text, text, text, text, text, text, text), public.sg_sidang_hapus(int)
   to authenticated;
 grant execute on function
   public.sg_sku_catat_internal(uuid, uuid, text, text, date, text, text),

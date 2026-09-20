@@ -4,7 +4,7 @@
  * Server menyimpan data dalam tabel (snake_case). Seluruh halaman aplikasi memakai bentuk data
  * bersarang berikut, sehingga lapisan ini menjembataninya:
  *
- *   users[]                        { id, username, role, nama, nis, kelas, sangga, agama, jabatan, calonGaruda,
+ *   users[]                        { id, username, role, nama, nis, kelas, sangga, agama, jabatan, calonGaruda, nta,
  *                                    wajibGantiPin, pinDireset:{oleh,waktu}, pinDiubah, dibuat }
  *   progress[pesertaId][skuId]     { status, jadwal, pengujiId, tanggalUji, nilai, catatan, catatanPeserta,
  *                                    verifikasi, diverifikasiPada, riwayat:[{waktu,teks,oleh}] }
@@ -29,6 +29,7 @@ export function petaProfil(r) {
     agama: atau(r.agama),
     jabatan: atau(r.jabatan),
     calonGaruda: r.calon_garuda ? tgl(r.calon_garuda) : undefined,
+    nta: atau(r.nta),
     wajibGantiPin: r.wajib_ganti_pin !== false,
     pinDireset: r.pin_direset_pada ? { oleh: r.pin_direset_oleh ?? null, waktu: r.pin_direset_pada } : undefined,
     pinDiubah: atau(r.pin_diubah),
@@ -126,3 +127,30 @@ export function petaMateri(r) {
 }
 
 export const susunMateri = (baris = []) => baris.map(petaMateri).sort((a, b) => a.urutan - b.urutan);
+
+export function petaSidang(r) {
+  return {
+    id: r.id,
+    pesertaId: r.peserta_id,
+    tingkat: r.tingkat,
+    tanggal: tgl(r.tanggal),
+    keputusan: r.keputusan,
+    magang: r.magang,
+    tugasAdat: r.tugas_adat,
+    tugasAdatKet: r.tugas_adat_ket ?? '',
+    catatan: r.catatan ?? '',
+    nomorBa: r.nomor_ba,
+    nomorUrut: r.nomor_urut ?? null,
+    capaianLulus: r.capaian_lulus,
+    capaianTotal: r.capaian_total,
+    butirBelum: Array.isArray(r.butir_belum) ? r.butir_belum : [],
+    nta: r.nta ?? '',
+    ketuaNama: r.ketua_nama ?? '',
+    ketuaSebutan: r.ketua_sebutan ?? '',
+    dibuatOleh: r.dibuat_oleh ?? null,
+    dibuatPada: r.dibuat_pada,
+  };
+}
+
+/** Baris tabel pengaturan -> { [kunci]: nilai teks } */
+export const petaPengaturan = (baris = []) => Object.fromEntries(baris.map((r) => [r.kunci, typeof r.nilai === 'string' ? r.nilai : String(r.nilai ?? '')]));
