@@ -9,6 +9,7 @@ import { bolehResetPin, validasiPinBaru } from '../lib/pinLogic';
 import { periksaBaris, POLA_NTA } from '../lib/importAnggota';
 import { bolehKelolaMateri, validasiMateri } from '../lib/materiLogic';
 import { hariIni } from '../lib/format';
+import { PENGATURAN_IURAN_BAWAAN, gabungPengaturanIuran } from '../lib/iuranLogic';
 
 /**
  * STATE APLIKASI
@@ -32,7 +33,7 @@ export function useApp() {
   return ctx;
 }
 
-const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '' };
+const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '', asisten: [], pengaturanIuran: PENGATURAN_IURAN_BAWAAN };
 const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi waktu Edge Function)
 const JEDA_SEGARKAN_MS = 30000;
 
@@ -53,6 +54,7 @@ export function AppProvider({ children }) {
   const instrumenMuat = useRef(null);                       // janji pemuatan yang sedang berjalan
   const instrumenSiapRef = useRef(false);                   // salinan instrumenSiap yang selalu mutakhir (untuk callback)
   instrumenSiapRef.current = instrumenSiap;
+  const [versiIuran, setVersiIuran] = useState(0); // naik setiap iuran, kas, atau asisten berubah
   const [sesiUjianSiap, setSesiUjianSiap] = useState(false); // daftar sesi ujian sudah dimuat (lazy, sekali per sesi login)
   const sesiUjianMuat = useRef(null);
   const sesiUjianSiapRef = useRef(false);
@@ -117,8 +119,10 @@ export function AppProvider({ children }) {
     const a = api();
     const mulaiGenerasi = generasi.current;
     const daftarKunci = [...new Set([semesterDari(hariIni()), ...semesterRef.current])];
-    const [u, p, sesi, pf, m, ...hadir] = await Promise.all([
+    const [u, p, sesi, pf, m, asisten, pengIuran, ...hadir] = await Promise.all([
       a.muatProfil(), a.muatProgress(), a.muatSesiAbsen(), a.muatPortofolio(), a.muatMateri(),
+      a.muatAsisten(), // penunjukan asisten bendahara: tidak wajib (basis data lama belum punya tabelnya), jadi tidak ikut pemeriksaan gagal
+      a.muatPengaturanIuran(), // pengaturan iuran: bila fungsinya belum ada dipakai nilai bawaan
       ...daftarKunci.map((k) => { const r = rentangKunci(k); return a.muatHadirRentang(r.mulai, r.akhir); }),
     ]);
     const gagal = [u, p, sesi, pf, m, ...hadir].find((r) => !r.ok);
@@ -127,7 +131,7 @@ export function AppProvider({ children }) {
     const hadirGabung = Object.assign({}, ...hadir.map((h) => h.data));
     setDb((d) => ({
       ...d, // sidang dan pengaturan dimuat terpisah (muatSidang) dan tidak boleh hilang saat penyegaran
-      users: u.data, progress: p.data, portofolio: pf.data, materi: m.data,
+      users: u.data, progress: p.data, portofolio: pf.data, materi: m.data, asisten: asisten.ok ? asisten.data : [], pengaturanIuran: pengIuran.ok ? gabungPengaturanIuran(pengIuran.data) : PENGATURAN_IURAN_BAWAAN,
       absensi: gabungHadirSemester(d.absensi, sesi.data, daftarKunci, hadirGabung),
     }));
     tandaiSiap(daftarKunci);
@@ -229,6 +233,8 @@ export function AppProvider({ children }) {
       portofolio: (pid) => terapkan(api().muatPortofolio(pid), (p) => (d) => ({ ...d, portofolio: pid ? { ...d.portofolio, [pid]: p[pid] ?? {} } : p })),
       hadir: (tanggal) => terapkan(api().muatHadirTanggal(tanggal), (h) => (d) => ({ ...d, absensi: { ...d.absensi, hadir: { ...d.absensi.hadir, [tanggal]: h } } })),
       materi: () => terapkan(api().muatMateri(), (materi) => (d) => ({ ...d, materi })),
+      asisten: () => terapkan(api().muatAsisten(), (asisten) => (d) => ({ ...d, asisten })),
+      pengaturanIuran: () => terapkan(api().muatPengaturanIuran(), (p) => (d) => ({ ...d, pengaturanIuran: gabungPengaturanIuran(p) })),
       sidang: async () => {
         const [s, u] = await Promise.all([api().muatSidang(), api().muatSidangUrut()]);
         const gagal = [s, u].find((r) => !r.ok);
@@ -433,6 +439,56 @@ export function AppProvider({ children }) {
     if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
     return r;
   };
+
+  /* ------------- Iuran bumbung kepramukaan (dicatat Dewan Ambalan atau asisten bendahara) ------------- */
+  const dewanAmbalan = user?.role === 'penguji' && user?.jabatan === 'Dewan Ambalan';
+  const asistenSaya = user?.role === 'peserta' && db.asisten.some((a) => a.pesertaId === user.id);
+  const pencatatIuran = dewanAmbalan || asistenSaya;
+  const penunjukAsisten = dewanAmbalan || (user?.role === 'penguji' && user?.jabatan === 'Pembina');
+  const MSG_IURAN = 'Hanya Dewan Ambalan atau asisten bendahara yang dapat mencatat iuran.';
+  const naikkanIuran = () => setVersiIuran((v) => v + 1); // hook rekap dan lembar memuat ulang bila angka ini berubah
+
+  /** Membaca data iuran (rekap, kas, lembar, riwayat) tanpa toast; sesi berakhir ditangani di sini. */
+  const bacaIuran = async (nama, ...args) => {
+    const r = await api()[nama](...args);
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  };
+
+  /** Jumlah kosong atau 0 = tidak iuran. Tidak menampilkan toast bila berhasil (dipakai berulang saat mencatat). */
+  const aturIuran = (tanggal, pesertaId, jumlah) =>
+    pencatatIuran ? aksi(api().aturIuran(tanggal, pesertaId, jumlah), { sesudah: naikkanIuran }) : Promise.resolve(ditolak(notify, MSG_IURAN));
+
+  const aturIuranBanyak = async (tanggal, pesertaIds, jumlah, hanyaKosong = true) => {
+    if (!pencatatIuran) return ditolak(notify, MSG_IURAN);
+    const r = await aksi(api().aturIuranBanyak(tanggal, pesertaIds, jumlah, hanyaKosong), { sesudah: naikkanIuran });
+    if (r.ok) notify(r.data > 0 ? `Iuran ${r.data} Penegak dicatat.` : 'Tidak ada iuran yang perlu diisi.');
+    return r;
+  };
+
+  const simpanKas = (tanggal, total, catatan = '') =>
+    dewanAmbalan
+      ? aksi(api().simpanKas(tanggal, total, catatan), { sukses: total == null ? 'Tutup kas dihapus.' : 'Tutup kas tersimpan.', sesudah: naikkanIuran })
+      : Promise.resolve(ditolak(notify, 'Hanya Dewan Ambalan yang dapat menutup kas.'));
+
+  /** Iuran susulan saat ujian (Dewan): menebus Jumat kosong terlama dulu. Mengembalikan { ok, data: jumlah Jumat yang terisi }. */
+  const catatIuranSusulan = async (pesertaId, tanggal, jumlah, pertemuan) => {
+    if (!dewanAmbalan) return ditolak(notify, 'Hanya Dewan Ambalan yang dapat mencatat iuran susulan.');
+    const r = await aksi(api().catatIuranSusulan(pesertaId, tanggal, jumlah, pertemuan), { sesudah: naikkanIuran });
+    if (r.ok) notify(`Iuran susulan untuk ${r.data} pertemuan dicatat.`);
+    return r;
+  };
+
+  const aturAsisten = (pesertaId, aktif) =>
+    penunjukAsisten
+      ? aksi(api().aturAsisten(pesertaId, aktif), { sukses: aktif ? 'Asisten bendahara ditunjuk.' : 'Penunjukan asisten dicabut.', sesudah: () => segarkan.asisten() })
+      : Promise.resolve(ditolak(notify, 'Hanya Dewan Ambalan atau Pembina yang dapat menunjuk asisten bendahara.'));
+
+  /** Pengaturan iuran (standar, ambang rutin, batas nilai): hanya Pembina dan Admin. */
+  const simpanPengaturanIuran = (nilai) =>
+    user?.role === 'admin' || (user?.role === 'penguji' && user?.jabatan === 'Pembina')
+      ? aksi(api().simpanPengaturanIuran(nilai), { sukses: 'Pengaturan iuran tersimpan.', sesudah: () => Promise.all([segarkan.pengaturanIuran(), Promise.resolve(naikkanIuran())]) })
+      : Promise.resolve(ditolak(notify, 'Hanya Pembina dan Admin Gudep yang dapat mengubah pengaturan iuran.'));
 
   /* ------------------------ Pencalonan Penegak Garuda ------------------------ */
   const daftarCalonGaruda = () =>
@@ -737,6 +793,7 @@ export function AppProvider({ children }) {
     instrumen: db.instrumen, instrumenGalat: db.instrumenGalat, instrumenSiap, bolehKelolaInstrumen, pastikanInstrumen, simpanInstrumen, statusInstrumen, simpanPengaturanInstrumen,
     sesiUjian: db.sesiUjian, sesiUjianGalat: db.sesiUjianGalat, sesiUjianSiap, pastikanSesiUjian, simpanSesiUjian, ubahStatusSesiUjian, hapusSesiUjian, bolehHapusSesi,
     muatUlangProgress, tokenSuratTingkat, muatPenilaian,
+    asisten: db.asisten, pengaturanIuran: db.pengaturanIuran, simpanPengaturanIuran, dewanAmbalan, asistenSaya, pencatatIuran, penunjukAsisten, versiIuran, bacaIuran, catatIuranSusulan, aturIuran, aturIuranBanyak, simpanKas, aturAsisten,
     daftarPeserta, peranUser, bolehKelolaAbsen,
     login, logout,
     ajukan, batalkanAjuan, catatHasil,

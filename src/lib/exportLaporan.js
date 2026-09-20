@@ -9,6 +9,7 @@ import { PERIODE, STATUS_ABSEN } from './absensiLogic';
 import { getItem } from './portofolioLogic';
 import { PREDIKAT } from './raportLogic';
 import { fmtTanggal, fmtTglPendek, hariIni } from './format';
+import { AMBANG_RUTIN } from './iuranLogic';
 import { unduhXlsx } from './exportXlsx';
 
 const WARNA_ABSEN = { H: 'FFD1FAE5', I: 'FFDBEAFE', S: 'FFFEF3C7', A: 'FFFEE2E2' };
@@ -274,6 +275,100 @@ export function susunPortofolioXlsx({ rekap, portofolio, filter }) {
 export const unduhPortofolioXlsx = (data) =>
   unduhXlsx({ namaFile: `rekap-portofolio-garuda-${hariIni()}.xlsx`, sheets: susunPortofolioXlsx(data) });
 
+/* ------------------------- IURAN BUMBUNG KEPRAMUKAAN ------------------------- */
+
+/**
+ * Rekap iuran bumbung: lembar per Penegak, per pertemuan (dengan tutup kas), per sangga, dan per kelas.
+ *   rekap   = keluaran rekapPeserta() (sudah difilter)
+ *   sesi    = [{ tanggal }] pertemuan pada periode, urut naik
+ *   ring    = keluaran ringkasAgregat()
+ *   kas     = { [tanggal]: { totalFisik, catatan } } (boleh kosong)
+ *   ambang  = ambang rutin (persen) dari pengaturan iuran; bawaan AMBANG_RUTIN
+ */
+export function susunIuranXlsx({ tahunAjaran, periode, rekap, sesi, ring, kas = {}, filter, ambang = AMBANG_RUTIN }) {
+  const judul = [
+    'Rekap Iuran Bumbung Kepramukaan',
+    `${GUDEP.nama}. Tahun Ajaran ${tahunAjaran}, ${PERIODE[periode]}`,
+    `Filter Penegak: ${teksFilter(filter)}. Pertemuan terlaksana: ${sesi.length}. Total gudep: Rp ${ring.total.toLocaleString('id-ID')}. Dicetak ${fmtTanggal(hariIni())}`,
+  ];
+  const uang = { format: '#,##0', rata: 'right' };
+  const peserta = {
+    nama: 'Per Penegak',
+    judul,
+    kolom: [
+      { header: 'No', key: 'no', lebar: 6, rata: 'center' },
+      { header: 'Nama', key: 'nama', lebar: 30 },
+      { header: 'NIS', key: 'nis', lebar: 12 },
+      { header: 'Kelas', key: 'kelas', lebar: 9, rata: 'center' },
+      { header: 'Sangga', key: 'sangga', lebar: 18 },
+      { header: 'Pertemuan Beriuran', key: 'kali', lebar: 12, rata: 'center' },
+      { header: 'Rutin', key: 'rutin', lebar: 8, rata: 'center' },
+      { header: 'Susulan', key: 'susulan', lebar: 8, rata: 'center' },
+      { header: 'Persen Beriuran (%)', key: 'persen', lebar: 12, rata: 'center', format: '0"%"' },
+      { header: 'Total (Rp)', key: 'total', lebar: 14, ...uang },
+      { header: 'Susulan (Rp)', key: 'totalSusulan', lebar: 14, ...uang },
+      { header: 'Keterangan', key: 'ket', lebar: 24 },
+    ],
+    baris: rekap.map((r, i) => ({
+      no: i + 1, nama: r.peserta.nama, nis: r.peserta.nis ?? '', kelas: r.peserta.kelas ?? '', sangga: r.peserta.sangga ?? '',
+      kali: r.kali, rutin: r.rutin, susulan: r.susulan, persen: r.persen ?? '', total: r.total, totalSusulan: r.totalSusulan,
+      ket: r.persen === null ? 'Belum ada pertemuan' : r.persen < ambang ? `Di bawah ${ambang}%` : `Memenuhi ${ambang}%`,
+    })),
+    warna: (b, key) => (key === 'persen' || key === 'ket') && b.persen !== '' && b.persen < ambang ? MERAH_MUDA : undefined,
+  };
+  const pertemuan = {
+    nama: 'Per Pertemuan',
+    judul,
+    kolom: [
+      { header: 'No', key: 'no', lebar: 6, rata: 'center' },
+      { header: 'Tanggal', key: 'tanggal', lebar: 22 },
+      { header: 'Jumlah Penegak Beriuran', key: 'orang', lebar: 14, rata: 'center' },
+      { header: 'Total Iuran (Rp)', key: 'jumlah', lebar: 16, ...uang },
+      { header: 'Di antaranya Susulan (Rp)', key: 'susulan', lebar: 16, ...uang },
+      { header: 'Uang Fisik (Rp)', key: 'fisik', lebar: 16, ...uang },
+      { header: 'Selisih (Rp)', key: 'selisih', lebar: 14, ...uang },
+      { header: 'Catatan Kas', key: 'catatan', lebar: 34 },
+    ],
+    baris: sesi.map((s, i) => {
+      const a = ring.perTanggal[s.tanggal] ?? { jumlah: 0, susulan: 0, orang: 0 };
+      const k = kas[s.tanggal];
+      return {
+        no: i + 1, tanggal: fmtTanggal(s.tanggal), orang: a.orang, jumlah: a.jumlah, susulan: a.susulan,
+        fisik: k ? k.totalFisik : '', selisih: k ? k.totalFisik - a.jumlah : '', catatan: k?.catatan ?? (k ? '' : 'Kas belum ditutup'),
+      };
+    }),
+    warna: (b, key) => (key === 'selisih' && b.selisih !== '' && b.selisih !== 0 ? MERAH_MUDA : undefined),
+  };
+  const kelompok = (nama, kolomNama, daftar) => ({
+    nama,
+    judul,
+    kolom: [
+      { header: 'No', key: 'no', lebar: 6, rata: 'center' },
+      { header: kolomNama, key: 'kunci', lebar: 24 },
+      { header: 'Jumlah Catatan Iuran', key: 'kali', lebar: 14, rata: 'center' },
+      { header: 'Total (Rp)', key: 'jumlah', lebar: 16, ...uang },
+      { header: 'Di antaranya Susulan (Rp)', key: 'susulan', lebar: 16, ...uang },
+    ],
+    baris: daftar.map((d, i) => ({ no: i + 1, kunci: d.kunci || '(tanpa data)', kali: d.kali, jumlah: d.jumlah, susulan: d.susulan })),
+  });
+  const keterangan = {
+    nama: 'Keterangan',
+    judul: ['Keterangan'],
+    kolom: [{ header: 'Butir', key: 'k', lebar: 30 }, { header: 'Arti', key: 'a', lebar: 80 }],
+    baris: [
+      { k: 'Pertemuan Beriuran', a: 'Jumlah Jumat terlaksana pada periode ini yang berisi iuran (rutin ditambah susulan).' },
+      { k: 'Rutin dan Susulan', a: 'Rutin = dibayar pada Jumat itu. Susulan = ditebus belakangan untuk Jumat itu (mis. sekaligus saat ujian SKU).' },
+      { k: 'Persen Beriuran', a: `Pertemuan beriuran dibagi pertemuan terlaksana. Ambang rutin ${ambang}%; di bawahnya ditandai merah.` },
+      { k: 'Uang Fisik dan Selisih', a: 'Uang fisik dari tutup kas dikurangi total catatan iuran pada Jumat itu. Selisih bukan nol ditandai merah.' },
+    ],
+  };
+  return [peserta, pertemuan, kelompok('Per Sangga', 'Sangga', ring.sangga), kelompok('Per Kelas', 'Kelas', ring.kelas), keterangan];
+}
+
+export const namaFileIuran = (tahunAjaran, periode) => `rekap-iuran-bumbung-${tahunAjaran.replace('/', '-')}-${periode}.xlsx`;
+
+export const unduhIuranXlsx = (data) => unduhXlsx({ namaFile: namaFileIuran(data.tahunAjaran, data.periode), sheets: susunIuranXlsx(data) });
+
 /* ------------------------------- INSTRUMEN ------------------------------- */
 
 /**
@@ -294,7 +389,7 @@ export function susunInstrumenXlsx({ unit, instrumen }) {
       baris.push({
         kode: u.id, butir: u.label, teksButir: i === 0 ? u.teks : '', status: i === 0 ? (ins.status === 'ditetapkan' ? 'Ditetapkan' : 'Draf') : '',
         cara: i === 0 ? ins.caraUji : '', instruksi: i === 0 ? ins.instruksi : '', jenis: k.jenis, kriteria: k.teks, bobot: k.bobot,
-        wajib: k.wajib ? 'Wajib' : '-', panduan: k.panduan,
+        wajib: k.wajib ? 'Wajib' : '-', sumber: k.sumber === 'iuran' ? 'iuran' : 'manual', panduan: k.panduan,
       });
     });
   }
@@ -320,6 +415,7 @@ export function susunInstrumenXlsx({ unit, instrumen }) {
           { header: 'Kriteria / pertanyaan', key: 'kriteria', lebar: 55 },
           { header: 'Bobot', key: 'bobot', lebar: 8, rata: 'center' },
           { header: 'Wajib?', key: 'wajib', lebar: 10, rata: 'center' },
+          { header: 'Sumber nilai (manual/iuran)', key: 'sumber', lebar: 14, rata: 'center' },
           { header: 'Panduan penguji (RAHASIA)', key: 'panduan', lebar: 60 },
         ],
         baris,

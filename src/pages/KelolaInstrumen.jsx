@@ -7,6 +7,7 @@ import {
   periksaPengaturanInstrumen, STATUS_INSTRUMEN, statusUnit,
 } from '../lib/instrumenLogic';
 import { unduhInstrumenXlsx } from '../lib/exportLaporan';
+import { BUTIR_IURAN } from '../lib/iuranLogic';
 import { Icon, Kosong, Modal } from '../components/ui';
 
 const CHIP = 'inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset';
@@ -24,7 +25,8 @@ const BATAS_DAFTAR = 40;
 function EditorInstrumen({ unit, awal, onTutup }) {
   const { simpanInstrumen } = useApp();
   const nomor = useRef(0);
-  const baru = () => ({ kunci: `baru-${(nomor.current += 1)}`, id: null, jenis: 'Lisan', teks: '', bobot: 1, wajib: false, panduan: '' });
+  const butirIuran = BUTIR_IURAN.includes(unit.id); // Bantara 6 dan Laksana 6: satu kriteria boleh bersumber catatan iuran
+  const baru = () => ({ kunci: `baru-${(nomor.current += 1)}`, id: null, jenis: 'Lisan', teks: '', bobot: 1, wajib: false, panduan: '', sumber: 'manual' });
   const [caraUji, setCaraUji] = useState(awal?.caraUji ?? '');
   const [instruksi, setInstruksi] = useState(awal?.instruksi ?? '');
   const [status, setStatus] = useState(awal?.status ?? 'draf');
@@ -115,6 +117,20 @@ function EditorInstrumen({ unit, awal, onTutup }) {
               <label className="flex items-center gap-1.5 text-sm font-semibold">
                 <input type="checkbox" checked={k.wajib} onChange={(e) => ubah(k.kunci, { wajib: e.target.checked })} /> Wajib
               </label>
+              {butirIuran && (
+                <label className="flex items-center gap-1.5 text-sm" title="Nilai kriteria ini disarankan otomatis dari catatan iuran bumbung; penguji boleh mengubahnya dengan alasan">
+                  Sumber nilai
+                  <select
+                    className="input w-auto"
+                    aria-label={`Sumber nilai kriteria ${i + 1}`}
+                    value={k.sumber ?? 'manual'}
+                    onChange={(e) => setKriteria((d) => d.map((x) => (x.kunci === k.kunci ? { ...x, sumber: e.target.value } : (e.target.value === 'iuran' && x.sumber === 'iuran' ? { ...x, sumber: 'manual' } : x))))}
+                  >
+                    <option value="manual">Manual (dinilai penguji)</option>
+                    <option value="iuran">Saran otomatis dari iuran</option>
+                  </select>
+                </label>
+              )}
               <span className="ml-auto flex gap-1">
                 <button type="button" className="rounded-md p-1.5 text-pramuka-600 hover:bg-pramuka-100 disabled:opacity-30" onClick={() => geser(i, -1)} disabled={i === 0} aria-label={`Naikkan kriteria ${i + 1}`}><Icon nama="panahAtas" className="h-4 w-4" /></button>
                 <button type="button" className="rounded-md p-1.5 text-pramuka-600 hover:bg-pramuka-100 disabled:opacity-30" onClick={() => geser(i, 1)} disabled={i === kriteria.length - 1} aria-label={`Turunkan kriteria ${i + 1}`}><Icon nama="panahBawah" className="h-4 w-4" /></button>

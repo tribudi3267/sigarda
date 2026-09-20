@@ -6,6 +6,7 @@ import { periodeDari, rekapAbsensi, sesiPeriode, tahunAjaranDari, PERIODE } from
 import { fmtTanggal, hariIni } from '../lib/format';
 import useAbsensiPeriode from '../hooks/useAbsensiPeriode';
 import JadwalUjianBersama from '../components/JadwalUjianBersama';
+import KartuIuran from '../components/KartuIuran';
 import { Badge, Icon, Kosong, Lencana, ProgressBar, TeksPoin } from '../components/ui';
 
 export default function PesertaBeranda({ setTab, setTingkat }) {
@@ -130,6 +131,8 @@ export default function PesertaBeranda({ setTab, setTingkat }) {
           </div>
         )}
       </section>
+
+      <KartuIuran onBuka={() => setTab('iuran')} />
 
       <JadwalUjianBersama />
 

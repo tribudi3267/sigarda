@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import useInstrumen from '../hooks/useInstrumen';
+import { useIuranRingkas } from '../hooks/useIuran';
+import PanelIuranSku from './PanelIuranSku';
 import { NILAI } from '../config';
 import { hitungSkorInstrumen } from '../lib/instrumenLogic';
 import { PESAN_BUTIR_AGAMA, bolehMenilaiPoin, getEntry } from '../lib/skuLogic';
@@ -41,14 +43,37 @@ function IsiUji({ pesertaId, poin, instr, pengaturan, tanggalAwal, onTutup }) {
   const hasilAkhir = mode ? (hasilPilih ?? hit?.saran ?? null) : hasil;
   const beda = mode && hit?.lengkap && hasilAkhir !== hit.saran;
 
+  // Kriteria bersumber iuran (butir iuran): nilainya DISARANKAN dari catatan iuran semester tanggal uji; boleh diubah dengan alasan.
+  const adaIuran = !!instr?.kriteria.some((k) => k.sumber === 'iuran');
+  const { ringkas: ringkasIuran, galat: galatIuran } = useIuranRingkas(pesertaId, tanggalUji, adaIuran && mode);
+  const saranIuran = ringkasIuran?.saran ?? null;
+  const saranSebelum = useRef(null);
+  useEffect(() => {
+    if (!adaIuran || saranIuran === null) return;
+    // isi (atau perbarui, sesudah iuran susulan) hanya nilai yang belum diubah penguji secara manual.
+    // Saran lama ditangkap dulu: fungsi pembaruan state berjalan setelah efek ini selesai, saat ref sudah berganti.
+    const lama = saranSebelum.current;
+    setNilaiKriteria((d) => {
+      const b = { ...d };
+      for (const k of instr.kriteria) if (k.sumber === 'iuran' && (b[k.id] === undefined || b[k.id] === lama)) b[k.id] = saranIuran;
+      return b;
+    });
+    saranSebelum.current = saranIuran;
+  }, [saranIuran, adaIuran, instr]);
+  const iuranBeda = mode && adaIuran && saranIuran !== null && instr.kriteria.some((k) => k.sumber === 'iuran' && nilaiKriteria[k.id] !== undefined && nilaiKriteria[k.id] !== saranIuran);
+
   const pilihan = (instr ? PILIHAN_INSTRUMEN : PILIHAN).filter((p) => p.id !== 'reset' || entry.status !== 'belum');
-  const perluCatatan = hasilAkhir === 'ulang' || hasilAkhir === 'reset' || beda;
+  const perluCatatan = hasilAkhir === 'ulang' || hasilAkhir === 'reset' || beda || iuranBeda;
   const bisaSimpan = pin.length === 6 && !sibuk && (!mode || hit?.lengkap);
 
   const simpan = async () => {
     if (sibuk) return;
     if (mode && beda && !catatan.trim()) {
       setGalat(`Hasil yang dipilih berbeda dari saran (skor ${hit.skor}, saran: ${hit.saran === 'lulus' ? 'lulus' : 'perlu diulang'}). Isi catatan alasannya.`);
+      return;
+    }
+    if (iuranBeda && !catatan.trim()) {
+      setGalat(`Nilai kriteria iuran berbeda dari saran hitungan iuran (saran: ${saranIuran}). Isi catatan alasannya.`);
       return;
     }
     if (mode && hasilAkhir === 'ulang' && !catatan.trim()) {
@@ -129,7 +154,16 @@ function IsiUji({ pesertaId, poin, instr, pengaturan, tanggalAwal, onTutup }) {
 
       {mode && (
         <>
-          <InstrumenNilai instr={instr} pengaturan={pengaturan} nilai={nilaiKriteria} ubahNilai={setNilaiKriteria} hit={hit} />
+          <InstrumenNilai
+            instr={instr}
+            pengaturan={pengaturan}
+            nilai={nilaiKriteria}
+            ubahNilai={setNilaiKriteria}
+            hit={hit}
+            saranIuran={saranIuran}
+            panelIuran={adaIuran ? <PanelIuranSku ringkas={ringkasIuran} galat={galatIuran} pesertaId={pesertaId} tanggalUji={tanggalUji} tingkat={poin.tingkat} /> : null}
+          />
+          {iuranBeda && <p className="-mt-2 mb-3 text-xs font-semibold text-amber-800">Nilai kriteria iuran berbeda dari saran ({saranIuran}). Catatan alasan wajib diisi dan tercatat di riwayat.</p>}
           {hit.lengkap && (
             <fieldset className="mb-4">
               <legend className="label">Hasil yang dicatat</legend>
@@ -163,7 +197,7 @@ function IsiUji({ pesertaId, poin, instr, pengaturan, tanggalAwal, onTutup }) {
       )}
 
       <Field
-        label={hasil === 'reset' ? 'Alasan pembatalan' : beda ? 'Catatan alasan (wajib)' : perluCatatan ? 'Catatan perbaikan' : 'Catatan penguji (opsional)'}
+        label={hasil === 'reset' ? 'Alasan pembatalan' : beda || iuranBeda ? 'Catatan alasan (wajib)' : perluCatatan ? 'Catatan perbaikan' : 'Catatan penguji (opsional)'}
         htmlFor="catatan-uji"
       >
         <textarea id="catatan-uji" rows={3} className="input" value={catatan} onChange={(e) => setCatatan(e.target.value)} />

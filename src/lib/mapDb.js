@@ -194,7 +194,7 @@ export function susunInstrumen(instrumen = [], kriteria = [], penguji = [], pand
   }
   for (const k of [...kriteria].sort((a, b) => a.urutan - b.urutan)) {
     hasil[k.sku_id]?.kriteria.push({
-      id: Number(k.id), urutan: k.urutan, jenis: k.jenis, teks: k.teks, bobot: k.bobot, wajib: !!k.wajib, panduan: petaPanduan.get(Number(k.id)) ?? '',
+      id: Number(k.id), urutan: k.urutan, jenis: k.jenis, teks: k.teks, bobot: k.bobot, wajib: !!k.wajib, sumber: k.sumber ?? 'manual', panduan: petaPanduan.get(Number(k.id)) ?? '',
     });
   }
   return hasil;
@@ -213,6 +213,7 @@ export const susunPenilaian = (baris = []) =>
       saran: r.saran, hasil: r.hasil, diganti: !!r.diganti, catatan: r.catatan ?? '',
       rincian: (Array.isArray(r.rincian) ? r.rincian : []).map((k) => ({
         kriteriaId: Number(k.kriteria_id), urutan: k.urutan, jenis: k.jenis, teks: k.teks, bobot: k.bobot, wajib: !!k.wajib, nilai: k.nilai,
+        sumber: k.sumber ?? 'manual', saran: k.saran ?? null,
       })),
     }));
 
@@ -229,6 +230,25 @@ export function susunSesiUjian(sesi = [], butir = [], peserta = []) {
     }))
     .sort((x, y) => y.tanggal.localeCompare(x.tanggal) || y.id - x.id);
 }
+
+/** Baris iuran -> { [tanggal]: { [pesertaId]: { jumlah, jenis, oleh, waktu } } } */
+export function susunIuran(baris = []) {
+  const hasil = {};
+  for (const r of baris) (hasil[tgl(r.tanggal)] ??= {})[r.peserta_id] = { jumlah: r.jumlah, jenis: r.jenis, oleh: r.oleh ?? null, waktu: r.waktu };
+  return hasil;
+}
+
+/** Baris iuran_kas -> { [tanggal]: { totalFisik, catatan, oleh, waktu } } */
+export const susunKas = (baris = []) =>
+  Object.fromEntries(baris.map((r) => [tgl(r.tanggal), { totalFisik: r.total_fisik, catatan: r.catatan ?? '', oleh: r.oleh ?? null, waktu: r.waktu }]));
+
+/** Baris asisten_iuran -> [{ pesertaId, ditunjukOleh, ditunjukPada }] */
+export const susunAsisten = (baris = []) =>
+  baris.map((r) => ({ pesertaId: r.peserta_id, ditunjukOleh: r.ditunjuk_oleh ?? null, ditunjukPada: r.ditunjuk_pada }));
+
+/** Daftar dari sg_iuran_lembar -> [{ id, nama, kelas, sangga, status, jumlah, jenis }] (bidang kosong dinormalkan) */
+export const susunLembarIuran = (baris = []) =>
+  baris.map((r) => ({ id: r.id, nama: r.nama, kelas: r.kelas ?? '', sangga: r.sangga ?? '', status: r.status ?? null, jumlah: r.jumlah ?? null, jenis: r.jenis ?? null }));
 
 /** Baris raport satu semester -> { [pesertaId]: baris } */
 export const susunRaport = (baris = []) => Object.fromEntries(baris.map((r) => [r.peserta_id, petaRaport(r)]));

@@ -21,6 +21,7 @@ import Sidang from './pages/Sidang';
 import Raport from './pages/Raport';
 import KelolaInstrumen from './pages/KelolaInstrumen';
 import SesiUjian from './pages/SesiUjian';
+import Iuran from './pages/Iuran';
 import HalamanVerifikasi from './components/HalamanVerifikasi';
 import { parameterVerifikasi } from './lib/verifikasiLogic';
 import { bolehKelolaMateri } from './lib/materiLogic';
@@ -30,7 +31,7 @@ import LogoMark from './components/LogoMark';
  * Menu per peran, dikelompokkan menurut fungsinya (tampil sebagai kelompok di menu samping, dan berurutan di menu bawah ponsel).
  *  Utama            : Dashboard (Penegak: Beranda atau Garuda)
  *  Pengujian SKU    : Penegak: Poin SKU, Cetak. Dewan/Pembina: Antrian, Peserta, Sesi, Instrumen (Pembina), Sidang, Cetak. Admin: Sesi, Instrumen, Sidang, Cetak
- *  Kegiatan Ambalan : Absensi, Portofolio (pengurus), Raport (Pembina dan Admin)
+ *  Kegiatan Ambalan : Absensi, Iuran (semua peran), Portofolio (pengurus), Raport (Pembina dan Admin)
  *  Materi           : Materi, Kelola Materi (Pembina dan Admin)
  *  Pengelolaan      : Anggota (Admin)
  * Akun saya dan Reset PIN anggota (pengurus) tidak ada di daftar ini: keduanya di menu akun (nama pengguna di menu samping atau header).
@@ -41,6 +42,7 @@ function buatNav(user, peran) {
   const raport = { id: 'raport', label: 'Raport', ikon: 'raport' };
   const instrumen = { id: 'instrumen', label: 'Instrumen', ikon: 'instrumen' };
   const absensi = { id: 'absensi', label: 'Absensi', ikon: 'absensi' };
+  const iuran = { id: 'iuran', label: 'Iuran', ikon: 'iuran' };
   const portofolio = { id: 'portofolio', label: 'Portofolio', ikon: 'portofolio' };
   const sidang = { id: 'sidang', label: 'Sidang', ikon: 'sidang' };
   const sesi = { id: 'sesi', label: 'Sesi ujian', ikon: 'sesi' };
@@ -51,7 +53,7 @@ function buatNav(user, peran) {
     return [
       { judul: 'Utama', item: [peran === 'calon-garuda' ? { id: 'beranda', label: 'Garuda', ikon: 'bintang' } : { id: 'beranda', label: 'Beranda', ikon: 'beranda' }] },
       { judul: 'Pengujian SKU', item: [{ id: 'sku', label: 'Poin SKU', ikon: 'daftar' }, cetak] },
-      { judul: 'Kegiatan Ambalan', item: [absensi] },
+      { judul: 'Kegiatan Ambalan', item: [absensi, iuran] },
       { judul: 'Materi', item: [materi] },
     ];
   }
@@ -59,14 +61,14 @@ function buatNav(user, peran) {
     return [
       { judul: 'Utama', item: [{ id: 'dashboard', label: 'Dashboard', ikon: 'dashboard' }] },
       { judul: 'Pengujian SKU', item: [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }, { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, sesi, ...(kelolaBoleh ? [instrumen] : []), sidang, cetak] },
-      { judul: 'Kegiatan Ambalan', item: [absensi, portofolio, ...(kelolaBoleh ? [raport] : [])] },
+      { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, ...(kelolaBoleh ? [raport] : [])] },
       { judul: 'Materi', item: [materi, ...(kelolaBoleh ? [kelola] : [])] },
     ];
   }
   return [
     { judul: 'Utama', item: [{ id: 'rekap', label: 'Dashboard', ikon: 'dashboard' }] },
     { judul: 'Pengujian SKU', item: [sesi, instrumen, sidang, cetak] },
-    { judul: 'Kegiatan Ambalan', item: [absensi, portofolio, raport] },
+    { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, raport] },
     { judul: 'Materi', item: [materi, kelola] },
     { judul: 'Pengelolaan', item: [{ id: 'anggota', label: 'Anggota', ikon: 'anggota' }] },
   ];
@@ -167,6 +169,8 @@ function Shell() {
     isi = <ResetPin />;
   } else if (tabAktif === 'sidang' && user.role !== 'peserta') {
     isi = <Sidang />;
+  } else if (tabAktif === 'iuran') {
+    isi = <Iuran />;
   } else if (tabAktif === 'sesi' && user.role !== 'peserta') {
     isi = <SesiUjian />;
   } else if (tabAktif === 'raport' && bolehKelolaMateri(user)) {

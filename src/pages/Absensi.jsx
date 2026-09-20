@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { AMBANG_HADIR } from '../config';
 import {
@@ -10,6 +10,9 @@ import { fmtHariTanggal, fmtTglPendek, hariIni } from '../lib/format';
 import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
 import PilihPeriode, { periodeAwal } from '../components/PilihPeriode';
 import useAbsensiPeriode from '../hooks/useAbsensiPeriode';
+import { useIuranTanggal } from '../hooks/useIuran';
+import PilihNominal from '../components/PilihNominal';
+import { NOMINAL_TOMBOL, rupiah } from '../lib/iuranLogic';
 import { Avatar, BadgeAbsen, BadgePeran, Icon, Kosong, MuatAbsensi, ProgressBar } from '../components/ui';
 
 const KOTAK = 'inline-flex h-6 w-6 items-center justify-center rounded text-xs font-bold ring-1 ring-inset';
@@ -94,7 +97,8 @@ function Kotak({ label, nilai }) {
 }
 
 function InputAbsensi() {
-  const { daftarPeserta, absensi, buatSesiAbsen, setStatusAbsen, tandaiBanyakAbsen, hapusSesiAbsen } = useApp();
+  const { daftarPeserta, absensi, buatSesiAbsen, setStatusAbsen, tandaiBanyakAbsen, hapusSesiAbsen, dewanAmbalan, aturIuran, aturIuranBanyak } = useApp();
+  const [nominalMassal, setNominalMassal] = useState(1000);
   const [tanggal, setTanggal] = useState(() => jumatTerakhir(hariIni()));
   const [filter, setFilter] = useState(FILTER_AWAL);
 
@@ -114,6 +118,10 @@ function InputAbsensi() {
 
   const sesi = bisaCatat ? absensi.sesi[tanggal] : null;
   const catatan = absensi.hadir[tanggal] ?? {};
+  // Iuran bumbung: dicatat Dewan Ambalan; Pembina dan Admin melihat. Bagian ini tersembunyi bila basis data belum dimigrasi.
+  const iur = useIuranTanggal(tanggal, bisaCatat && !!sesi);
+  const tampilIuran = iur.siap && !iur.galat;
+  const jumlahIuran = Object.values(iur.baris).reduce((s, b) => s + b.jumlah, 0);
 
   // Semua anggota dapat dicatat pada tanggal berapa pun (termasuk pengisian susulan)
   const berhak = useMemo(() => (bisaCatat ? daftarPeserta : []), [daftarPeserta, bisaCatat]);
@@ -126,7 +134,7 @@ function InputAbsensi() {
   for (const u of berhak) hitung[catatan[u.id]?.status ?? 'B'] += 1;
 
   const hapus = () => {
-    if (window.confirm(`Hapus sesi ${fmtHariTanggal(tanggal)} beserta seluruh catatan absensinya?`)) hapusSesiAbsen(tanggal);
+    if (window.confirm(`Hapus sesi ${fmtHariTanggal(tanggal)} beserta seluruh catatan absensinya? (Sesi yang memiliki catatan iuran atau tutup kas tidak dapat dihapus sebelum dikosongkan oleh Dewan Ambalan.)`)) hapusSesiAbsen(tanggal);
   };
   const idTersaring = tersaring.map((u) => u.id);
 
@@ -234,6 +242,7 @@ function InputAbsensi() {
                   <span>Sakit <b className="text-amber-700">{hitung.S}</b></span>
                   <span>Alpa <b className="text-red-700">{hitung.A}</b></span>
                   <span>Belum dicatat <b>{hitung.B}</b></span>
+                  {tampilIuran && <span>Iuran bumbung <b className="text-amber-800">{rupiah(jumlahIuran)}</b> ({Object.keys(iur.baris).length} Penegak)</span>}
                 </p>
               </div>
               <button className="btn btn-outline btn-sm text-red-700" onClick={hapus}>
@@ -253,6 +262,21 @@ function InputAbsensi() {
             <button className="btn btn-outline btn-sm" onClick={() => tandaiBanyakAbsen(tanggal, idTersaring, 'A')}>Tandai alpa</button>
           </div>
 
+          {dewanAmbalan && tampilIuran && (
+            <div className="no-print mb-3 flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-pramuka-600">Iuran bumbung untuk yang hadir dan belum berisi iuran:</span>
+              <select className="input w-auto py-1" aria-label="Nominal iuran massal" value={nominalMassal} onChange={(e) => setNominalMassal(Number(e.target.value))}>
+                {NOMINAL_TOMBOL.map((n) => <option key={n} value={n}>{rupiah(n)}</option>)}
+              </select>
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => aturIuranBanyak(tanggal, tersaring.filter((u) => catatan[u.id]?.status === 'H').map((u) => u.id), nominalMassal, true)}
+              >
+                Isi iuran
+              </button>
+            </div>
+          )}
+
           {tersaring.length === 0 ? (
             <Kosong judul="Tidak ada anggota" teks="Ubah kata kunci, sangga, kelas, atau peran pada filter." />
           ) : (
@@ -260,31 +284,51 @@ function InputAbsensi() {
               {tersaring.map((u) => {
                 const status = catatan[u.id]?.status;
                 return (
-                  <li key={u.id} className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:p-4">
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <Avatar nama={u.nama} />
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold">{u.nama}</p>
-                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-pramuka-500">
-                          Kelas {u.kelas}, {u.sangga} <BadgePeran peran={u.peran} singkat />
-                        </p>
+                  <li key={u.id} className="p-3 sm:p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <Avatar nama={u.nama} />
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold">{u.nama}</p>
+                          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-pramuka-500">
+                            Kelas {u.kelas}, {u.sangga} <BadgePeran peran={u.peran} singkat />
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5" role="group" aria-label={`Absensi ${u.nama}`}>
+                        {KODE_STATUS.map((k) => (
+                          <button
+                            key={k}
+                            aria-pressed={status === k}
+                            title={STATUS_ABSEN[k].label}
+                            onClick={() => setStatusAbsen(tanggal, u.id, status === k ? null : k)}
+                            className={`min-w-[3.5rem] rounded-lg px-2.5 py-1.5 text-xs font-semibold ring-1 ring-inset transition-colors ${
+                              status === k ? STATUS_ABSEN[k].aktif : 'bg-white text-pramuka-700 ring-pramuka-300 hover:bg-pramuka-100'
+                            }`}
+                          >
+                            {STATUS_ABSEN[k].label}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5" role="group" aria-label={`Absensi ${u.nama}`}>
-                      {KODE_STATUS.map((k) => (
-                        <button
-                          key={k}
-                          aria-pressed={status === k}
-                          title={STATUS_ABSEN[k].label}
-                          onClick={() => setStatusAbsen(tanggal, u.id, status === k ? null : k)}
-                          className={`min-w-[3.5rem] rounded-lg px-2.5 py-1.5 text-xs font-semibold ring-1 ring-inset transition-colors ${
-                            status === k ? STATUS_ABSEN[k].aktif : 'bg-white text-pramuka-700 ring-pramuka-300 hover:bg-pramuka-100'
-                          }`}
-                        >
-                          {STATUS_ABSEN[k].label}
-                        </button>
-                      ))}
-                    </div>
+                    {tampilIuran && (
+                      <div className="mt-2 flex flex-wrap items-start gap-x-3 gap-y-1 border-t border-dashed border-pramuka-200 pt-2">
+                        <span className="w-full shrink-0 text-xs font-semibold text-pramuka-600 sm:w-auto sm:pt-1.5">
+                          Iuran bumbung (Rp){iur.baris[u.id]?.jenis === 'susulan' ? ' - susulan' : ''}
+                        </span>
+                        {dewanAmbalan ? (
+                          <PilihNominal
+                            label={`Iuran ${u.nama}`}
+                            nilai={iur.baris[u.id]?.jumlah ?? null}
+                            onUbah={(jumlah) => aturIuran(tanggal, u.id, jumlah)}
+                          />
+                        ) : (
+                          <span className="text-sm font-semibold text-pramuka-800 sm:pt-1">
+                            {iur.baris[u.id] ? rupiah(iur.baris[u.id].jumlah) : <span className="font-normal text-pramuka-500">belum ada iuran</span>}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </li>
                 );
               })}

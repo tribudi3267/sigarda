@@ -16,6 +16,7 @@ export function LencanaKriteria({ k }) {
       <span className={`${CHIP} bg-pramuka-50 text-pramuka-700 ring-pramuka-200`}>{k.jenis}</span>
       {k.bobot > 1 && <span className={`${CHIP} bg-pramuka-50 text-pramuka-700 ring-pramuka-200`}>bobot {k.bobot}</span>}
       {k.wajib && <span className={`${CHIP} bg-amber-100 text-amber-900 ring-amber-300`}>Wajib</span>}
+      {k.sumber === 'iuran' && <span className={`${CHIP} bg-emerald-50 text-emerald-900 ring-emerald-300`}>Dari iuran</span>}
     </span>
   );
 }
@@ -25,7 +26,7 @@ export function LencanaKriteria({ k }) {
  *   hit  = hasil hitungSkorInstrumen (skor, saran, lengkap, belum, wajibOk)
  *   nilai / ubahNilai = { [idKriteria]: 1-5 } dan pengubahnya (fungsi setState; dipanggil dengan pembaruan fungsional)
  */
-export default function InstrumenNilai({ instr, pengaturan, nilai, ubahNilai, hit }) {
+export default function InstrumenNilai({ instr, pengaturan, nilai, ubahNilai, hit, saranIuran = null, panelIuran = null }) {
   const gagalWajib = kriteriaWajibGagal(instr.kriteria, nilai, pengaturan);
   return (
     <div className="mb-4">
@@ -36,6 +37,8 @@ export default function InstrumenNilai({ instr, pengaturan, nilai, ubahNilai, hi
           <p className="mt-2 whitespace-pre-wrap leading-relaxed text-pramuka-800">{instr.instruksi}</p>
         </details>
       )}
+
+      {panelIuran}
 
       <ol className="space-y-3">
         {instr.kriteria.map((k, i) => (
@@ -59,11 +62,11 @@ export default function InstrumenNilai({ instr, pengaturan, nilai, ubahNilai, hi
                   key={n}
                   type="button"
                   aria-pressed={nilai[k.id] === n}
-                  title={NILAI_KRITERIA[n]}
+                  title={k.sumber === 'iuran' && saranIuran === n ? `${NILAI_KRITERIA[n]} (saran dari iuran)` : NILAI_KRITERIA[n]}
                   onClick={() => ubahNilai((d) => ({ ...d, [k.id]: n }))}
                   className={`rounded-lg px-1 py-2 text-center ring-1 ring-inset transition-colors ${
                     nilai[k.id] === n ? 'bg-pramuka-800 text-pramuka-50 ring-pramuka-800' : 'bg-white text-pramuka-700 ring-pramuka-300 hover:bg-pramuka-100'
-                  }`}
+                  } ${k.sumber === 'iuran' && saranIuran === n && nilai[k.id] !== n ? 'ring-2 !ring-emas' : ''}`}
                 >
                   <span className="block text-base font-bold leading-none">{n}</span>
                   <span className="mt-0.5 block text-[10px] leading-tight opacity-80">{NILAI_KRITERIA[n]}</span>

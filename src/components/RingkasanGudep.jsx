@@ -9,6 +9,7 @@ import { rekapPortofolio, ringkasPortofolio } from '../lib/portofolioLogic';
 import { hariIni } from '../lib/format';
 import useAbsensiPeriode from '../hooks/useAbsensiPeriode';
 import { Icon, MuatAbsensi, ProgressBar } from './ui';
+import KartuIuran from './KartuIuran';
 
 /**
  * Ringkasan lintas fitur untuk dashboard Dewan Ambalan, Pembina, dan Admin Gudep:
@@ -102,6 +103,8 @@ export default function RingkasanGudep({ onNav }) {
         )}
         </>)}
       </section>
+
+      <KartuIuran onBuka={() => onNav('iuran')} />
 
       <section aria-label="Rekap portofolio Garuda">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">

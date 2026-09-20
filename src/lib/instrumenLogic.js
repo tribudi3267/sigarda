@@ -103,7 +103,9 @@ export function periksaInstrumen({ caraUji, instruksi, kriteria, status }) {
     if (!t || t.length > 400) return `Kriteria ${n}: teks wajib diisi (maksimal 400 karakter).`;
     if (!Number.isInteger(k.bobot) || k.bobot < 1 || k.bobot > 5) return `Kriteria ${n}: bobot harus 1 sampai 5.`;
     if ((k.panduan ?? '').length > 1500) return `Kriteria ${n}: panduan maksimal 1500 karakter.`;
+    if (k.sumber !== undefined && k.sumber !== 'manual' && k.sumber !== 'iuran') return `Kriteria ${n}: sumber nilai tidak dikenal.`;
   }
+  if (kriteria.filter((k) => k.sumber === 'iuran').length > 1) return 'Hanya satu kriteria yang boleh bersumber iuran.';
   return '';
 }
 

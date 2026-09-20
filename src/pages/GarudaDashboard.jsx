@@ -6,6 +6,7 @@ import PortofolioChecklist from '../components/PortofolioChecklist';
 import RekapKesiapan, { JurnalTerbaru } from '../components/RekapKesiapan';
 import { Icon, Lencana } from '../components/ui';
 import JadwalUjianBersama from '../components/JadwalUjianBersama';
+import KartuIuran from '../components/KartuIuran';
 
 /** Dashboard Penegak Calon Garuda: jurnal kesiapan dan cek list 26 dokumen portofolio. */
 export default function GarudaDashboard({ setTab }) {
@@ -29,6 +30,8 @@ export default function GarudaDashboard({ setTab }) {
           </p>
         </div>
       </section>
+
+      <KartuIuran onBuka={() => setTab('iuran')} />
 
       <JadwalUjianBersama />
 

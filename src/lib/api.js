@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunHadir, susunInstrumen, susunMateri, susunPenilaian, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunMateri, susunPenilaian, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -189,6 +189,40 @@ export function buatApi(klien) {
       return r.ok || r.sesiBerakhir ? r : { ok: true, data: {}, galat: r.pesan };
     },
 
+    /* ------------------------- Iuran bumbung kepramukaan ------------------------- */
+    /** Iuran pada rentang tanggal (pengurus: semua; Penegak: hanya miliknya, dijaga RLS). Hasil { [tanggal]: { [pesertaId]: { jumlah, jenis } } }. */
+    muatIuran: (mulai, akhir) =>
+      muat(async () => susunIuran(await ambilSemua('iuran', { filter: [['tanggal', 'gte', mulai], ['tanggal', 'lte', akhir]], urut: ['tanggal', 'peserta_id'] }))),
+    /** Tutup kas pada rentang tanggal (hanya pengurus). */
+    muatKas: (mulai, akhir) =>
+      muat(async () => susunKas(await ambilSemua('iuran_kas', { filter: [['tanggal', 'gte', mulai], ['tanggal', 'lte', akhir]], urut: ['tanggal'] }))),
+    /** Asisten bendahara yang sedang ditunjuk (pengurus: semua; Penegak: hanya dirinya bila ditunjuk). */
+    muatAsisten: () => muat(async () => susunAsisten(await ambilSemua('asisten_iuran', { urut: ['peserta_id'] }))),
+    /** Riwayat perubahan iuran satu Jumat (hanya pengurus), lama ke baru. */
+    muatLogIuran: (tanggal) => muat(async () => ambilSemua('iuran_log', { filter: [['tanggal', tanggal]], urut: ['id'] })),
+    /** Lembar catat satu Jumat untuk Dewan Ambalan dan asisten: [{ id, nama, kelas, sangga, status, jumlah, jenis }]. */
+    muatLembarIuran: async (tanggal) => {
+      const r = await rpc('sg_iuran_lembar', { p_tanggal: tanggal });
+      return r.ok ? { ok: true, data: susunLembarIuran(r.data ?? []) } : r;
+    },
+    /** Rekap agregat untuk semua peran: [{ tanggal, tipe: 'gudep' | 'sangga' | 'kelas', kunci, jumlah, susulan, orang }]. */
+    muatIuranAgregat: async (mulai, akhir) => {
+      const r = await rpc('sg_iuran_agregat', { p_mulai: mulai, p_akhir: akhir });
+      return r.ok ? { ok: true, data: r.data ?? [] } : r;
+    },
+    aturIuran: (tanggal, pesertaId, jumlah) => rpc('sg_iuran_set', { p_tanggal: tanggal, p_peserta_id: pesertaId, p_jumlah: jumlah ?? null }),
+    aturIuranBanyak: (tanggal, pesertaIds, jumlah, hanyaKosong = true) =>
+      rpc('sg_iuran_set_banyak', { p_tanggal: tanggal, p_peserta_ids: pesertaIds, p_jumlah: jumlah, p_hanya_kosong: hanyaKosong }),
+    simpanKas: (tanggal, total, catatan = '') => rpc('sg_iuran_kas_simpan', { p_tanggal: tanggal, p_total: total ?? null, p_catatan: catatan }),
+    aturAsisten: (pesertaId, aktif) => rpc('sg_asisten_iuran_atur', { p_peserta_id: pesertaId, p_aktif: aktif }),
+    /** Pengaturan iuran (standar, ambang, batas nilai) untuk semua peran; hasil { standar, ambang, lima, tiga, dua }. */
+    muatPengaturanIuran: () => rpc('sg_iuran_pengaturan'),
+    simpanPengaturanIuran: (nilai) => rpc('sg_iuran_pengaturan_simpan', { p_nilai: nilai }),
+    /** Ringkasan iuran satu Penegak untuk lembar penilaian butir iuran (pengurus): semester dari tanggal uji. */
+    muatIuranRingkas: (pesertaId, tanggal) => rpc('sg_iuran_ringkas', { p_peserta_id: pesertaId, p_tanggal: tanggal }),
+    /** Iuran susulan (Dewan): menebus Jumat kosong terlama dulu. Mengembalikan jumlah Jumat yang terisi. */
+    catatIuranSusulan: (pesertaId, tanggal, jumlah, pertemuan) =>
+      rpc('sg_iuran_susulan', { p_peserta_id: pesertaId, p_tanggal: tanggal, p_jumlah: jumlah, p_pertemuan: pertemuan }),
     /**
      * Riwayat penilaian dengan instrumen untuk satu butir milik satu Penegak (lama ke baru). Penegak hanya dapat membaca miliknya sendiri (RLS).
      * Dibaca saat rincian dibuka, bukan saat masuk, agar data awal tetap ringan.
@@ -294,7 +328,7 @@ export function buatApi(klien) {
     simpanInstrumen: (d) =>
       rpc('sg_instrumen_simpan', {
         p_sku_id: d.skuId, p_cara_uji: d.caraUji ?? '', p_instruksi: d.instruksi ?? '', p_status: d.status,
-        p_kriteria: d.kriteria.map((k) => ({ id: k.id ?? null, jenis: k.jenis, teks: k.teks, bobot: k.bobot, wajib: !!k.wajib, panduan: k.panduan ?? '' })),
+        p_kriteria: d.kriteria.map((k) => ({ id: k.id ?? null, jenis: k.jenis, teks: k.teks, bobot: k.bobot, wajib: !!k.wajib, panduan: k.panduan ?? '', sumber: k.sumber ?? 'manual' })),
       }),
     /* ------------------- QR Surat Tanda Lulus dan sesi ujian ------------------- */
     sertifikatTingkat: (pesertaId, tingkat) => rpc('sg_sertifikat_tingkat', { p_peserta_id: pesertaId, p_tingkat: tingkat }),

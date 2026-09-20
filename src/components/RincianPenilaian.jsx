@@ -46,7 +46,14 @@ export default function RincianPenilaian({ pesertaId, skuId }) {
           <ul className="mt-2 space-y-1.5">
             {p.rincian.map((k) => (
               <li key={k.kriteriaId} className="flex items-start justify-between gap-3 text-sm">
-                <span className="min-w-0 leading-snug">{k.teks} <LencanaKriteria k={k} /></span>
+                <span className="min-w-0 leading-snug">
+                  {k.teks} <LencanaKriteria k={k} />
+                  {k.sumber === 'iuran' && k.saran != null && (
+                    <span className={`ml-1 text-xs ${k.saran === k.nilai ? 'text-pramuka-500' : 'font-semibold text-amber-800'}`}>
+                      saran iuran {k.saran}{k.saran === k.nilai ? ', diikuti' : `, penguji memberi ${k.nilai}`}
+                    </span>
+                  )}
+                </span>
                 <span className={`${CHIP} shrink-0 ${KELAS_NILAI[k.nilai] ?? ''}`} title={`Nilai ${k.nilai} dari 5`}>
                   {k.nilai} {NILAI_KRITERIA[k.nilai]}
                 </span>

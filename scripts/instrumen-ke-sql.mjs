@@ -61,6 +61,7 @@ for (const f of berkas) {
   ws.getRow(baris).eachCell((c, i) => { kolom[teks(c)] = i; });
   const cari = (awal) => Object.entries(kolom).find(([k]) => k.startsWith(awal))?.[1];
   const K = { kode: cari('Kode unit'), cara: cari('Cara uji'), ins: cari('Instruksi'), jenis: cari('Jenis skala'), krit: cari('Kriteria'), bobot: cari('Bobot'), wajib: cari('Wajib'), pandu: cari('Panduan') };
+  const kolomSumber = cari('Sumber nilai'); // opsional: 'iuran' = nilai disarankan dari catatan iuran (hanya butir Bantara 6 dan Laksana 6)
   const hilang = Object.entries(K).filter(([, v]) => !v).map(([k]) => k);
   if (hilang.length) { galat.push(`${f}: kolom tidak ditemukan: ${hilang.join(', ')}`); continue; }
 
@@ -81,7 +82,9 @@ for (const f of berkas) {
     const bobot = Number(teks(r.getCell(K.bobot)));
     if (!JENIS.includes(jenis)) galat.push(`${f} baris ${n} (${kode}): jenis skala "${jenis}" tidak sah`);
     if (!Number.isInteger(bobot) || bobot < 1 || bobot > 5) galat.push(`${f} baris ${n} (${kode}): bobot harus 1-5`);
-    u.kriteria.push({ jenis, teks: kriteria, bobot, wajib: /^wajib$/i.test(teks(r.getCell(K.wajib))), panduan: teks(r.getCell(K.pandu)) });
+    const sumber = kolomSumber && /^iuran$/i.test(teks(r.getCell(kolomSumber))) ? 'iuran' : 'manual';
+    if (sumber === 'iuran' && !['BAN-06', 'LAK-06'].includes(kode)) galat.push(` baris ${n} (${kode}): sumber nilai iuran hanya untuk butir Bantara 6 dan Laksana 6`);
+    u.kriteria.push({ jenis, teks: kriteria, bobot, wajib: /^wajib$/i.test(teks(r.getCell(K.wajib))), sumber, panduan: teks(r.getCell(K.pandu)) });
   });
 }
 for (const u of unit.values()) {
@@ -129,7 +132,9 @@ for (const u of daftar) {
   baris.push('      on conflict (sku_id) do update set instruksi = excluded.instruksi;');
   baris.push(`    delete from public.instrumen_kriteria where sku_id = ${kodeSql(u.kode)};`);
   u.kriteria.forEach((k, i) => {
-    baris.push(`    insert into public.instrumen_kriteria (sku_id, urutan, jenis, teks, bobot, wajib) values (${kodeSql(u.kode)}, ${i + 1}, ${kodeSql(k.jenis)}, ${q(k.teks)}, ${k.bobot}, ${k.wajib}) returning id into v_id;`);
+    // Kolom sumber hanya disebut bila dipakai, agar berkas tetap dapat dijalankan pada basis data yang belum dimigrasi iuran
+    const punyaSumber = k.sumber === 'iuran';
+    baris.push(`    insert into public.instrumen_kriteria (sku_id, urutan, jenis, teks, bobot, wajib${punyaSumber ? ', sumber' : ''}) values (${kodeSql(u.kode)}, ${i + 1}, ${kodeSql(k.jenis)}, ${q(k.teks)}, ${k.bobot}, ${k.wajib}${punyaSumber ? ", 'iuran'" : ''}) returning id into v_id;`);
     baris.push(`    insert into public.instrumen_panduan (kriteria_id, panduan) values (v_id, ${q(k.panduan)});`);
   });
   baris.push('  end if;');
