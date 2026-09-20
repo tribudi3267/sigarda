@@ -32,7 +32,7 @@ export function useApp() {
   return ctx;
 }
 
-const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {} };
+const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '' };
 const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi waktu Edge Function)
 const JEDA_SEGARKAN_MS = 30000;
 
@@ -49,6 +49,10 @@ export function AppProvider({ children }) {
   const [sesiId, setSesiId] = useState(null);
   const [db, setDb] = useState(DB_KOSONG);
   const [semesterSiap, setSemesterSiap] = useState({}); // { 'TA|periode': true } = kehadiran semester itu sudah dimuat
+  const [instrumenSiap, setInstrumenSiap] = useState(false); // instrumen penilaian sudah dimuat (lazy, sekali per sesi)
+  const instrumenMuat = useRef(null);                       // janji pemuatan yang sedang berjalan
+  const instrumenSiapRef = useRef(false);                   // salinan instrumenSiap yang selalu mutakhir (untuk callback)
+  instrumenSiapRef.current = instrumenSiap;
   const [toast, setToast] = useState(null);
   const apiRef = useRef(null);
   const lokalRef = useRef(null);
@@ -82,6 +86,8 @@ export function AppProvider({ children }) {
     semesterRef.current = new Set();
     semesterSedangMuat.current = new Map();
     setSemesterSiap({});
+    setInstrumenSiap(false);
+    instrumenMuat.current = null;
     setDb(DB_KOSONG);
   }, []);
 
@@ -293,7 +299,11 @@ export function AppProvider({ children }) {
   const batalkanAjuan = (skuId) =>
     aksi(api().batalkanAjuan(skuId), { sukses: 'Pengajuan dibatalkan.', sesudah: () => segarkan.progress(user.id) });
 
-  /** Hanya penguji. PIN penguji diverifikasi di server (verifikasi digital). */
+  /**
+   * Hanya penguji. PIN penguji diverifikasi di server (verifikasi digital). Bila `data.rincian` (nilai tiap kriteria instrumen) ikut dikirim,
+   * server menghitung ulang skor dan saran, dan jawabannya memuat `rubrik: true`. Jawaban tanpa penanda itu berarti Edge Function belum
+   * diperbarui (fungsi lama mengabaikan rincian), sehingga hasilnya tidak boleh dianggap tercatat lewat instrumen.
+   */
   const catatHasil = ({ pin, pesertaId, ...data }) => {
     if (user?.role !== 'penguji') return Promise.resolve(ditolak(notify, 'Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.'));
     const pesanBerhasil = {
@@ -302,8 +312,58 @@ export function AppProvider({ children }) {
       proses: 'Pengujian ditandai sedang berjalan.',
       reset: 'Status poin dikembalikan.',
     }[data.hasil];
-    return aksi(api().catatHasil({ pin, pesertaId, ...data }), { sukses: pesanBerhasil, sesudah: () => segarkan.progress(pesertaId) });
+    const janji = api().catatHasil({ pin, pesertaId, ...data }).then((r) => (
+      r.ok && data.rincian && !r.rubrik
+        ? { ok: false, pesan: 'Fungsi server (Edge Function) belum diperbarui sehingga nilai instrumen tidak tercatat. Pasang ulang fungsi terbaru (lihat README), lalu periksa status butir ini sebelum mengulang.' }
+        : r
+    ));
+    return aksi(janji, { sukses: pesanBerhasil, sesudah: () => segarkan.progress(pesertaId) });
   };
+
+  /* ------------------ Instrumen penilaian (dimuat sekali, sesuai kebutuhan) ------------------ */
+  const bolehKelolaInstrumen = user?.role === 'admin' || (user?.role === 'penguji' && user?.jabatan === 'Pembina');
+  const MSG_INSTRUMEN = 'Hanya Pembina dan Admin Gudep yang dapat mengelola instrumen penilaian.';
+
+  /** Memuat instrumen dan pengaturannya bila belum, atau ulang bila `paksa`. Aman dipanggil berulang (permintaan yang sama dipakai bersama). */
+  const pastikanInstrumen = useCallback(async (paksa = false) => {
+    if (!paksa && instrumenSiapRef.current) return { ok: true };
+    if (instrumenMuat.current) return instrumenMuat.current;
+    const mulaiGenerasi = generasi.current;
+    const janji = (async () => {
+      const a = api();
+      const [i, p] = await Promise.all([a.muatInstrumen(), a.muatPengaturan()]);
+      instrumenMuat.current = null;
+      if (mulaiGenerasi !== generasi.current) return { ok: true };
+      if (!i.ok) {
+        if (i.sesiBerakhir) await sesiBerakhir();
+        return i;
+      }
+      setDb((d) => ({ ...d, instrumen: i.data, instrumenGalat: i.galat ?? '', ...(p.ok ? { pengaturan: p.data } : {}) }));
+      instrumenSiapRef.current = true;
+      setInstrumenSiap(true);
+      return { ok: true };
+    })();
+    instrumenMuat.current = janji;
+    return janji;
+  }, [sesiBerakhir]);
+
+  const simpanInstrumen = (data) =>
+    bolehKelolaInstrumen
+      ? aksi(api().simpanInstrumen(data), { sukses: 'Instrumen tersimpan.', sesudah: () => pastikanInstrumen(true) })
+      : Promise.resolve(ditolak(notify, MSG_INSTRUMEN));
+
+  const statusInstrumen = (skuIds, status) =>
+    bolehKelolaInstrumen
+      ? aksi(api().statusInstrumen(skuIds, status), {
+        sukses: status === 'ditetapkan' ? `${skuIds.length} instrumen ditetapkan dan mulai dipakai menilai.` : `${skuIds.length} instrumen dikembalikan ke draf.`,
+        sesudah: () => pastikanInstrumen(true),
+      })
+      : Promise.resolve(ditolak(notify, MSG_INSTRUMEN));
+
+  const simpanPengaturanInstrumen = (nilai) =>
+    bolehKelolaInstrumen
+      ? aksi(api().simpanPengaturanInstrumen(nilai), { sukses: 'Pengaturan instrumen tersimpan.', sesudah: () => segarkan.pengaturan() })
+      : Promise.resolve(ditolak(notify, MSG_INSTRUMEN));
 
   /* ------------------------ Pencalonan Penegak Garuda ------------------------ */
   const daftarCalonGaruda = () =>
@@ -573,6 +633,7 @@ export function AppProvider({ children }) {
     sidang: db.sidang, sidangUrut: db.sidangUrut, pengaturan: db.pengaturan, bolehSidang, bolehHapusSidang, muatSidang, simpanSidang, hapusSidang,
     simpanPengaturan, aturUrutSidang,
     raport: db.raport, bolehRaport, muatRaport, simpanRaport, hapusRaport, simpanPengaturanRaport,
+    instrumen: db.instrumen, instrumenGalat: db.instrumenGalat, instrumenSiap, bolehKelolaInstrumen, pastikanInstrumen, simpanInstrumen, statusInstrumen, simpanPengaturanInstrumen,
     daftarPeserta, peranUser, bolehKelolaAbsen,
     login, logout,
     ajukan, batalkanAjuan, catatHasil,

@@ -180,5 +180,24 @@ export function petaRaport(r) {
   };
 }
 
+/**
+ * Instrumen penilaian: { [skuId]: { skuId, caraUji, status, instruksi, kriteria: [{ id, urutan, jenis, teks, bobot, wajib, panduan }] } }.
+ * `instruksi` dan `panduan` hanya terisi untuk pengurus (tabelnya tidak terbaca Penegak).
+ */
+export function susunInstrumen(instrumen = [], kriteria = [], penguji = [], panduan = []) {
+  const petaInstruksi = new Map(penguji.map((r) => [r.sku_id, r.instruksi ?? '']));
+  const petaPanduan = new Map(panduan.map((r) => [Number(r.kriteria_id), r.panduan ?? '']));
+  const hasil = {};
+  for (const r of instrumen) {
+    hasil[r.sku_id] = { skuId: r.sku_id, caraUji: r.cara_uji ?? '', status: r.status, instruksi: petaInstruksi.get(r.sku_id) ?? '', diubahPada: r.diubah_pada, kriteria: [] };
+  }
+  for (const k of [...kriteria].sort((a, b) => a.urutan - b.urutan)) {
+    hasil[k.sku_id]?.kriteria.push({
+      id: Number(k.id), urutan: k.urutan, jenis: k.jenis, teks: k.teks, bobot: k.bobot, wajib: !!k.wajib, panduan: petaPanduan.get(Number(k.id)) ?? '',
+    });
+  }
+  return hasil;
+}
+
 /** Baris raport satu semester -> { [pesertaId]: baris } */
 export const susunRaport = (baris = []) => Object.fromEntries(baris.map((r) => [r.peserta_id, petaRaport(r)]));

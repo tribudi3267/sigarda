@@ -4,6 +4,7 @@
  */
 import { buatKlienFake, siapkanPg } from './klienFake';
 import { isiDataContoh } from './seedLokal';
+import { isiInstrumenContoh } from './instrumenContoh';
 
 const NAMA_DB = 'sigarda-lokal';
 const KUNCI_SESI = 'sigarda_lokal_sesi';
@@ -30,6 +31,7 @@ export async function bootLokal() {
   if (!sudahAda) {
     await siapkanPg(pg, { sqlStub: stub.default, sqlSkema: skema.default });
     await isiDataContoh(pg);
+    await isiInstrumenContoh(pg);
   }
 
   return {

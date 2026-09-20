@@ -41,6 +41,7 @@ Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Adm
 | Portofolio | (di dashboard Garuda) isi status, catatan, tautan | Tinjau dan beri catatan, rekap, unduh Excel | Rekap, unduh Excel |
 | Sidang | | Antrian sidang, lembar sidang (Layak dan Lulus / Ditunda-Remedi), riwayat, cetak Berita Acara, pengaturan nomor dan ketua. Hapus catatan: hanya Pembina | Sama dengan penguji, termasuk hapus |
 | Raport | | Hanya **Pembina**: nilai ekstrakurikuler per semester, cetak per Penegak, Excel per kelas, pengaturan | Sama dengan Pembina |
+| Instrumen | Melihat daftar kriteria penilaian per butir (pada butir yang instrumennya ditetapkan) | Menilai dengan instrumen (skor 1-5 per kriteria) di lembar penilaian | Hanya **Pembina** dan Admin: kelola instrumen, tetapkan, pengaturan |
 | Anggota | | | Tambah, ubah, hapus anggota; import Excel dan unduh template (Penegak, Dewan Ambalan, Pembina) |
 | Reset PIN | | Sesuai kewenangan (lihat di bawah) | Semua kecuali Admin |
 | Akun (ikon di header) | Ganti PIN sendiri | Ganti PIN sendiri | Ganti PIN sendiri |
@@ -148,6 +149,19 @@ Menu **Raport** (hanya Pembina dan Admin; Dewan Ambalan dan Penegak tidak meliha
 - Server menghitung ulang kehadiran, capaian, skor, dan predikat dari data absensi dan progres SKU saat menyimpan (`sg_raport_simpan`), jadi angka tidak bisa dipalsukan dari layar. Rumus di `src/lib/raportLogic.js` dan di SQL sama persis (pembulatan setengah ke atas dengan bilangan bulat) dan dijaga oleh pengujian.
 - Penulisan hanya lewat fungsi server `sg_raport_simpan`, `sg_raport_hapus`, `sg_raport_pengaturan_simpan`; tabel `raport` hanya terbaca Pembina dan Admin.
 
+### Instrumen penilaian SKU
+Tiap unit SKU (butir; butir agama per sub-butir, total 90 unit) dapat punya **instrumen**: cara uji, instruksi penguji, dan 1-15 kriteria (jenis Lisan/Praktik/Bukti kegiatan/Pengamatan, bobot 1-5, tanda **Wajib**, panduan penguji).
+- **Penilaian**: penguji memberi nilai 1-5 pada tiap kriteria di lembar penilaian. **Skor** (0-100) = 20 x jumlah(nilai x bobot) / jumlah(bobot), dibulatkan setengah ke atas. **Saran LULUS** bila skor mencapai ambang (bawaan 75) dan, bila "kriteria wajib menjadi syarat lulus" menyala (bawaan: menyala), setiap kriteria wajib bernilai minimal 3. Predikat: 90 ke atas Sangat baik, 75 ke atas Baik, selebihnya Cukup. Semua angka dapat diatur di tab Pengaturan.
+- **Penguji boleh memilih hasil berbeda dari saran**, dengan catatan alasan wajib yang tercatat di riwayat. Skor, saran, dan rincian tiap kriteria disimpan pada tabel `sku_penilaian` (hanya bertambah; salinan kriteria ikut tersimpan sehingga tetap terbaca walau instrumen diubah).
+- **Status**: instrumen baru berstatus **draf** (tidak dipakai). Hanya yang **ditetapkan** oleh Pembina atau Admin dipakai menilai dan terlihat Penegak (daftar kriteria saja; instruksi dan panduan penguji hanya terbaca pengurus, dijaga RLS). Butir tanpa instrumen ditetapkan tetap memakai penilaian lama (Lulus/Perlu diulang + predikat). Butir yang instrumennya ditetapkan tidak lagi dapat dinilai dengan cara lama (ditegakkan di server); "Mulai uji" dan "Kembalikan" tetap ada.
+- **Server menghitung ulang** skor dan saran (`sigarda.instrumen_hitung`); pencatatan lewat Edge Function setelah PIN penguji diverifikasi (`sg_sku_catat_rubrik_internal`), lalu memakai jalur yang sama dengan penilaian lama (status, kode verifikasi VRF-, riwayat). Rumus di `src/lib/instrumenLogic.js` dan SQL sama persis dan dijaga pengujian.
+- **Kelola** (menu Instrumen, Pembina dan Admin): daftar 90 unit, penyuntingan kriteria (urutan, bobot, wajib, panduan), penetapan massal, dan pengaturan. Penyuntingan instrumen yang sedang dipakai berlaku untuk penilaian berikutnya.
+- **ISI INSTRUMEN TIDAK ADA DI REPOSITORI INI.** Repositori bersifat publik, sedangkan panduan penguji tidak boleh terbaca Penegak. Isi disimpan di berkas Excel (di luar repositori) dan dimuat ke database lewat SQL yang dibuat skrip:
+  ```
+  node scripts/instrumen-ke-sql.mjs <keluaran.sql> <berkas.xlsx | folder> ... [--mode=baru|perbarui-draf|timpa-semua]
+  ```
+  Format Excel sama dengan berkas tinjauan. Mode `baru` (bawaan) hanya menambah butir yang belum punya instrumen; `perbarui-draf` mengganti isi instrumen yang masih draf; `timpa-semua` mengganti semuanya (suntingan Pembina ikut tertimpa). Jangan memasukkan SQL hasilnya ke repositori. Mode lokal hanya memuat 3 instrumen CONTOH fiktif.
+
 ### Filter dinamis
 Semua filter (sangga, kelas, peran, agama, tahun ajaran) dibangun dari data yang ada.
 
@@ -196,6 +210,9 @@ ganti PIN, dan verifikasi PIN penguji.
    kunci API baru Supabase bukan JWT sehingga pemeriksaan bawaan akan menolak semua permintaan.
 
 Dengan CLI: `supabase functions deploy sigarda --no-verify-jwt`.
+
+**Memperbarui fungsi yang sudah terpasang.** Bila `supabase/functions/sigarda/index.ts` berubah, ulangi langkah 2 (tempel isi terbaru, **Deploy**); pengaturan "Verify JWT" dan nama fungsi tidak berubah.
+Pembaruan untuk **instrumen penilaian** mewajibkan ini: fungsi lama mengabaikan nilai kriteria, dan aplikasi akan menolak penilaian instrumen dengan pesan bahwa fungsi belum diperbarui.
 
 **Nama fungsi.** Deploy lewat editor dashboard kadang memberi alamat dengan nama acak (mis. `hello-world`), walau Anda mengetik `sigarda`.
 Buka fungsi itu, tab **Details**, lihat **Endpoint URL** (`https://KODE.supabase.co/functions/v1/NAMA`). Bila `NAMA` bukan `sigarda`,
@@ -285,6 +302,8 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
   Jalankan **setelah** `2026-09-sidang-dk.sql`. Catatan sidang dan pengaturan yang sudah ada tidak berubah.
 - [`2026-09-raport.sql`](supabase/migrasi/2026-09-raport.sql): Nilai Raport Ekstrakurikuler. Hanya menambah tabel `raport`, fungsi hitung di server, dan fungsi `sg_raport_simpan`, `sg_raport_hapus`, `sg_raport_pengaturan_simpan`.
   Jalankan **setelah** `2026-09-sidang-dk.sql` dan `2026-09-sidang-format-nomor.sql` (bila belum, migrasi ini berhenti dengan pesan yang menuntun dan tidak mengubah apa pun). **Wajib dijalankan sebelum menerbitkan kode Raport**; sebelum itu menu Raport hanya menampilkan pesan bahwa basis data belum diperbarui, halaman lain tidak terpengaruh.
+- [`2026-09-instrumen.sql`](supabase/migrasi/2026-09-instrumen.sql): instrumen penilaian SKU. Menambah 5 tabel (`instrumen`, `instrumen_kriteria`, `instrumen_penguji`, `instrumen_panduan`, `sku_penilaian`), fungsi hitung skor, `sg_sku_catat_rubrik_internal`, `sg_instrumen_simpan`, `sg_instrumen_status`, `sg_instrumen_pengaturan_simpan`, dan memperbarui `sg_sku_catat_internal`.
+  Jalankan **setelah** migrasi Sidang dan Raport. Tidak mengubah data; tanpa isi instrumen alur penilaian yang berjalan tidak berubah. Setelah itu (1) muat isi instrumen (SQL dari `scripts/instrumen-ke-sql.mjs`, lihat di atas), (2) **pasang ulang Edge Function** (lihat langkah 4), lalu (3) `git push`. Instrumen baru berstatus draf sampai Pembina menetapkannya di menu Instrumen.
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 
 ## Struktur folder
@@ -295,6 +314,7 @@ sku-bukateja/
 ├── .env.example  .env.lokal            contoh variabel; .env.lokal untuk npm run dev:lokal
 ├── .github/workflows/deploy.yml        terbit otomatis ke GitHub Pages
 ├── scripts/buat-skema.mjs              membuat supabase/skema.sql (menyisipkan katalog butir dari src/data)
+├── scripts/instrumen-ke-sql.mjs        Excel instrumen penilaian -> SQL pemuat isi (isinya sendiri TIDAK di repositori)
 ├── supabase/
 │   ├── skema.sql                       (dibuat otomatis) tabel, RLS, fungsi sg_*, katalog. Dijalankan di SQL Editor
 │   ├── sumber/inti.sql                 sumber skema tanpa katalog (EDIT DI SINI, lalu npm run skema)
@@ -312,7 +332,7 @@ sku-bukateja/
     │   ├── supabaseClient.js           klien Supabase (atau lokal)
     │   ├── api.js                      satu-satunya lapisan yang berbicara ke Supabase (tabel, sg_*, Edge Function)
     │   ├── mapDb.js                    tabel server -> bentuk data yang dipakai halaman
-    │   ├── skuLogic.js  absensiLogic.js  portofolioLogic.js  materiLogic.js  sidangLogic.js  raportLogic.js  pinLogic.js  importAnggota.js  cariNama.js
+    │   ├── skuLogic.js  absensiLogic.js  portofolioLogic.js  materiLogic.js  sidangLogic.js  raportLogic.js  instrumenLogic.js  pinLogic.js  importAnggota.js  cariNama.js
     │   └── exportXlsx.js  exportLaporan.js  format.js
     ├── lokal/                          backend lokal: klien tiruan di atas PGlite, data contoh (bukan produksi)
     ├── context/AppContext.jsx          state global (salinan data sesuai izin) dan semua aksi

@@ -4,6 +4,8 @@ import { useApp } from '../context/AppContext';
 import { hitungMateriPerButir } from '../lib/materiLogic';
 import { butirPeserta, getEntry } from '../lib/skuLogic';
 import { fmtTanggal, fmtWaktu } from '../lib/format';
+import useInstrumen from '../hooks/useInstrumen';
+import { LencanaKriteria } from './InstrumenNilai';
 import { Badge, Icon } from './ui';
 
 const FILTER = [
@@ -22,6 +24,8 @@ export default function SkuChecklist({ tingkat, peserta, renderAksi, onBukaMater
   const { progress, users, materi } = useApp();
   const [filter, setFilter] = useState('semua');
   const [terbuka, setTerbuka] = useState(null);
+  const [kriteriaTerbuka, setKriteriaTerbuka] = useState(null);
+  const { instrumen, pengaturan: pngInstrumen } = useInstrumen();
 
   const syarat = FILTER.find((f) => f.id === filter).status;
   const namaOrang = (id) => users.find((u) => u.id === id)?.nama ?? '-';
@@ -47,6 +51,7 @@ export default function SkuChecklist({ tingkat, peserta, renderAksi, onBukaMater
   const detailUnit = (poin, entry, ekstra = null) => {
     const lulusPoin = entry.status === 'lulus';
     const riwayat = entry.riwayat ?? [];
+    const instr = instrumen[poin.id]?.status === 'ditetapkan' && instrumen[poin.id].kriteria.length ? instrumen[poin.id] : null;
     return (
       <>
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -80,6 +85,15 @@ export default function SkuChecklist({ tingkat, peserta, renderAksi, onBukaMater
         <div className="no-print mt-3 flex flex-wrap items-center gap-3">
           {renderAksi?.(poin, entry)}
           {ekstra}
+          {instr && (
+            <button
+              onClick={() => setKriteriaTerbuka(kriteriaTerbuka === poin.id ? null : poin.id)}
+              aria-expanded={kriteriaTerbuka === poin.id}
+              className="text-xs font-semibold text-pramuka-600 underline underline-offset-2 hover:text-pramuka-800"
+            >
+              Kriteria penilaian ({instr.kriteria.length})
+            </button>
+          )}
           {riwayat.length > 0 && (
             <button
               onClick={() => setTerbuka(terbuka === poin.id ? null : poin.id)}
@@ -90,6 +104,22 @@ export default function SkuChecklist({ tingkat, peserta, renderAksi, onBukaMater
             </button>
           )}
         </div>
+
+        {instr && kriteriaTerbuka === poin.id && (
+          <div className="animasi-naik no-print mt-2 rounded-md bg-pramuka-50 px-3 py-2 text-sm">
+            <p className="mb-1 text-xs font-semibold text-pramuka-700">
+              Yang dinilai pada butir ini{instr.caraUji ? ` (cara uji: ${instr.caraUji})` : ''}. Skor {pngInstrumen.ambang} atau lebih dinyatakan lulus.
+            </p>
+            <ol className="list-decimal space-y-1.5 pl-5">
+              {instr.kriteria.map((k) => (
+                <li key={k.id}>
+                  <span className="leading-snug">{k.teks}</span>{' '}
+                  <LencanaKriteria k={k} />
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
 
         {terbuka === poin.id && (
           <ol className="animasi-naik mt-2 space-y-1 border-l-2 border-emas/60 pl-3 text-xs text-pramuka-600">

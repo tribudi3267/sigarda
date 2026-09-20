@@ -8,7 +8,8 @@
 //   buat-akun      Admin membuat akun (satu atau banyak, dipakai import Excel)
 //   hapus-akun     Admin menghapus akun
 //   ubah-username  Admin mengubah nama pengguna (NIS untuk Penegak)
-//   catat-hasil    penguji mencatat hasil uji SKU; PIN penguji diverifikasi di server
+//   catat-hasil    penguji mencatat hasil uji SKU; PIN penguji diverifikasi di server. Bila body memuat `rincian`
+//                  (nilai tiap kriteria), penilaian memakai instrumen dan skornya dihitung ulang di server.
 //
 // Deploy: lihat README bagian "Menghubungkan ke Supabase". Matikan "Verify JWT" pada fungsi ini
 // (pemeriksaan sesi dilakukan di kode ini), karena kunci API baru Supabase bukan JWT.
@@ -287,6 +288,17 @@ async function aksiCatatHasil(b: any, me: any, d: any) {
     return r;
   }
   await panggil(d, 'sg_kunci_lepas_internal', { p_username: me.username });
+
+  // Penilaian dengan instrumen: nilai tiap kriteria dikirim, skor dan saran dihitung ulang di server.
+  if (b.rincian !== undefined && b.rincian !== null && !Array.isArray(b.rincian)) return gagal('Nilai kriteria tidak sah.');
+  if (Array.isArray(b.rincian)) {
+    const { data, error: galatRubrik } = await d.db.rpc('sg_sku_catat_rubrik_internal', {
+      p_oleh: me.id, p_peserta_id: b.pesertaId, p_sku_id: b.skuId, p_tanggal_uji: b.tanggalUji || null,
+      p_rincian: b.rincian, p_hasil: b.hasil, p_catatan: b.catatan ?? '',
+    });
+    if (galatRubrik) return gagal(galatRubrik.message);
+    return { ok: true, rubrik: true, hasil: data };
+  }
 
   const { error } = await d.db.rpc('sg_sku_catat_internal', {
     p_oleh: me.id, p_peserta_id: b.pesertaId, p_sku_id: b.skuId, p_hasil: b.hasil,

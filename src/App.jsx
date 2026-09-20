@@ -19,6 +19,7 @@ import Materi from './pages/Materi';
 import KelolaMateri from './pages/KelolaMateri';
 import Sidang from './pages/Sidang';
 import Raport from './pages/Raport';
+import KelolaInstrumen from './pages/KelolaInstrumen';
 import { bolehKelolaMateri } from './lib/materiLogic';
 import LogoMark from './components/LogoMark';
 
@@ -27,14 +28,15 @@ import LogoMark from './components/LogoMark';
  *  Penegak Calon Bantara/Laksana : Beranda, Poin SKU, Materi, Absensi, Cetak
  *  Penegak Calon Garuda          : Dashboard Garuda (jurnal portofolio), Poin SKU, Materi, Absensi, Cetak
  *  Dewan Ambalan                 : Dashboard, Antrian uji, Peserta, Materi, Absensi, Portofolio, Sidang, Cetak, Reset PIN
- *  Pembina                       : idem Dewan Ambalan, ditambah Kelola Materi dan Raport
- *  Admin Gudep                   : Dashboard, Anggota, Materi, Kelola Materi, Absensi, Portofolio, Sidang, Raport, Cetak, Reset PIN
+ *  Pembina                       : idem Dewan Ambalan, ditambah Kelola Materi, Instrumen, dan Raport
+ *  Admin Gudep                   : Dashboard, Anggota, Materi, Kelola Materi, Instrumen, Absensi, Portofolio, Sidang, Raport, Cetak, Reset PIN
  *  Semua peran                   : Akun (tombol di header) untuk mengganti PIN sendiri
  */
 function buatNav(user, peran) {
   const materi = { id: 'materi', label: 'Materi', ikon: 'buku' };
   const kelola = { id: 'kelolamateri', label: 'Kelola Materi', ikon: 'pustaka' };
   const raport = { id: 'raport', label: 'Raport', ikon: 'raport' };
+  const instrumen = { id: 'instrumen', label: 'Instrumen', ikon: 'instrumen' };
 
   if (user.role === 'peserta') {
     return [
@@ -53,7 +55,7 @@ function buatNav(user, peran) {
       { id: 'antrian', label: 'Antrian', ikon: 'jam' },
       { id: 'peserta', label: 'Peserta', ikon: 'anggota' },
       materi,
-      ...(bolehKelolaMateri(user) ? [kelola] : []),
+      ...(bolehKelolaMateri(user) ? [kelola, instrumen] : []),
       { id: 'absensi', label: 'Absensi', ikon: 'absensi' },
       { id: 'portofolio', label: 'Portofolio', ikon: 'portofolio' },
       { id: 'sidang', label: 'Sidang', ikon: 'sidang' },
@@ -67,6 +69,7 @@ function buatNav(user, peran) {
     { id: 'anggota', label: 'Anggota', ikon: 'anggota' },
     materi,
     kelola,
+    instrumen,
     { id: 'absensi', label: 'Absensi', ikon: 'absensi' },
     { id: 'portofolio', label: 'Portofolio', ikon: 'portofolio' },
     { id: 'sidang', label: 'Sidang', ikon: 'sidang' },
@@ -172,6 +175,8 @@ function Shell() {
     isi = <Sidang />;
   } else if (tabAktif === 'raport' && bolehKelolaMateri(user)) {
     isi = <Raport />;
+  } else if (tabAktif === 'instrumen' && bolehKelolaMateri(user)) {
+    isi = <KelolaInstrumen />;
   } else if (tabAktif === 'materi') {
     isi = <Materi key={materiButir ?? 'semua'} butirAwal={materiButir} onKelola={bukaKelola} />;
   } else if (tabAktif === 'kelolamateri') {

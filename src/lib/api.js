@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunHadir, susunMateri, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunHadir, susunInstrumen, susunMateri, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -171,6 +171,24 @@ export function buatApi(klien) {
         urut: ['peserta_id'],
       }))),
 
+    /**
+     * Seluruh instrumen penilaian (kecil: sekitar 90 butir). Penegak hanya menerima yang ditetapkan dan tanpa panduan; pengurus menerima semua.
+     * Pada database yang belum menjalankan migrasi 2026-09-instrumen.sql, aplikasi tetap harus berfungsi dengan alur penilaian lama, jadi
+     * kegagalan selain sesi berakhir dianggap "belum ada instrumen" dan pesannya dibawa di `galat` untuk halaman kelola.
+     */
+    muatInstrumen: async () => {
+      const r = await muat(async () => {
+        const [a, b, c, d] = await Promise.all([
+          ambilSemua('instrumen', { urut: ['sku_id'] }),
+          ambilSemua('instrumen_kriteria', { urut: ['sku_id', 'urutan'] }),
+          ambilSemua('instrumen_penguji', { urut: ['sku_id'] }),
+          ambilSemua('instrumen_panduan', { urut: ['kriteria_id'] }),
+        ]);
+        return susunInstrumen(a, b, c, d);
+      });
+      return r.ok || r.sesiBerakhir ? r : { ok: true, data: {}, galat: r.pesan };
+    },
+
     /* ----------------------------- SKU ----------------------------- */
     ajukan: ({ skuId, jadwal, pengujiId, catatan }) =>
       rpc('sg_sku_ajukan', { p_sku_id: skuId, p_jadwal: jadwal || null, p_penguji_id: pengujiId || null, p_catatan: catatan ?? '' }),
@@ -240,5 +258,14 @@ export function buatApi(klien) {
     hapusRaport: (pesertaId, tahunAjaran, semester) =>
       rpc('sg_raport_hapus', { p_peserta_id: pesertaId, p_tahun_ajaran: tahunAjaran, p_semester: semester }),
     simpanPengaturanRaport: (nilai) => rpc('sg_raport_pengaturan_simpan', { p_nilai: nilai }),
+
+    /* ------------------------ Instrumen penilaian (Pembina dan Admin) ------------------------ */
+    simpanInstrumen: (d) =>
+      rpc('sg_instrumen_simpan', {
+        p_sku_id: d.skuId, p_cara_uji: d.caraUji ?? '', p_instruksi: d.instruksi ?? '', p_status: d.status,
+        p_kriteria: d.kriteria.map((k) => ({ id: k.id ?? null, jenis: k.jenis, teks: k.teks, bobot: k.bobot, wajib: !!k.wajib, panduan: k.panduan ?? '' })),
+      }),
+    statusInstrumen: (skuIds, status) => rpc('sg_instrumen_status', { p_sku_ids: skuIds, p_status: status }),
+    simpanPengaturanInstrumen: (nilai) => rpc('sg_instrumen_pengaturan_simpan', { p_nilai: nilai }),
   };
 }
