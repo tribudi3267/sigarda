@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import Layout from './components/Layout';
 import Login from './components/Login';
@@ -24,61 +24,49 @@ import { bolehKelolaMateri } from './lib/materiLogic';
 import LogoMark from './components/LogoMark';
 
 /**
- * Menu per peran.
- *  Penegak Calon Bantara/Laksana : Beranda, Poin SKU, Materi, Absensi, Cetak
- *  Penegak Calon Garuda          : Dashboard Garuda (jurnal portofolio), Poin SKU, Materi, Absensi, Cetak
- *  Dewan Ambalan                 : Dashboard, Antrian uji, Peserta, Materi, Absensi, Portofolio, Sidang, Cetak, Reset PIN
- *  Pembina                       : idem Dewan Ambalan, ditambah Kelola Materi, Instrumen, dan Raport
- *  Admin Gudep                   : Dashboard, Anggota, Materi, Kelola Materi, Instrumen, Absensi, Portofolio, Sidang, Raport, Cetak, Reset PIN
- *  Semua peran                   : Akun (tombol di header) untuk mengganti PIN sendiri
+ * Menu per peran, dikelompokkan menurut fungsinya (tampil sebagai kelompok di menu samping, dan berurutan di menu bawah ponsel).
+ *  Utama            : Dashboard (Penegak: Beranda atau Garuda)
+ *  Pengujian SKU    : Penegak: Poin SKU, Cetak. Dewan/Pembina: Antrian, Peserta, Instrumen (Pembina), Sidang, Cetak. Admin: Instrumen, Sidang, Cetak
+ *  Kegiatan Ambalan : Absensi, Portofolio (pengurus), Raport (Pembina dan Admin)
+ *  Materi           : Materi, Kelola Materi (Pembina dan Admin)
+ *  Pengelolaan      : Anggota (Admin)
+ * Akun saya dan Reset PIN anggota (pengurus) tidak ada di daftar ini: keduanya di menu akun (nama pengguna di menu samping atau header).
  */
 function buatNav(user, peran) {
   const materi = { id: 'materi', label: 'Materi', ikon: 'buku' };
   const kelola = { id: 'kelolamateri', label: 'Kelola Materi', ikon: 'pustaka' };
   const raport = { id: 'raport', label: 'Raport', ikon: 'raport' };
   const instrumen = { id: 'instrumen', label: 'Instrumen', ikon: 'instrumen' };
+  const absensi = { id: 'absensi', label: 'Absensi', ikon: 'absensi' };
+  const portofolio = { id: 'portofolio', label: 'Portofolio', ikon: 'portofolio' };
+  const sidang = { id: 'sidang', label: 'Sidang', ikon: 'sidang' };
+  const cetak = { id: 'cetak', label: 'Cetak', ikon: 'cetak' };
+  const kelolaBoleh = bolehKelolaMateri(user);
 
   if (user.role === 'peserta') {
     return [
-      peran === 'calon-garuda'
-        ? { id: 'beranda', label: 'Garuda', ikon: 'bintang' }
-        : { id: 'beranda', label: 'Beranda', ikon: 'beranda' },
-      { id: 'sku', label: 'Poin SKU', ikon: 'daftar' },
-      materi,
-      { id: 'absensi', label: 'Absensi', ikon: 'absensi' },
-      { id: 'cetak', label: 'Cetak', ikon: 'cetak' },
+      { judul: 'Utama', item: [peran === 'calon-garuda' ? { id: 'beranda', label: 'Garuda', ikon: 'bintang' } : { id: 'beranda', label: 'Beranda', ikon: 'beranda' }] },
+      { judul: 'Pengujian SKU', item: [{ id: 'sku', label: 'Poin SKU', ikon: 'daftar' }, cetak] },
+      { judul: 'Kegiatan Ambalan', item: [absensi] },
+      { judul: 'Materi', item: [materi] },
     ];
   }
   if (user.role === 'penguji') {
     return [
-      { id: 'dashboard', label: 'Dashboard', ikon: 'dashboard' },
-      { id: 'antrian', label: 'Antrian', ikon: 'jam' },
-      { id: 'peserta', label: 'Peserta', ikon: 'anggota' },
-      materi,
-      ...(bolehKelolaMateri(user) ? [kelola, instrumen] : []),
-      { id: 'absensi', label: 'Absensi', ikon: 'absensi' },
-      { id: 'portofolio', label: 'Portofolio', ikon: 'portofolio' },
-      { id: 'sidang', label: 'Sidang', ikon: 'sidang' },
-      ...(bolehKelolaMateri(user) ? [raport] : []),
-      { id: 'cetak', label: 'Cetak', ikon: 'cetak' },
-      { id: 'resetpin', label: 'Reset PIN', ikon: 'kunci' },
+      { judul: 'Utama', item: [{ id: 'dashboard', label: 'Dashboard', ikon: 'dashboard' }] },
+      { judul: 'Pengujian SKU', item: [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }, { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, ...(kelolaBoleh ? [instrumen] : []), sidang, cetak] },
+      { judul: 'Kegiatan Ambalan', item: [absensi, portofolio, ...(kelolaBoleh ? [raport] : [])] },
+      { judul: 'Materi', item: [materi, ...(kelolaBoleh ? [kelola] : [])] },
     ];
   }
   return [
-    { id: 'rekap', label: 'Dashboard', ikon: 'dashboard' },
-    { id: 'anggota', label: 'Anggota', ikon: 'anggota' },
-    materi,
-    kelola,
-    instrumen,
-    { id: 'absensi', label: 'Absensi', ikon: 'absensi' },
-    { id: 'portofolio', label: 'Portofolio', ikon: 'portofolio' },
-    { id: 'sidang', label: 'Sidang', ikon: 'sidang' },
-    raport,
-    { id: 'cetak', label: 'Cetak', ikon: 'cetak' },
-    { id: 'resetpin', label: 'Reset PIN', ikon: 'kunci' },
+    { judul: 'Utama', item: [{ id: 'rekap', label: 'Dashboard', ikon: 'dashboard' }] },
+    { judul: 'Pengujian SKU', item: [instrumen, sidang, cetak] },
+    { judul: 'Kegiatan Ambalan', item: [absensi, portofolio, raport] },
+    { judul: 'Materi', item: [materi, kelola] },
+    { judul: 'Pengelolaan', item: [{ id: 'anggota', label: 'Anggota', ikon: 'anggota' }] },
   ];
 }
-
 function Toast() {
   const { toast } = useApp();
   if (!toast) return null;
@@ -137,9 +125,11 @@ function Shell() {
   // PIN awal dari admin atau PIN hasil reset wajib diganti sebelum aplikasi dapat dipakai
   if (user.wajibGantiPin) return <GantiPinWajib />;
 
-  const nav = buatNav(user, peranUser);
-  // Bila menu yang dipilih tidak ada lagi (mis. peran berubah), kembali ke menu pertama
-  const tabAktif = tab === 'akun' || nav.some((n) => n.id === tab) ? tab : nav[0].id;
+  const grup = buatNav(user, peranUser);
+  const nav = grup.flatMap((g) => g.item);
+  // Bila menu yang dipilih tidak ada lagi (mis. peran berubah), kembali ke menu pertama. Akun saya dan Reset PIN dibuka dari menu akun.
+  const halamanAkun = tab === 'akun' || (tab === 'resetpin' && user.role !== 'peserta');
+  const tabAktif = halamanAkun || nav.some((n) => n.id === tab) ? tab : nav[0].id;
 
   const pilihTab = (t) => {
     setTab(t);
@@ -222,7 +212,7 @@ function Shell() {
   }
 
   return (
-    <Layout nav={nav} tab={tabAktif} setTab={pilihTab}>
+    <Layout nav={nav} grup={grup} tab={tabAktif} setTab={pilihTab}>
       {isi}
     </Layout>
   );

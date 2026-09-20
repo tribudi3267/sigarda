@@ -31,6 +31,8 @@ Peran anggota penegak ditentukan otomatis dari progres SKU:
 
 Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Admin Gudep**.
 
+**Letak menu.** Di tablet, laptop, dan PC, menu ada di **samping kiri**, dikelompokkan menurut fungsinya (Utama, Pengujian SKU, Kegiatan Ambalan, Materi, dan Pengelolaan untuk Admin) dan dapat diciutkan menjadi ikon saja (pilihan diingat di peramban). Di ponsel, menu berupa ikon di bawah yang dapat digeser ke kiri dan kanan; panah bercahaya di tepi menunjukkan masih ada menu tersembunyi di sisi itu. **Nama tampilan** pengguna selalu terlihat di tempat yang sama (bawah menu samping, atau kanan atas header ponsel); diarahkan kursor atau diklik membuka kartu akun (tanpa PIN) dengan Pengaturan akun (ganti PIN), Reset PIN anggota (Dewan, Pembina, Admin), dan Keluar.
+
 | Menu | Penegak | Dewan Ambalan / Pembina | Admin |
 |---|---|---|---|
 | Dashboard | Beranda progres SKU. Calon Garuda: dashboard jurnal portofolio | Antrian uji, rekap absensi, rekap portofolio | Rekap anggota, absensi, portofolio, kelulusan SKU |
@@ -43,8 +45,8 @@ Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Adm
 | Raport | | Hanya **Pembina**: nilai ekstrakurikuler per semester, cetak per Penegak, Excel per kelas, pengaturan | Sama dengan Pembina |
 | Instrumen | Melihat daftar kriteria penilaian per butir (pada butir yang instrumennya ditetapkan) | Menilai dengan instrumen (skor 1-5 per kriteria) di lembar penilaian | Hanya **Pembina** dan Admin: kelola instrumen, tetapkan, pengaturan |
 | Anggota | | | Tambah, ubah, hapus anggota; import Excel dan unduh template (Penegak, Dewan Ambalan, Pembina) |
-| Reset PIN | | Sesuai kewenangan (lihat di bawah) | Semua kecuali Admin |
-| Akun (ikon di header) | Ganti PIN sendiri | Ganti PIN sendiri | Ganti PIN sendiri |
+| Reset PIN (menu akun) | | Sesuai kewenangan (lihat di bawah) | Semua kecuali Admin |
+| Pengaturan akun (menu akun) | Ganti PIN sendiri | Ganti PIN sendiri | Ganti PIN sendiri |
 | Cetak | Kartu SKU, Surat Tanda Lulus | Idem | Idem |
 
 ### Masuk, nama pengguna, dan PIN
@@ -54,7 +56,7 @@ Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Adm
 - **PIN awal** dibuat admin saat menambah anggota (atau otomatis saat import Excel) lalu dibagikan langsung. Pada login pertama,
   layar **Buat PIN baru** menahan pengguna sampai PIN diganti. Ini **ditegakkan di server**: selama PIN belum diganti, server hanya
   melayani pembacaan profil sendiri dan penggantian PIN.
-- **Ganti PIN** sukarela: ikon Akun di header, isi PIN lama dan PIN baru.
+- **Ganti PIN** sukarela: buka menu akun (nama Anda di menu samping atau header) lalu Pengaturan akun, isi PIN lama dan PIN baru.
 - **Reset PIN** membuat PIN acak 6 angka baru yang tampil satu kali kepada pengreset. Pemilik akun wajib menggantinya
   lagi saat login pertama. Siapa boleh mereset siapa:
 
@@ -244,7 +246,7 @@ setelah mengganti email di dalamnya. Domain ini harus sama untuk seluruh akun.
 
 ### Lupa PIN Admin
 Peran lain tidak dapat mereset Admin. Pengelola proyek Supabase dapat memulihkannya lewat [`supabase/pulihkan_pin_admin.sql`](supabase/pulihkan_pin_admin.sql)
-(SQL Editor). Untuk akun lain, gunakan menu Reset PIN.
+(SQL Editor). Untuk akun lain, gunakan Reset PIN anggota di menu akun.
 
 ## Menerbitkan ke GitHub Pages
 

@@ -59,6 +59,41 @@
   display: none;
 }
 
+/* Panah penunjuk menu tersembunyi pada menu bawah ponsel: cahaya emas yang berdenyut pelan dan dorongan kecil ke arah geser */
+@keyframes denyut-panah {
+  0%,
+  100% {
+    box-shadow: 0 0 5px 1px rgba(226, 184, 74, 0.35), 0 0 12px 2px rgba(226, 184, 74, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 10px 2px rgba(226, 184, 74, 0.8), 0 0 20px 5px rgba(226, 184, 74, 0.35);
+  }
+}
+@keyframes dorong-kanan {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+}
+@keyframes dorong-kiri {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-3px);
+  }
+}
+.panah-geser-kanan {
+  animation: denyut-panah 2.2s ease-in-out infinite, dorong-kanan 1.6s ease-in-out infinite;
+}
+.panah-geser-kiri {
+  animation: denyut-panah 2.2s ease-in-out infinite, dorong-kiri 1.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
