@@ -6,6 +6,7 @@ import { butirPeserta, getEntry } from '../lib/skuLogic';
 import { fmtTanggal, fmtWaktu } from '../lib/format';
 import useInstrumen from '../hooks/useInstrumen';
 import { LencanaKriteria } from './InstrumenNilai';
+import RincianPenilaian from './RincianPenilaian';
 import { Badge, Icon } from './ui';
 
 const FILTER = [
@@ -25,6 +26,7 @@ export default function SkuChecklist({ tingkat, peserta, renderAksi, onBukaMater
   const [filter, setFilter] = useState('semua');
   const [terbuka, setTerbuka] = useState(null);
   const [kriteriaTerbuka, setKriteriaTerbuka] = useState(null);
+  const [rincianTerbuka, setRincianTerbuka] = useState(null);
   const { instrumen, pengaturan: pngInstrumen } = useInstrumen();
 
   const syarat = FILTER.find((f) => f.id === filter).status;
@@ -51,6 +53,8 @@ export default function SkuChecklist({ tingkat, peserta, renderAksi, onBukaMater
   const detailUnit = (poin, entry, ekstra = null) => {
     const lulusPoin = entry.status === 'lulus';
     const riwayat = entry.riwayat ?? [];
+    // Rincian nilai ada bila butir pernah dinilai dengan instrumen (riwayat mencatat skornya)
+    const adaRincian = (entry.status === 'lulus' || entry.status === 'ulang') && riwayat.some((r) => /^Skor instrumen/.test(r.teks));
     const instr = instrumen[poin.id]?.status === 'ditetapkan' && instrumen[poin.id].kriteria.length ? instrumen[poin.id] : null;
     return (
       <>
@@ -94,6 +98,15 @@ export default function SkuChecklist({ tingkat, peserta, renderAksi, onBukaMater
               Kriteria penilaian ({instr.kriteria.length})
             </button>
           )}
+          {adaRincian && (
+            <button
+              onClick={() => setRincianTerbuka(rincianTerbuka === poin.id ? null : poin.id)}
+              aria-expanded={rincianTerbuka === poin.id}
+              className="text-xs font-semibold text-pramuka-600 underline underline-offset-2 hover:text-pramuka-800"
+            >
+              Rincian nilai
+            </button>
+          )}
           {riwayat.length > 0 && (
             <button
               onClick={() => setTerbuka(terbuka === poin.id ? null : poin.id)}
@@ -120,6 +133,8 @@ export default function SkuChecklist({ tingkat, peserta, renderAksi, onBukaMater
             </ol>
           </div>
         )}
+
+        {adaRincian && rincianTerbuka === poin.id && <RincianPenilaian pesertaId={peserta.id} skuId={poin.id} />}
 
         {terbuka === poin.id && (
           <ol className="animasi-naik mt-2 space-y-1 border-l-2 border-emas/60 pl-3 text-xs text-pramuka-600">

@@ -1,7 +1,7 @@
 import { NILAI_KRITERIA, kriteriaWajibGagal } from '../lib/instrumenLogic';
 
 const CHIP = 'inline-flex items-center whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset';
-const KELAS_NILAI = {
+export const KELAS_NILAI = {
   1: 'bg-red-100 text-red-900 ring-red-300',
   2: 'bg-red-50 text-red-800 ring-red-200',
   3: 'bg-amber-100 text-amber-900 ring-amber-300',

@@ -12,7 +12,7 @@ import ImportAnggotaModal from '../components/ImportAnggotaModal';
 import { LOKAL } from '../lib/supabaseClient';
 import { Avatar, BadgePeran, Field, Icon, Kosong, Modal } from '../components/ui';
 
-const BARU = { role: 'peserta', nama: '', nis: '', username: '', kelas: '', sangga: '', agama: AGAMA[0], jabatan: '', pin: '' };
+const BARU = { role: 'peserta', nama: '', nis: '', username: '', kelas: '', sangga: '', agama: AGAMA[0], jabatan: '', pin: '', nta: '' };
 
 /** Menampilkan nama pengguna dan PIN awal akun baru satu kali, agar admin dapat menyampaikannya. */
 function AkunBaru({ akun, onTutup }) {
@@ -124,6 +124,9 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
               <datalist id="saran-sangga">{saran.sangga.map((s) => <option key={s} value={s} />)}</datalist>
             </Field>
           </div>
+          <Field label="NTA (opsional)" htmlFor="f-nta" bantuan="Nomor Tanda Anggota Pramuka, mis. 11.03.10.701.00123. Bisa diisi kemudian; juga terisi otomatis dari lembar sidang.">
+            <input id="f-nta" className="input" autoComplete="off" maxLength={40} value={f.nta ?? ''} onChange={set('nta')} />
+          </Field>
           <Field
             label="Agama"
             htmlFor="f-agama"
@@ -282,7 +285,7 @@ export default function AdminAnggota() {
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-pramuka-500">
                   {u.role === 'peserta' && (
                     <>
-                      NIS {u.nis || '-'}, kelas {u.kelas}, {u.sangga}, {u.agama} <BadgePeran peran={u.peran} singkat />
+                      NIS {u.nis || '-'}, kelas {u.kelas}, {u.sangga}, {u.agama}{u.nta ? `, NTA ${u.nta}` : ''} <BadgePeran peran={u.peran} singkat />
                     </>
                   )}
                   {u.role === 'penguji' && <>{u.jabatan}, pengguna <span className="font-mono">{u.username}</span></>}

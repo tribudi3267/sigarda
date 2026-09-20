@@ -77,13 +77,15 @@ Buka **Anggota**, pilih tab kelompoknya, lalu **Unduh template Excel**. Setiap k
 
 | Kelompok | Kolom template |
 |---|---|
-| Penegak | Nama Lengkap, **NIS (wajib, menjadi nama pengguna)**, Kelas, Sangga, Agama, PIN Awal (opsional) |
+| Penegak | Nama Lengkap, **NIS (wajib, menjadi nama pengguna)**, Kelas, Sangga, Agama, NTA (opsional), PIN Awal (opsional) |
 | Dewan Ambalan, Pembina | Nama Lengkap, Nama Pengguna (opsional), PIN Awal (opsional) |
 
 Setelah diisi, klik **Import Excel**. Aplikasi menampilkan pratinjau per baris (siap atau dilewati beserta alasannya). Baris yang
 lolos dikirim ke server per 25 akun; server memeriksa ulang dan bisa menolak baris tertentu. Penulisan kelas dan sangga disamakan
 dengan data yang ada. Setelah impor, daftar **nama pengguna dan PIN awal** tampil satu kali dan dapat diunduh sebagai Excel.
 Maksimal 500 baris per impor.
+
+**NTA** (Nomor Tanda Anggota, mis. `11.03.10.701.00123`) opsional untuk Penegak: dapat diisi pada kolom template, pada formulir tambah atau ubah anggota, dan pada lembar sidang. Akun dibuat lebih dulu, lalu NTA disimpan lewat fungsi khusus Admin `sg_anggota_nta_atur` (migrasi `2026-09-nta-anggota.sql`); bila fungsi itu belum ada, akun tetap dibuat dan aplikasi memberi tahu bahwa NTA belum tersimpan. Berkas template lama tanpa kolom NTA tetap dapat diimpor.
 
 ### Materi SKU dari Google Drive
 Pembina dan Admin Gudep melampirkan **tautan berbagi** file PDF di Google Drive; aplikasi tidak menyimpan file, hanya tautannya.
@@ -158,12 +160,14 @@ Tiap unit SKU (butir; butir agama per sub-butir, total 90 unit) dapat punya **in
 - **Penguji boleh memilih hasil berbeda dari saran**, dengan catatan alasan wajib yang tercatat di riwayat. Skor, saran, dan rincian tiap kriteria disimpan pada tabel `sku_penilaian` (hanya bertambah; salinan kriteria ikut tersimpan sehingga tetap terbaca walau instrumen diubah).
 - **Status**: instrumen baru berstatus **draf** (tidak dipakai). Hanya yang **ditetapkan** oleh Pembina atau Admin dipakai menilai dan terlihat Penegak (daftar kriteria saja; instruksi dan panduan penguji hanya terbaca pengurus, dijaga RLS). Butir tanpa instrumen ditetapkan tetap memakai penilaian lama (Lulus/Perlu diulang + predikat). Butir yang instrumennya ditetapkan tidak lagi dapat dinilai dengan cara lama (ditegakkan di server); "Mulai uji" dan "Kembalikan" tetap ada.
 - **Server menghitung ulang** skor dan saran (`sigarda.instrumen_hitung`); pencatatan lewat Edge Function setelah PIN penguji diverifikasi (`sg_sku_catat_rubrik_internal`), lalu memakai jalur yang sama dengan penilaian lama (status, kode verifikasi VRF-, riwayat). Rumus di `src/lib/instrumenLogic.js` dan SQL sama persis dan dijaga pengujian.
+- **Rincian nilai untuk Penegak dan pengurus**: pada butir yang pernah dinilai dengan instrumen, tombol **Rincian nilai** menampilkan tiap penilaian (terbaru di atas): tanggal, skor, hasil, nilai 1-5 pada tiap kriteria, dan catatan penguji. Dibaca dari `sku_penilaian` saat dibuka (Penegak hanya membaca miliknya, dijaga RLS). Instruksi dan panduan penguji tidak pernah ikut.
 - **Kelola** (menu Instrumen, Pembina dan Admin): daftar 90 unit, penyuntingan kriteria (urutan, bobot, wajib, panduan), penetapan massal, dan pengaturan. Penyuntingan instrumen yang sedang dipakai berlaku untuk penilaian berikutnya.
 - **ISI INSTRUMEN TIDAK ADA DI REPOSITORI INI.** Repositori bersifat publik, sedangkan panduan penguji tidak boleh terbaca Penegak. Isi disimpan di berkas Excel (di luar repositori) dan dimuat ke database lewat SQL yang dibuat skrip:
   ```
   node scripts/instrumen-ke-sql.mjs <keluaran.sql> <berkas.xlsx | folder> ... [--mode=baru|perbarui-draf|timpa-semua]
   ```
   Format Excel sama dengan berkas tinjauan. Mode `baru` (bawaan) hanya menambah butir yang belum punya instrumen; `perbarui-draf` mengganti isi instrumen yang masih draf; `timpa-semua` mengganti semuanya (suntingan Pembina ikut tertimpa). Jangan memasukkan SQL hasilnya ke repositori. Mode lokal hanya memuat 3 instrumen CONTOH fiktif.
+  **Unduh Excel** di menu Instrumen mengekspor semua instrumen yang sudah ada dalam format yang sama, sehingga alurnya bisa berputar: unduh, sunting di Excel, ubah ke SQL dengan `--mode=perbarui-draf`, jalankan di SQL Editor. Berkas hasil unduhan memuat **panduan penguji (rahasia)**: jangan dibagikan kepada Penegak dan jangan diunggah ke repositori.
 
 ### Sesi ujian bersama
 Menu **Sesi ujian** (Dewan Ambalan, Pembina, Admin) menjadwalkan ujian untuk banyak Penegak sekaligus: nama, tanggal, tempat, **butir** yang diuji, dan **daftar peserta** (tombol "Ambil dari pengajuan" mengisi peserta dan butir dari pengajuan yang menunggu).
@@ -178,6 +182,7 @@ Kartu SKU mencetak **satu QR per butir yang lulus** dan Surat Tanda Lulus mencet
 - **Yang tampil bagi pemegang token**: nama lengkap, butir (atau tingkat), tanggal uji, dan penguji. Tidak ada NIS, kelas, sangga, agama, atau data akun lain. Jawaban untuk token yang tidak sah selalu sama (`{ditemukan:false}`), tidak membedakan "tidak ada" dari "salah format".
 - **Kode `VRF-`** (28 bit, dapat ditebak) hanya dapat ditanyakan di halaman yang sama dan hanya menjawab **sah atau tidak** beserta tingkat, butir, dan tanggal, **tanpa nama**.
 - Fungsi publik `sg_verifikasi_token` dan `sg_verifikasi_kode` hanya membaca dan diberi hak `anon`; tabel `sertifikat_tingkat` tidak terbaca siapa pun secara langsung. Halaman verifikasi tidak diindeks mesin pencari (`noindex`).
+- **Cetak**: Kartu SKU berisi banyak QR (satu per butir lulus), sehingga Kartu Bantara yang lengkap memakai **dua halaman A4** (kepala tabel diulang di halaman kedua; baris tidak terpotong). QR pada Kartu memakai koreksi kesalahan L dengan modul sekitar 0,3 mm, terbaca pemindai ponsel pada kertas bersih. Cetak dengan kualitas normal atau tinggi, jangan diperkecil (opsi "Sesuaikan ke halaman"), dan uji pindai satu kartu sebelum dibagikan.
 - **Batasnya**: Supabase tidak membatasi laju panggilan fungsi publik ini secara bawaan. Token acak 128 bit tidak dapat ditebak, tetapi seseorang dapat mengulang pertanyaan kode `VRF-` (hanya sah/tidak, tanpa nama). Alamat pada QR mengikuti alamat aplikasi yang sedang dibuka saat mencetak: cetak dari alamat terbit (bukan `localhost`).
 
 ### Filter dinamis
@@ -324,6 +329,7 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
   Jalankan **setelah** migrasi Sidang dan Raport. Tidak mengubah data; tanpa isi instrumen alur penilaian yang berjalan tidak berubah. Setelah itu (1) muat isi instrumen (SQL dari `scripts/instrumen-ke-sql.mjs`, lihat di atas), (2) **pasang ulang Edge Function** (lihat langkah 4), lalu (3) `git push`. Instrumen baru berstatus draf sampai Pembina menetapkannya di menu Instrumen.
 - [`2026-09-verifikasi-sesi.sql`](supabase/migrasi/2026-09-verifikasi-sesi.sql): verifikasi QR dan sesi ujian. Menambah kolom `sku_progress.verifikasi_token` (butir yang **sudah lulus diberi token**), tabel `sertifikat_tingkat`, `sesi_ujian`, `sesi_ujian_butir`, `sesi_ujian_peserta`, fungsi `sg_verifikasi_token`, `sg_verifikasi_kode` (dapat dipanggil tanpa login), `sg_sertifikat_tingkat`, `sg_sesi_simpan`, `sg_sesi_status`, `sg_sesi_hapus`, dan memperbarui `sg_sku_catat_internal` (token dibuat saat lulus).
   Jalankan **setelah** kelima migrasi di atas (bila belum, berhenti dengan pesan yang menuntun dan tidak mengubah apa pun). **Edge Function tidak berubah** untuk fitur ini. Sebelum migrasi ini dijalankan, aplikasi baru tetap berjalan: Kartu SKU tercetak tanpa QR, menu Sesi ujian menampilkan pesan bahwa basis data belum diperbarui, dan Surat Tanda Lulus tercetak tanpa QR dengan peringatan.
+- [`2026-09-nta-anggota.sql`](supabase/migrasi/2026-09-nta-anggota.sql): NTA anggota untuk import Excel dan formulir ubah anggota. Hanya menambah fungsi `sg_anggota_nta_atur(jsonb)` (khusus Admin Gudep); tidak mengubah tabel atau data. Jalankan **setelah** `2026-09-verifikasi-sesi.sql`. Edge Function tidak berubah. Sebelum migrasi ini dijalankan, aplikasi baru tetap berjalan; hanya pengisian NTA dari formulir dan import yang memberi tahu bahwa NTA belum tersimpan.
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 
 ## Struktur folder
@@ -357,7 +363,7 @@ sku-bukateja/
     ├── lokal/                          backend lokal: klien tiruan di atas PGlite, data contoh (bukan produksi)
     ├── context/AppContext.jsx          state global (salinan data sesuai izin) dan semua aksi
     ├── hooks/useAbsensiPeriode.js      memuat kehadiran semester yang dipilih saat filter periode diubah
-    ├── components/                     Layout, Footer, Login, FormGantiPin, ImportAnggotaModal, SkuChecklist, PratinjauDrive, BeritaAcaraSidang, CetakRaport, KodeQr, HalamanVerifikasi, ...
+    ├── components/                     Layout, Footer, Login, FormGantiPin, ImportAnggotaModal, SkuChecklist, PratinjauDrive, BeritaAcaraSidang, CetakRaport, KodeQr, HalamanVerifikasi, RincianPenilaian, JadwalUjianBersama, ...
     └── pages/                          PesertaBeranda, PesertaSku, Materi, KelolaMateri, Absensi, Sidang, Raport, SesiUjian, ResetPin, AdminAnggota, ...
 ```
 

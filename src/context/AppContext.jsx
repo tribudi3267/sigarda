@@ -6,7 +6,7 @@ import {
   adalahJumat, daftarSemester, gabungHadirSemester, KODE_STATUS, kunciSemester, rentangKunci, semesterDari, tanggalValid,
 } from '../lib/absensiLogic';
 import { bolehResetPin, validasiPinBaru } from '../lib/pinLogic';
-import { periksaBaris } from '../lib/importAnggota';
+import { periksaBaris, POLA_NTA } from '../lib/importAnggota';
 import { bolehKelolaMateri, validasiMateri } from '../lib/materiLogic';
 import { hariIni } from '../lib/format';
 
@@ -427,6 +427,13 @@ export function AppProvider({ children }) {
     return r;
   };
 
+  /** Riwayat penilaian instrumen satu butir (dibuka dari rincian nilai). Hasil { ok, data } atau { ok: false, pesan }, tanpa toast. */
+  const muatPenilaian = async (pesertaId, skuId) => {
+    const r = await api().muatPenilaian(pesertaId, skuId);
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  };
+
   /* ------------------------ Pencalonan Penegak Garuda ------------------------ */
   const daftarCalonGaruda = () =>
     aksi(api().daftarCalonGaruda(), {
@@ -583,6 +590,11 @@ export function AppProvider({ children }) {
     if (user?.role !== 'admin') return { ok: false, pesan: 'Hanya Admin Gudep yang dapat mengelola anggota.' };
     const nama = data.nama?.trim();
     if (!nama) return { ok: false, pesan: 'Nama wajib diisi.' };
+    // NTA diperiksa sebelum apa pun disimpan, agar data lain tidak tersimpan sebagian
+    const ntaCek = String(data.nta ?? '').trim();
+    if (data.role === 'peserta' && ntaCek && !POLA_NTA.test(ntaCek)) {
+      return { ok: false, pesan: 'NTA tidak valid: maksimal 40 karakter (huruf, angka, titik, garis miring, strip, spasi).' };
+    }
 
     if (!data.id) {
       const r = await api().buatAkun(KELOMPOK_DARI_DATA(data), [{
@@ -591,9 +603,16 @@ export function AppProvider({ children }) {
       if (!r.ok) return { ok: false, pesan: r.pesan };
       const baris = r.hasil?.[0];
       if (!baris?.ok) return { ok: false, pesan: baris?.pesan ?? 'Akun belum dapat dibuat.' };
+      // NTA diisi sesudah akun ada (fungsi terpisah, khusus Admin). Bila gagal, akun tetap dibuat dan Admin diberi tahu.
+      const nta = data.role === 'peserta' ? String(data.nta ?? '').trim() : '';
+      let peringatan = '';
+      if (nta) {
+        const n = await api().aturNta([{ username: baris.username, nta }]);
+        if (!n.ok) peringatan = `NTA belum tersimpan: ${n.pesan}`;
+      }
       await segarkan.users();
-      notify('Anggota baru ditambahkan. PIN awal wajib diganti saat login pertama.');
-      return { ok: true, akun: { nama: baris.nama, username: baris.username, pin: baris.pin } };
+      notify(peringatan ? `Anggota baru ditambahkan, tetapi ${peringatan}` : 'Anggota baru ditambahkan. PIN awal wajib diganti saat login pertama.', peringatan ? 'err' : 'ok');
+      return { ok: true, akun: { nama: baris.nama, username: baris.username, pin: baris.pin }, peringatan };
     }
 
     const lama = db.users.find((u) => u.id === data.id);
@@ -606,6 +625,16 @@ export function AppProvider({ children }) {
     if (!r.ok) {
       if (r.sesiBerakhir) await sesiBerakhir();
       return { ok: false, pesan: r.pesan };
+    }
+    // NTA hanya dikirim bila berubah (server lama tanpa migrasi NTA tetap dapat mengubah data lain)
+    const ntaBaru = String(data.nta ?? '').trim();
+    if (lama?.role === 'peserta' && data.nta !== undefined && ntaBaru !== (lama.nta ?? '')) {
+      const n = await api().aturNta([{ username: usernameBaru || lama.username, nta: ntaBaru }]);
+      if (!n.ok) {
+        await segarkan.users();
+        if (n.sesiBerakhir) await sesiBerakhir();
+        return { ok: false, pesan: `Data anggota tersimpan, tetapi NTA belum: ${n.pesan}` };
+      }
     }
     await segarkan.users();
     notify('Data anggota diperbarui.');
@@ -634,10 +663,20 @@ export function AppProvider({ children }) {
       for (const h of r.hasil) (h.ok ? daftar : ditolakServer).push(h);
       kemajuan?.(Math.min(i + UKURAN_ROMBONGAN, kirim.length), kirim.length);
     }
+    // NTA (opsional, hanya Penegak) diisi sesudah akun dibuat. Bila gagal, akun tetap ada dan Admin diberi tahu.
+    let peringatanNta = '';
+    if (kelompok === 'peserta' && daftar.length) {
+      const ntaPerBaris = new Map(siap.map(({ no, data }) => [no, String(data.nta ?? '').trim()]));
+      const daftarNta = daftar.map((h) => ({ username: h.username, nta: ntaPerBaris.get(h.no) ?? '' })).filter((x) => x.nta);
+      if (daftarNta.length) {
+        const n = await api().aturNta(daftarNta);
+        if (!n.ok) peringatanNta = `NTA ${daftarNta.length} anggota belum tersimpan: ${n.pesan}`;
+      }
+    }
     if (daftar.length) await segarkan.users();
     if (!daftar.length) return ditolak(notify, galatBerhenti ?? ditolakServer[0]?.pesan ?? 'Tidak ada akun yang berhasil dibuat.');
     notify(`${daftar.length} anggota berhasil diimpor.`);
-    return { ok: true, daftar, ditolakServer, galatBerhenti };
+    return { ok: true, daftar, ditolakServer, galatBerhenti, peringatanNta };
   };
 
   const hapusAnggota = async (id) => {
@@ -697,7 +736,7 @@ export function AppProvider({ children }) {
     raport: db.raport, bolehRaport, muatRaport, simpanRaport, hapusRaport, simpanPengaturanRaport,
     instrumen: db.instrumen, instrumenGalat: db.instrumenGalat, instrumenSiap, bolehKelolaInstrumen, pastikanInstrumen, simpanInstrumen, statusInstrumen, simpanPengaturanInstrumen,
     sesiUjian: db.sesiUjian, sesiUjianGalat: db.sesiUjianGalat, sesiUjianSiap, pastikanSesiUjian, simpanSesiUjian, ubahStatusSesiUjian, hapusSesiUjian, bolehHapusSesi,
-    muatUlangProgress, tokenSuratTingkat,
+    muatUlangProgress, tokenSuratTingkat, muatPenilaian,
     daftarPeserta, peranUser, bolehKelolaAbsen,
     login, logout,
     ajukan, batalkanAjuan, catatHasil,

@@ -14,6 +14,8 @@ import { AGAMA } from '../data/skuData';
 import { formatPinSah, pinLemah } from './pinLogic';
 
 export const POLA_USERNAME = /^[a-z0-9][a-z0-9._-]{2,31}$/;
+/** Nomor Tanda Anggota Pramuka (opsional). Sama dengan aturan di server (sg_anggota_nta_atur). */
+export const POLA_NTA = /^[0-9A-Za-z./ -]{1,40}$/;
 const PESAN_PIN = 'PIN awal harus 6 angka dan tidak boleh sama semua atau berurutan';
 const pinAwalSah = (pin) => formatPinSah(pin) && !pinLemah(pin);
 
@@ -31,6 +33,7 @@ const KOLOM_PENEGAK = [
   { header: 'Kelas', key: 'kelas', lebar: 10 },
   { header: 'Sangga', key: 'sangga', lebar: 20 },
   { header: 'Agama', key: 'agama', lebar: 14 },
+  { header: 'NTA (opsional)', key: 'nta', lebar: 22 },
   { header: 'PIN Awal (opsional)', key: 'pin', lebar: 20 },
 ];
 const KOLOM_PENGURUS = [
@@ -67,6 +70,7 @@ function petaHeader(teks) {
   if (k === 'kelas') return 'kelas';
   if (k === 'sangga') return 'sangga';
   if (k === 'agama') return 'agama';
+  if (k === 'nta' || k.startsWith('nta')) return 'nta';
   if (k.startsWith('pin')) return 'pin';
   return null;
 }
@@ -88,7 +92,7 @@ export function teksSel(v) {
 
 /**
  * Mengembalikan baris mentah: [{ no, nama, nis, kelas, sangga, agama, pin }] (no = nomor baris di Excel).
- * Untuk Dewan Ambalan dan Pembina, nis/kelas/sangga/agama selalu kosong.
+ * Untuk Dewan Ambalan dan Pembina, nis/kelas/sangga/agama/nta selalu kosong.
  */
 export async function bacaExcelAnggota(buffer, kelompok = 'peserta') {
   const penegak = kelompok === 'peserta';
@@ -134,7 +138,7 @@ export async function bacaExcelAnggota(buffer, kelompok = 'peserta') {
     const ambil = (k) => (kolom[k] ? teksSel(row.getCell(kolom[k]).value) : '');
     const item = {
       no: r, nama: ambil('nama'), nis: ambil('nis'), kelas: ambil('kelas'), sangga: ambil('sangga'), agama: ambil('agama'),
-      username: ambil('username'), pin: ambil('pin'),
+      username: ambil('username'), pin: ambil('pin'), nta: penegak ? ambil('nta') : '',
     };
     if (!item.nama && !item.nis && !item.kelas && !item.sangga && !item.agama && !item.username) continue; // baris kosong
     baris.push(item);
@@ -170,6 +174,7 @@ export function periksaBaris(baris, users, kelompok = 'peserta') {
     if (!b.sangga) galat.push('Sangga kosong');
     if (!b.agama) galat.push('Agama kosong');
     else if (!agama) galat.push(`Agama "${b.agama}" tidak dikenal (pilih: ${AGAMA.join(', ')})`);
+    if (b.nta && !POLA_NTA.test(b.nta)) galat.push('NTA tidak valid (maksimal 40 karakter: huruf, angka, titik, garis miring, strip, spasi)');
     if (b.pin && !pinAwalSah(b.pin)) galat.push(PESAN_PIN);
 
     if (!galat.length) dipakai.add(nis); // duplikat di dalam file yang sama ikut terdeteksi
@@ -211,12 +216,13 @@ const PETUNJUK_PENEGAK = (label) => [
   ['2. Kolom wajib', 'Nama Lengkap, NIS, Kelas, Sangga, Agama. NIS WAJIB dan tidak boleh sama dengan anggota lain: NIS menjadi nama pengguna untuk masuk ke aplikasi.'],
   ['3. Agama', `Pilih dari daftar: ${AGAMA.join(', ')}. Agama menentukan sub-butir pada butir 1 SKU.`],
   ['4. Kelas dan Sangga', 'Bebas diketik (mis. X, XI, XII, atau nama sangga baru). Penulisan akan disamakan dengan data yang sudah ada.'],
-  ['5. PIN Awal (opsional)', 'Isi tepat 6 angka (tidak boleh sama semua atau berurutan). Jika dikosongkan, aplikasi membuat PIN acak. Setiap anggota WAJIB mengganti PIN saat login pertama.'],
-  ['6. Batas', `Maksimal ${MAKS_BARIS} baris per impor. Baris dengan NIS yang sudah terdaftar dilewati.`],
-  ['7. Setelah impor', 'Daftar NIS dan PIN awal tampil satu kali dan dapat diunduh. Bagikan ke masing-masing anggota secara langsung.'],
+  ['5. NTA (opsional)', 'Nomor Tanda Anggota Pramuka, mis. 11.03.10.701.00123. Boleh dikosongkan dan diisi kemudian (di lembar sidang atau ubah anggota). Maksimal 40 karakter.'],
+  ['6. PIN Awal (opsional)', 'Isi tepat 6 angka (tidak boleh sama semua atau berurutan). Jika dikosongkan, aplikasi membuat PIN acak. Setiap anggota WAJIB mengganti PIN saat login pertama.'],
+  ['7. Batas', `Maksimal ${MAKS_BARIS} baris per impor. Baris dengan NIS yang sudah terdaftar dilewati.`],
+  ['8. Setelah impor', 'Daftar NIS dan PIN awal tampil satu kali dan dapat diunduh. Bagikan ke masing-masing anggota secara langsung.'],
   ['', ''],
   ['Contoh isian', ''],
-  ['Nama Lengkap | NIS | Kelas | Sangga | Agama', 'Andi Pratama | 10301 | X | Sangga Elang | Islam'],
+  ['Nama Lengkap | NIS | Kelas | Sangga | Agama | NTA', 'Andi Pratama | 10301 | X | Sangga Elang | Islam | 11.03.10.701.00123'],
   ['', 'Made Sari | 10302 | XI | Sangga Merak | Hindu'],
 ];
 
@@ -256,6 +262,7 @@ export async function buatTemplateAnggota(kelompok = 'peserta') {
   // Kolom NIS dan PIN berformat teks agar angka 0 di depan tidak hilang
   for (let r = 2; r <= MAKS_BARIS + 1; r += 1) {
     ws.getCell(r, nomorKolom('pin')).numFmt = '@';
+    if (penegak) ws.getCell(r, nomorKolom('nta')).numFmt = '@';
     if (!penegak) ws.getCell(r, nomorKolom('username')).numFmt = '@';
     if (penegak) {
       ws.getCell(r, nomorKolom('nis')).numFmt = '@';

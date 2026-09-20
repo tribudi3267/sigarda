@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunHadir, susunInstrumen, susunMateri, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunHadir, susunInstrumen, susunMateri, susunPenilaian, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -190,6 +190,13 @@ export function buatApi(klien) {
     },
 
     /**
+     * Riwayat penilaian dengan instrumen untuk satu butir milik satu Penegak (lama ke baru). Penegak hanya dapat membaca miliknya sendiri (RLS).
+     * Dibaca saat rincian dibuka, bukan saat masuk, agar data awal tetap ringan.
+     */
+    muatPenilaian: (pesertaId, skuId) =>
+      muat(async () => susunPenilaian(await ambilSemua('sku_penilaian', { filter: [['peserta_id', pesertaId], ['sku_id', skuId]], urut: ['id'] }))),
+
+    /**
      * Sesi ujian (pengurus: semua; Penegak: hanya yang mencantumkan dirinya). Bila database belum dimigrasi, dianggap kosong dengan galat.
      */
     muatSesiUjian: async () => {
@@ -247,6 +254,9 @@ export function buatApi(klien) {
         p_id: u.id, p_nama: u.nama, p_kelas: u.kelas ?? null, p_sangga: u.sangga ?? null,
         p_agama: u.agama ?? null, p_calon_garuda: u.calonGaruda === undefined ? null : !!u.calonGaruda,
       }),
+
+    /** NTA anggota (Admin). `daftar` = [{ username, nta }]; nta kosong menghapus. Mengembalikan jumlah anggota yang diperbarui. */
+    aturNta: (daftar) => rpc('sg_anggota_nta_atur', { p_data: daftar }),
 
     /* ------------------------------- Materi ------------------------------- */
     simpanMateri: (m) =>

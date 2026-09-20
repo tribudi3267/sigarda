@@ -56,7 +56,7 @@ export function KartuSku({ peserta, tingkat }) {
         <td className={SEL}>
           {lulus ? (
             <span className="flex items-center gap-2">
-              {e.token && <KodeQr teks={urlVerifikasi(e.token)} ukuran={56} label={`QR verifikasi butir ${no}`} className="border border-pramuka-200" />}
+              {e.token && <KodeQr teks={urlVerifikasi(e.token)} ukuran={44} koreksi="L" label={`QR verifikasi butir ${no}`} className="border border-pramuka-200" />}
               <span className="font-mono">{e.verifikasi}</span>
             </span>
           ) : '-'}
@@ -66,21 +66,22 @@ export function KartuSku({ peserta, tingkat }) {
   };
 
   return (
-    <article className="print-area mx-auto min-w-[660px] max-w-[794px] border border-pramuka-300 bg-white p-8 text-pramuka-900">
+    <article className="print-area mx-auto min-w-[660px] max-w-[794px] border border-pramuka-300 bg-white p-6 text-pramuka-900">
       <KopSurat />
       <h2 className="mt-4 text-center font-display text-base font-bold">KARTU KEMAJUAN {t.judul.toUpperCase()}</h2>
 
-      <dl className="mt-4 grid grid-cols-[110px_1fr] gap-x-2 gap-y-1 text-sm">
-        <dt>Nama</dt><dd>: {peserta.nama}</dd>
+      {/* Dua kolom agar Kartu dengan banyak QR muat dua halaman A4 */}
+      <dl className="mt-3 grid grid-cols-[60px_1fr_60px_1fr] gap-x-2 gap-y-0.5 text-sm">
+        <dt>Nama</dt><dd className="col-span-3">: {peserta.nama}</dd>
         <dt>NIS</dt><dd>: {peserta.nis || '-'}</dd>
         <dt>Kelas</dt><dd>: {peserta.kelas}</dd>
         <dt>Sangga</dt><dd>: {peserta.sangga}</dd>
         <dt>Agama</dt><dd>: {peserta.agama}</dd>
-        <dt>Peran</dt><dd>: {PERAN[peserta.peran]?.label}</dd>
-        <dt>Progres</dt><dd>: {h.lulus} dari {h.total} butir lulus ({h.persen}%)</dd>
+        <dt>Peran</dt><dd className="col-span-3">: {PERAN[peserta.peran]?.label}</dd>
+        <dt>Progres</dt><dd className="col-span-3">: {h.lulus} dari {h.total} butir lulus ({h.persen}%)</dd>
       </dl>
 
-      <table className="mt-4 w-full border-collapse text-[11px]">
+      <table className="mt-3 w-full border-collapse text-[11px] leading-tight">
         <thead>
           <tr className="bg-pramuka-100">
             {['No', 'Butir SKU', 'Status', 'Tanggal uji', 'Penguji', 'QR dan kode verifikasi'].map((k) => (
@@ -101,7 +102,7 @@ export function KartuSku({ peserta, tingkat }) {
         </tbody>
       </table>
 
-      <div className="mt-8 flex items-end justify-between gap-6 break-inside-avoid">
+      <div className="mt-4 flex items-end justify-between gap-6 break-inside-avoid">
         <p className="max-w-xs text-[10px] leading-snug text-pramuka-600">
           Periksa keaslian butir yang lulus dengan memindai QR pada tabel atau membuka {alamatDasar()}?v= lalu mengetik kode verifikasinya.
         </p>

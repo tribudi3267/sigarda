@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Susunan lembar Excel untuk laporan absensi dan portofolio Garuda.
  * Fungsi `susun...` murni (mudah diuji); `unduh...` memicu pengunduhan di browser.
  */
@@ -273,4 +273,66 @@ export function susunPortofolioXlsx({ rekap, portofolio, filter }) {
 
 export const unduhPortofolioXlsx = (data) =>
   unduhXlsx({ namaFile: `rekap-portofolio-garuda-${hariIni()}.xlsx`, sheets: susunPortofolioXlsx(data) });
+
+/* ------------------------------- INSTRUMEN ------------------------------- */
+
+/**
+ * Instrumen penilaian untuk ditinjau atau disunting di Excel. FORMAT SAMA dengan berkas tinjauan yang dibaca `scripts/instrumen-ke-sql.mjs`
+ * (Kode unit di kolom A; Cara uji dan Instruksi hanya pada baris pertama tiap butir), sehingga hasil sunting dapat dimasukkan kembali
+ * dengan `--mode=perbarui-draf`. Kolom Butir, Isi butir, dan Status hanya informasi dan diabaikan skrip. Hanya butir yang sudah punya
+ * instrumen ikut diekspor. BERKAS INI MEMUAT PANDUAN PENGUJI: tidak boleh sampai ke Penegak.
+ * `unit` = daftarUnitInstrumen(...), `instrumen` = { [skuId]: { caraUji, status, instruksi, kriteria: [...] } }.
+ */
+export function susunInstrumenXlsx({ unit, instrumen }) {
+  const baris = [];
+  let jumlah = 0;
+  for (const u of unit) {
+    const ins = instrumen[u.id];
+    if (!ins || !ins.kriteria.length) continue;
+    jumlah += 1;
+    ins.kriteria.forEach((k, i) => {
+      baris.push({
+        kode: u.id, butir: u.label, teksButir: i === 0 ? u.teks : '', status: i === 0 ? (ins.status === 'ditetapkan' ? 'Ditetapkan' : 'Draf') : '',
+        cara: i === 0 ? ins.caraUji : '', instruksi: i === 0 ? ins.instruksi : '', jenis: k.jenis, kriteria: k.teks, bobot: k.bobot,
+        wajib: k.wajib ? 'Wajib' : '-', panduan: k.panduan,
+      });
+    });
+  }
+  return {
+    jumlah,
+    sheets: [
+      {
+        nama: 'Instrumen',
+        judul: [
+          'Instrumen Penilaian SKU Penegak',
+          `${GUDEP.nama}. Diunduh ${fmtTanggal(hariIni())}. ${jumlah} butir, ${baris.length} kriteria.`,
+          'RAHASIA: memuat panduan penguji. Jangan dibagikan kepada Penegak dan jangan diunggah ke repositori publik.',
+          'Sunting lalu masukkan kembali dengan: node scripts/instrumen-ke-sql.mjs <keluaran.sql> <berkas.xlsx> --mode=perbarui-draf (kolom Butir, Isi butir, dan Status diabaikan).',
+        ],
+        kolom: [
+          { header: 'Kode unit', key: 'kode', lebar: 15 },
+          { header: 'Butir', key: 'butir', lebar: 18 },
+          { header: 'Isi butir', key: 'teksButir', lebar: 40 },
+          { header: 'Status', key: 'status', lebar: 12 },
+          { header: 'Cara uji', key: 'cara', lebar: 30 },
+          { header: 'Instruksi untuk penguji', key: 'instruksi', lebar: 50 },
+          { header: 'Jenis skala', key: 'jenis', lebar: 15 },
+          { header: 'Kriteria / pertanyaan', key: 'kriteria', lebar: 55 },
+          { header: 'Bobot', key: 'bobot', lebar: 8, rata: 'center' },
+          { header: 'Wajib?', key: 'wajib', lebar: 10, rata: 'center' },
+          { header: 'Panduan penguji (RAHASIA)', key: 'panduan', lebar: 60 },
+        ],
+        baris,
+        warna: (b, key) => (key === 'status' && b.status === 'Ditetapkan' ? 'FFD1FAE5' : key === 'wajib' && b.wajib === 'Wajib' ? 'FFFEF3C7' : undefined),
+      },
+    ],
+  };
+}
+
+export const namaFileInstrumen = () => `instrumen-penilaian-sku-${hariIni()}.xlsx`;
+
+export const unduhInstrumenXlsx = (data) => {
+  const { sheets } = susunInstrumenXlsx(data);
+  return unduhXlsx({ namaFile: namaFileInstrumen(), sheets });
+};
 

@@ -24,6 +24,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
   const [galat, setGalat] = useState('');
   const [hasil, setHasil] = useState([]);
   const [ditolakServer, setDitolakServer] = useState([]);
+  const [peringatanNta, setPeringatanNta] = useState('');
   const [kemajuan, setKemajuan] = useState(null);
 
   const periksa = periksaBaris(baris, users, kelompok);
@@ -59,6 +60,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
     if (r.ok) {
       setHasil(r.daftar);
       setDitolakServer([...r.ditolakServer, ...(r.galatBerhenti ? [{ no: '-', pesan: r.galatBerhenti }] : [])]);
+      setPeringatanNta(r.peringatanNta ?? '');
       setTahap('hasil');
     }
   };
@@ -106,7 +108,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
           <ol className="list-decimal space-y-1 pl-5 text-sm text-pramuka-700">
             <li>Unduh template Excel {label}, lalu isi datanya (satu baris satu orang).</li>
             <li>{penegak
-              ? 'Kolom wajib: Nama Lengkap, NIS, Kelas, Sangga, Agama. NIS menjadi nama pengguna untuk masuk. PIN Awal boleh dikosongkan.'
+              ? 'Kolom wajib: Nama Lengkap, NIS, Kelas, Sangga, Agama. NIS menjadi nama pengguna untuk masuk. NTA dan PIN Awal boleh dikosongkan.'
               : 'Kolom wajib: Nama Lengkap. Nama Pengguna dan PIN Awal boleh dikosongkan (dibuat otomatis).'}</li>
             <li>Unggah file di bawah, periksa pratinjaunya, lalu impor. Maksimal {MAKS_BARIS} baris.</li>
           </ol>
@@ -211,6 +213,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
               </tbody>
             </table>
           </div>
+          {peringatanNta && <p role="alert" className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-950">{peringatanNta}</p>}
           {ditolakServer.length > 0 && (
             <div role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
               <p className="font-semibold">{ditolakServer.length} baris ditolak server:</p>

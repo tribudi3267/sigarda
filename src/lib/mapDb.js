@@ -200,6 +200,22 @@ export function susunInstrumen(instrumen = [], kriteria = [], penguji = [], pand
   return hasil;
 }
 
+/**
+ * Catatan penilaian dengan instrumen (tabel sku_penilaian), lama ke baru:
+ * [{ id, waktu, pengujiId, tanggalUji, skor, wajibOk, saran, hasil, diganti, catatan, rincian: [{ kriteriaId, urutan, jenis, teks, bobot, wajib, nilai }] }]
+ * `rincian` adalah salinan kriteria saat penilaian dibuat, jadi tetap terbaca walau instrumen diubah kemudian.
+ */
+export const susunPenilaian = (baris = []) =>
+  [...baris]
+    .sort((a, b) => Number(a.id) - Number(b.id))
+    .map((r) => ({
+      id: Number(r.id), waktu: r.waktu, pengujiId: r.penguji_id ?? null, tanggalUji: tgl(r.tanggal_uji), skor: r.skor, wajibOk: !!r.wajib_ok,
+      saran: r.saran, hasil: r.hasil, diganti: !!r.diganti, catatan: r.catatan ?? '',
+      rincian: (Array.isArray(r.rincian) ? r.rincian : []).map((k) => ({
+        kriteriaId: Number(k.kriteria_id), urutan: k.urutan, jenis: k.jenis, teks: k.teks, bobot: k.bobot, wajib: !!k.wajib, nilai: k.nilai,
+      })),
+    }));
+
 /** Sesi ujian: [{ id, nama, tanggal, tempat, catatan, status, dibuatOleh, butir: [butirId], peserta: [pesertaId] }], tanggal terbaru dulu. */
 export function susunSesiUjian(sesi = [], butir = [], peserta = []) {
   const b = new Map();

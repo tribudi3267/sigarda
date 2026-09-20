@@ -6,6 +6,7 @@ import {
   daftarUnitInstrumen, hitungSkorInstrumen, JENIS_KRITERIA, MAKS_KRITERIA, PENGATURAN_INSTRUMEN_BAWAAN, periksaInstrumen,
   periksaPengaturanInstrumen, STATUS_INSTRUMEN, statusUnit,
 } from '../lib/instrumenLogic';
+import { unduhInstrumenXlsx } from '../lib/exportLaporan';
 import { Icon, Kosong, Modal } from '../components/ui';
 
 const CHIP = 'inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset';
@@ -143,6 +144,7 @@ function DaftarInstrumen() {
   const [status, setStatus] = useState('');
   const [cari, setCari] = useState('');
   const [pilih, setPilih] = useState(() => new Set());
+  const [mengunduh, setMengunduh] = useState(false);
   const [edit, setEdit] = useState(null);
   const [batas, setBatas] = useState(BATAS_DAFTAR);
   const [proses, setProses] = useState(false);
@@ -168,6 +170,15 @@ function DaftarInstrumen() {
     if (semuaTerpilih) bisaDipilih.forEach((u) => b.delete(u.id)); else bisaDipilih.forEach((u) => b.add(u.id));
     return b;
   });
+
+  const unduh = async () => {
+    setMengunduh(true);
+    try {
+      await unduhInstrumenXlsx({ unit: UNIT, instrumen });
+    } finally {
+      setMengunduh(false);
+    }
+  };
 
   const ubahStatus = async (nilai) => {
     const ids = [...pilih];
@@ -219,6 +230,14 @@ function DaftarInstrumen() {
         </label>
         <button className="btn btn-primary btn-sm" onClick={() => ubahStatus('ditetapkan')} disabled={!pilih.size || proses}>Tetapkan ({pilih.size})</button>
         <button className="btn btn-outline btn-sm" onClick={() => ubahStatus('draf')} disabled={!pilih.size || proses}>Kembalikan ke draf ({pilih.size})</button>
+        <button
+          className="btn btn-outline btn-sm sm:ml-auto"
+          onClick={unduh}
+          disabled={hitung.draf + hitung.ditetapkan === 0 || mengunduh}
+          title="Berkas memuat panduan penguji (rahasia). Formatnya dapat dimasukkan kembali dengan scripts/instrumen-ke-sql.mjs."
+        >
+          <Icon nama="unduh" className="h-4 w-4" />{mengunduh ? 'Menyiapkan...' : `Unduh Excel (${hitung.draf + hitung.ditetapkan})`}
+        </button>
       </div>
 
       {tampil.length === 0 ? (

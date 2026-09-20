@@ -5,6 +5,7 @@ import { fmtTanggal } from '../lib/format';
 import PortofolioChecklist from '../components/PortofolioChecklist';
 import RekapKesiapan, { JurnalTerbaru } from '../components/RekapKesiapan';
 import { Icon, Lencana } from '../components/ui';
+import JadwalUjianBersama from '../components/JadwalUjianBersama';
 
 /** Dashboard Penegak Calon Garuda: jurnal kesiapan dan cek list 26 dokumen portofolio. */
 export default function GarudaDashboard({ setTab }) {
@@ -28,6 +29,8 @@ export default function GarudaDashboard({ setTab }) {
           </p>
         </div>
       </section>
+
+      <JadwalUjianBersama />
 
       <div className="grid gap-5 lg:grid-cols-[1.1fr_1fr]">
         <RekapKesiapan pesertaId={user.id} />
