@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunBatchNaikKelas, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunBatchNaikKelas, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -309,8 +309,17 @@ export function buatApi(klien) {
     aturAgamaPembina: (daftar) => rpc('sg_anggota_agama_atur', { p_data: daftar }),
     /** Jenis kelamin anggota, semua peran (Admin). `daftar` = [{ username, jk }]; jk 'L' | 'P', kosong menghapus. Semua atau tidak sama sekali. Mengembalikan jumlah yang diperbarui. */
     aturJenisKelamin: (daftar) => rpc('sg_anggota_jk_atur', { p_data: daftar }),
-    /** Jabatan Dewan Ambalan (Admin). `daftar` = [{ username, jabatan }]; jabatan kosong menghapus. Semua atau tidak sama sekali. Mengembalikan jumlah yang diperbarui. */
+    /** Jabatan Dewan Ambalan pada akun Penegak (Pembina dan Admin). `daftar` = [{ username (NIS), jabatan }]; jabatan kosong mencabut. Semua atau tidak sama sekali. Mengembalikan jumlah yang berubah. */
     aturJabatanDewan: (daftar) => rpc('sg_anggota_jabatan_dewan_atur', { p_data: daftar }),
+    /**
+     * Kepengurusan Dewan Ambalan lewat berkas (Pembina dan Admin): `daftar` = [{ username (NIS), jabatan }]. ganti = true mengganti SELURUH kepengurusan. terapkan = false: pratinjau.
+     * Hasil { galat, ringkasan: { beri, ganti, cabut, sama, galat }, baris: [{ no, id, username, nama, kelas, dari_jabatan, jabatan, hasil, pesan }] }.
+     */
+    terapkanKepengurusan: (daftar, ganti = true, terapkan = false) => rpc('sg_kepengurusan_terapkan', { p_data: daftar, p_ganti: ganti, p_terapkan: terapkan }),
+    /** Mengarsipkan (aktifkan = false) atau mengaktifkan kembali akun Dewan Ambalan LAMA (Admin). Mengembalikan jumlah akun yang berubah. */
+    arsipkanDewanLama: (ids, aktifkan = false) => rpc('sg_dewan_lama_arsipkan', { p_ids: ids, p_aktifkan: aktifkan }),
+    /** Riwayat kepengurusan Dewan Ambalan (pengurus), terbaru lebih dulu. */
+    muatLogKepengurusan: () => muat(async () => susunLogKepengurusan(await ambilSemua('kepengurusan_log', { urut: ['id'] }))),
     /** Rombel banyak Penegak sekaligus (Admin). `daftar` = [{ username (NIS), rombel }]. Semua atau tidak sama sekali. Mengembalikan jumlah baris. */
     perbaruiRombel: (daftar) => rpc('sg_rombel_perbarui', { p_data: daftar }),
 
@@ -335,6 +344,9 @@ export function buatApi(klien) {
     /** Penugasan satu tahun ajaran (pengurus): [{ rombel, pengujiId, ditetapkanPada }]. */
     muatPenugasan: (tahunAjaran) =>
       muat(async () => susunPenugasan(await ambilSemua('penugasan_rombel', { filter: [['tahun_ajaran', tahunAjaran]], urut: ['rombel', 'penguji_id'] }))),
+    /** Penugasan khusus per Penegak satu tahun ajaran (pengurus): [{ pesertaId, pengujiId, ditetapkanPada }]. */
+    muatPenugasanPeserta: (tahunAjaran) =>
+      muat(async () => susunPenugasanPeserta(await ambilSemua('penugasan_peserta', { filter: [['tahun_ajaran', tahunAjaran]], urut: ['peserta_id', 'penguji_id'] }))),
     /** Riwayat penugasan satu tahun ajaran (pengurus), lama ke baru. */
     muatLogPenugasan: (tahunAjaran) =>
       muat(async () => susunLogPenugasan(await ambilSemua('penugasan_log', { filter: [['tahun_ajaran', tahunAjaran]], urut: ['id'] }))),
@@ -357,10 +369,13 @@ export function buatApi(klien) {
       }),
     /** Mencabut dokumen terbit dengan alasan (Pembina atau Admin). */
     cabutDokumen: (id, alasan) => rpc('sg_dokumen_cabut', { p_id: id, p_alasan: alasan ?? '' }),
-    /** Menambah (ada = true) atau mencabut (false) penugasan satu penguji pada beberapa rombel (Admin). Mengembalikan jumlah perubahan nyata. */
+    /** Menambah (ada = true) atau mencabut (false) penugasan satu penguji pada beberapa rombel (Pembina dan Admin). Mengembalikan jumlah perubahan nyata. */
     aturPenugasan: (tahunAjaran, pengujiId, rombel, ada) =>
       rpc('sg_penugasan_atur', { p_tahun_ajaran: tahunAjaran, p_penguji_id: pengujiId, p_rombel: rombel, p_ada: ada }),
-    /** Menyalin penugasan tahun ajaran `dari` ke `ke` (Admin). Mengembalikan jumlah penugasan baru. */
+    /** Penugasan KHUSUS satu Penegak (Pembina dan Admin): daftar penguji LENGKAP tahun ajaran itu; kosong = kembali ke penugasan rombel. Mengembalikan jumlah perubahan. */
+    aturPenugasanPeserta: (tahunAjaran, pesertaId, pengujiIds, alasan = '') =>
+      rpc('sg_penugasan_peserta_atur', { p_tahun_ajaran: tahunAjaran, p_peserta_id: pesertaId, p_penguji_ids: pengujiIds, p_alasan: alasan }),
+    /** Menyalin penugasan tahun ajaran `dari` ke `ke` (Pembina dan Admin). Mengembalikan jumlah penugasan baru. */
     salinPenugasan: (dari, ke) => rpc('sg_penugasan_salin', { p_dari: dari, p_ke: ke }),
     simpanGuruAgama: (g) => rpc('sg_guru_agama_simpan', { p_id: g.id ?? null, p_agama: g.agama, p_nama: g.nama, p_keterangan: g.keterangan ?? '' }),
     hapusGuruAgama: (id) => rpc('sg_guru_agama_hapus', { p_id: id }),

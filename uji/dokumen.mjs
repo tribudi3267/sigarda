@@ -230,18 +230,19 @@ console.log('\n--- Kesetaraan server dan klien: penguji_sah dengan dokumen, semu
 {
   U = await users();
   const baris = (await q(`select rombel, penguji_id as "pengujiId" from public.penugasan_rombel where tahun_ajaran = sigarda.tahun_ajaran_kini()`)).map((x) => ({ ...x }));
+  const khusus = (await q(`select peserta_id as "pesertaId", penguji_id as "pengujiId" from public.penugasan_peserta where tahun_ajaran = sigarda.tahun_ajaran_kini()`)).map((x) => ({ ...x }));
   const dok = (await K.pembina.a.muatDokumen()).data;
   let sama = true, n = 0;
   for (const p of U.filter((u) => u.role === 'peserta')) {
     for (const tingkat of ['Bantara', 'Laksana']) {
       for (const poin of daftarPoin(tingkat, p.agama)) {
         const s = await q('select o_penguji::text id, o_rombel from sigarda.penguji_sah($1, $2)', [p.id, poin.id]);
-        const c = pengujiSah({ users: U, penugasan: baris, peserta: p, poin, dokumen: dok });
+        const c = pengujiSah({ users: U, penugasan: baris, penugasanPeserta: khusus, peserta: p, poin, dokumen: dok });
         n++;
         if (s.map((x) => x.id).sort().join() !== c.penguji.map((x) => x.id).sort().join() || (s.length > 0 && s[0].o_rombel !== c.dariRombel)) { sama = false; console.log('   beda:', p.nama, poin.id); }
         for (const u of U.filter((x) => x.role === 'penguji')) {
           const sv = (await q('select sigarda.penguji_peran_ok($1, $2, $3) v', [p.id, u.id, poin.id]))[0].v;
-          if (sv !== pengujiPeranOk(U, p, u, poin, dok)) { sama = false; console.log('   beda peran_ok:', p.nama, poin.id, u.nama); }
+          if (sv !== pengujiPeranOk(U, p, u, poin, dok, { penugasan: baris, penugasanPeserta: khusus })) { sama = false; console.log('   beda peran_ok:', p.nama, poin.id, u.nama); }
         }
       }
     }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { labelJenisKelamin } from '../lib/jenisKelaminLogic';
 import { useApp } from '../context/AppContext';
+import { useKonteksMenilai } from '../hooks/useRombelSaya';
 import { bolehMenilaiPoin, hitungProgres, laksanaTerbuka } from '../lib/skuLogic';
 import { perluSuratAgama, suratAgamaAktif } from '../lib/dokumenLogic';
 import SkuChecklist from '../components/SkuChecklist';
@@ -13,6 +14,7 @@ import { Avatar, BadgePeran, BadgeStatus, Icon, Kosong, ProgressBar } from '../c
 /** Halaman rincian satu peserta. Pembina/Dewan Ambalan dapat menilai, admin hanya melihat. */
 export default function PesertaDetail({ pesertaId, onKembali, onCetak, onBukaPortofolio, onBukaMateri }) {
   const { daftarPesertaSemua, progress, user, users, dokumen, muatDokumen, bolehSurat } = useApp();
+  const konteks = useKonteksMenilai();
   useEffect(() => { if (user.role !== 'peserta') muatDokumen(); }, [user.role, muatDokumen]); // surat pengantar agama memengaruhi siapa yang boleh menilai butir agama
   const [tingkat, setTingkat] = useState('Bantara');
   const [uji, setUji] = useState(null);
@@ -29,11 +31,11 @@ export default function PesertaDetail({ pesertaId, onKembali, onCetak, onBukaPor
 
   const renderAksi = (poin, entry) => {
     if (!bisaMenguji) return null;
-    if (!bolehMenilaiPoin(user, poin, { users, peserta, dokumen })) {
+    if (!bolehMenilaiPoin(user, poin, { ...konteks, peserta })) {
       const bisaSurat = poin.agama && bolehSurat && perluSuratAgama(users, peserta) && entry.status !== 'lulus';
       return (
         <span className="flex flex-col items-end gap-1 text-xs font-semibold text-pramuka-500">
-          {poin.agama ? 'Butir agama dinilai Pembina seagama' : 'Butir Laksana dinilai Pembina'}
+          {poin.agama ? 'Butir agama dinilai Pembina seagama' : 'Butir Laksana dinilai Pembina atau penguji yang ditugaskan'}
           {bisaSurat && <button className="btn btn-outline btn-sm" onClick={() => onCetak(peserta.id, 'surat')}>Surat pengantar guru agama</button>}
         </span>
       );

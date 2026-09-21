@@ -7,6 +7,7 @@ import {
   pesertaRombelLama, ringkasRombel,
 } from '../lib/rombelLogic';
 import { Field, Icon, Kosong, Modal } from './ui';
+import PenugasanPenegak, { ketPenguji } from './PenugasanPenegak';
 
 /** Formulir tambah atau ubah satu guru agama (Admin). */
 function FormGuruAgama({ awal, onTutup }) {
@@ -84,9 +85,11 @@ function RiwayatPenugasan({ ta }) {
               {data.map((h) => (
                 <li key={h.id} className="px-4 py-2.5">
                   <p>
-                    <span className="font-semibold">{h.olehNama || 'Admin'}</span>{' '}
+                    <span className="font-semibold">{h.olehNama || 'Pengelola'}</span>{' '}
                     {h.tindakan === 'tambah' ? 'menugaskan' : 'mencabut'} <span className="font-semibold">{h.pengujiNama}</span>{' '}
-                    {h.tindakan === 'tambah' ? 'pada' : 'dari'} rombel <span className="font-mono font-semibold">{h.rombel}</span>
+                    {h.pesertaId || h.pesertaNama
+                      ? <>{h.tindakan === 'tambah' ? 'khusus untuk' : 'dari'} Penegak <span className="font-semibold">{h.pesertaNama || '(akun sudah tidak ada)'}</span> <span className="font-mono text-xs">({h.rombel})</span></>
+                      : <>{h.tindakan === 'tambah' ? 'pada' : 'dari'} rombel <span className="font-mono font-semibold">{h.rombel}</span></>}
                     {h.catatan ? ` (${h.catatan})` : ''}
                   </p>
                   <p className="text-xs text-pramuka-500">{fmtWaktu(h.waktu)}</p>
@@ -101,14 +104,15 @@ function RiwayatPenugasan({ ta }) {
 }
 
 /**
- * Penugasan penguji per rombel: matriks penguji x rombel (per kelas), salin dari tahun ajaran lalu, peringatan rombel tanpa penguji,
- * cakupan agama Pembina, dan guru agama. `bolehUbah` (Admin) menampilkan tombol pengatur; selain itu hanya melihat.
- * Fase 1a hanya menyimpan penugasan; belum ada aturan yang berubah bagi Penegak dan penguji.
+ * Penugasan penguji per rombel: matriks penguji (Pembina dan Penegak berjabatan Dewan) x rombel (per kelas), salin dari tahun ajaran lalu,
+ * peringatan rombel tanpa penguji, penugasan khusus per Penegak, cakupan agama Pembina, dan guru agama. `bolehUbah` (Pembina dan Admin)
+ * menampilkan tombol pengatur; selain itu hanya melihat. Guru agama hanya diubah Admin.
  */
 export default function PenugasanRombel({ bolehUbah = false, onPerbaruiRombel }) {
   const {
-    users, penugasan, guruAgama, muatPenugasan, aturPenugasan, salinPenugasan, hapusGuruAgama,
+    user, users, penugasan, guruAgama, muatPenugasan, aturPenugasan, salinPenugasan, hapusGuruAgama,
   } = useApp();
+  const bolehGuru = user?.role === 'admin';
   const taKini = useMemo(() => tahunAjaranDari(hariIni()), []);
   const [ta, setTa] = useState(taKini);
   const [kelas, setKelas] = useState(KELAS_ROMBEL[0]);
@@ -178,9 +182,10 @@ export default function PenugasanRombel({ bolehUbah = false, onPerbaruiRombel })
       </div>
 
       <p className="mb-4 rounded-md bg-pramuka-50 px-3 py-2 text-xs leading-relaxed text-pramuka-700">
-        Penugasan menentukan Pembina dan Dewan Ambalan yang menguji tiap rombel pada tahun ajaran ini.
-        {bolehUbah ? ' Ketuk sel untuk menugaskan atau mencabut.' : ' Hanya Admin Gudep yang dapat mengubahnya.'}{' '}
-        Untuk sementara belum ada aturan yang berubah: rombel tanpa penugasan tetap memakai aturan lama (semua penguji boleh menguji).
+        Penugasan menentukan Pembina dan Penegak berjabatan Dewan Ambalan yang menguji tiap rombel pada tahun ajaran ini.
+        {bolehUbah ? ' Ketuk sel untuk menugaskan atau mencabut.' : ' Hanya Pembina dan Admin Gudep yang dapat mengubahnya.'}{' '}
+        Rombel tanpa penugasan memakai aturan bawaan: semua penguji boleh menguji, tetapi Dewan hanya butir Bantara. Dewan yang ditugaskan pada rombel
+        boleh menguji butir Laksana juga; butir agama tetap hanya untuk Pembina yang seagama.
       </p>
 
       {lama.length > 0 && (
@@ -231,7 +236,7 @@ export default function PenugasanRombel({ bolehUbah = false, onPerbaruiRombel })
           </div>
 
           {pengujiUrut.length === 0 ? (
-            <Kosong judul="Belum ada Pembina atau Dewan Ambalan" teks="Tambahkan dulu lewat menu Anggota." />
+            <Kosong judul="Belum ada Pembina atau pengurus Dewan Ambalan" teks="Tambahkan Pembina lewat menu Anggota dan tetapkan pengurus Dewan lewat menu Kepengurusan." />
           ) : (
             <div className="panel overflow-x-auto">
               <table className="w-full min-w-max border-collapse text-center text-sm">
@@ -246,7 +251,7 @@ export default function PenugasanRombel({ bolehUbah = false, onPerbaruiRombel })
                     <tr key={p.id}>
                       <th scope="row" className="sticky left-0 z-10 bg-white px-3 py-1.5 text-left font-normal">
                         <span className="block max-w-[9rem] truncate font-semibold" title={p.nama}>{p.nama}</span>
-                        <span className="block text-xs text-pramuka-500">{p.jabatan}</span>
+                        <span className="block text-xs text-pramuka-500">{ketPenguji(p)}</span>
                         {bolehUbah && (
                           <span className="mt-0.5 flex gap-2 text-xs">
                             <button className="font-semibold text-pramuka-700 underline disabled:opacity-40" disabled={!!sibuk[`${p.id}|*`]} onClick={() => barisSemua(p, true)}>Semua</button>
@@ -299,6 +304,8 @@ export default function PenugasanRombel({ bolehUbah = false, onPerbaruiRombel })
           )}
           <p className="mt-2 text-xs text-pramuka-500">Kolom berisi nomor rombel pada kelas {kelas} (01 = {kelas}-01). Sel amber pada baris "Jumlah penguji" berarti rombel berisi Penegak tanpa penguji.</p>
 
+          <PenugasanPenegak ta={ta} bolehUbah={bolehUbah} />
+
           <RiwayatPenugasan ta={ta} />
 
           <h2 className="mb-1 mt-8 text-lg font-bold">Agama dan guru agama</h2>
@@ -308,7 +315,7 @@ export default function PenugasanRombel({ bolehUbah = false, onPerbaruiRombel })
           {tanpaAgama.length > 0 && (
             <p role="status" className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-950">
               Agama {tanpaAgama.length} Pembina belum diisi ({tanpaAgama.map((p) => p.nama).join(', ')}).
-              {bolehUbah ? ' Isi lewat Anggota, tab Pembina, tombol Ubah.' : ' Minta Admin Gudep mengisinya.'}
+              {bolehGuru ? ' Isi lewat Anggota, tab Pembina, tombol Ubah.' : ' Minta Admin Gudep mengisinya.'}
             </p>
           )}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -333,7 +340,7 @@ export default function PenugasanRombel({ bolehUbah = false, onPerbaruiRombel })
                           <p className="truncate text-sm font-semibold" title={g.nama}>{g.nama}</p>
                           {g.keterangan && <p className="truncate text-xs text-pramuka-500" title={g.keterangan}>{g.keterangan}</p>}
                         </div>
-                        {bolehUbah && (
+                        {bolehGuru && (
                           <>
                             <button className="rounded-md p-1.5 text-pramuka-600 hover:bg-pramuka-100" aria-label={`Ubah ${g.nama}`} onClick={() => setFormGuru({ ...g })}>
                               <Icon nama="ubah" className="h-4 w-4" />
@@ -346,7 +353,7 @@ export default function PenugasanRombel({ bolehUbah = false, onPerbaruiRombel })
                       </li>
                     ))}
                   </ul>
-                  {bolehUbah && (
+                  {bolehGuru && (
                     <button className="btn btn-outline btn-sm mt-1" onClick={() => setFormGuru({ id: null, agama: a.agama, nama: '', keterangan: '' })}>
                       <Icon nama="tambah" className="h-4 w-4" /> Tambah guru agama
                     </button>

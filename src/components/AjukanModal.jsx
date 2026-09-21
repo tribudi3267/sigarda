@@ -39,11 +39,11 @@ export default function AjukanModal({ poin, onTutup }) {
     else setGalat(hasil.pesan);
   };
 
-  const label = poin.agama ? 'Penguji (Pembina seagama)' : poin.tingkat === 'Laksana' ? 'Penguji (Pembina)' : 'Penguji (Pembina atau Dewan Ambalan)';
+  const label = poin.agama ? 'Penguji (Pembina seagama)' : poin.tingkat === 'Laksana' ? 'Penguji (Pembina atau yang ditugaskan)' : 'Penguji (Pembina atau Dewan Ambalan)';
   const bantuan = poin.agama
     ? 'Butir agama hanya diuji oleh Pembina yang seagama dengan Anda.'
     : poin.tingkat === 'Laksana'
-      ? 'Butir Laksana hanya diuji oleh Pembina.'
+      ? 'Butir Laksana diuji oleh Pembina atau penguji Dewan Ambalan yang ditugaskan untuk Anda.'
       : undefined;
 
   return (
@@ -73,7 +73,7 @@ export default function AjukanModal({ poin, onTutup }) {
           {kosong && <option value="">Belum ada penguji yang sesuai</option>}
           {daftar.map((u) => (
             <option key={u.id} value={u.id}>
-              {u.nama}{u.jabatan ? `, ${u.jabatan}` : ''} ({u.beban} antrian)
+              {u.nama}{u.jabatan_dewan ? `, ${u.jabatan_dewan} Dewan Ambalan` : u.jabatan ? `, ${u.jabatan}` : ''} ({u.beban} antrian)
             </option>
           ))}
         </select>

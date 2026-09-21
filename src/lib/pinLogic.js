@@ -58,6 +58,8 @@ export function buatPinAcak(panjang = PIN_PANJANG) {
 }
 
 const jabatanDari = (u) => (u.role === 'penguji' ? u.jabatan : null);
+/** Penegak aktif berjabatan Dewan Ambalan (cermin penegakDewan di Edge Function). */
+const penegakDewan = (u) => !!u && u.role === 'peserta' && !!u.jabatanDewan && (u.status ?? 'aktif') === 'aktif';
 
 export function bolehResetPin(aktor, target) {
   if (!aktor || !target || aktor.id === target.id) return false;
@@ -66,6 +68,7 @@ export function bolehResetPin(aktor, target) {
     return target.role === 'peserta' || (target.role === 'penguji' && jabatanDari(target) === 'Dewan Ambalan');
   }
   if (aktor.role === 'penguji' && jabatanDari(aktor) === 'Dewan Ambalan') return target.role === 'peserta';
+  if (penegakDewan(aktor)) return target.role === 'peserta';
   return false;
 }
 

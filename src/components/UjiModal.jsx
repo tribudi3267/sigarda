@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import useInstrumen from '../hooks/useInstrumen';
+import { useKonteksMenilai } from '../hooks/useRombelSaya';
 import { useIuranRingkas } from '../hooks/useIuran';
 import PanelIuranSku from './PanelIuranSku';
 import { NILAI } from '../config';
@@ -223,13 +224,14 @@ function IsiUji({ pesertaId, poin, instr, pengaturan, tanggalAwal, onTutup }) {
 
 /** Penguji menilai satu poin. PIN penguji berfungsi sebagai verifikasi digital. Butir berinstrumen ditetapkan dinilai lewat instrumen. */
 export default function UjiModal({ pesertaId, poin, tanggalAwal = null, onTutup }) {
-  const { user, users, dokumen, muatDokumen } = useApp();
+  const { user, users, muatDokumen } = useApp();
+  const konteks = useKonteksMenilai();
   const { instrumen, siap, pengaturan } = useInstrumen();
   useEffect(() => { if (poin.agama) muatDokumen(); }, [poin.agama, muatDokumen]); // surat pengantar agama menentukan siapa yang boleh menilai butir agama
-  if (!bolehMenilaiPoin(user, poin, { users, peserta: users.find((u) => u.id === pesertaId), dokumen })) {
+  if (!bolehMenilaiPoin(user, poin, { ...konteks, peserta: users.find((u) => u.id === pesertaId) })) {
     return (
       <Modal buka tutup={onTutup} judul="Penilaian poin SKU" aksi={<button className="btn btn-outline" onClick={onTutup}>Tutup</button>}>
-        <p role="alert" className="py-4 text-sm text-pramuka-800">{pesanTidakBolehMenilai(poin)} Minta Pembina{poin.agama ? ' yang seagama' : ''} menilai butir ini.</p>
+        <p role="alert" className="py-4 text-sm text-pramuka-800">{pesanTidakBolehMenilai(poin)} Minta Pembina{poin.agama ? ' yang seagama' : ' atau penguji yang ditugaskan'} menilai butir ini.</p>
       </Modal>
     );
   }

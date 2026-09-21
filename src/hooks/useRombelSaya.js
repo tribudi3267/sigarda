@@ -4,6 +4,22 @@ import { FILTER_AWAL } from '../components/FilterBar';
 import { filterEfektif, rombelSaya, tahunAjaranKini } from '../lib/rombelLogic';
 
 /**
+ * Konteks untuk bolehMenilaiPoin: pengguna, surat pengantar, penugasan rombel dan penugasan khusus Penegak tahun ajaran berjalan (dimuat sekali per sesi
+ * bila belum ada). Butir Laksana bagi penguji yang bukan Pembina hanya boleh dinilai bila ia ditugaskan untuk Penegak itu.
+ */
+export function useKonteksMenilai() {
+  const { user, users, dokumen, penugasan, penugasanPeserta, muatPenugasan } = useApp();
+  const ta = tahunAjaranKini();
+  const pengurus = user?.role !== 'peserta';
+  const termuat = penugasan[ta] != null;
+  useEffect(() => { if (pengurus && !termuat) muatPenugasan(ta); }, [pengurus, termuat, ta, muatPenugasan]);
+  return useMemo(
+    () => ({ users, dokumen: dokumen ?? [], penugasan: penugasan[ta] ?? [], penugasanPeserta: (penugasanPeserta ?? {})[ta] ?? [] }),
+    [users, dokumen, penugasan, penugasanPeserta, ta]
+  );
+}
+
+/**
  * Rombel yang ditugaskan kepada pengguna (Pembina atau Dewan Ambalan) pada tahun ajaran berjalan; larik kosong untuk Admin, untuk penguji
  * yang belum ditugaskan, dan selama penugasan belum termuat (halaman lalu menampilkan semua, aturan lama). Penugasan dimuat sekali per
  * sesi bila belum ada; halaman Antrian dan Dashboard memuat ulang sendiri.

@@ -23,6 +23,7 @@ const cocok = (r, re) => !r.ok && re.test(r.pesan ?? '');
 const ta = tahunAjaranKini();
 const users = async () => (await K.admin.a.muatProfil()).data;
 const penugasanKini = async () => (await q(`select rombel, penguji_id as "pengujiId" from public.penugasan_rombel where tahun_ajaran = $1`, [ta])).map((x) => ({ ...x }));
+const penugasanPesertaKini = async () => (await q(`select peserta_id as "pesertaId", penguji_id as "pengujiId" from public.penugasan_peserta where tahun_ajaran = $1`, [ta])).map((x) => ({ ...x }));
 const sebagai = async (id, sql, args = []) => { try { return { ok: true, rows: (await sqlSebagai(pg, id, sql, args)).rows }; } catch (e) { return { ok: false, pesan: e.message }; } };
 const riwayatAkhir = async (pid, sku) => (await q('select teks from public.sku_riwayat where peserta_id = $1 and sku_id = $2 order by id desc limit 1', [pid, sku]))[0]?.teks;
 const progress = async (pid, sku) => (await q('select status, penguji_id from public.sku_progress where peserta_id = $1 and sku_id = $2', [pid, sku]))[0];
@@ -51,19 +52,20 @@ console.log('\n--- Kesetaraan server dan klien: penguji_sah untuk semua Penegak 
 const bandingkan = async (nama) => {
   U = await users();
   const baris = await penugasanKini();
+  const khusus = await penugasanPesertaKini();
   let sama = true, n = 0;
   for (const p of U.filter((u) => u.role === 'peserta')) {
     for (const tingkat of ['Bantara', 'Laksana']) {
       for (const poin of daftarPoin(tingkat, p.agama)) {
         const s = (await q('select o_penguji::text id, o_rombel from sigarda.penguji_sah($1, $2)', [p.id, poin.id]));
-        const c = pengujiSah({ users: U, penugasan: baris, peserta: p, poin });
+        const c = pengujiSah({ users: U, penugasan: baris, penugasanPeserta: khusus, peserta: p, poin });
         const idS = s.map((x) => x.id).sort().join(), idC = c.penguji.map((x) => x.id).sort().join();
         const rS = s.length > 0 && s[0].o_rombel;
         n++;
         if (idS !== idC || (s.length > 0 && rS !== c.dariRombel)) { sama = false; console.log('   beda:', p.nama, poin.id, idS, idC, rS, c.dariRombel); }
         for (const u of U.filter((x) => x.role === 'penguji')) {
           const sv = (await q('select sigarda.penguji_peran_ok($1, $2, $3) v', [p.id, u.id, poin.id]))[0].v;
-          if (sv !== pengujiPeranOk(U, p, u, poin)) { sama = false; console.log('   beda peran_ok:', p.nama, poin.id, u.nama); }
+          if (sv !== pengujiPeranOk(U, p, u, poin, [], { penugasan: baris, penugasanPeserta: khusus })) { sama = false; console.log('   beda peran_ok:', p.nama, poin.id, u.nama); }
         }
       }
     }
@@ -79,6 +81,9 @@ await q(`update public.profiles set agama = 'Islam' where id = $1`, [pembina]);
 await q(`delete from public.penugasan_rombel where tahun_ajaran = $1 and rombel = 'X-01' and penguji_id = $2`, [ta, pembina]);
 await q(`insert into public.penugasan_rombel (tahun_ajaran, rombel, penguji_id) values ($1, 'XII-02', $2), ($1, 'X-05', $3)`, [ta, dewan, dewan]);
 await bandingkan('penugasan diubah (X-01 hanya Dewan, XII-02 dan X-05 hanya Dewan)');
+await q(`insert into public.penugasan_peserta (tahun_ajaran, peserta_id, penguji_id) values ($1, $2, $3), ($1, $4, $5)`, [ta, rina, pembina, made, dewan]);
+await bandingkan('penugasan khusus Penegak (Rina hanya Pembina, Made hanya Dewan)');
+await q(`delete from public.penugasan_peserta where tahun_ajaran = $1`, [ta]);
 // kembalikan keadaan contoh
 await q(`delete from public.penugasan_rombel where tahun_ajaran = $1 and rombel in ('XII-02', 'X-05')`, [ta]);
 await q(`insert into public.penugasan_rombel (tahun_ajaran, rombel, penguji_id) values ($1, 'X-01', $2) on conflict do nothing`, [ta, pembina]);
@@ -89,7 +94,7 @@ console.log('\n--- Aturan peran (klien murni) ---');
   const bantara = cariPoin('BAN-05'), laksana = cariPoin('LAK-02'), agamaIsl = cariPoin('BAN-01-ISL-1');
   const P_ = { role: 'penguji', jabatan: 'Pembina' }, D_ = { role: 'penguji', jabatan: 'Dewan Ambalan' };
   ok(bolehMenilaiPoin(P_, bantara) && bolehMenilaiPoin(D_, bantara), 'butir Bantara biasa: Pembina dan Dewan boleh');
-  ok(bolehMenilaiPoin(P_, laksana) && !bolehMenilaiPoin(D_, laksana), 'butir Laksana: hanya Pembina');
+  ok(bolehMenilaiPoin(P_, laksana) && !bolehMenilaiPoin(D_, laksana), 'butir Laksana tanpa konteks penugasan: hanya Pembina (Dewan hanya bila ditugaskan, lihat pengujiPeranOk)');
   ok(bolehMenilaiPoin(P_, agamaIsl) && !bolehMenilaiPoin(D_, agamaIsl), 'butir agama: hanya Pembina');
   ok(/Laksana.*Pembina/.test(pesanTidakBolehMenilai(laksana)) && /agama.*Pembina/.test(pesanTidakBolehMenilai(agamaIsl)), 'pesan sesuai butir');
   const pembinaDb = U.find((u) => u.id === pembina), ahmadDb = U.find((u) => u.id === ahmad), rinaDb = U.find((u) => u.id === rina);
@@ -103,7 +108,7 @@ let r = await K.ahmad.a.pengujiPilihan('BAN-05');
 ok(r.ok && r.data.sumber === 'rombel' && r.data.rombel === 'X-01' && !r.data.agamaButir && r.data.penguji.length === 2, 'Ahmad (X-01), butir Bantara biasa: Pembina dan Dewan yang bertugas di X-01');
 ok(r.ok && r.data.penguji.every((u) => typeof u.beban === 'number' && u.id && u.nama), 'tiap penguji membawa nama dan beban antrian');
 r = await K.ahmad.a.pengujiPilihan('LAK-02');
-ok(r.ok && r.data.penguji.length === 1 && r.data.penguji[0].id === pembina, 'butir Laksana: hanya Pembina');
+ok(r.ok && r.data.penguji.length === 2, 'butir Laksana (Ahmad, X-01): Pembina dan Dewan yang ditugaskan di X-01 (Dewan boleh menguji Laksana bila ditugaskan)');
 r = await K.ahmad.a.pengujiPilihan('BAN-01-ISL-1');
 ok(r.ok && r.data.agamaButir && r.data.penguji.length === 1 && r.data.penguji[0].id === pembina, 'butir agama Islam: hanya Pembina yang beragama Islam');
 r = await K.ahmad.a.pengujiPilihan('BAN-01-KAT-1');
@@ -113,7 +118,9 @@ ok(r.ok && r.rows[0].d.agama_butir === true && r.rows[0].d.penguji.length === 0,
 r = await sebagai(made, `select public.sg_penguji_pilihan('BAN-12') d`);
 ok(r.ok && r.rows[0].d.sumber === 'rombel' && r.rows[0].d.rombel === 'XI-02' && r.rows[0].d.penguji.length === 1 && r.rows[0].d.penguji[0].id === dewan, 'Made (XI-02, hanya Dewan bertugas): butir Bantara biasa hanya Dewan');
 r = await sebagai(rina, `select public.sg_penguji_pilihan('LAK-03') d`);
-ok(r.ok && r.rows[0].d.sumber === 'semua' && r.rows[0].d.penguji.length === 1 && r.rows[0].d.penguji[0].id === pembina, 'Rina, butir Laksana: Dewan yang bertugas tak boleh, jadi semua Pembina (sumber "semua")');
+ok(r.ok && r.rows[0].d.sumber === 'rombel' && r.rows[0].d.penguji.length === 1 && r.rows[0].d.penguji[0].id === dewan, 'Rina (XI-02, hanya Dewan bertugas), butir Laksana: Dewan yang ditugaskan sah (sumber "rombel")');
+r = await sebagai(pid('10118'), `select public.sg_penguji_pilihan('LAK-06') d`);
+ok(r.ok && r.rows[0].d.sumber === 'rombel' && r.rows[0].d.penguji.length === 1 && r.rows[0].d.penguji[0].id === pembina, 'Dimas (XI-01, hanya Pembina bertugas), butir Laksana: hanya Pembina');
 r = await sebagai(maria, `select public.sg_penguji_pilihan('BAN-05') d`);
 ok(r.ok && r.rows[0].d.sumber === 'semua' && r.rows[0].d.penguji.length === 2, 'Maria (XII-02, tanpa penguji bertugas): aturan lama, semua penguji');
 r = await K.pembina.a.pengujiPilihan('BAN-05', made);
@@ -139,10 +146,13 @@ r = await ajukan(made, 'BAN-12', dewan);
 ok(r.ok && (await progress(made, 'BAN-12')).penguji_id === dewan, 'Made memilih Dewan yang bertugas: diterima');
 await bersih(made, 'BAN-12');
 r = await ajukan(rina, 'LAK-03', dewan);
-ok(!r.ok && /Butir Laksana hanya dapat diuji oleh Pembina/.test(r.pesan), 'butir Laksana kepada Dewan: ditolak - ' + r.pesan);
-r = await ajukan(rina, 'LAK-03', pembina);
-ok(r.ok, 'butir Laksana kepada Pembina: diterima walau Pembina tidak bertugas di XI-02 (tak ada Pembina bertugas, aturan lama)');
+ok(r.ok && (await progress(rina, 'LAK-03')).penguji_id === dewan, 'butir Laksana kepada Dewan yang ditugaskan di XI-02: diterima');
 await bersih(rina, 'LAK-03');
+r = await ajukan(rina, 'LAK-03', pembina);
+ok(!r.ok && /tidak bertugas pada rombel/.test(r.pesan), 'butir Laksana kepada Pembina yang tidak bertugas di XI-02 (Dewan bertugas di sana): ditolak - ' + r.pesan);
+await bersih(pid('10118'), 'LAK-06');
+r = await ajukan(pid('10118'), 'LAK-06', dewan);
+ok(!r.ok && /Butir Laksana hanya dapat diuji oleh Pembina atau penguji yang ditugaskan/.test(r.pesan), 'butir Laksana kepada Dewan yang tidak ditugaskan untuk Dimas: ditolak - ' + r.pesan);
 r = await ajukan(made, 'BAN-01-HIN-1', pembina);
 ok(!r.ok && /seagama/.test(r.pesan), 'butir agama Hindu kepada Pembina Islam: ditolak - ' + r.pesan);
 r = await ajukan(made, 'BAN-01-HIN-1', null);
@@ -173,14 +183,14 @@ await bersih(made, 'BAN-12');
 r = await sebagai(made, `select public.sg_sku_ajukan('BAN-12', current_date, null, '')`);
 ok(r.ok, 'Made mengajukan BAN-12 ke antrian rombel');
 r = await sebagai(rina, `select public.sg_sku_ajukan('LAK-03', current_date, null, '')`);
-ok(r.ok, 'Rina mengajukan LAK-03 ke antrian rombel (Pembina mana pun, aturan lama karena tak ada Pembina bertugas)');
+ok(r.ok, 'Rina mengajukan LAK-03 ke antrian rombel (Dewan yang ditugaskan di XI-02 sah)');
 {
   U = await users();
   const prog = (await K.admin.a.muatProgress()).data;
   const baris = await penugasanKini();
   const idAntrian = (arr) => arr.filter((x) => x.peserta.id === rina || x.peserta.id === made).map((x) => `${x.peserta.id === rina ? 'R' : 'M'}:${x.poin.id}`).sort().join();
-  ok(idAntrian(antrianPengujian(prog, U, dewan, baris)) === 'M:BAN-12', 'Dewan melihat BAN-12 Made (bertugas di XI-02), tidak melihat butir Laksana Rina');
-  ok(idAntrian(antrianPengujian(prog, U, pembina, baris)) === 'R:LAK-03', 'Pembina melihat LAK-03 Rina, tidak melihat BAN-12 Made (XI-02 diurus Dewan)');
+  ok(idAntrian(antrianPengujian(prog, U, dewan, baris)) === 'M:BAN-12,R:LAK-03', 'Dewan melihat BAN-12 Made dan LAK-03 Rina (bertugas di XI-02)');
+  ok(idAntrian(antrianPengujian(prog, U, pembina, baris)) === '', 'Pembina tidak melihat keduanya (XI-02 diurus Dewan)');
   ok(idAntrian(antrianPengujian(prog, U, null, baris)) === 'M:BAN-12,R:LAK-03', 'tampilkan semua penguji: keduanya tampil');
 }
 
@@ -188,10 +198,10 @@ console.log('\n--- Server: mencatat hasil (lunak; "menggantikan"; Dewan hanya Ba
 const catat = (K_, pin, o) => K_.a.catatHasil({ pin, pesertaId: made, skuId: 'BAN-12', tanggalUji: hariIni, nilai: 'Baik', catatan: '', ...o });
 r = await catat(K.dewan, PIN_DEMO.dewan, { hasil: 'proses' });
 ok(r.ok && (await progress(made, 'BAN-12')).penguji_id === dewan && (await riwayatAkhir(made, 'BAN-12')) === 'Pengujian dimulai', 'Dewan mengambil antrian bersama lewat "Mulai uji": tanpa kata "menggantikan"');
-r = await catat(K.dewan, PIN_DEMO.dewan, { hasil: 'proses', pesertaId: rina, skuId: 'LAK-03' });
-ok(!r.ok && /Butir Laksana hanya dapat dinilai oleh Pembina/.test(r.pesan), 'Dewan tidak dapat menguji butir Laksana (mulai uji): ' + r.pesan);
-r = await catat(K.dewan, PIN_DEMO.dewan, { hasil: 'ulang', pesertaId: rina, skuId: 'LAK-03', catatan: 'x' });
-ok(!r.ok && /Butir Laksana/.test(r.pesan), 'Dewan tidak dapat menguji butir Laksana (hasil)');
+r = await catat(K.dewan, PIN_DEMO.dewan, { hasil: 'proses', pesertaId: pid('10118'), skuId: 'LAK-06' });
+ok(!r.ok && /Butir Laksana hanya dapat dinilai oleh Pembina/.test(r.pesan), 'Dewan yang tidak ditugaskan untuk Dimas tidak dapat menguji butir Laksana (mulai uji): ' + r.pesan);
+r = await catat(K.dewan, PIN_DEMO.dewan, { hasil: 'ulang', pesertaId: pid('10118'), skuId: 'LAK-06', catatan: 'x' });
+ok(!r.ok && /Butir Laksana/.test(r.pesan), 'Dewan yang tidak ditugaskan tidak dapat menguji butir Laksana (hasil)');
 r = await catat(K.pembina, PIN_DEMO.pembina, { hasil: 'ulang', catatan: 'Perbaiki bagian pertama.' });
 ok(r.ok && (await progress(made, 'BAN-12')).penguji_id === pembina && (await riwayatAkhir(made, 'BAN-12')).startsWith('Perlu diulang (menggantikan '), 'Pembina mencatat hasil pengujian yang dipegang Dewan: riwayat "menggantikan": ' + (await riwayatAkhir(made, 'BAN-12')));
 {
@@ -200,8 +210,8 @@ ok(r.ok && (await progress(made, 'BAN-12')).penguji_id === pembina && (await riw
 }
 r = await catat(K.pembina, PIN_DEMO.pembina, { hasil: 'proses', pesertaId: rina, skuId: 'LAK-03' });
 ok(r.ok && (await progress(rina, 'LAK-03')).penguji_id === pembina && (await riwayatAkhir(rina, 'LAK-03')) === 'Pengujian dimulai', 'Pembina mengambil LAK-03 dari antrian bersama tanpa "menggantikan"');
-r = await catat(K.dewan, PIN_DEMO.dewan, { hasil: 'reset', pesertaId: rina, skuId: 'LAK-03', catatan: 'coba' });
-ok(!r.ok && /Butir Laksana/.test(r.pesan), 'Dewan tidak dapat mengembalikan status butir Laksana');
+r = await catat(K.dewan, PIN_DEMO.dewan, { hasil: 'reset', pesertaId: pid('10118'), skuId: 'LAK-06', catatan: 'coba' });
+ok(!r.ok && /Butir Laksana/.test(r.pesan), 'Dewan yang tidak ditugaskan tidak dapat mengembalikan status butir Laksana');
 // agama seagama saat mencatat
 r = await K.pembina.a.catatHasil({ pin: PIN_DEMO.pembina, pesertaId: made, skuId: 'BAN-01-HIN-1', hasil: 'proses', tanggalUji: hariIni, catatan: '' });
 ok(!r.ok && /seagama/.test(r.pesan), 'Pembina Islam tidak dapat menilai butir agama Hindu: ' + r.pesan);
@@ -242,9 +252,12 @@ ok((await progress(ahmad, 'BAN-05')).status === 'proses', 'prasyarat: pengujian 
 ok(cocok(await alih(K.pembina, { pengujiId: null }), /harus dialihkan ke penguji tertentu/), 'pengujian yang sedang berjalan tidak dapat dikembalikan ke antrian bersama');
 r = await alih(K.pembina, { pengujiId: dewan });
 ok(r.ok && (await progress(ahmad, 'BAN-05')).status === 'proses' && (await progress(ahmad, 'BAN-05')).penguji_id === dewan, 'pengujian berjalan dialihkan ke Dewan; status tetap proses');
-// Laksana tidak boleh dialihkan ke Dewan
+// Laksana tidak boleh dialihkan ke Dewan yang tidak ditugaskan untuk Penegak itu (Dimas, XI-01: hanya Pembina bertugas); ke Dewan yang ditugaskan (Rina, XI-02) boleh
+await q(`insert into public.sku_progress (peserta_id, sku_id, status, jadwal) values ($1, 'LAK-06', 'diajukan', current_date)`, [pid('10118')]);
+ok(cocok(await K.pembina.a.alihkanPengajuan({ pesertaId: pid('10118'), skuId: 'LAK-06', pengujiId: dewan, alasan: 'coba' }), /tidak dapat menguji/), 'butir Laksana tidak dapat dialihkan ke Dewan yang tidak ditugaskan');
+await bersih(pid('10118'), 'LAK-06');
 await q(`insert into public.sku_progress (peserta_id, sku_id, status, jadwal) values ($1, 'LAK-03', 'diajukan', current_date)`, [rina]);
-ok(cocok(await K.pembina.a.alihkanPengajuan({ pesertaId: rina, skuId: 'LAK-03', pengujiId: dewan, alasan: 'coba' }), /tidak dapat menguji/), 'butir Laksana tidak dapat dialihkan ke Dewan');
+ok((await K.pembina.a.alihkanPengajuan({ pesertaId: rina, skuId: 'LAK-03', pengujiId: dewan, alasan: 'Dewan bertugas di XI-02' })).ok, 'butir Laksana dapat dialihkan ke Dewan yang ditugaskan untuk rombel Penegak');
 ok(cocok(await K.pembina.a.alihkanPengajuan({ pesertaId: maria, skuId: 'BAN-01-KAT-1', pengujiId: pembina, alasan: 'coba' }), /Hanya pengajuan yang menunggu/), 'pengajuan yang tidak ada ditolak');
 await bersih(rina, 'LAK-03');
 await bersih(ahmad, 'BAN-05');

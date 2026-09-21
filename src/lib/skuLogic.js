@@ -99,16 +99,18 @@ export const tingkatSelesai = (progress, peserta, tingkat) => {
 export const laksanaTerbuka = (progress, peserta) => tingkatSelesai(progress, peserta, 'Bantara');
 
 /**
- * Butir agama (sub-butir Butir 1, `poin.agama` terisi) dan butir Laksana hanya dinilai Pembina; butir Bantara lain dinilai Pembina atau
- * Dewan Ambalan. Aturan yang sama ditegakkan di server (sg_sku_catat_internal dan sg_sku_ajukan); ini hanya untuk menyembunyikan aksi
- * yang pasti ditolak. Bila `konteks = { users, peserta, dokumen }` diberikan, butir agama juga menuntut Pembina yang seagama dengan Penegak
- * (setelah ada Pembina yang agamanya terisi), kecuali ada surat pengantar ke guru agama yang berlaku (`dokumen`).
+ * Butir agama (sub-butir Butir 1, `poin.agama` terisi) hanya dinilai Pembina; butir Laksana dinilai Pembina atau penguji yang ditugaskan untuk
+ * Penegak itu; butir Bantara lain dinilai Pembina atau Dewan Ambalan. Aturan yang sama ditegakkan di server (sg_sku_catat_internal dan sg_sku_ajukan);
+ * ini hanya untuk menyembunyikan aksi yang pasti ditolak. Bila `konteks = { users, peserta, dokumen, penugasan, penugasanPeserta }` diberikan, butir
+ * agama juga menuntut Pembina yang seagama dengan Penegak (setelah ada Pembina yang agamanya terisi), kecuali ada surat pengantar ke guru agama yang
+ * berlaku (`dokumen`), dan butir Laksana menuntut penugasan bagi penguji yang bukan Pembina. `user` = pengguna dalam tampilan Dewan
+ * (role 'penguji'), termasuk Penegak berjabatan Dewan.
  */
 export const PESAN_BUTIR_AGAMA = 'Butir agama hanya dapat dinilai oleh Pembina.';
-export const PESAN_BUTIR_LAKSANA = 'Butir Laksana hanya dapat dinilai oleh Pembina.';
+export const PESAN_BUTIR_LAKSANA = 'Butir Laksana hanya dapat dinilai oleh Pembina atau penguji yang ditugaskan untuk Penegak ini.';
 export const bolehMenilaiPoin = (user, poin, konteks) => {
   if (user?.role !== 'penguji') return false;
-  if (konteks) return pengujiPeranOk(konteks.users, konteks.peserta, user, poin, konteks.dokumen);
+  if (konteks) return pengujiPeranOk(konteks.users, konteks.peserta, user, poin, konteks.dokumen, { penugasan: konteks.penugasan, penugasanPeserta: konteks.penugasanPeserta });
   return user.jabatan === 'Pembina' || (!poin?.agama && poin?.tingkat !== 'Laksana');
 };
 /** Pesan untuk penguji yang tidak boleh menilai butir ini (agama lebih dulu, lalu Laksana). */
@@ -260,17 +262,18 @@ export function catatHasilUji(progress, { peserta, skuId, pengujiId, hasil, tang
  * antrian bersama rombel (pengajuan tanpa penguji tujuan) yang sah dinilainya. Kesahan itu memakai `penugasan` (baris penugasan tahun
  * ajaran berjalan); tanpa `penugasan` semua antrian bersama ditampilkan (aturan lama). `bersama` = belum ada penguji tujuan.
  */
-export function antrianPengujian(progress, users, pengujiId = null, penugasan = null, dokumen = []) {
+export function antrianPengujian(progress, users, pengujiId = null, penugasan = null, dokumen = [], penugasanPeserta = []) {
   const hasil = [];
   for (const u of users) {
     if (u.role !== 'peserta' || (u.status ?? 'aktif') !== 'aktif') continue;
+    if (pengujiId && u.id === pengujiId) continue; // Penegak berjabatan Dewan tidak menguji dirinya sendiri
     for (const [skuId, entry] of Object.entries(progress[u.id] ?? {})) {
       if (entry.status !== 'diajukan' && entry.status !== 'proses') continue;
       if (pengujiId && entry.pengujiId && entry.pengujiId !== pengujiId) continue;
       const poin = cariPoin(skuId);
       if (!poin) continue;
       const bersama = !entry.pengujiId;
-      if (pengujiId && bersama && penugasan && !pengujiSah({ users, penugasan, peserta: u, poin, dokumen }).penguji.some((x) => x.id === pengujiId)) continue;
+      if (pengujiId && bersama && penugasan && !pengujiSah({ users, penugasan, penugasanPeserta, peserta: u, poin, dokumen }).penguji.some((x) => x.id === pengujiId)) continue;
       hasil.push({ peserta: u, poin, entry, bersama });
     }
   }

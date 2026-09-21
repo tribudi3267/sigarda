@@ -81,8 +81,8 @@ ok(cocok(await K.admin.a.aturPenugasan(TA, ahmadId, ['X-01'], true), /Penguji ti
 ok(cocok(await K.admin.a.aturPenugasan(TA, K.admin.id, ['X-01'], true), /Penguji tidak ditemukan/), 'Admin sendiri bukan penguji');
 ok(cocok(await K.admin.a.aturPenugasan(TA, pembinaId, Array.from({ length: 31 }, () => 'X-01'), true), /Maksimal 30/), 'maksimal 30 rombel per permintaan');
 ok((await K.admin.a.aturPenugasan(TA, pembinaId, [], true)).data === 0, 'daftar kosong: tidak berbuat apa-apa');
-for (const [nama, kk] of [['Pembina', K.pembina], ['Dewan Ambalan', K.dewan], ['Penegak', K.ahmad]]) {
-  ok(cocok(await kk.a.aturPenugasan(TA, pembinaId, ['X-05'], true), /Hanya Admin/), `${nama} tidak dapat mengatur penugasan`);
+for (const [nama, kk] of [['Dewan Ambalan (akun lama)', K.dewan], ['Penegak', K.ahmad]]) {
+  ok(cocok(await kk.a.aturPenugasan(TA, pembinaId, ['X-05'], true), /Hanya Pembina dan Admin/), `${nama} tidak dapat mengatur penugasan`);
 }
 r = await K.admin.a.aturPenugasan(TA, dewanId, daftarRombelKelas('X'), true);
 ok(r.ok && r.data === 10, 'Admin menugaskan Dewan Ambalan pada seluruh kelas X (10 rombel sekaligus)');
@@ -112,7 +112,7 @@ ok((await K.admin.a.salinPenugasan(taKini, TA2)).data === 0 && (await q('select 
 ok(cocok(await K.admin.a.salinPenugasan(taKini, taKini), /tidak boleh sama/), 'asal dan tujuan sama ditolak');
 ok(cocok(await K.admin.a.salinPenugasan('2040/2041', TA2), /belum memiliki penugasan/), 'sumber kosong ditolak dengan pesan jelas');
 ok(cocok(await K.admin.a.salinPenugasan('x', TA2), /Tahun ajaran tidak sah/), 'tahun ajaran sumber tidak sah');
-ok(cocok(await K.pembina.a.salinPenugasan(taKini, '2035/2036'), /Hanya Admin/), 'Pembina tidak dapat menyalin');
+ok(cocok(await K.dewan.a.salinPenugasan(taKini, '2035/2036'), /Hanya Pembina dan Admin/), 'Dewan Ambalan tidak dapat menyalin (Pembina dan Admin boleh sejak fase 6b)');
 
 console.log('\n--- Server: penguji dihapus, riwayat tetap ---');
 {

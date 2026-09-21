@@ -7,7 +7,7 @@ import {
 } from '../lib/absensiLogic';
 import { bolehResetPin, validasiPinBaru } from '../lib/pinLogic';
 import { periksaBaris, POLA_NTA } from '../lib/importAnggota';
-import { normalisasiRombel, PESAN_ROMBEL } from '../lib/rombelLogic';
+import { normalisasiRombel, PESAN_ROMBEL, penegakDewan } from '../lib/rombelLogic';
 import { rencanaJabatanDewan } from '../lib/dewanLogic';
 import { PESAN_JK, normalisasiJenisKelamin } from '../lib/jenisKelaminLogic';
 import { bolehKelolaMateri, validasiMateri } from '../lib/materiLogic';
@@ -32,6 +32,8 @@ import { berhentiPushPerangkat, pulihkanPush } from '../lib/pushClient';
  * dimuat; halaman tidak boleh menghitung rekap untuk semester yang belum siap (hasilnya menyesatkan: semua "belum dicatat").
  */
 const Ctx = createContext(null);
+/** Konteks mentah, hanya untuk pengujian tampilan (uji/halaman-6b.mjs) yang memasang nilai palsu. */
+export const KonteksApp = Ctx;
 
 export function useApp() {
   const ctx = useContext(Ctx);
@@ -39,7 +41,7 @@ export function useApp() {
   return ctx;
 }
 
-const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '', asisten: [], pengaturanIuran: PENGATURAN_IURAN_BAWAAN, penugasan: {}, guruAgama: [], dokumen: null, notifikasi: [] };
+const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '', asisten: [], pengaturanIuran: PENGATURAN_IURAN_BAWAAN, penugasan: {}, penugasanPeserta: {}, guruAgama: [], dokumen: null, notifikasi: [] };
 const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi waktu Edge Function)
 const JEDA_SEGARKAN_MS = 30000;
 const JEDA_NOTIFIKASI_MS = 60000; // Kotak Notifikasi ditarik ulang tiap menit selama halaman terlihat
@@ -48,6 +50,11 @@ const ditolak = (notify, pesan) => {
   notify(pesan, 'err');
   return { ok: false, pesan };
 };
+
+/** Tampilan yang dipilih Penegak berjabatan Dewan ('penegak' | 'dewan'), diingat per akun di peramban ini (hanya kenyamanan; hak sebenarnya ditegakkan server). */
+const kunciMode = (id) => `sigarda.mode.${id}`;
+const bacaMode = (id) => { try { return window.localStorage.getItem(kunciMode(id)) === 'dewan' ? 'dewan' : 'penegak'; } catch { return 'penegak'; } };
+const simpanMode = (id, mode) => { try { window.localStorage.setItem(kunciMode(id), mode); } catch { /* tanpa penyimpanan: pilihan berlaku sampai halaman ditutup */ } };
 
 const KELOMPOK_DARI_DATA = (d) => (d.role === 'peserta' ? 'peserta' : d.role === 'admin' ? 'admin' : d.jabatan === 'Pembina' ? 'pembina' : 'dewan');
 
@@ -83,9 +90,31 @@ export function AppProvider({ children }) {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const user = useMemo(() => db.users.find((u) => u.id === sesiId) ?? null, [db.users, sesiId]);
-  /** Semua Penegak (termasuk nonaktif dan alumni) dengan peran turunannya: untuk mencari satu orang, halaman Anggota, dan filter status. */
-  const daftarPesertaSemua = useMemo(() => pesertaDenganPeran(db.progress, db.users), [db.progress, db.users]);
+  /** Akun yang masuk, apa adanya (Penegak berjabatan Dewan tetap berperan 'peserta'). */
+  const akun = useMemo(() => db.users.find((u) => u.id === sesiId) ?? null, [db.users, sesiId]);
+  /**
+   * Dewan Ambalan = atribut akun Penegak. Penegak aktif berjabatan Dewan memilih tampilan: 'penegak' (Penegak biasa) atau 'dewan' (pengurus dan penguji).
+   * `user` = pengguna menurut tampilan yang dipilih: dalam tampilan Dewan ia berperan 'penguji' berjabatan Dewan Ambalan, sehingga seluruh menu dan aturan
+   * penguji berlaku. Hanya tampilan; server menegakkan hak dari data akun (sigarda.pengurus, sigarda.bisa_menguji).
+   */
+  const punyaDewan = penegakDewan(akun);
+  const [modeDipilih, setModeDipilih] = useState('penegak');
+  useEffect(() => { setModeDipilih(sesiId ? bacaMode(sesiId) : 'penegak'); }, [sesiId]);
+  const mode = punyaDewan ? modeDipilih : 'penegak';
+  const ubahMode = useCallback((m) => {
+    const baru = m === 'dewan' ? 'dewan' : 'penegak';
+    setModeDipilih(baru);
+    if (sesiId) simpanMode(sesiId, baru);
+  }, [sesiId]);
+  const user = useMemo(
+    () => (akun && mode === 'dewan' ? { ...akun, role: 'penguji', jabatan: 'Dewan Ambalan', peranAsli: 'peserta' } : akun),
+    [akun, mode]
+  );
+  /** Semua Penegak (termasuk nonaktif dan alumni) dengan peran turunannya: untuk mencari satu orang, halaman Anggota, dan filter status. Penegak biasa hanya melihat dirinya. */
+  const daftarPesertaSemua = useMemo(() => {
+    const semua = pesertaDenganPeran(db.progress, db.users);
+    return user?.role === 'peserta' ? semua.filter((p) => p.id === user.id) : semua;
+  }, [db.progress, db.users, user?.role, user?.id]);
   /** Penegak yang AKTIF: daftar kerja (rekap, absensi, iuran, antrian, dashboard). Nonaktif dan alumni hanya dapat dilihat. */
   const daftarPeserta = useMemo(() => daftarPesertaSemua.filter((u) => (u.status ?? 'aktif') === 'aktif'), [daftarPesertaSemua]);
   const peranUser = useMemo(
@@ -750,8 +779,8 @@ export function AppProvider({ children }) {
         const g = await api().aturAgamaPembina([{ username: baris.username, agama: data.agama }]);
         if (!g.ok) peringatan = `${peringatan ? `${peringatan} ` : ''}Agama belum tersimpan: ${g.pesan}`;
       }
-      // Jabatan Dewan Ambalan juga diisi sesudah akun ada. Pradana/Pradani yang masih dipegang orang lain dikosongkan pada permintaan yang sama.
-      if (anggotaDewan && data.jabatanDewan) {
+      // Jabatan Dewan Ambalan (atribut akun Penegak) juga diisi sesudah akun ada. Pradana/Pradani yang masih dipegang orang lain dikosongkan pada permintaan yang sama.
+      if (data.role === 'peserta' && data.jabatanDewan) {
         const j = await api().aturJabatanDewan(rencanaJabatanDewan(db.users, { id: '', username: baris.username }, data.jabatanDewan).daftar);
         if (!j.ok) peringatan = `${peringatan ? `${peringatan} ` : ''}Jabatan belum tersimpan: ${j.pesan}`;
       }
@@ -792,7 +821,7 @@ export function AppProvider({ children }) {
       }
     }
     // Jabatan Dewan Ambalan hanya dikirim bila berubah (Pradana/Pradani yang dipegang orang lain dikosongkan pada permintaan yang sama)
-    if (anggotaDewan && data.jabatanDewan !== undefined && (data.jabatanDewan || '') !== (lama?.jabatanDewan || '')) {
+    if (data.role === 'peserta' && data.jabatanDewan !== undefined && (data.jabatanDewan || '') !== (lama?.jabatanDewan || '')) {
       const j = await api().aturJabatanDewan(rencanaJabatanDewan(db.users, { id: data.id, username: usernameBaru || lama.username }, data.jabatanDewan || '').daftar);
       if (!j.ok) {
         await segarkan.users();
@@ -958,6 +987,55 @@ export function AppProvider({ children }) {
     notify(statusBaru === 'aktif' ? 'Penegak diaktifkan kembali.' : statusBaru === 'alumni' ? 'Penegak ditetapkan sebagai alumni.' : 'Penegak dinonaktifkan.');
     return r;
   };
+  /* ---------------- Kepengurusan Dewan Ambalan (Pembina dan Admin; jabatan = atribut akun Penegak) ---------------- */
+  const bolehKepengurusan = user?.role === 'admin' || (user?.role === 'penguji' && user.jabatan === 'Pembina');
+  const MSG_KEPENGURUSAN = 'Hanya Pembina dan Admin Gudep yang dapat mengatur kepengurusan Dewan Ambalan.';
+  /**
+   * Kepengurusan lewat berkas. terapkan = false: pratinjau; true: menerapkan lalu menyegarkan data. Mengembalikan { ok, data } dengan data =
+   * { galat, ringkasan, baris }; pesan galat ditampilkan pemanggil (bukan toast) agar dapat berdampingan dengan pratinjau.
+   */
+  const terapkanKepengurusan = async (daftar, ganti = true, terapkan = false) => {
+    if (!bolehKepengurusan) return ditolak(notify, MSG_KEPENGURUSAN);
+    const r = await api().terapkanKepengurusan(daftar, ganti, terapkan);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    if (terapkan) {
+      await Promise.all([segarkan.users(), segarkan.progress?.()].filter(Boolean));
+      notify('Kepengurusan Dewan Ambalan diterapkan.');
+    }
+    return r;
+  };
+  /** Jabatan satu atau beberapa Penegak (`daftar` = [{ username, jabatan }]; jabatan kosong = cabut). */
+  const aturJabatanDewan = async (daftar) => {
+    if (!bolehKepengurusan) return ditolak(notify, MSG_KEPENGURUSAN);
+    const r = await api().aturJabatanDewan(daftar);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    await Promise.all([segarkan.users(), segarkan.progress?.()].filter(Boolean));
+    return r;
+  };
+  /** Arsipkan (aktifkan = false) atau aktifkan kembali akun Dewan LAMA (Admin). */
+  const arsipkanDewanLama = async (ids, aktifkan = false) => {
+    if (user?.role !== 'admin') return ditolak(notify, 'Hanya Admin Gudep yang dapat mengarsipkan akun Dewan Ambalan lama.');
+    const r = await api().arsipkanDewanLama(ids, aktifkan);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    await Promise.all([segarkan.users(), segarkan.progress?.()].filter(Boolean));
+    notify(aktifkan ? `${r.data} akun Dewan lama diaktifkan kembali.` : `${r.data} akun Dewan lama diarsipkan.`);
+    return r;
+  };
+  const muatLogKepengurusan = async () => {
+    const r = await api().muatLogKepengurusan();
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  };
+
   /** Riwayat kenaikan kelas dan perubahan status (pengurus): { batch, log }. */
   const muatNaikKelas = async () => {
     const r = await api().muatNaikKelas();
@@ -966,19 +1044,21 @@ export function AppProvider({ children }) {
   };
 
   /* ---------------- Penugasan penguji per rombel dan guru agama (Admin mengatur, pengurus melihat) ---------------- */
-  const MSG_PENUGASAN = 'Hanya Admin Gudep yang dapat mengatur penugasan penguji.';
+  const MSG_PENUGASAN = 'Hanya Pembina dan Admin Gudep yang dapat mengatur penugasan penguji.';
+  const bolehAturPenugasan = user?.role === 'admin' || (user?.role === 'penguji' && user.jabatan === 'Pembina');
 
   /** Memuat penugasan tahun ajaran ini dan daftar guru agama (pengurus). Mengembalikan { ok }. */
   const muatPenugasan = useCallback(async (tahunAjaran) => {
     const mulaiGenerasi = generasi.current;
-    const [p, g] = await Promise.all([api().muatPenugasan(tahunAjaran), api().muatGuruAgama()]);
+    const [p, g, x] = await Promise.all([api().muatPenugasan(tahunAjaran), api().muatGuruAgama(), api().muatPenugasanPeserta(tahunAjaran)]);
     if (mulaiGenerasi !== generasi.current) return { ok: true };
     const gagal = [p, g].find((r) => !r.ok);
     if (gagal) {
       if (gagal.sesiBerakhir) await sesiBerakhir();
       return { ok: false, pesan: gagal.pesan };
     }
-    setDb((d) => ({ ...d, penugasan: { ...d.penugasan, [tahunAjaran]: p.data }, guruAgama: g.data }));
+    // penugasan khusus per Penegak: tidak wajib (database yang belum dimigrasi dianggap tanpa pengecualian)
+    setDb((d) => ({ ...d, penugasan: { ...d.penugasan, [tahunAjaran]: p.data }, penugasanPeserta: { ...d.penugasanPeserta, [tahunAjaran]: x.ok ? x.data : [] }, guruAgama: g.data }));
     return { ok: true };
   }, [sesiBerakhir]);
 
@@ -1024,12 +1104,18 @@ export function AppProvider({ children }) {
     bolehSurat ? aksi(api().cabutDokumen(id, alasan), { sukses: 'Surat dicabut.', sesudah: () => muatDokumen() }) : Promise.resolve(ditolak(notify, MSG_SURAT));
 
   const aturPenugasan = (tahunAjaran, pengujiId, rombel, ada) =>
-    user?.role === 'admin'
+    bolehAturPenugasan
       ? aksi(api().aturPenugasan(tahunAjaran, pengujiId, rombel, ada), { sesudah: () => muatPenugasan(tahunAjaran) })
       : Promise.resolve(ditolak(notify, MSG_PENUGASAN));
 
+  /** Penugasan KHUSUS satu Penegak: daftar penguji lengkap tahun ajaran itu (kosong = kembali ke penugasan rombel), dengan alasan. */
+  const aturPenugasanPeserta = (tahunAjaran, pesertaId, pengujiIds, alasan) =>
+    bolehAturPenugasan
+      ? aksi(api().aturPenugasanPeserta(tahunAjaran, pesertaId, pengujiIds, alasan), { sukses: 'Penugasan khusus Penegak tersimpan.', sesudah: () => muatPenugasan(tahunAjaran) })
+      : Promise.resolve(ditolak(notify, MSG_PENUGASAN));
+
   const salinPenugasan = (dari, ke) =>
-    user?.role === 'admin'
+    bolehAturPenugasan
       ? aksi(api().salinPenugasan(dari, ke), {
         sesudah: async (r) => { await muatPenugasan(ke); notify(r.data > 0 ? `${r.data} penugasan disalin dari ${dari}.` : `Semua penugasan ${dari} sudah ada di ${ke}. Tidak ada yang ditambahkan.`); },
       })
@@ -1075,7 +1161,7 @@ export function AppProvider({ children }) {
 
   const value = {
     status, galatMuat, lokal: LOKAL ? { aktif: true, reset: () => lokalRef.current?.reset() } : { aktif: false },
-    db, user, users: db.users, progress: db.progress, absensi: db.absensi, portofolio: db.portofolio,
+    db, user, akun, mode, punyaDewan, ubahMode, users: db.users, progress: db.progress, absensi: db.absensi, portofolio: db.portofolio,
     materi: db.materi, bolehKelolaMateri: izinMateri, simpanMateri, hapusMateri, geserUrutanMateri,
     sidang: db.sidang, sidangUrut: db.sidangUrut, pengaturan: db.pengaturan, bolehSidang, bolehHapusSidang, muatSidang, simpanSidang, hapusSidang,
     simpanPengaturan, aturUrutSidang,
@@ -1094,7 +1180,8 @@ export function AppProvider({ children }) {
     simpanAnggota, imporAnggota, hapusAnggota, perbaruiRombel, lengkapiJenisKelamin,
     simpanGudep,
     dokumen: db.dokumen, muatDokumen, terbitkanSuratAgama, cabutDokumen, bolehSurat,
-    penugasan: db.penugasan, guruAgama: db.guruAgama, muatPenugasan, muatLogPenugasan, aturPenugasan, salinPenugasan, simpanGuruAgama, hapusGuruAgama,
+    penugasan: db.penugasan, penugasanPeserta: db.penugasanPeserta, guruAgama: db.guruAgama, muatPenugasan, muatLogPenugasan, aturPenugasan, aturPenugasanPeserta, salinPenugasan, simpanGuruAgama, hapusGuruAgama, bolehAturPenugasan,
+    bolehKepengurusan, terapkanKepengurusan, aturJabatanDewan, arsipkanDewanLama, muatLogKepengurusan,
     muatUlang: muatSemua,
     notifikasi: db.notifikasi, belumDibaca: jumlahBelumDibaca(db.notifikasi), segarkanNotifikasi, tandaiNotifikasi, api,
     notify, toast,

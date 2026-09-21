@@ -63,7 +63,7 @@ export default function AlihkanModal({ peserta, poin, entry, onTutup }) {
           {pilihan && bolehAntrian && <option value="">Antrian rombel: penguji yang bertugas mana pun</option>}
           {tanpaTujuan && <option value="">Tidak ada penguji lain yang sesuai</option>}
           {daftar.map((u) => (
-            <option key={u.id} value={u.id}>{u.nama}{u.jabatan ? `, ${u.jabatan}` : ''} ({u.beban} antrian)</option>
+            <option key={u.id} value={u.id}>{u.nama}{u.jabatan_dewan ? `, ${u.jabatan_dewan} Dewan Ambalan` : u.jabatan ? `, ${u.jabatan}` : ''} ({u.beban} antrian)</option>
           ))}
         </select>
       </Field>

@@ -3,6 +3,7 @@ import { APP } from '../config';
 import { useApp } from '../context/AppContext';
 import { KETERANGAN_STATUS, statusAnggota } from '../lib/naikKelasLogic';
 import { useGudep } from '../lib/gudepStore';
+import BilahTampilan from './BilahTampilan';
 import Footer from './Footer';
 import LogoMark from './LogoMark';
 import MenuAkun from './MenuAkun';
@@ -64,6 +65,7 @@ export default function Layout({ nav, grup, tab, setTab, children }) {
               Akun Anda berstatus <b>{statusAnggota(user) === 'alumni' ? 'alumni' : 'nonaktif'}</b>. {KETERANGAN_STATUS[statusAnggota(user)]} Untuk aktif kembali, hubungi Pembina atau Admin Gudep.
             </p>
           )}
+          <BilahTampilan />
           {children}
         </main>
 

@@ -23,6 +23,7 @@ import KelolaInstrumen from './pages/KelolaInstrumen';
 import Penugasan from './pages/Penugasan';
 import DataGudep from './pages/DataGudep';
 import NaikKelas from './pages/NaikKelas';
+import Kepengurusan from './pages/Kepengurusan';
 import SesiUjian from './pages/SesiUjian';
 import Iuran from './pages/Iuran';
 import Notifikasi from './pages/Notifikasi';
@@ -38,7 +39,8 @@ import LogoMark from './components/LogoMark';
  *  Pengujian SKU    : Penegak: Poin SKU, Cetak. Dewan/Pembina: Antrian, Peserta, Sesi, Instrumen dan Penugasan (Pembina), Sidang, Cetak. Admin: Sesi, Instrumen, Sidang, Cetak
  *  Kegiatan Ambalan : Absensi, Iuran (semua peran), Portofolio (pengurus), Raport (Pembina dan Admin)
  *  Materi           : Materi, Kelola Materi (Pembina dan Admin)
- *  Pengelolaan      : Anggota, Naik Kelas, Data Gudep (Admin)
+ *  Pengelolaan      : Anggota, Kepengurusan, Naik Kelas, Data Gudep (Admin). Kepengurusan Dewan Ambalan juga untuk Pembina (di Pengujian SKU).
+ * Dewan Ambalan = jabatan pada akun Penegak: pemegangnya memilih tampilan Penegak atau Dewan (user.role berubah menjadi 'penguji' pada tampilan Dewan).
  * Akun saya dan Reset PIN anggota (pengurus) tidak ada di daftar ini: keduanya di menu akun (nama pengguna di menu samping atau header).
  */
 function buatNav(user, peran, belumDibaca = 0) {
@@ -53,6 +55,7 @@ function buatNav(user, peran, belumDibaca = 0) {
   const sesi = { id: 'sesi', label: 'Sesi ujian', ikon: 'sesi' };
   const cetak = { id: 'cetak', label: 'Cetak', ikon: 'cetak' };
   const penugasan = { id: 'penugasan', label: 'Penugasan', ikon: 'penugasan' };
+  const kepengurusan = { id: 'kepengurusan', label: 'Kepengurusan', ikon: 'perisai' };
   const kelolaBoleh = bolehKelolaMateri(user);
   const notifikasi = { id: 'notifikasi', label: 'Notifikasi', ikon: 'lonceng', lencana: belumDibaca };
 
@@ -67,7 +70,7 @@ function buatNav(user, peran, belumDibaca = 0) {
   if (user.role === 'penguji') {
     return [
       { judul: 'Utama', item: [{ id: 'dashboard', label: 'Dashboard', ikon: 'dashboard' }, notifikasi] },
-      { judul: 'Pengujian SKU', item: [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }, { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, sesi, ...(kelolaBoleh ? [instrumen, penugasan] : []), sidang, cetak] },
+      { judul: 'Pengujian SKU', item: [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }, { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, sesi, ...(kelolaBoleh ? [instrumen, penugasan, kepengurusan] : []), sidang, cetak] },
       { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, ...(kelolaBoleh ? [raport] : [])] },
       { judul: 'Materi', item: [materi, ...(kelolaBoleh ? [kelola] : [])] },
     ];
@@ -77,7 +80,7 @@ function buatNav(user, peran, belumDibaca = 0) {
     { judul: 'Pengujian SKU', item: [sesi, instrumen, sidang, cetak] },
     { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, raport] },
     { judul: 'Materi', item: [materi, kelola] },
-    { judul: 'Pengelolaan', item: [{ id: 'anggota', label: 'Anggota', ikon: 'anggota' }, { id: 'naikkelas', label: 'Naik Kelas', ikon: 'naikkelas' }, { id: 'gudep', label: 'Data Gudep', ikon: 'perisai' }] },
+    { judul: 'Pengelolaan', item: [{ id: 'anggota', label: 'Anggota', ikon: 'anggota' }, kepengurusan, { id: 'naikkelas', label: 'Naik Kelas', ikon: 'naikkelas' }, { id: 'gudep', label: 'Data Gudep', ikon: 'perisai' }] },
   ];
 }
 function Toast() {
@@ -118,6 +121,22 @@ function LayarStatus({ status, galat }) {
   );
 }
 
+/** Akun Dewan Ambalan lama yang diarsipkan tidak dapat dipakai lagi. */
+function LayarArsip() {
+  const { logout } = useApp();
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-pramuka-800 px-6 text-center text-pramuka-50">
+      <LogoMark size={64} />
+      <h1 className="mt-5 font-display text-2xl font-bold tracking-wide">Akun ini sudah diarsipkan</h1>
+      <p className="mt-2 max-w-lg text-sm leading-relaxed text-pramuka-200" role="alert">
+        Dewan Ambalan kini berupa jabatan pada akun Penegak. Keluar, lalu masuk memakai akun Penegak Anda (NIS). Bila jabatan Dewan Anda sudah ditetapkan,
+        tombol tampilan Dewan muncul di sana. Hubungi Pembina atau Admin Gudep bila belum.
+      </p>
+      <button className="btn btn-gold mt-5" onClick={logout}>Keluar</button>
+    </div>
+  );
+}
+
 function Shell() {
   const { user, peranUser, status, galatMuat, belumDibaca, segarkanNotifikasi } = useApp();
   const [tab, setTab] = useState(null);
@@ -132,7 +151,7 @@ function Shell() {
     setFokusId(null);
     setMateriButir(null);
     setKelolaId(null);
-  }, [user?.id]);
+  }, [user?.id, user?.role]);
 
   // Klik notifikasi push membuka aplikasi di Kotak Notifikasi: lewat alamat ?buka=notifikasi (aplikasi tertutup) atau pesan service worker (sudah terbuka).
   useEffect(() => {
@@ -168,6 +187,8 @@ function Shell() {
   if (!user) return <Login />;
   // PIN awal dari admin atau PIN hasil reset wajib diganti sebelum aplikasi dapat dipakai
   if (user.wajibGantiPin) return <GantiPinWajib />;
+  // Akun Dewan Ambalan LAMA yang sudah diarsipkan: Dewan kini jabatan pada akun Penegak, jadi masuk memakai akun Penegak sendiri
+  if (user.role === 'penguji' && (user.status ?? 'aktif') !== 'aktif') return <LayarArsip />;
 
   const grup = buatNav(user, peranUser, belumDibaca);
   const nav = grup.flatMap((g) => g.item);
@@ -224,6 +245,8 @@ function Shell() {
     isi = <NaikKelas />;
   } else if (tabAktif === 'penugasan' && user.role === 'penguji' && user.jabatan === 'Pembina') {
     isi = <Penugasan />;
+  } else if (tabAktif === 'kepengurusan' && (user.role === 'admin' || (user.role === 'penguji' && user.jabatan === 'Pembina'))) {
+    isi = <Kepengurusan />;
   } else if (tabAktif === 'materi') {
     isi = <Materi key={materiButir ?? 'semua'} butirAwal={materiButir} onKelola={bukaKelola} />;
   } else if (tabAktif === 'kelolamateri') {

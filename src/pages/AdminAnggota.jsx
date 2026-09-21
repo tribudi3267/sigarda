@@ -2,7 +2,7 @@
 import { useApp } from '../context/AppContext';
 import { KELOMPOK_PENGGUNA, SARAN_SANGGA, cocokKelompok } from '../config';
 import { AGAMA } from '../data/skuData';
-import { JABATAN_DEWAN, rencanaJabatanDewan } from '../lib/dewanLogic';
+import { JABATAN_DEWAN, PESAN_JABATAN, akunDewanLama, jabatanDewanSah, rencanaJabatanDewan } from '../lib/dewanLogic';
 import { layakGaruda } from '../lib/skuLogic';
 import { urutTeks } from '../lib/format';
 import { normalisasiNama } from '../lib/cariNama';
@@ -78,13 +78,15 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
 
   const layak = !baru && f.role === 'peserta' && layakGaruda(progress, f);
   const agamaBerubah = !baru && f.role === 'peserta' && users.find((u) => u.id === f.id)?.agama !== f.agama;
-  // Pradana/Pradani hanya satu orang: pemegang lama akan digantikan (jadi anggota Dewan biasa) bila jabatan ini dipilih
-  const menggantikan = f.role === 'penguji' && f.jabatan === 'Dewan Ambalan' && f.jabatanDewan
-    ? rencanaJabatanDewan(users, { id: f.id ?? '', username: f.username ?? '' }, f.jabatanDewan).menggantikan
+  // Pradana/Pradani hanya satu orang: pemegang lama kehilangan jabatannya (kembali menjadi Penegak biasa) bila jabatan ini dipilih
+  const menggantikan = f.role === 'peserta' && f.jabatanDewan
+    ? rencanaJabatanDewan(users, { id: f.id ?? '', username: (f.nis ?? f.username ?? '').trim().toLowerCase() }, f.jabatanDewan).menggantikan
     : null;
+  const jabatanSalah = f.role === 'peserta' && !jabatanDewanSah(f.jabatanDewan);
 
   const kirim = async () => {
     if (sibuk) return;
+    if (jabatanSalah) { setGalat(PESAN_JABATAN); return; }
     setSibuk(true);
     setGalat('');
     // Penegak masuk memakai NIS, jadi NIS = nama pengguna
@@ -114,7 +116,7 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
       <Field label="Peran" htmlFor="f-role">
         {baru ? (
           <select id="f-role" className="input" value={kelompokAktif.id} onChange={pilihKelompok}>
-            {KELOMPOK_PENGGUNA.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
+            {KELOMPOK_PENGGUNA.filter((k) => k.id !== 'dewan').map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
           </select>
         ) : (
           <p className="input bg-pramuka-50">{kelompokAktif.label}</p>
@@ -159,6 +161,23 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
           <Field label="NTA (opsional)" htmlFor="f-nta" bantuan="Nomor Tanda Anggota Pramuka, mis. 11.03.10.701.00123. Bisa diisi kemudian; juga terisi otomatis dari lembar sidang.">
             <input id="f-nta" className="input" autoComplete="off" maxLength={40} value={f.nta ?? ''} onChange={set('nta')} />
           </Field>
+          {(f.status ?? 'aktif') === 'aktif' && (
+            <>
+              <Field
+                label="Jabatan Dewan Ambalan (opsional)"
+                htmlFor="f-jabatan-dewan"
+                bantuan="Dewan Ambalan adalah jabatan pada akun Penegak ini (bukan akun terpisah): pemegang jabatan dapat berganti tampilan Penegak/Dewan dan menguji sesuai penugasan. Pradana menjadi ketua sidang; Pradana dan Pradani menandatangani Surat Tanda Lulus. Pradana dan Pradani masing-masing hanya satu orang. Jabatan dicabut otomatis saat Penegak nonaktif atau alumni. Untuk mengganti seluruh kepengurusan sekaligus, pakai menu Kepengurusan."
+              >
+                <input id="f-jabatan-dewan" className="input" list="saran-jabatan-dewan" maxLength={60} autoComplete="off" placeholder="Kosongkan bila bukan pengurus Dewan" value={f.jabatanDewan ?? ''} onChange={set('jabatanDewan')} />
+                <datalist id="saran-jabatan-dewan">{JABATAN_DEWAN.map((j) => <option key={j} value={j} />)}</datalist>
+              </Field>
+              {menggantikan && (
+                <p role="status" className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                  {menggantikan.nama} saat ini menjabat {f.jabatanDewan}. Bila disimpan, jabatan itu berpindah ke {f.nama?.trim() || 'anggota ini'} dan {menggantikan.nama} kembali menjadi Penegak biasa.
+                </p>
+              )}
+            </>
+          )}
           <Field
             label="Agama"
             htmlFor="f-agama"
@@ -211,21 +230,9 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
 
       {f.role === 'penguji' && f.jabatan === 'Dewan Ambalan' && (
         <>
-          <Field
-            label="Jabatan Dewan Ambalan (opsional)"
-            htmlFor="f-jabatan-dewan"
-            bantuan="Pradana menjadi ketua sidang; Pradana dan Pradani menandatangani Surat Tanda Lulus (nama dan NTA diambil dari akun ini). Pradana dan Pradani masing-masing hanya satu orang."
-          >
-            <select id="f-jabatan-dewan" className="input" value={f.jabatanDewan ?? ''} onChange={set('jabatanDewan')}>
-              <option value="">Anggota Dewan (tanpa jabatan)</option>
-              {JABATAN_DEWAN.map((j) => <option key={j} value={j}>{j}</option>)}
-            </select>
-          </Field>
-          {menggantikan && (
-            <p role="status" className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-950">
-              {menggantikan.nama} saat ini menjabat {f.jabatanDewan}. Bila disimpan, jabatan itu berpindah ke {f.nama?.trim() || 'anggota ini'} dan {menggantikan.nama} menjadi anggota Dewan biasa.
-            </p>
-          )}
+          <p className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-950">
+            Ini akun Dewan Ambalan LAMA. Dewan Ambalan kini berupa jabatan pada akun Penegak: tetapkan kepengurusan di menu Kepengurusan, lalu arsipkan akun lama di sana.
+          </p>
           <Field label="NTA (opsional)" htmlFor="f-nta-dewan" bantuan="Nomor Tanda Anggota Pramuka, mis. 11.03.10.701.00123. Tercetak pada tanda tangan Pradana dan Pradani.">
             <input id="f-nta-dewan" className="input" autoComplete="off" maxLength={40} value={f.nta ?? ''} onChange={set('nta')} />
           </Field>
@@ -276,6 +283,8 @@ export default function AdminAnggota() {
 
   const penugasan = kelompok === TAB_PENUGASAN;
   const aktif = KELOMPOK_PENGGUNA.find((k) => k.id === kelompok);
+  const adaDewanLama = useMemo(() => akunDewanLama(users).length > 0, [users]);
+  const dewanLama = kelompok === 'dewan';
   const rombelLama = useMemo(() => pesertaRombelLama(users).length, [users]);
   const tanpaJk = useMemo(() => anggotaTanpaJk(users).length, [users]);
   const daftar = useMemo(() => {
@@ -297,8 +306,8 @@ export default function AdminAnggota() {
     <div className="animasi-naik">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-2xl font-bold">Data anggota</h1>
-        {!penugasan && <div className="flex flex-wrap gap-2">
-          {KELOMPOK_IMPOR.includes(kelompok) && (
+        {!penugasan && !dewanLama && <div className="flex flex-wrap gap-2">
+          {KELOMPOK_IMPOR.includes(kelompok) && kelompok !== 'dewan' && (
             <>
               <button className="btn btn-outline btn-sm" onClick={() => unduhTemplateAnggota(kelompok)}>
                 <Icon nama="unduh" className="h-4 w-4" /> Unduh template Excel
@@ -318,7 +327,7 @@ export default function AdminAnggota() {
       </div>
 
       <div role="tablist" aria-label="Jenis anggota" className="mb-3 inline-flex flex-wrap rounded-lg bg-pramuka-100 p-1">
-        {KELOMPOK_PENGGUNA.map((k) => (
+        {KELOMPOK_PENGGUNA.filter((k) => k.id !== 'dewan' || adaDewanLama).map((k) => (
           <button
             key={k.id}
             role="tab"
@@ -326,7 +335,7 @@ export default function AdminAnggota() {
             onClick={() => { setKelompok(k.id); setCari(''); }}
             className={`rounded-md px-3 py-2 text-sm font-semibold ${kelompok === k.id ? 'bg-pramuka-800 text-pramuka-50' : 'text-pramuka-700 hover:bg-pramuka-200'}`}
           >
-            {k.label}
+            {k.id === 'dewan' ? 'Dewan (akun lama)' : k.label}
           </button>
         ))}
         <button
@@ -343,6 +352,12 @@ export default function AdminAnggota() {
         <div role="status" className="mb-3 rounded-md bg-amber-50 px-3 py-2.5 text-sm text-amber-950">
           <p><span className="font-semibold">{tanpaJk} anggota</span> belum diisi jenis kelaminnya (semua peran).</p>
           <button className="btn btn-gold btn-sm mt-2" onClick={() => setJkModal(true)}>Lengkapi jenis kelamin</button>
+        </div>
+      )}
+
+      {dewanLama && (
+        <div role="status" className="mb-3 rounded-md bg-amber-50 px-3 py-2.5 text-sm text-amber-950">
+          Dewan Ambalan kini berupa <span className="font-semibold">jabatan pada akun Penegak</span>. Akun di bawah ini adalah akun Dewan lama; arsipkan setelah kepengurusan baru ditetapkan di menu Kepengurusan.
         </div>
       )}
 
@@ -385,10 +400,10 @@ export default function AdminAnggota() {
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-pramuka-500">
                   {u.role === 'peserta' && (
                     <>
-                      NIS {u.nis || '-'}, {ketJk(u.jenisKelamin)}, rombel {u.kelas}, {u.sangga}, {u.agama}{u.nta ? `, NTA ${u.nta}` : ''} <BadgePeran peran={u.peran} singkat />{(u.status ?? 'aktif') !== 'aktif' && <BadgeStatus status={u.status} />}{u.status === 'alumni' && u.lulusTa ? ` lulus ${u.lulusTa}` : ''}
+                      NIS {u.nis || '-'}, {ketJk(u.jenisKelamin)}, rombel {u.kelas}, {u.sangga}, {u.agama}{u.nta ? `, NTA ${u.nta}` : ''} <BadgePeran peran={u.peran} singkat />{u.jabatanDewan && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900 ring-1 ring-inset ring-amber-300">Dewan: {u.jabatanDewan}</span>}{(u.status ?? 'aktif') !== 'aktif' && <BadgeStatus status={u.status} />}{u.status === 'alumni' && u.lulusTa ? ` lulus ${u.lulusTa}` : ''}
                     </>
                   )}
-                  {u.role === 'penguji' && <>{u.jabatan}{u.jabatanDewan ? ` (${u.jabatanDewan})` : ''}, {ketJk(u.jenisKelamin)}{u.jabatan === 'Pembina' ? `, agama ${u.agama ?? 'belum diisi'}` : ''}{u.jabatan === 'Dewan Ambalan' && u.nta ? `, NTA ${u.nta}` : ''}, pengguna <span className="font-mono">{u.username}</span></>}
+                  {u.role === 'penguji' && <>{u.jabatan === 'Dewan Ambalan' ? 'Akun Dewan lama' : u.jabatan}{u.jabatanDewan ? ` (${u.jabatanDewan})` : ''}, {ketJk(u.jenisKelamin)}{u.jabatan === 'Pembina' ? `, agama ${u.agama ?? 'belum diisi'}` : ''}{u.jabatan === 'Dewan Ambalan' && u.nta ? `, NTA ${u.nta}` : ''}, pengguna <span className="font-mono">{u.username}</span></>}
                   {u.role === 'admin' && <>Admin Gudep, {ketJk(u.jenisKelamin)}, pengguna <span className="font-mono">{u.username}</span></>}
                 </p>
               </div>

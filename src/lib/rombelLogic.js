@@ -5,9 +5,10 @@
  * menyimpan rombel. Aturan yang sama ditegakkan server (sigarda.rombel_sah, sg_profil_buat_internal, sg_anggota_ubah,
  * sg_rombel_perbarui); di sini hanya untuk umpan balik cepat dan tampilan. Dijaga oleh uji/penugasan-klien.mjs.
  *
- * Penugasan (penugasan_rombel): Admin menetapkan Pembina dan Dewan Ambalan untuk tiap rombel per tahun ajaran. Rombel tanpa
- * penugasan tetap memakai aturan lama (semua penguji) sampai diatur. Penegakannya (siapa yang sah dipilih dan dinilai) ada di bagian
- * "Penegakan penugasan" di bawah, yang mencerminkan sigarda.penguji_sah di server.
+ * Penugasan (penugasan_rombel): Pembina dan Admin menetapkan Pembina dan Penegak berjabatan Dewan Ambalan untuk tiap rombel per tahun ajaran, dan
+ * (penugasan_peserta) untuk satu Penegak tertentu sebagai pengecualian. Rombel tanpa penugasan tetap memakai aturan lama (semua penguji) sampai
+ * diatur. Penegakannya (siapa yang sah dipilih dan dinilai) ada di bagian "Penegakan penugasan" di bawah, yang mencerminkan sigarda.penguji_sah.
+ * Dewan Ambalan adalah ATRIBUT akun Penegak (profiles.jabatan_dewan), bukan akun terpisah: penegakDewan, bisaMenguji.
  */
 import { AGAMA } from '../data/skuData';
 import { hariIni, urutAlami } from './format';
@@ -55,11 +56,17 @@ export const geserTahunAjaran = (ta, n) => {
 
 /* ------------------------------ Penugasan ------------------------------ */
 
+/** Penegak aktif berjabatan Dewan Ambalan (cermin sigarda.penegak_dewan). */
+export const penegakDewan = (u) => !!u && u.role === 'peserta' && !!u.jabatanDewan && (u.status ?? 'aktif') === 'aktif';
+/** Boleh menjadi penguji: penguji aktif (Pembina, atau akun Dewan lama yang belum diarsipkan) atau Penegak berjabatan Dewan (cermin sigarda.bisa_menguji). */
+export const bisaMenguji = (u) => !!u && (u.role === 'penguji' ? (u.status ?? 'aktif') === 'aktif' : penegakDewan(u));
+export const adalahPembina = (u) => !!u && u.role === 'penguji' && u.jabatan === 'Pembina';
+
 /** Pembina lebih dulu, lalu Dewan Ambalan, masing-masing menurut nama. */
 export const daftarPengujiUrut = (users) =>
   users
-    .filter((u) => u.role === 'penguji')
-    .sort((a, b) => (a.jabatan === b.jabatan ? 0 : a.jabatan === 'Pembina' ? -1 : 1) || a.nama.localeCompare(b.nama, 'id'));
+    .filter(bisaMenguji)
+    .sort((a, b) => Number(!adalahPembina(a)) - Number(!adalahPembina(b)) || a.nama.localeCompare(b.nama, 'id'));
 
 /** Himpunan kunci `${pengujiId}|${rombel}` dari daftar [{ rombel, pengujiId }]. */
 export const kunciPenugasan = (baris = []) => new Set(baris.map((b) => `${b.pengujiId}|${b.rombel}`));
@@ -131,28 +138,47 @@ export const tahunAjaranKini = (tanggalIso = hariIni()) => {
 };
 
 /**
- * Aturan peran penguji untuk satu butir (berlaku saat memilih penguji DAN mencatat hasil): butir Laksana dan butir agama hanya Pembina;
- * butir Bantara lain boleh Pembina atau Dewan Ambalan. Butir agama hanya untuk Pembina yang agamanya sama dengan Penegak; selama belum ada
- * satu pun Pembina yang agamanya terisi (masa peralihan), semua Pembina dianggap sah. Pengecualian: bila ada surat pengantar ke guru agama
- * yang masih berlaku untuk Penegak dan butir itu (`dokumen`), Pembina yang tidak seagama boleh mencatat hasilnya. Cermin sigarda.penguji_peran_ok.
+ * Penguji ini DITUGASKAN untuk Penegak ini (tahun ajaran berjalan)? Penugasan khusus Penegak (`penugasanPeserta` = [{ pesertaId, pengujiId }]) bila ada
+ * menggantikan penugasan rombelnya (`penugasan` = [{ rombel, pengujiId }]). Cermin sigarda.ditugaskan.
  */
-export function pengujiPeranOk(users, peserta, penguji, poin, dokumen = []) {
-  if (!penguji || penguji.role !== 'penguji' || !poin) return false;
-  if (penguji.jabatan !== 'Pembina' && (poin.tingkat === 'Laksana' || poin.agama)) return false;
-  if (poin.agama && users.some((u) => u.role === 'penguji' && u.jabatan === 'Pembina' && u.agama)) {
+export function ditugaskanUntuk({ penugasan = [], penugasanPeserta = [], peserta, pengujiId }) {
+  const khusus = penugasanPeserta.filter((b) => b.pesertaId === peserta?.id);
+  if (khusus.length) return khusus.some((b) => b.pengujiId === pengujiId);
+  return rombelSah(peserta?.kelas) && penugasan.some((b) => b.rombel === peserta.kelas && b.pengujiId === pengujiId);
+}
+
+/**
+ * Aturan peran penguji untuk satu butir (berlaku saat memilih penguji DAN mencatat hasil): penguji = Pembina atau Penegak berjabatan Dewan (aktif), bukan
+ * Penegak itu sendiri. Butir agama hanya Pembina yang agamanya sama dengan Penegak (selama belum ada satu pun Pembina yang agamanya terisi, masa
+ * peralihan, semua Pembina dianggap sah); pengecualian: surat pengantar ke guru agama yang masih berlaku untuk Penegak dan butir itu (`dokumen`).
+ * Butir Laksana: Pembina, atau penguji yang ditugaskan untuk Penegak itu (`tugas` = { penugasan, penugasanPeserta }); tanpa penugasan, Dewan hanya
+ * menguji butir Bantara. Cermin sigarda.penguji_peran_ok.
+ */
+export function pengujiPeranOk(users, peserta, penguji, poin, dokumen = [], tugas = {}) {
+  if (!bisaMenguji(penguji) || !poin || penguji.id === peserta?.id) return false;
+  const pembina = adalahPembina(penguji);
+  if (!pembina && poin.agama) return false;
+  if (!pembina && poin.tingkat === 'Laksana' && !ditugaskanUntuk({ ...tugas, peserta, pengujiId: penguji.id })) return false;
+  if (poin.agama && users.some((u) => adalahPembina(u) && u.agama)) {
     if ((!penguji.agama || penguji.agama !== peserta?.agama) && !suratAgamaAktif(dokumen, peserta?.id, poin.id)) return false;
   }
   return true;
 }
 
 /**
- * Penguji yang sah untuk satu Penegak dan satu butir. `penugasan` = baris penugasan tahun ajaran berjalan ([{ rombel, pengujiId }]).
- * Bila rombel Penegak diatur dan ada penguji bertugas yang memenuhi aturan peran: hanya mereka (dariRombel true); bila tidak (rombel belum
- * diatur, kelas format lama, atau tak seorang pun yang bertugas boleh menguji butir itu): semua penguji yang memenuhi aturan peran.
- * Cermin sigarda.penguji_sah. Mengembalikan { penguji: [pengguna], dariRombel }.
+ * Penguji yang sah untuk satu Penegak dan satu butir. `penugasan` = baris penugasan rombel tahun ajaran berjalan ([{ rombel, pengujiId }]),
+ * `penugasanPeserta` = penugasan khusus Penegak ([{ pesertaId, pengujiId }]). Urutan: (1) penugasan khusus Penegak itu, (2) penugasan rombelnya,
+ * masing-masing bila ada penguji bertugas yang memenuhi aturan peran (dariRombel true); bila tidak (belum diatur, kelas format lama, atau tak seorang
+ * pun yang bertugas boleh menguji butir itu): semua penguji yang memenuhi aturan peran. Cermin sigarda.penguji_sah.
+ * Mengembalikan { penguji: [pengguna], dariRombel }.
  */
-export function pengujiSah({ users, penugasan = [], peserta, poin, dokumen = [] }) {
-  const layak = (u) => pengujiPeranOk(users, peserta, u, poin, dokumen);
+export function pengujiSah({ users, penugasan = [], penugasanPeserta = [], peserta, poin, dokumen = [] }) {
+  const layak = (u) => pengujiPeranOk(users, peserta, u, poin, dokumen, { penugasan, penugasanPeserta });
+  const khusus = new Set(penugasanPeserta.filter((b) => b.pesertaId === peserta?.id).map((b) => b.pengujiId));
+  if (khusus.size) {
+    const dariKhusus = users.filter((u) => khusus.has(u.id) && layak(u));
+    if (dariKhusus.length) return { penguji: dariKhusus, dariRombel: true };
+  }
   if (rombelSah(peserta?.kelas)) {
     const ditugaskan = new Set(penugasan.filter((b) => b.rombel === peserta.kelas).map((b) => b.pengujiId));
     const dariRombel = users.filter((u) => ditugaskan.has(u.id) && layak(u));

@@ -262,12 +262,24 @@ export const susunRaport = (baris = []) => Object.fromEntries(baris.map((r) => [
 export const susunPenugasan = (baris = []) =>
   baris.map((r) => ({ rombel: r.rombel, pengujiId: r.penguji_id, ditetapkanPada: r.ditetapkan_pada }));
 
-/** Baris penugasan_log -> [{ id, waktu, tahunAjaran, rombel, pengujiId, pengujiNama, tindakan, catatan, olehNama }] (lama ke baru) */
+/** Baris penugasan_peserta (penugasan khusus satu Penegak) -> [{ pesertaId, pengujiId, ditetapkanPada }] */
+export const susunPenugasanPeserta = (baris = []) =>
+  baris.map((r) => ({ pesertaId: r.peserta_id, pengujiId: r.penguji_id, ditetapkanPada: r.ditetapkan_pada }));
+
+/** Baris penugasan_log -> [{ id, waktu, tahunAjaran, rombel, pengujiId, pengujiNama, tindakan, catatan, olehNama, pesertaId, pesertaNama }] (lama ke baru); pesertaId terisi bila penugasan khusus satu Penegak */
 export const susunLogPenugasan = (baris = []) =>
   baris.map((r) => ({
     id: Number(r.id), waktu: r.waktu, tahunAjaran: r.tahun_ajaran, rombel: r.rombel, pengujiId: r.penguji_id ?? null,
     pengujiNama: r.penguji_nama, tindakan: r.tindakan, catatan: r.catatan ?? '', olehNama: r.oleh_nama ?? '',
+    pesertaId: r.peserta_id ?? null, pesertaNama: r.peserta_nama ?? '',
   }));
+
+/** Baris kepengurusan_log -> [{ id, waktu, pesertaId, pesertaNama, nis, tindakan, jabatanLama, jabatanBaru, alasan, olehNama }] (terbaru lebih dulu) */
+export const susunLogKepengurusan = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), waktu: r.waktu, pesertaId: r.peserta_id ?? null, pesertaNama: r.peserta_nama, nis: r.nis ?? '', tindakan: r.tindakan,
+    jabatanLama: r.jabatan_lama ?? null, jabatanBaru: r.jabatan_baru ?? null, alasan: r.alasan ?? '', olehNama: r.oleh_nama ?? '',
+  })).sort((a, b) => b.id - a.id);
 
 /** Baris naik_kelas_batch -> [{ id, waktu, tahunAjaran, ringkasan, olehNama, dibatalkanPada }] (terbaru lebih dulu) */
 export const susunBatchNaikKelas = (baris = []) =>

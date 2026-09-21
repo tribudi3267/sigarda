@@ -70,7 +70,13 @@ export function buatPinAcak(panjang = 6) {
   return '739158';
 }
 
-/** Admin -> semua selain admin. Pembina -> Penegak dan Dewan Ambalan. Dewan Ambalan -> Penegak. Tidak ada yang mereset dirinya sendiri. */
+/** Penegak aktif berjabatan Dewan Ambalan (Dewan = atribut akun Penegak). */
+export const penegakDewan = (u: any) => !!u && u.role === 'peserta' && !!u.jabatan_dewan && (u.status ?? 'aktif') === 'aktif';
+
+/**
+ * Admin -> semua selain admin. Pembina -> Penegak dan Dewan Ambalan. Dewan Ambalan (akun lama atau Penegak berjabatan Dewan) -> Penegak.
+ * Tidak ada yang mereset dirinya sendiri.
+ */
 export function bolehResetPin(aktor: any, target: any) {
   if (!aktor || !target || aktor.id === target.id) return false;
   if (aktor.role === 'admin') return target.role !== 'admin';
@@ -78,6 +84,7 @@ export function bolehResetPin(aktor: any, target: any) {
     return target.role === 'peserta' || (target.role === 'penguji' && target.jabatan === 'Dewan Ambalan');
   }
   if (aktor.role === 'penguji' && aktor.jabatan === 'Dewan Ambalan') return target.role === 'peserta';
+  if (penegakDewan(aktor)) return target.role === 'peserta';
   return false;
 }
 
@@ -278,7 +285,7 @@ async function aksiUbahUsername(b: any, me: any, d: any) {
 }
 
 async function aksiCatatHasil(b: any, me: any, d: any) {
-  if (me.role !== 'penguji') return gagal('Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.');
+  if (me.role !== 'penguji' && !penegakDewan(me)) return gagal('Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.');
   const menit = await panggil(d, 'sg_kunci_cek_internal', { p_username: me.username });
   if (menit > 0) return gagal(pesanKunci(menit), { terkunci: true });
   const benar = POLA_PIN.test(String(b.pin ?? '')) ? await d.masukDenganPassword(emailDari(me.username), String(b.pin)) : null;

@@ -62,7 +62,7 @@ const rinaK = r;
 await q(`update public.profiles set wajib_ganti_pin = false`);
 const rinaAju = await rinaK.a.ajukan({ skuId: 'LAK-03', jadwal: hariIni, pengujiId: null, catatan: '' });
 ok(rinaAju.ok, 'Rina (Laksana) mengajukan ke antrian rombel');
-ok((await notif(pembina, 'ajukan')).length === 1 && (await notif(dewan, 'ajukan')).length === 0, 'butir Laksana: hanya Pembina diberi tahu (Dewan bukan penguji sah)');
+ok((await notif(pembina, 'ajukan')).length === 0 && (await notif(dewan, 'ajukan')).length === 1, 'butir Laksana Rina (XI-02, hanya Dewan bertugas): hanya Dewan diberi tahu (Dewan yang ditugaskan sah menguji Laksana)');
 
 console.log('\n--- Pemicu: alihkan, mulai, hasil ---');
 await bersih(ahmad, 'BAN-05'); await kosongkan();

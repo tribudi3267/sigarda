@@ -11,12 +11,12 @@ import RingkasanGudep from '../components/RingkasanGudep';
 import UjiModal from '../components/UjiModal';
 import { Avatar, Badge, BadgePeran, Icon, Kosong, ProgressBar, TeksPoin } from '../components/ui';
 
-/** Baris penugasan tahun ajaran berjalan untuk menyaring antrian bersama rombel; dimuat sekali. null selama belum termuat (aturan lama). */
+/** Baris penugasan tahun ajaran berjalan (rombel dan khusus Penegak) untuk menyaring antrian bersama rombel; dimuat sekali. penugasan null selama belum termuat (aturan lama). */
 function usePenugasanKini() {
-  const { penugasan, muatPenugasan, muatDokumen } = useApp();
+  const { penugasan, penugasanPeserta, muatPenugasan, muatDokumen } = useApp();
   const ta = tahunAjaranKini();
   useEffect(() => { muatPenugasan(ta); muatDokumen(); }, [ta, muatPenugasan, muatDokumen]); // dokumen: surat pengantar agama ikut menentukan penguji yang sah
-  return penugasan[ta] ?? null;
+  return { penugasan: penugasan[ta] ?? null, penugasanPeserta: (penugasanPeserta ?? {})[ta] ?? [] };
 }
 
 function Dashboard({ onNav }) {
@@ -54,14 +54,14 @@ function Antrian({ onBuka }) {
   const [semua, setSemua] = useState(false);
   const [uji, setUji] = useState(null);
   const [alih, setAlih] = useState(null);
-  const penugasan = usePenugasanKini();
+  const { penugasan, penugasanPeserta } = usePenugasanKini();
   const namaOrang = (id) => users.find((u) => u.id === id)?.nama ?? 'penguji';
 
   // Antrian saya (ditujukan kepada saya + antrian rombel saya) sudah sesuai rombel tugas. Rombel saya baru menyaring saat melihat antrian semua penguji.
   const rombel = useMemo(() => rombelDariPenugasan(penugasan, user.id), [penugasan, user.id]);
   const [hanyaSaya, setHanyaSaya] = useState(true);
   const batasRombel = semua && hanyaSaya && rombel.length > 0;
-  const antrian = antrianPengujian(progress, users, semua ? null : user.id, penugasan, dokumen ?? [])
+  const antrian = antrianPengujian(progress, users, semua ? null : user.id, penugasan, dokumen ?? [], penugasanPeserta)
     .filter((a) => !batasRombel || rombel.includes(a.peserta.kelas));
   const menunggu = antrian.filter((a) => a.entry.status === 'diajukan').length;
 
@@ -93,7 +93,7 @@ function Antrian({ onBuka }) {
       ) : (
         <ul className="panel divide-y divide-pramuka-100">
           {antrian.map(({ peserta, poin, entry, bersama }) => {
-            const boleh = bolehMenilaiPoin(user, poin, { users, peserta, dokumen });
+            const boleh = bolehMenilaiPoin(user, poin, { users, peserta, dokumen, penugasan: penugasan ?? [], penugasanPeserta });
             return (
             <li key={`${peserta.id}-${poin.id}`} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 gap-3">

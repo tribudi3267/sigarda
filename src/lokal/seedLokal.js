@@ -115,4 +115,13 @@ export async function isiStatusContoh(pg) {
   if (!ada) return;
   await pg.query("update public.profiles set status = 'nonaktif', status_pada = sigarda.hari_ini() where username = '10234'");
   await pg.query("update public.profiles set status = 'alumni', status_pada = sigarda.hari_ini(), lulus_ta = '2025/2026' where username = '10010'");
+  // Dewan Ambalan = jabatan pada akun Penegak (fase 6b): Nadia Putri (NIS 10008) menjabat Sekretaris dan ditugaskan menguji rombel XII-01, agar tombol tampilan
+  // Penegak/Dewan dan penugasan khusus terlihat. Akun Dewan contoh yang lama tetap ada (akun Dewan lama) untuk peragaan pengarsipan.
+  const kolom = (await pg.query("select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'jabatan_dewan'")).rows.length;
+  const tabel = (await pg.query("select to_regclass('public.penugasan_peserta') as t")).rows[0].t;
+  if (kolom && tabel) {
+    await pg.query("update public.profiles set jabatan_dewan = 'Sekretaris' where username = '10008'");
+    const ta = (await pg.query('select sigarda.tahun_ajaran_kini() as t')).rows[0].t;
+    await pg.query("insert into public.penugasan_rombel (tahun_ajaran, rombel, penguji_id, ditetapkan_oleh) select $1, 'XII-01', id, id from public.profiles where username = '10008' on conflict do nothing", [ta]);
+  }
 }
