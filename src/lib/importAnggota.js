@@ -12,6 +12,7 @@
 import { KELOMPOK_PENGGUNA, cocokKelompok } from '../config';
 import { AGAMA } from '../data/skuData';
 import { formatPinSah, pinLemah } from './pinLogic';
+import { JABATAN_DEWAN, JABATAN_TUNGGAL, normalisasiJabatanDewan } from './dewanLogic';
 import { normalisasiRombel, PESAN_ROMBEL, SEMUA_ROMBEL } from './rombelLogic';
 
 export const POLA_USERNAME = /^[a-z0-9][a-z0-9._-]{2,31}$/;
@@ -37,6 +38,14 @@ const KOLOM_PENEGAK = [
   { header: 'NTA (opsional)', key: 'nta', lebar: 22 },
   { header: 'PIN Awal (opsional)', key: 'pin', lebar: 20 },
 ];
+// Dewan Ambalan: jabatan (Pradana dan seterusnya) dan NTA opsional; Pradana dan Pradani dipakai pada tanda tangan dokumen.
+const KOLOM_DEWAN = [
+  { header: 'Nama Lengkap', key: 'nama', lebar: 40 },
+  { header: 'Nama Pengguna (opsional)', key: 'username', lebar: 26 },
+  { header: 'Jabatan Dewan (opsional)', key: 'jabatanDewan', lebar: 24 },
+  { header: 'NTA (opsional)', key: 'nta', lebar: 22 },
+  { header: 'PIN Awal (opsional)', key: 'pin', lebar: 22 },
+];
 const KOLOM_PENGURUS = [
   { header: 'Nama Lengkap', key: 'nama', lebar: 40 },
   { header: 'Nama Pengguna (opsional)', key: 'username', lebar: 26 },
@@ -50,7 +59,7 @@ const KOLOM_PEMBINA = [
   { header: 'PIN Awal (opsional)', key: 'pin', lebar: 22 },
 ];
 
-export const kolomTemplate = (kelompok = 'peserta') => (kelompok === 'peserta' ? KOLOM_PENEGAK : kelompok === 'pembina' ? KOLOM_PEMBINA : KOLOM_PENGURUS);
+export const kolomTemplate = (kelompok = 'peserta') => (kelompok === 'peserta' ? KOLOM_PENEGAK : kelompok === 'pembina' ? KOLOM_PEMBINA : kelompok === 'dewan' ? KOLOM_DEWAN : KOLOM_PENGURUS);
 export const KOLOM_TEMPLATE = KOLOM_PENEGAK;
 
 /* ---------- Normalisasi ---------- */
@@ -78,6 +87,7 @@ function petaHeader(teks) {
   if (k === 'kelas' || k === 'rombel') return 'kelas';
   if (k === 'sangga') return 'sangga';
   if (k === 'agama' || k.startsWith('agama')) return 'agama';
+  if (k.startsWith('jabatan')) return 'jabatanDewan';
   if (k === 'nta' || k.startsWith('nta')) return 'nta';
   if (k.startsWith('pin')) return 'pin';
   return null;
@@ -100,7 +110,7 @@ export function teksSel(v) {
 
 /**
  * Mengembalikan baris mentah: [{ no, nama, nis, kelas, sangga, agama, pin }] (no = nomor baris di Excel).
- * Untuk Dewan Ambalan dan Pembina, nis/kelas/sangga/nta selalu kosong; agama hanya terbaca untuk Pembina.
+ * Untuk Dewan Ambalan dan Pembina, nis/kelas/sangga selalu kosong; agama hanya terbaca untuk Pembina; jabatan dan NTA hanya untuk Dewan Ambalan.
  */
 export async function bacaExcelAnggota(buffer, kelompok = 'peserta') {
   const penegak = kelompok === 'peserta';
@@ -146,7 +156,8 @@ export async function bacaExcelAnggota(buffer, kelompok = 'peserta') {
     const ambil = (k) => (kolom[k] ? teksSel(row.getCell(kolom[k]).value) : '');
     const item = {
       no: r, nama: ambil('nama'), nis: ambil('nis'), kelas: ambil('kelas'), sangga: ambil('sangga'), agama: penegak || kelompok === 'pembina' ? ambil('agama') : '',
-      username: ambil('username'), pin: ambil('pin'), nta: penegak ? ambil('nta') : '',
+      username: ambil('username'), pin: ambil('pin'), nta: penegak || kelompok === 'dewan' ? ambil('nta') : '',
+      jabatanDewan: kelompok === 'dewan' ? ambil('jabatanDewan') : '',
     };
     if (!item.nama && !item.nis && !item.kelas && !item.sangga && !item.agama && !item.username) continue; // baris kosong
     baris.push(item);
@@ -196,6 +207,7 @@ function periksaPengurus(baris, users, kelompok) {
   const k = kelompokDari(kelompok);
   const namaAda = new Set(users.filter((u) => cocokKelompok(k, u)).map((u) => u.nama.trim().toLowerCase()));
   const dipakai = new Set(users.map((u) => u.username).filter(Boolean).map((x) => x.toLowerCase()));
+  const tunggalDiFile = new Set(); // Pradana/Pradani yang sudah muncul pada baris siap sebelumnya
 
   return baris.map((b) => {
     const galat = [];
@@ -211,12 +223,22 @@ function periksaPengurus(baris, users, kelompok) {
     // Agama hanya untuk Pembina dan opsional; Dewan Ambalan tidak berAgama.
     const agama = kelompok === 'pembina' && b.agama ? normalisasiAgama(b.agama) : '';
     if (kelompok === 'pembina' && b.agama && !agama) galat.push(`Agama "${b.agama}" tidak dikenal (pilih: ${AGAMA.join(', ')})`);
+    // Jabatan Dewan Ambalan (opsional) dan NTA: hanya untuk Dewan. Pradana/Pradani hanya satu orang.
+    const jabatanDewan = kelompok === 'dewan' && b.jabatanDewan ? normalisasiJabatanDewan(b.jabatanDewan) : '';
+    if (kelompok === 'dewan' && b.jabatanDewan && !jabatanDewan) galat.push(`Jabatan "${b.jabatanDewan}" tidak dikenal (pilih: ${JABATAN_DEWAN.join(', ')})`);
+    else if (JABATAN_TUNGGAL.includes(jabatanDewan)) {
+      const pemegang = users.find((u) => u.role === 'penguji' && u.jabatan === 'Dewan Ambalan' && u.jabatanDewan === jabatanDewan);
+      if (pemegang) galat.push(`${jabatanDewan} sudah dijabat ${pemegang.nama} (ubah jabatannya lebih dulu lewat Ubah anggota)`);
+      else if (tunggalDiFile.has(jabatanDewan)) galat.push(`${jabatanDewan} muncul lebih dari satu kali pada file`);
+    }
+    if (kelompok === 'dewan' && b.nta && !POLA_NTA.test(b.nta)) galat.push('NTA tidak valid (maksimal 40 karakter: huruf, angka, titik, garis miring, strip, spasi)');
     if (b.pin && !pinAwalSah(b.pin)) galat.push(PESAN_PIN);
     if (!galat.length) { // duplikat di dalam file yang sama ikut terdeteksi
       if (username) dipakai.add(username);
       else namaAda.add(nama);
+      if (JABATAN_TUNGGAL.includes(jabatanDewan)) tunggalDiFile.add(jabatanDewan);
     }
-    return { no: b.no, data: { ...b, agama, agamaAsli: kelompok === 'pembina' ? b.agama ?? '' : '' }, galat, siap: galat.length === 0 };
+    return { no: b.no, data: { ...b, agama, agamaAsli: kelompok === 'pembina' ? b.agama ?? '' : '', jabatanDewan, jabatanAsli: b.jabatanDewan ?? '' }, galat, siap: galat.length === 0 };
   });
 }
 
@@ -239,22 +261,35 @@ const PETUNJUK_PENEGAK = (label) => [
   ['', 'Made Sari | 10302 | XI-07 | Sangga Merak | Hindu'],
 ];
 
-const PETUNJUK_PENGURUS = (label, pembina = false) => [
-  [`Petunjuk pengisian template import ${label} SIGARDA`, ''],
-  ['', ''],
-  ['1. Isi data pada lembar "Anggota"', `Satu baris satu orang, mulai baris 2 (di bawah judul kolom). Semua yang diimpor didaftarkan sebagai ${label}. Jangan mengubah atau menghapus judul kolom.`],
-  ['2. Kolom wajib', 'Nama Lengkap. Gelar boleh ditulis (mis. Budi Santoso, S.Pd.).'],
-  ['3. Nama Pengguna (opsional)', 'Dipakai untuk masuk. 3 sampai 32 karakter: huruf kecil, angka, titik, garis bawah, atau strip. Jika dikosongkan dibuat otomatis dari nama (mis. budi.santoso).'],
-  ...(pembina ? [['4. Agama (opsional)', `Pilih dari daftar: ${AGAMA.join(', ')}. Butir agama pada SKU hanya boleh diuji Pembina yang seagama dengan Penegak, jadi sebaiknya diisi. Boleh dikosongkan dan diisi kemudian lewat Ubah anggota.`]] : []),
-  [`${pembina ? 5 : 4}. PIN Awal (opsional)`, 'Isi tepat 6 angka (tidak boleh sama semua atau berurutan). Jika dikosongkan, aplikasi membuat PIN acak. Setiap orang WAJIB mengganti PIN saat login pertama.'],
-  [`${pembina ? 6 : 5}. Batas`, `Maksimal ${MAKS_BARIS} baris per impor. Nama yang sudah terdaftar sebagai ${label} dilewati, kecuali kolom Nama Pengguna diisi (untuk dua orang yang kebetulan bernama sama).`],
-  [`${pembina ? 7 : 6}. Setelah impor`, 'Daftar nama pengguna dan PIN awal tampil satu kali dan dapat diunduh. Bagikan ke masing-masing orang secara langsung.'],
-  ['', ''],
-  ['Contoh isian', ''],
-  pembina
-    ? ['Nama Lengkap | Nama Pengguna | Agama | PIN Awal', 'Budi Santoso, S.Pd. | budi.santoso | Islam | (kosong, PIN dibuat acak)']
-    : ['Nama Lengkap | Nama Pengguna | PIN Awal', 'Budi Santoso, S.Pd. | budi.santoso | (kosong, PIN dibuat acak)'],
-];
+const PETUNJUK_PENGURUS = (label, kelompok) => {
+  const pembina = kelompok === 'pembina';
+  const dewan = kelompok === 'dewan';
+  const ekstra = [];
+  if (pembina) ekstra.push(['Agama (opsional)', `Pilih dari daftar: ${AGAMA.join(', ')}. Butir agama pada SKU hanya boleh diuji Pembina yang seagama dengan Penegak, jadi sebaiknya diisi. Boleh dikosongkan dan diisi kemudian lewat Ubah anggota.`]);
+  if (dewan) {
+    ekstra.push(['Jabatan Dewan (opsional)', `Pilih dari daftar: ${JABATAN_DEWAN.join(', ')}. Pradana dan Pradani masing-masing hanya satu orang: Pradana menjadi ketua sidang dan bersama Pradani menandatangani Surat Tanda Lulus. Boleh dikosongkan dan diisi kemudian lewat Ubah anggota.`]);
+    ekstra.push(['NTA (opsional)', 'Nomor Tanda Anggota Pramuka, mis. 11.03.10.701.00123. Maksimal 40 karakter. Sebaiknya diisi untuk Pradana dan Pradani karena tercetak pada tanda tangan.']);
+  }
+  const n = 4 + ekstra.length;
+  return [
+    [`Petunjuk pengisian template import ${label} SIGARDA`, ''],
+    ['', ''],
+    ['1. Isi data pada lembar "Anggota"', `Satu baris satu orang, mulai baris 2 (di bawah judul kolom). Semua yang diimpor didaftarkan sebagai ${label}. Jangan mengubah atau menghapus judul kolom.`],
+    ['2. Kolom wajib', 'Nama Lengkap. Gelar boleh ditulis (mis. Budi Santoso, S.Pd.).'],
+    ['3. Nama Pengguna (opsional)', 'Dipakai untuk masuk. 3 sampai 32 karakter: huruf kecil, angka, titik, garis bawah, atau strip. Jika dikosongkan dibuat otomatis dari nama (mis. budi.santoso).'],
+    ...ekstra.map(([judul, teks], k) => [`${4 + k}. ${judul}`, teks]),
+    [`${n}. PIN Awal (opsional)`, 'Isi tepat 6 angka (tidak boleh sama semua atau berurutan). Jika dikosongkan, aplikasi membuat PIN acak. Setiap orang WAJIB mengganti PIN saat login pertama.'],
+    [`${n + 1}. Batas`, `Maksimal ${MAKS_BARIS} baris per impor. Nama yang sudah terdaftar sebagai ${label} dilewati, kecuali kolom Nama Pengguna diisi (untuk dua orang yang kebetulan bernama sama).`],
+    [`${n + 2}. Setelah impor`, 'Daftar nama pengguna dan PIN awal tampil satu kali dan dapat diunduh. Bagikan ke masing-masing orang secara langsung.'],
+    ['', ''],
+    ['Contoh isian', ''],
+    pembina
+      ? ['Nama Lengkap | Nama Pengguna | Agama | PIN Awal', 'Budi Santoso, S.Pd. | budi.santoso | Islam | (kosong, PIN dibuat acak)']
+      : dewan
+        ? ['Nama Lengkap | Nama Pengguna | Jabatan Dewan | NTA | PIN Awal', 'Andi Pratama | andi.pratama | Pradana | 11.03.10.701.00123 | (kosong, PIN dibuat acak)']
+        : ['Nama Lengkap | Nama Pengguna | PIN Awal', 'Budi Santoso, S.Pd. | budi.santoso | (kosong, PIN dibuat acak)'],
+  ];
+};
 
 export async function buatTemplateAnggota(kelompok = 'peserta') {
   const { default: ExcelJS } = await import('exceljs');
@@ -278,12 +313,18 @@ export async function buatTemplateAnggota(kelompok = 'peserta') {
   // Kolom NIS dan PIN berformat teks agar angka 0 di depan tidak hilang
   for (let r = 2; r <= MAKS_BARIS + 1; r += 1) {
     ws.getCell(r, nomorKolom('pin')).numFmt = '@';
-    if (penegak) ws.getCell(r, nomorKolom('nta')).numFmt = '@';
+    if (penegak || kelompok === 'dewan') ws.getCell(r, nomorKolom('nta')).numFmt = '@';
     if (!penegak) ws.getCell(r, nomorKolom('username')).numFmt = '@';
     if (kelompok === 'pembina') {
       ws.getCell(r, nomorKolom('agama')).dataValidation = {
         type: 'list', allowBlank: true, formulae: [`"${AGAMA.join(',')}"`],
         showErrorMessage: true, errorTitle: 'Agama', error: `Pilih salah satu: ${AGAMA.join(', ')}`,
+      };
+    }
+    if (kelompok === 'dewan') {
+      ws.getCell(r, nomorKolom('jabatanDewan')).dataValidation = {
+        type: 'list', allowBlank: true, formulae: [`"${JABATAN_DEWAN.join(',')}"`],
+        showErrorMessage: true, errorTitle: 'Jabatan Dewan', error: `Pilih salah satu: ${JABATAN_DEWAN.join(', ')}`,
       };
     }
     if (penegak) {
@@ -302,7 +343,7 @@ export async function buatTemplateAnggota(kelompok = 'peserta') {
   const petunjuk = wb.addWorksheet('Petunjuk');
   petunjuk.getColumn(1).width = 30;
   petunjuk.getColumn(2).width = 80;
-  const isi = penegak ? PETUNJUK_PENEGAK(label) : PETUNJUK_PENGURUS(label, kelompok === 'pembina');
+  const isi = penegak ? PETUNJUK_PENEGAK(label) : PETUNJUK_PENGURUS(label, kelompok);
   isi.forEach((b) => petunjuk.addRow(b));
   petunjuk.getRow(1).font = { bold: true, size: 14, color: { argb: 'FF45291A' } };
   petunjuk.getRow(isi.findIndex((b) => b[0] === 'Contoh isian') + 1).font = { bold: true };

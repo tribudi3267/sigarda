@@ -6,12 +6,13 @@
  * data tersimpan, dan untuk isian yang belum pernah tersimpan. Aturan isian di sini harus sama dengan sg_gudep_simpan di SQL (dijaga oleh pengujian).
  *
  * Bentuk: { nama, singkat, sekolah, alamat, kota, nomorGudep, kwarran, kwarcab, kodeSurat, telepon, email,
- *           pembina, kamabigus, pradana, pradani: { jabatan, nama, nta, nip } }
+ *           pembina, kamabigus: { jabatan, nama, nta, nip } }
+ * Pradana dan Pradani bukan bagian dari data gudep: diambil dari anggota Dewan Ambalan berjabatan itu (src/lib/dewanLogic.js).
  */
 import { GUDEP_BAWAAN } from '../config';
 
 export const KOLOM_TEKS = ['nama', 'singkat', 'sekolah', 'alamat', 'kota', 'nomorGudep', 'kwarran', 'kwarcab', 'kodeSurat', 'telepon', 'email'];
-export const KOLOM_ORANG = ['pembina', 'kamabigus', 'pradana', 'pradani'];
+export const KOLOM_ORANG = ['pembina', 'kamabigus'];
 export const BAGIAN_ORANG = ['jabatan', 'nama', 'nta', 'nip'];
 /** Isian yang boleh dipakai tanpa login (sg_gudep_publik): nama gudep, ambalan, sekolah, kota. */
 export const KOLOM_PUBLIK = ['nama', 'singkat', 'sekolah', 'kota'];
@@ -30,8 +31,6 @@ export const rapikan = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
 export const KETERANGAN_ORANG = {
   pembina: { judul: 'Pembina Gudep / Ka Gudep', pakai: 'Penanda tangan surat intern sekolah, kartu SKU, dan raport ekstrakurikuler.' },
   kamabigus: { judul: 'Kamabigus / Kepala Sekolah', pakai: 'Penanda tangan surat keluar sekolah (Ketua Majelis Pembimbing Gugus Depan).' },
-  pradana: { judul: 'Pradana', pakai: 'Pimpinan Dewan Ambalan putra; ketua sidang pada berita acara dan penanda tangan Surat Tanda Lulus.' },
-  pradani: { judul: 'Pradani', pakai: 'Pimpinan Dewan Ambalan putri.' },
 };
 
 /**
@@ -97,17 +96,6 @@ export const barisKop = (g) => ({
 
 /** Penanda tangan surat menurut jenis surat: 'intern' = Pembina Gudep / Ka Gudep; 'keluar' = Kamabigus / Kepala Sekolah. */
 export const penandaTanganSurat = (g, jenis) => (jenis === 'keluar' ? g.kamabigus : g.pembina);
-
-/**
- * Ketua sidang untuk berita acara = Pradana pada data gudep (nama dan jabatan). Cermin sigarda.ketua_sidang: bila data gudep belum pernah disimpan
- * (`tersimpan` false) atau nama/jabatan Pradana kosong, dipakai pengaturan lama sidang (`namaLama`, `sebutanLama`; sebutanLama sudah membawa bawaannya).
- */
-export function ketuaSidang(gudep, { tersimpan = true, namaLama = '', sebutanLama = '' } = {}) {
-  return {
-    nama: (tersimpan && rapikan(gudep?.pradana?.nama)) || rapikan(namaLama),
-    sebutan: (tersimpan && rapikan(gudep?.pradana?.jabatan)) || rapikan(sebutanLama),
-  };
-}
 
 /** Kepingan publik (dipakai halaman masuk dan verifikasi): hanya kolom yang boleh dilihat tanpa login. */
 export const kepinganPublik = (g) => Object.fromEntries(KOLOM_PUBLIK.map((k) => [k, g[k]]));

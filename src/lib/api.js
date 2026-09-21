@@ -307,6 +307,8 @@ export function buatApi(klien) {
     aturNta: (daftar) => rpc('sg_anggota_nta_atur', { p_data: daftar }),
     /** Agama Pembina (Admin). `daftar` = [{ username, agama }]; agama kosong menghapus. Hanya berlaku untuk Pembina. Mengembalikan jumlah yang diperbarui. */
     aturAgamaPembina: (daftar) => rpc('sg_anggota_agama_atur', { p_data: daftar }),
+    /** Jabatan Dewan Ambalan (Admin). `daftar` = [{ username, jabatan }]; jabatan kosong menghapus. Semua atau tidak sama sekali. Mengembalikan jumlah yang diperbarui. */
+    aturJabatanDewan: (daftar) => rpc('sg_anggota_jabatan_dewan_atur', { p_data: daftar }),
     /** Rombel banyak Penegak sekaligus (Admin). `daftar` = [{ username (NIS), rombel }]. Semua atau tidak sama sekali. Mengembalikan jumlah baris. */
     perbaruiRombel: (daftar) => rpc('sg_rombel_perbarui', { p_data: daftar }),
 
@@ -383,6 +385,8 @@ export function buatApi(klien) {
         p_kriteria: d.kriteria.map((k) => ({ id: k.id ?? null, jenis: k.jenis, teks: k.teks, bobot: k.bobot, wajib: !!k.wajib, panduan: k.panduan ?? '', sumber: k.sumber ?? 'manual' })),
       }),
     /* ------------------- QR Surat Tanda Lulus dan sesi ujian ------------------- */
+    /** Token dan kode QR verifikasi Berita Acara Sidang (dibuat bila belum ada). Hasil { token, kode }. */
+    tokenSidang: (id) => rpc('sg_sidang_token', { p_id: id }),
     sertifikatTingkat: (pesertaId, tingkat) => rpc('sg_sertifikat_tingkat', { p_peserta_id: pesertaId, p_tingkat: tingkat }),
     simpanSesi: (d) =>
       rpc('sg_sesi_simpan', {

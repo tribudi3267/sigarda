@@ -7,8 +7,7 @@ import {
   labelButirBelum, lembarKesiapan, nomorUrutBerikutnya, OPSI_BULAN, OPSI_DIGIT, pengaturanSidang, PEMISAH, periksaFormatNomor, rapikan,
   SEBUTAN_KETUA_BAWAAN, sudahLayak, uraiFormat,
 } from '../lib/sidangLogic';
-import { ketuaSidang } from '../lib/gudepLogic';
-import { useGudep, useGudepTersimpan } from '../lib/gudepStore';
+import { ketuaSidang, pejabatDewan } from '../lib/dewanLogic';
 import BeritaAcaraSidang from '../components/BeritaAcaraSidang';
 import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
 import { Avatar, Badge, Icon, Kosong, Modal, ProgressBar } from '../components/ui';
@@ -430,17 +429,16 @@ function RiwayatSidang({ onCetak }) {
 const PILIHAN_AWAL = { digit: 4, kode: 'DK', tingkat: false, bulan: 'romawi', pemisah: '/' };
 
 function PengaturanSidang() {
-  const { pengaturan, sidangUrut, simpanPengaturan, aturUrutSidang, notify } = useApp();
+  const { pengaturan, sidangUrut, simpanPengaturan, aturUrutSidang, notify, users } = useApp();
   const awal = pengaturanSidang(pengaturan);
   const awalUrai = uraiFormat(awal.format);
 
   const [mode, setMode] = useState(awalUrai ? 'pilihan' : 'manual');
   const [pilih, setPilih] = useState(awalUrai ?? PILIHAN_AWAL);
   const [formatManual, setFormatManual] = useState(awal.format);
-  const gudep = useGudep();
-  const gudepTersimpan = useGudepTersimpan();
-  // Ketua sidang = Pradana pada Data Gudep (Admin); pengaturan lama hanya cadangan bila Data Gudep belum diisi
-  const ketua = ketuaSidang(gudep, { tersimpan: gudepTersimpan, namaLama: awal.namaKetua, sebutanLama: awal.sebutanKetua });
+  // Ketua sidang = anggota Dewan Ambalan berjabatan Pradana (diatur Admin di menu Anggota); pengaturan lama hanya cadangan bila belum ada Pradana
+  const pradana = pejabatDewan(users).pradana;
+  const ketua = ketuaSidang({ pradana }, { namaLama: awal.namaKetua, sebutanLama: awal.sebutanKetua });
   const [proses, setProses] = useState(false);
   const tahunIni = Number(hariIni().slice(0, 4));
   const [tahunUrut, setTahunUrut] = useState(tahunIni);
@@ -614,10 +612,9 @@ function PengaturanSidang() {
       <section className="panel mb-4 p-4">
         <h2 className="text-base font-bold">Tanda tangan</h2>
         <p className="mt-2 text-sm text-pramuka-700">
-          Ketua sidang pada berita acara adalah <b>Pradana</b> menurut <b>Data Gudep</b>. Nama dan jabatannya diubah oleh Admin Gudep di menu <b>Data Gudep</b>{' '}
-          (mis. pada pergantian pengurus tahun ajaran baru); berita acara yang sudah dibuat tetap memuat nama saat sidang dicatat.
-          {!gudepTersimpan && ' Data Gudep belum diisi, jadi dipakai pengaturan lama (nama kosong dicetak garis untuk tanda tangan).'}
-          {gudepTersimpan && !ketua.nama && ' Nama Pradana pada Data Gudep masih kosong, sehingga dicetak garis untuk tanda tangan.'}
+          Ketua sidang pada berita acara adalah anggota Dewan Ambalan yang berjabatan <b>Pradana</b>. Jabatan diatur oleh Admin Gudep di menu <b>Anggota</b>{' '}
+          (ubah anggota Dewan Ambalan; mis. pada pergantian pengurus tahun ajaran baru); berita acara yang sudah dibuat tetap memuat nama saat sidang dicatat.
+          {!pradana.nama && ' Belum ada anggota Dewan Ambalan yang berjabatan Pradana, jadi dipakai pengaturan lama (nama kosong dicetak garis untuk tanda tangan).'}
         </p>
 
         <div className="mt-4 rounded-lg bg-pramuka-50 px-3 py-3 text-center text-sm">
@@ -638,8 +635,18 @@ function PengaturanSidang() {
 /* ============================== Tampilan cetak ============================== */
 
 function CetakBeritaAcara({ id, onKembali }) {
-  const { sidang, users } = useApp();
+  const { sidang, users, tokenSidang } = useApp();
   const s = sidang.find((x) => x.id === id);
+  // Berita Acara memuat QR verifikasi: token dibuat (bila belum ada) begitu berita acara dibuka; cetak ulang memakai token yang sama.
+  const [qr, setQr] = useState({ id: null, token: null, kode: null, galat: '' });
+  useEffect(() => {
+    let batal = false;
+    tokenSidang(id).then((r) => {
+      if (!batal) setQr({ id, token: r.ok ? r.data.token : null, kode: r.ok ? r.data.kode : null, galat: r.ok ? '' : r.pesan });
+    });
+    return () => { batal = true; };
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const qrSiap = qr.id === id;
   if (!s) {
     return (
       <Kosong judul="Catatan sidang tidak ditemukan" teks="Mungkin sudah dihapus.">
@@ -658,7 +665,10 @@ function CetakBeritaAcara({ id, onKembali }) {
           <Icon nama="cetak" className="h-4 w-4" /> Cetak atau simpan PDF
         </button>
       </div>
-      <div className="overflow-x-auto pb-4"><BeritaAcaraSidang sidang={s} peserta={peserta} /></div>
+      {qrSiap && qr.galat && (
+        <p role="alert" className="no-print mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-950">QR verifikasi belum dapat dibuat ({qr.galat}). Berita acara tetap dapat dicetak tanpa QR.</p>
+      )}
+      <div className="overflow-x-auto pb-4"><BeritaAcaraSidang sidang={s} peserta={peserta} token={qrSiap ? qr.token : null} kode={qrSiap ? qr.kode : null} /></div>
     </div>
   );
 }

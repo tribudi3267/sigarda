@@ -2,6 +2,9 @@ import { fmtHariTanggal, fmtTanggal } from '../lib/format';
 import { namaAmbalan } from '../lib/gudepLogic';
 import { useGudep } from '../lib/gudepStore';
 import { HASIL_MAGANG, HASIL_TUGAS, labelButirBelum } from '../lib/sidangLogic';
+import { alamatDasar, urlVerifikasi } from '../lib/verifikasiLogic';
+import BlokTtd from './BlokTtd';
+import KodeQr from './KodeQr';
 import { KopSurat } from './DokumenSku';
 
 // Kotak centang digambar dengan garis tepi (bukan teks "[ X ]") agar tidak pernah terpotong ke baris berikutnya di layar maupun cetakan.
@@ -15,22 +18,13 @@ const Kotak = ({ isi }) => (
   </span>
 );
 
-function Ttd({ jabatan, nama, nta }) {
-  return (
-    <div className="text-center text-sm">
-      <p>{jabatan}</p>
-      <div className="h-16" />
-      {nama ? <p className="font-bold underline">{nama}</p> : <p>( ______________________________ )</p>}
-      {nta && <p className="text-xs">NTA {nta}</p>}
-    </div>
-  );
-}
-
 /**
  * Berita Acara Sidang Dewan Kehormatan Ambalan (A4 portrait). Isi mengikuti format dari Pembina.
  * Nama ketua dan sebutan jabatannya diambil dari catatan sidang (dicatat saat sidang), bukan dari pengaturan saat ini.
+ * `token` dan `kode` = QR dan kode verifikasi (sg_sidang_token); tanpa token berita acara tetap tercetak tanpa QR.
+ * QR hanya membuktikan berita acara benar tercatat di aplikasi; dokumen sah bila bertanda tangan dan berstempel.
  */
-export default function BeritaAcaraSidang({ sidang, peserta }) {
+export default function BeritaAcaraSidang({ sidang, peserta, token = null, kode = null }) {
   const G = useGudep();
   const NAMA_AMBALAN = namaAmbalan(G); // "Ambalan Gajah Mada/..." dipakai apa adanya; bila belum diawali kata Ambalan, kata itu ditambahkan
   const layak = sidang.keputusan === 'layak';
@@ -110,9 +104,21 @@ export default function BeritaAcaraSidang({ sidang, peserta }) {
       <p className="mt-3 text-right text-sm">{G.kota}, {fmtTanggal(sidang.tanggal)}</p>
       <p className="mt-1 text-center text-sm font-semibold">Membuat Keputusan,</p>
       <div className="mt-2 grid grid-cols-2 gap-8">
-        <Ttd jabatan={sidang.ketuaSebutan} nama={sidang.ketuaNama} />
-        <Ttd jabatan="Pembina Pramuka Penegak" nama={G.pembina.nama} nta={G.pembina.nta} />
+        <BlokTtd orang={{ jabatan: sidang.ketuaSebutan, nama: sidang.ketuaNama }} />
+        <BlokTtd orang={{ jabatan: 'Pembina Pramuka Penegak', nama: G.pembina.nama, nta: G.pembina.nta }} />
       </div>
+
+      {token && (
+        <div className="mt-5 flex items-start gap-3 border-t border-pramuka-200 pt-3 text-[10px] leading-snug text-pramuka-600 break-inside-avoid">
+          <KodeQr teks={urlVerifikasi(token)} ukuran={84} label={`QR verifikasi berita acara nomor ${sidang.nomorBa}`} className="border border-pramuka-200" />
+          <div>
+            <p className="font-semibold text-pramuka-800">Periksa keaslian berita acara</p>
+            <p>Pindai QR atau buka {alamatDasar().replace(/^https?:\/\//, '').replace(/\/$/, '')} lalu ketik kode:</p>
+            {kode && <p className="font-mono text-xs font-bold text-pramuka-900">{kode}</p>}
+            <p className="mt-1">QR hanya membuktikan berita acara ini tercatat di aplikasi; dokumen sah bila bertanda tangan dan berstempel.</p>
+          </div>
+        </div>
+      )}
     </article>
   );
 }

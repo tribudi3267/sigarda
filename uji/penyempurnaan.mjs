@@ -173,10 +173,10 @@ ok(dibaca.length === 4 && dibaca[0].nta === '11.03.10.701.00500' && dibaca[1].nt
 const per = periksaBaris(dibaca, (await K.admin.a.muatProfil()).data, 'peserta');
 ok(per[0].siap && per[1].siap && per[2].siap && !per[3].siap && /NTA tidak valid/.test(per[3].galat.join()), 'pemeriksaan: NTA rusak menandai baris tidak siap: ' + per[3].galat.join('; '));
 ok(per[0].data.nta === '11.03.10.701.00500', 'data siap impor membawa NTA');
-// template Dewan/Pembina tidak punya kolom NTA
+// template Dewan Ambalan punya kolom NTA (untuk Pradana dan Pradani); Pembina tidak
 const tplD = new ExcelJS.Workbook(); await tplD.xlsx.load(await buatTemplateAnggota('dewan'));
 const kepD = []; tplD.getWorksheet('Anggota').getRow(1).eachCell((c) => kepD.push(c.value));
-ok(!kepD.some((h) => /NTA/.test(h)), 'template Dewan Ambalan tidak memuat NTA');
+ok(kepD.some((h) => /NTA/.test(h)), 'template Dewan Ambalan memuat NTA (dipakai Pradana dan Pradani pada tanda tangan)');
 // berkas Penegak lama (tanpa kolom NTA) tetap terbaca
 const tplLama = new ExcelJS.Workbook(); const wl = tplLama.addWorksheet('Anggota'); wl.addRow(['Nama Lengkap', 'NIS', 'Kelas', 'Sangga', 'Agama', 'PIN Awal (opsional)']); wl.addRow(['Budi Lama', '77001', 'XI-01', 'Sangga Merak', 'Islam', '']);
 const lama = await bacaExcelAnggota(await tplLama.xlsx.writeBuffer(), 'peserta');

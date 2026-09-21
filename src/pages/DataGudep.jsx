@@ -28,7 +28,7 @@ function Isian({ id, label, jalur, nilai, ubah, galat, bantuan, maks, jenis = 't
 
 /**
  * Pengaturan data gudep (Admin Gudep): identitas gudep dan ambalan, alamat, kwartir, serta pejabat (Pembina Gudep / Ka Gudep, Kamabigus / Kepala
- * Sekolah, Pradana, Pradani) beserta NTA. Isian tersimpan di basis data dan menjadi rujukan seluruh dokumen cetak, kop surat, dan tampilan aplikasi.
+ * Sekolah) beserta NTA. Pradana dan Pradani diambil dari anggota Dewan Ambalan. Isian tersimpan di basis data dan menjadi rujukan seluruh dokumen cetak, kop surat, dan tampilan aplikasi.
  */
 export default function DataGudep() {
   const { simpanGudep } = useApp();
@@ -116,7 +116,11 @@ export default function DataGudep() {
       </section>
 
       <section aria-labelledby="gudep-pejabat">
-        <h2 id="gudep-pejabat" className="mb-2 text-base font-bold text-pramuka-900">Pejabat dan NTA</h2>
+        <h2 id="gudep-pejabat" className="mb-1 text-base font-bold text-pramuka-900">Pejabat dan NTA</h2>
+        <p className="mb-2 text-xs text-pramuka-600">
+          Pradana dan Pradani tidak diketik di sini: atur di menu <b>Anggota</b> (ubah anggota Dewan Ambalan, isian Jabatan Dewan Ambalan). Namanya dan NTA-nya diambil
+          dari akun anggota itu, dan dipakai sebagai ketua sidang (Pradana) serta penanda tangan Surat Tanda Lulus.
+        </p>
         <div className="grid gap-4 lg:grid-cols-2">
           {KOLOM_ORANG.map((o) => (
             <div key={o} className="panel p-4">

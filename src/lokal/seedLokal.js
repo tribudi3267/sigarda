@@ -38,6 +38,10 @@ export async function isiDataContoh(pg) {
 
   // Agama Pembina contoh dan penugasan contoh (tahun ajaran berjalan). XII-02 sengaja tanpa penguji agar peringatannya terlihat.
   await pg.query("update public.profiles set agama = 'Islam' where id = $1", [p('u-penguji-1')]);
+  // Dewan contoh menjabat Pradana (dipakai ketua sidang dan tanda tangan Surat Tanda Lulus); skema lama (uji migrasi) belum punya kolomnya
+  if ((await pg.query("select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'jabatan_dewan'")).rows.length) {
+    await pg.query("update public.profiles set jabatan_dewan = 'Pradana' where id = $1", [p('u-penguji-2')]);
+  }
   if ((await pg.query("select to_regclass('public.penugasan_rombel') as t")).rows[0].t) { // skema lama (uji migrasi) belum punya
     const ta = (await pg.query('select sigarda.tahun_ajaran_kini() as t')).rows[0].t;
     // Guru agama contoh (rujukan surat pengantar): Penegak Katolik dan Hindu tidak punya Pembina seagama pada data contoh

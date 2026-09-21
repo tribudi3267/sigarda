@@ -5,6 +5,8 @@ import { fmtTanggal, hariIni, kodeVerifikasi } from '../lib/format';
 import { alamatDasar, urlVerifikasi } from '../lib/verifikasiLogic';
 import { useGudep } from '../lib/gudepStore';
 import { barisKop } from '../lib/gudepLogic';
+import { pejabatDewan, penandaTanganDewan } from '../lib/dewanLogic';
+import BlokTtd from './BlokTtd';
 import KodeQr from './KodeQr';
 import LogoMark from './LogoMark';
 
@@ -24,19 +26,6 @@ export function KopSurat({ gudep = null }) {
       </div>
       <div className="w-16" aria-hidden="true" />
     </header>
-  );
-}
-
-function BlokTtd({ orang, tanggal }) {
-  const G = useGudep();
-  return (
-    <div className="text-center text-sm">
-      {tanggal && <p>{G.kota}, {fmtTanggal(tanggal)}</p>}
-      <p className={tanggal ? '' : 'mt-[1.35rem]'}>{orang.jabatan}</p>
-      <div className="h-16" />
-      {orang.nama ? <p className="font-bold underline">{orang.nama}</p> : <p>( ______________________________ )</p>}
-      {orang.nta && <p className="text-xs">NTA {orang.nta}</p>}
-    </div>
   );
 }
 
@@ -131,21 +120,25 @@ function FragmenAgama({ no, agama, children }) {
   );
 }
 
+// Kolom blok tanda tangan STL menurut jumlah penanda tangan Dewan (1 atau 2): [tanpa QR, dengan QR di tengah].
+const KOLOM_TTD = [['grid-cols-2', 'grid-cols-[1fr_auto_1fr]'], ['grid-cols-3', 'grid-cols-[1fr_1fr_auto_1fr]']];
+
 /**
  * Surat Tanda Lulus (A4 landscape). Hanya boleh dicetak bila seluruh butir lulus.
  * `token` = token QR surat (dari sg_sertifikat_tingkat); tanpa token surat tetap tercetak tanpa QR.
  */
 export function SuratTandaLulus({ peserta, tingkat, token = null }) {
   const G = useGudep();
-  const { progress } = useApp();
+  const { progress, users } = useApp();
   const t = TINGKAT[tingkat];
   const tglLulus = tanggalLulusTingkat(progress, peserta, tingkat);
   const tahun = (tglLulus ?? hariIni()).slice(0, 4);
   const hash = kodeVerifikasi([peserta.id, tingkat, tglLulus ?? '']).slice(4);
   const nomor = `${G.kodeSurat}/STL-${t.kode}/${tahun}/${hash}`;
+  const dewan = penandaTanganDewan(pejabatDewan(users)); // Pradana dan/atau Pradani (anggota Dewan Ambalan); Pembina di kanan memuat tanggal
 
   return (
-    <article className="print-area mx-auto min-w-[760px] max-w-[1050px] border-[10px] border-pramuka-800 bg-white p-2 text-pramuka-900">
+    <article className={`print-area mx-auto ${dewan.length > 1 ? 'min-w-[900px]' : 'min-w-[760px]'} max-w-[1050px] border-[10px] border-pramuka-800 bg-white p-2 text-pramuka-900`}>
       <div className="border-2 border-emas px-10 py-8 text-center">
         <div className="flex justify-center"><LogoMark size={72} /></div>
         <p className="mt-2 text-sm font-semibold">{G.nama}, {G.kwarran}</p>
@@ -163,16 +156,16 @@ export function SuratTandaLulus({ peserta, tingkat, token = null }) {
           tanggal {fmtTanggal(tglLulus)}.
         </p>
 
-        <div className={`mt-8 grid items-end gap-8 ${token ? 'grid-cols-[1fr_auto_1fr]' : 'grid-cols-2'}`}>
-          <BlokTtd orang={G.pradana} tanggal={tglLulus} />
+        <div className={`mt-8 grid items-start gap-8 ${KOLOM_TTD[dewan.length - 1][token ? 1 : 0]}`}>
+          {dewan.map((o, i) => <BlokTtd key={i} orang={o} sisakanTanggal />)}
           {token && (
-            <div className="flex flex-col items-center text-[10px] leading-snug text-pramuka-600">
+            <div className="flex flex-col items-center self-center text-[10px] leading-snug text-pramuka-600">
               <KodeQr teks={urlVerifikasi(token)} ukuran={96} label={`QR verifikasi Surat Tanda Lulus ${tingkat}`} className="border border-pramuka-200" />
               <p className="mt-1 font-semibold text-pramuka-800">Pindai untuk memeriksa keaslian</p>
               <p>{alamatDasar().replace(/^https?:\/\//, '').replace(/\/$/, '')}</p>
             </div>
           )}
-          <BlokTtd orang={G.pembina} />
+          <BlokTtd orang={G.pembina} tanggal={tglLulus} />
         </div>
       </div>
     </article>

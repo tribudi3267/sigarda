@@ -46,15 +46,15 @@ p = periksaBaris([{ no: 2, nama: 'Rizky Dewan', ...kp }], users, 'pembina');
 ok(p[0].siap, 'nama sama pada jabatan berbeda (Pembina) boleh');
 
 // template
-ok(kolomTemplate('peserta').map((c) => c.key).join() === 'nama,nis,kelas,sangga,agama,nta,pin' && kolomTemplate('dewan').map((c) => c.key).join() === 'nama,username,pin', 'kolom template');
+ok(kolomTemplate('peserta').map((c) => c.key).join() === 'nama,nis,kelas,sangga,agama,nta,pin' && kolomTemplate('dewan').map((c) => c.key).join() === 'nama,username,jabatanDewan,nta,pin' && kolomTemplate('pembina').map((c) => c.key).join() === 'nama,username,agama,pin', 'kolom template');
 {
   const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await buatTemplateAnggota('dewan'));
   const ws = wb.getWorksheet('Anggota');
-  ws.getCell(2, 1).value = 'Sinta Ambalan'; ws.getCell(2, 2).value = 'sinta.a'; ws.getCell(2, 3).value = '0482911';
-  ws.getCell(3, 1).value = 'Tono'; ws.getCell(3, 3).value = '482913';
+  ws.getCell(2, 1).value = 'Sinta Ambalan'; ws.getCell(2, 2).value = 'sinta.a'; ws.getCell(2, 5).value = '0482911'; ws.getCell(2, 3).value = 'wakil pradana'; ws.getCell(2, 4).value = '11.03.10.701.00777';
+  ws.getCell(3, 1).value = 'Tono'; ws.getCell(3, 5).value = '482913';
   const b = await bacaExcelAnggota(await wb.xlsx.writeBuffer(), 'dewan');
-  ok(b.length === 2 && b[0].username === 'sinta.a' && b[0].pin === '0482911' && b[1].username === '' && b[1].pin === '482913', 'baca file Dewan dengan kolom Nama Pengguna: ' + JSON.stringify(b.map((x) => [x.nama, x.username, x.pin])));
-  ok(ws.getCell(2, 2).numFmt === '@' && ws.getCell(2, 3).numFmt === '@', 'kolom nama pengguna dan PIN berformat teks');
+  ok(b.length === 2 && b[0].username === 'sinta.a' && b[0].pin === '0482911' && b[1].username === '' && b[1].pin === '482913' && b[0].jabatanDewan === 'wakil pradana' && b[0].nta === '11.03.10.701.00777' && b[1].jabatanDewan === '', 'baca file Dewan dengan kolom Nama Pengguna: ' + JSON.stringify(b.map((x) => [x.nama, x.username, x.pin])));
+  ok(ws.getCell(2, 2).numFmt === '@' && ws.getCell(2, 4).numFmt === '@' && ws.getCell(2, 5).numFmt === '@', 'kolom nama pengguna, NTA, dan PIN berformat teks');
   let petunjuk = ''; wb.getWorksheet('Petunjuk').eachRow((r) => r.eachCell((c) => { petunjuk += c.value + ' '; }));
   ok(/Nama Pengguna/.test(petunjuk) && /6 angka/.test(petunjuk), 'petunjuk menyebut Nama Pengguna dan PIN 6 angka');
 }

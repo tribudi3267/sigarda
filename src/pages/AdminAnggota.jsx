@@ -2,6 +2,7 @@
 import { useApp } from '../context/AppContext';
 import { KELOMPOK_PENGGUNA, SARAN_SANGGA, cocokKelompok } from '../config';
 import { AGAMA } from '../data/skuData';
+import { JABATAN_DEWAN, rencanaJabatanDewan } from '../lib/dewanLogic';
 import { layakGaruda } from '../lib/skuLogic';
 import { urutTeks } from '../lib/format';
 import { normalisasiNama } from '../lib/cariNama';
@@ -15,7 +16,7 @@ import PerbaruiRombelModal from '../components/PerbaruiRombelModal';
 import { LOKAL } from '../lib/supabaseClient';
 import { Avatar, BadgePeran, Field, Icon, Kosong, Modal } from '../components/ui';
 
-const BARU = { role: 'peserta', nama: '', nis: '', username: '', kelas: '', sangga: '', agama: AGAMA[0], jabatan: '', pin: '', nta: '' };
+const BARU = { role: 'peserta', nama: '', nis: '', username: '', kelas: '', sangga: '', agama: AGAMA[0], jabatan: '', jabatanDewan: '', pin: '', nta: '' };
 const TAB_PENUGASAN = 'penugasan';
 
 /** Menampilkan nama pengguna dan PIN awal akun baru satu kali, agar admin dapat menyampaikannya. */
@@ -58,7 +59,7 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
   const pilihKelompok = (e) => {
     const k = KELOMPOK_PENGGUNA.find((x) => x.id === e.target.value);
     // Penegak wajib beragama (bawaan Islam); Pembina opsional (kosong); Dewan dan Admin tidak berAgama.
-    setF({ ...f, role: k.role, jabatan: k.jabatan ?? '', agama: k.role === 'peserta' ? f.agama || AGAMA[0] : k.jabatan === 'Pembina' ? f.agama ?? '' : '' });
+    setF({ ...f, role: k.role, jabatan: k.jabatan ?? '', jabatanDewan: '', agama: k.role === 'peserta' ? f.agama || AGAMA[0] : k.jabatan === 'Pembina' ? f.agama ?? '' : '' });
   };
 
   // Saran isian: gabungan data yang sudah ada dan saran bawaan
@@ -71,6 +72,10 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
 
   const layak = !baru && f.role === 'peserta' && layakGaruda(progress, f);
   const agamaBerubah = !baru && f.role === 'peserta' && users.find((u) => u.id === f.id)?.agama !== f.agama;
+  // Pradana/Pradani hanya satu orang: pemegang lama akan digantikan (jadi anggota Dewan biasa) bila jabatan ini dipilih
+  const menggantikan = f.role === 'penguji' && f.jabatan === 'Dewan Ambalan' && f.jabatanDewan
+    ? rencanaJabatanDewan(users, { id: f.id ?? '', username: f.username ?? '' }, f.jabatanDewan).menggantikan
+    : null;
 
   const kirim = async () => {
     if (sibuk) return;
@@ -186,6 +191,29 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
             {AGAMA.map((a) => <option key={a}>{a}</option>)}
           </select>
         </Field>
+      )}
+
+      {f.role === 'penguji' && f.jabatan === 'Dewan Ambalan' && (
+        <>
+          <Field
+            label="Jabatan Dewan Ambalan (opsional)"
+            htmlFor="f-jabatan-dewan"
+            bantuan="Pradana menjadi ketua sidang; Pradana dan Pradani menandatangani Surat Tanda Lulus (nama dan NTA diambil dari akun ini). Pradana dan Pradani masing-masing hanya satu orang."
+          >
+            <select id="f-jabatan-dewan" className="input" value={f.jabatanDewan ?? ''} onChange={set('jabatanDewan')}>
+              <option value="">Anggota Dewan (tanpa jabatan)</option>
+              {JABATAN_DEWAN.map((j) => <option key={j} value={j}>{j}</option>)}
+            </select>
+          </Field>
+          {menggantikan && (
+            <p role="status" className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-950">
+              {menggantikan.nama} saat ini menjabat {f.jabatanDewan}. Bila disimpan, jabatan itu berpindah ke {f.nama?.trim() || 'anggota ini'} dan {menggantikan.nama} menjadi anggota Dewan biasa.
+            </p>
+          )}
+          <Field label="NTA (opsional)" htmlFor="f-nta-dewan" bantuan="Nomor Tanda Anggota Pramuka, mis. 11.03.10.701.00123. Tercetak pada tanda tangan Pradana dan Pradani.">
+            <input id="f-nta-dewan" className="input" autoComplete="off" maxLength={40} value={f.nta ?? ''} onChange={set('nta')} />
+          </Field>
+        </>
       )}
 
       {f.role !== 'peserta' && (
@@ -334,7 +362,7 @@ export default function AdminAnggota() {
                       NIS {u.nis || '-'}, rombel {u.kelas}, {u.sangga}, {u.agama}{u.nta ? `, NTA ${u.nta}` : ''} <BadgePeran peran={u.peran} singkat />
                     </>
                   )}
-                  {u.role === 'penguji' && <>{u.jabatan}{u.jabatan === 'Pembina' ? `, agama ${u.agama ?? 'belum diisi'}` : ''}, pengguna <span className="font-mono">{u.username}</span></>}
+                  {u.role === 'penguji' && <>{u.jabatan}{u.jabatanDewan ? ` (${u.jabatanDewan})` : ''}{u.jabatan === 'Pembina' ? `, agama ${u.agama ?? 'belum diisi'}` : ''}{u.jabatan === 'Dewan Ambalan' && u.nta ? `, NTA ${u.nta}` : ''}, pengguna <span className="font-mono">{u.username}</span></>}
                   {u.role === 'admin' && <>Admin Gudep, pengguna <span className="font-mono">{u.username}</span></>}
                 </p>
               </div>

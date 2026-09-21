@@ -115,6 +115,8 @@ const tunda = (await pg.query(`select * from public.sidang_dk where peserta_id =
 ok(tunda.capaian_total === 23 && tunda.capaian_lulus === 0 && tunda.butir_belum.length === 28, `capaian per BUTIR (${tunda.capaian_lulus}/${tunda.capaian_total}), butir belum per unit (${tunda.butir_belum.length})`);
 
 console.log('\n--- Menyimpan keputusan: Layak, nomor, snapshot ---');
+// Data contoh memasang Dewan contoh sebagai Pradana; di sini diuji jalur cadangan (pengaturan lama), jadi jabatan dikosongkan dulu (ketua dari Pradana: uji/jabatan-dewan.mjs)
+await pg.query('update public.profiles set jabatan_dewan = null');
 await rpc('dewan', 'sg_pengaturan_simpan', { p_kunci: 'sidang.nama_ketua', p_nilai: ('Andi Pradana') });
 await rpc('dewan', 'sg_pengaturan_simpan', { p_kunci: 'sidang.sebutan_ketua', p_nilai: ('Pradana Dewan Ambalan') });
 r = await rpc('dewan', 'sg_sidang_simpan', args({ p_nta: '11.03.10.701.00123' }));

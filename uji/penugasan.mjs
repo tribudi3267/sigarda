@@ -255,7 +255,7 @@ console.log('\n--- Import Excel: rombel baku dan agama Pembina ---');
   ok(!p[1].siap && /Agama "Zoroaster" tidak dikenal/.test(p[1].galat.join()) && p[2].siap && p[2].data.agama === '', 'Pembina: agama tidak dikenal ditolak; kosong diperbolehkan');
   p = periksaBaris([{ no: 2, nama: 'Pak Dedi', ...kp, agama: 'Islam' }], users2, 'dewan');
   ok(p[0].siap && p[0].data.agama === '', 'Dewan Ambalan: agama diabaikan');
-  ok(kolomTemplate('pembina').map((c) => c.key).join() === 'nama,username,agama,pin' && kolomTemplate('dewan').map((c) => c.key).join() === 'nama,username,pin' && kolomTemplate('peserta').map((c) => c.header)[2] === 'Rombel', 'kolom template: Pembina berAgama, Dewan tidak, Penegak memakai "Rombel"');
+  ok(kolomTemplate('pembina').map((c) => c.key).join() === 'nama,username,agama,pin' && kolomTemplate('dewan').map((c) => c.key).join() === 'nama,username,jabatanDewan,nta,pin' && kolomTemplate('peserta').map((c) => c.header)[2] === 'Rombel', 'kolom template: Pembina berAgama, Dewan berjabatan dan NTA (tanpa agama), Penegak memakai "Rombel"');
 
   // template Pembina: unduh, isi, baca
   const wbP = new ExcelJS.Workbook(); await wbP.xlsx.load(await buatTemplateAnggota('pembina'));

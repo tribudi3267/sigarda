@@ -8,7 +8,7 @@ import { PIN_DEMO } from '../src/lokal/pinDemo.js';
 import { buatApi } from '../src/lib/api.js';
 import { GUDEP_BAWAAN } from '../src/config.js';
 import {
-  KOLOM_ORANG, KOLOM_TEKS, barisKop, gabungGudep, kepinganPublik, ketuaSidang, namaAmbalan, penandaTanganSurat, periksaGudep, samaGudep, untukForm,
+  KOLOM_ORANG, KOLOM_TEKS, barisKop, gabungGudep, kepinganPublik, namaAmbalan, penandaTanganSurat, periksaGudep, samaGudep, untukForm,
 } from '../src/lib/gudepLogic.js';
 import { ambilGudep, gudepTersimpan, resetGudep, setGudep, tambahGudep } from '../src/lib/gudepStore.js';
 import { penandaTanganSurat as pts } from '../src/lib/gudepLogic.js';
@@ -32,13 +32,11 @@ const contoh = {
   nomorGudep: '12.345/12.346', kwarran: 'Kwartir Ranting Contoh', kwarcab: 'Kwartir Cabang Contoh', kodeSurat: 'GD-SMAN2-CTH', telepon: '(0281) 123-456', email: 'gudep@sman2.sch.id',
   pembina: { jabatan: 'Pembina Gudep', nama: 'Budi Santoso, S.Pd.', nta: '11.03.12.345.00001', nip: '198001012005011001' },
   kamabigus: { jabatan: 'Kepala Sekolah / Kamabigus', nama: 'Dra. Siti Aminah, M.Pd.', nta: '11.03.12.345.00002', nip: '197001011995122001' },
-  pradana: { jabatan: 'Pradana Dewan Ambalan', nama: 'Ahmad Rizki', nta: '11.03.12.345.10001', nip: '' },
-  pradani: { jabatan: 'Pradani Dewan Ambalan', nama: 'Dewi Lestari', nta: '11.03.12.345.10002', nip: '' },
 };
 
 console.log('--- Nilai bawaan dan keadaan awal ---');
 ok(GUDEP_BAWAAN.nama === 'Gugus Depan SMAN 1 Bukateja' && GUDEP_BAWAAN.pembina.nama.length > 0 && !('ketuaAmbalan' in GUDEP_BAWAAN), 'GUDEP_BAWAAN memuat identitas dan pejabat baru (tanpa ketuaAmbalan lama)');
-ok(KOLOM_ORANG.join() === 'pembina,kamabigus,pradana,pradani' && KOLOM_TEKS.every((k) => k in GUDEP_BAWAAN), 'semua kolom teks ada pada nilai bawaan');
+ok(KOLOM_ORANG.join() === 'pembina,kamabigus' && KOLOM_TEKS.every((k) => k in GUDEP_BAWAAN), 'semua kolom teks ada pada nilai bawaan');
 ok(Object.keys(periksaGudep(GUDEP_BAWAAN)).length === 0, 'nilai bawaan lolos pemeriksaan');
 ok((await K.admin.a.muatGudep()).ok && (await K.admin.a.muatGudep()).data === null, 'belum pernah disimpan: muatGudep mengembalikan null');
 ok(JSON.stringify((await sebagai(null, 'select public.sg_gudep_publik() d')).rows[0].d) === '{}', 'identitas publik: objek kosong bila belum ada data');
@@ -58,7 +56,7 @@ console.log('\n--- Server: menyimpan dan membaca ---');
 let r = await K.admin.a.simpanGudep(contoh);
 ok(r.ok, 'Admin menyimpan data gudep');
 r = await K.admin.a.muatGudep();
-ok(r.ok && r.data.nama === 'Gugus Depan SMAN 2 Contoh' && r.data.pembina.nta === '11.03.12.345.00001' && r.data.kamabigus.nip === '197001011995122001' && r.data.pradani.nama === 'Dewi Lestari', 'tersimpan lengkap (identitas, pembina, kamabigus, pradana, pradani beserta NTA)');
+ok(r.ok && r.data.nama === 'Gugus Depan SMAN 2 Contoh' && r.data.pembina.nta === '11.03.12.345.00001' && r.data.kamabigus.nip === '197001011995122001' && !('pradana' in r.data) && !('pradani' in r.data), 'tersimpan lengkap (identitas, pembina, kamabigus beserta NTA); Pradana dan Pradani tidak disimpan di sini');
 ok((await q(`select diubah_oleh::text o from public.pengaturan where kunci = 'gudep.data'`))[0].o === K.admin.id, 'pelaku perubahan tercatat');
 for (const [nama, kk] of [['Pembina', K.pembina], ['Dewan Ambalan', K.dewan], ['Penegak', K.ahmad]]) {
   const b = await kk.a.muatGudep();
@@ -71,7 +69,7 @@ ok(r.data.nama === 'Gugus Depan SMAN 2 Contoh' && r.data.kamabigus.jabatan === '
 r = await K.admin.a.simpanGudep({ nama: 'Gugus Depan Lain', singkat: 'Ambalan X', sekolah: 'SMA X', kota: 'X', pembina: { jabatan: 'Pembina', nama: 'Y' } });
 ok(r.ok, 'isian yang tidak dikirim boleh dilewati (disimpan kosong)');
 r = await K.admin.a.muatGudep();
-ok(r.data.alamat === '' && r.data.pembina.nta === '' && r.data.pradana.nama === '', 'isian yang tidak dikirim tersimpan kosong');
+ok(r.data.alamat === '' && r.data.pembina.nta === '', 'isian yang tidak dikirim tersimpan kosong');
 await K.admin.a.simpanGudep(contoh);
 
 console.log('\n--- Server: pemeriksaan isian (server dan klien harus sepakat) ---');
@@ -82,9 +80,8 @@ const kasus = [
   ['telepon huruf', (d) => { d.telepon = 'abc123'; }], ['telepon +62', (d) => { d.telepon = '+62 (281) 123-456'; }], ['email tanpa @', (d) => { d.email = 'gudep.sch.id'; }], ['email kosong (sah)', (d) => { d.email = ''; }],
   ['email dua @', (d) => { d.email = 'a@b@c.id'; }], ['telepon terlalu panjang', (d) => { d.telepon = '1'.repeat(41); }],
   ['pembina tanpa nama', (d) => { d.pembina.nama = ''; }], ['pembina tanpa jabatan', (d) => { d.pembina.jabatan = ''; }], ['NTA pembina berkarakter terlarang', (d) => { d.pembina.nta = '11#03'; }],
-  ['NTA 41 karakter', (d) => { d.pradana.nta = '1'.repeat(41); }], ['NIP kamabigus terlarang', (d) => { d.kamabigus.nip = 'NIP:123'; }], ['nama pradana 121 karakter', (d) => { d.pradana.nama = 'A'.repeat(121); }],
-  ['jabatan pradani 81 karakter', (d) => { d.pradani.jabatan = 'A'.repeat(81); }], ['kamabigus dikosongkan seluruhnya (sah)', (d) => { d.kamabigus = { jabatan: '', nama: '', nta: '', nip: '' }; }],
-  ['pradani dikosongkan (sah)', (d) => { d.pradani = { jabatan: '', nama: '', nta: '', nip: '' }; }],
+  ['NTA 41 karakter', (d) => { d.kamabigus.nta = '1'.repeat(41); }], ['NIP kamabigus terlarang', (d) => { d.kamabigus.nip = 'NIP:123'; }], ['nama kamabigus 121 karakter', (d) => { d.kamabigus.nama = 'A'.repeat(121); }],
+  ['jabatan kamabigus 81 karakter', (d) => { d.kamabigus.jabatan = 'A'.repeat(81); }], ['kamabigus dikosongkan seluruhnya (sah)', (d) => { d.kamabigus = { jabatan: '', nama: '', nta: '', nip: '' }; }],
 ];
 {
   let sama = true;
@@ -97,6 +94,15 @@ const kasus = [
   ok(sama, `${kasus.length} isian: server dan klien (periksaGudep) sama-sama menerima atau menolak`);
 }
 await K.admin.a.simpanGudep(contoh);
+{
+  // Klien lama masih dapat mengirim pradana/pradani: diterima (dan diperiksa) tetapi tidak disimpan
+  const lama = { ...salin(contoh), pradana: { jabatan: 'Pradana Dewan Ambalan', nama: 'Ahmad Rizki', nta: '', nip: '' }, pradani: { jabatan: 'Pradani Dewan Ambalan', nama: 'Dewi', nta: '', nip: '' } };
+  const r = await K.admin.a.simpanGudep(lama);
+  const d = (await K.admin.a.muatGudep()).data;
+  ok(r.ok && !('pradana' in d) && !('pradani' in d) && d.pembina.nama === contoh.pembina.nama, 'klien lama: pradana dan pradani diterima tetapi tidak disimpan (diambil dari anggota Dewan Ambalan)');
+  ok(cocok(await K.admin.a.simpanGudep({ ...salin(contoh), pradana: { jabatan: 'x', nama: 'A'.repeat(121), nta: '', nip: '' } }), /maksimal 120/), 'klien lama: isian pradana tetap diperiksa');
+  await K.admin.a.simpanGudep(contoh);
+}
 ok(cocok(await K.admin.a.simpanGudep({ ...salin(contoh), logo: 'x' }), /"logo" tidak dikenal/), 'isian yang tidak dikenal ditolak');
 ok(cocok(await K.admin.a.simpanGudep({ ...salin(contoh), pembina: { ...contoh.pembina, gelar: 'x' } }), /pembina\.gelar" tidak dikenal/), 'bagian orang yang tidak dikenal ditolak');
 ok(cocok(await K.admin.a.simpanGudep({ ...salin(contoh), nama: 123 }), /harus berupa teks/), 'nilai bukan teks ditolak');
@@ -139,7 +145,7 @@ console.log('\n--- Klien: penyimpanan di perambah ---');
   ok(ambilGudep().nama === 'Publik' && ambilGudep().kota === 'Kota Publik' && ambilGudep().pembina.nama === GUDEP_BAWAAN.pembina.nama, 'tambahGudep (identitas publik sebelum login) tidak menghapus isian lain');
   const data = (await K.admin.a.muatGudep()).data;
   setGudep(data);
-  ok(ambilGudep().nama === 'Gugus Depan SMAN 2 Contoh' && ambilGudep().pembina.nta === '11.03.12.345.00001' && ambilGudep().pradani.nama === 'Dewi Lestari', 'setGudep memuat data lengkap dari server');
+  ok(ambilGudep().nama === 'Gugus Depan SMAN 2 Contoh' && ambilGudep().pembina.nta === '11.03.12.345.00001' && ambilGudep().kamabigus.nip === '197001011995122001', 'setGudep memuat data lengkap dari server');
   setGudep({ ...salin(contoh), telepon: '', kamabigus: { jabatan: 'KS', nama: '', nta: '', nip: '' } });
   ok(ambilGudep().telepon === '' && ambilGudep().kamabigus.nama === '', 'isian yang dikosongkan Admin tetap kosong (tidak kembali ke bawaan)');
   setGudep(null);
@@ -149,36 +155,8 @@ console.log('\n--- Klien: penyimpanan di perambah ---');
   ok(ambilGudep() === GUDEP_BAWAAN && ambilGudep().pembina.nta === GUDEP_BAWAAN.pembina.nta, 'resetGudep mengembalikan nilai bawaan (pejabat tidak tertinggal setelah keluar)');
 }
 
-console.log('\n--- Ketua sidang = Pradana pada Data Gudep (server dan klien sepakat) ---');
+console.log('\n--- Klien: status tersimpan ---');
 {
-  const pembinaId = K.pembina.id;
-  const ahmadId = (await q(`select id from public.profiles where username = '10231'`))[0].id;
-  const madeId = (await q(`select id from public.profiles where username = '10121'`))[0].id;
-  const sidang = async (idPeserta) => {
-    const r = await sebagai(pembinaId, `select public.sg_sidang_simpan($1, 'Bantara', current_date, 'tunda', 'tidak', 'tidak', '', 'Belum lengkap', null, null) id`, [idPeserta]);
-    if (!r.ok) throw new Error(r.pesan);
-    return (await q('select ketua_nama, ketua_sebutan from public.sidang_dk where id = $1', [r.rows[0].id]))[0];
-  };
-  await K.admin.a.simpanGudep(contoh);
-  let sn = await sidang(ahmadId);
-  ok(sn.ketua_nama === 'Ahmad Rizki' && sn.ketua_sebutan === 'Pradana Dewan Ambalan', 'sidang dicatat: ketua = Pradana pada Data Gudep (nama dan jabatan disalin ke catatan sidang)');
-  ok(JSON.stringify(ketuaSidang(contoh, { tersimpan: true, namaLama: 'Lama', sebutanLama: 'Sebutan Lama' })) === JSON.stringify({ nama: 'Ahmad Rizki', sebutan: 'Pradana Dewan Ambalan' }), 'klien (ketuaSidang) sama: memakai Pradana');
-  await pg.query(`insert into public.pengaturan (kunci, nilai) values ('sidang.nama_ketua', '"Ketua Lama"'), ('sidang.sebutan_ketua', '"Pemangku Adat Lama"')`);
-  sn = await sidang(madeId);
-  ok(sn.ketua_nama === 'Ahmad Rizki' && sn.ketua_sebutan === 'Pradana Dewan Ambalan', 'pengaturan lama diabaikan selama Pradana pada Data Gudep terisi');
-  // Pergantian pengurus: Admin memperbarui Pradana; sidang berikutnya memakai yang baru, catatan lama tidak berubah
-  await K.admin.a.simpanGudep({ ...salin(contoh), pradana: { jabatan: 'Pradana Dewan Ambalan', nama: 'Pradana Baru', nta: '', nip: '' } });
-  await q(`delete from public.sidang_dk where peserta_id = $1`, [madeId]);
-  sn = await sidang(madeId);
-  ok(sn.ketua_nama === 'Pradana Baru', 'sesudah Admin mengganti Pradana, sidang berikutnya memakai nama baru');
-  ok((await q(`select ketua_nama from public.sidang_dk where peserta_id = $1`, [ahmadId]))[0].ketua_nama === 'Ahmad Rizki', 'catatan sidang yang sudah ada tetap memuat nama saat sidang dicatat');
-  // Pradana dikosongkan: kembali ke pengaturan lama sebagai cadangan
-  await K.admin.a.simpanGudep({ ...salin(contoh), pradana: { jabatan: '', nama: '', nta: '', nip: '' } });
-  await q(`delete from public.sidang_dk where peserta_id = $1`, [madeId]);
-  sn = await sidang(madeId);
-  ok(sn.ketua_nama === 'Ketua Lama' && sn.ketua_sebutan === 'Pemangku Adat Lama', 'Pradana kosong: dipakai pengaturan lama sebagai cadangan');
-  ok(JSON.stringify(ketuaSidang({ pradana: { nama: '', jabatan: '' } }, { tersimpan: true, namaLama: 'Ketua Lama', sebutanLama: 'Pemangku Adat Lama' })) === JSON.stringify({ nama: 'Ketua Lama', sebutan: 'Pemangku Adat Lama' }), 'klien: Pradana kosong = cadangan');
-  ok(JSON.stringify(ketuaSidang(contoh, { tersimpan: false, namaLama: 'Ketua Lama', sebutanLama: 'Sebutan Bawaan' })) === JSON.stringify({ nama: 'Ketua Lama', sebutan: 'Sebutan Bawaan' }), 'klien: Data Gudep belum disimpan = pengaturan lama');
   resetGudep();
   ok(gudepTersimpan() === false, 'gudepTersimpan() salah sesudah reset');
   setGudep(contoh);

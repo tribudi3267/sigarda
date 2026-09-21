@@ -11,7 +11,7 @@ export const APP = {
 // jangan mengimpor konstanta ini langsung pada halaman.
 //   pembina   = Pembina Gudep / Ka Gudep (penanda tangan surat intern sekolah)
 //   kamabigus = Kepala Sekolah / Kamabigus (penanda tangan surat keluar sekolah)
-//   pradana, pradani = pimpinan Dewan Ambalan putra dan putri
+// Pradana dan Pradani TIDAK diatur di sini: diambil dari anggota Dewan Ambalan yang berjabatan itu (src/lib/dewanLogic.js).
 export const GUDEP_BAWAAN = {
   nama: 'Gugus Depan SMAN 1 Bukateja',
   singkat: 'Ambalan Gajah Mada/Christina M.T',
@@ -26,8 +26,6 @@ export const GUDEP_BAWAAN = {
   email: '',
   pembina: { jabatan: 'Pembina Gudep', nama: 'Diana Udhi Hendriyanto, S.Pd.M.Pd', nta: '11.03.10.701.02365', nip: '' },
   kamabigus: { jabatan: 'Kepala Sekolah / Kamabigus', nama: '', nta: '', nip: '' },
-  pradana: { jabatan: 'Pradana Dewan Ambalan', nama: '', nta: '', nip: '' },
-  pradani: { jabatan: 'Pradani Dewan Ambalan', nama: '', nta: '', nip: '' },
 };
 
 // Hanya SARAN pada isian anggota baru. Daftar pada filter selalu diambil dari data yang ada.

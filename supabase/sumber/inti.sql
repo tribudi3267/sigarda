@@ -58,6 +58,7 @@ create table public.profiles (
   jabatan text check (jabatan in ('Dewan Ambalan','Pembina','Admin Gudep')),
   calon_garuda date,
   nta text,                                                        -- Nomor Tanda Anggota Pramuka (opsional; diisi saat sidang)
+  jabatan_dewan text check (jabatan_dewan in ('Pradana','Pradani','Wakil Pradana','Wakil Pradani','Sekretaris','Bendahara')),  -- hanya Dewan Ambalan
   wajib_ganti_pin boolean not null default true,
   pin_direset_oleh uuid references public.profiles(id) on delete set null,
   pin_direset_pada timestamptz,
@@ -66,8 +67,11 @@ create table public.profiles (
   constraint profil_peserta check (role <> 'peserta' or (nis is not null and kelas is not null and sangga is not null and agama is not null and jabatan is null)),
   constraint profil_penguji check (role <> 'penguji' or jabatan in ('Dewan Ambalan','Pembina')),
   constraint profil_admin check (role <> 'admin' or jabatan = 'Admin Gudep'),
-  constraint profil_nta check (nta is null or nta ~ '^[0-9A-Za-z./ -]{1,40}$')
+  constraint profil_nta check (nta is null or nta ~ '^[0-9A-Za-z./ -]{1,40}$'),
+  constraint profil_jabatan_dewan check (jabatan_dewan is null or (role = 'penguji' and jabatan = 'Dewan Ambalan'))
 );
+-- Pradana dan Pradani masing-masing hanya satu pemegang (mereka menjadi ketua sidang dan penanda tangan Surat Tanda Lulus)
+create unique index profil_pradana_pradani_unik on public.profiles (jabatan_dewan) where jabatan_dewan in ('Pradana','Pradani');
 
 -- Katalog (diisi otomatis di bagian akhir berkas ini dari data aplikasi)
 create table public.sku_butir (
@@ -316,8 +320,11 @@ create table public.sidang_dk (
   ketua_nama text not null default '',
   ketua_sebutan text not null default '',
   dibuat_oleh uuid references public.profiles(id) on delete set null,
-  dibuat_pada timestamptz not null default now()
+  dibuat_pada timestamptz not null default now(),
+  token text unique check (token ~ '^[0-9a-f]{32}$'),                    -- QR verifikasi berita acara; dibuat saat dicetak (sg_sidang_token)
+  kode text check (kode ~ '^VRF-[0-9A-F]{7}$')
 );
+create index sidang_dk_kode_idx on public.sidang_dk (kode);
 create unique index sidang_dk_nomor on public.sidang_dk (nomor_ba);
 create unique index sidang_dk_layak on public.sidang_dk (peserta_id, tingkat) where keputusan = 'layak';
 create index on public.sidang_dk (peserta_id);
@@ -1799,6 +1806,61 @@ begin
   return v_n;
 end $$;
 
+-- ===== Jabatan Dewan Ambalan: fungsi =====
+-- Jabatan Dewan Ambalan (Pradana, Pradani, Wakil Pradana, Wakil Pradani, Sekretaris, Bendahara), oleh Admin Gudep. p_data = [{"username": "andi", "jabatan": "Pradana"}, ...];
+-- jabatan kosong menghapus jabatan. Hanya untuk anggota Dewan Ambalan. Pradana dan Pradani hanya satu pemegang: pemegang lama harus dikosongkan lebih dulu
+-- (boleh pada permintaan yang sama, mis. [{"username": "lama", "jabatan": ""}, {"username": "baru", "jabatan": "Pradana"}]). Semua atau tidak sama sekali.
+-- Pradana menjadi ketua sidang; Pradana dan Pradani menandatangani Surat Tanda Lulus. Mengembalikan jumlah anggota yang diperbarui.
+create function public.sg_anggota_jabatan_dewan_atur(p_data jsonb) returns int
+language plpgsql security definer set search_path = public as
+$$
+declare v_e jsonb; v_user text; v_jab text; v_n int := 0; v_k int; v_lain text;
+begin
+  perform sigarda.wajib_admin('Hanya Admin Gudep yang dapat mengubah jabatan Dewan Ambalan.');
+  if p_data is null or jsonb_typeof(p_data) <> 'array' then raise exception 'Data jabatan tidak valid.'; end if;
+  if jsonb_array_length(p_data) > 100 then raise exception 'Maksimal 100 baris jabatan per permintaan.'; end if;
+  for v_e in select * from jsonb_array_elements(p_data) loop
+    v_user := lower(btrim(coalesce(v_e ->> 'username', '')));
+    v_jab := sigarda.rapikan(coalesce(v_e ->> 'jabatan', ''));
+    if v_user = '' then raise exception 'Nama pengguna anggota Dewan Ambalan wajib diisi.'; end if;
+    if v_jab <> '' and v_jab not in ('Pradana','Pradani','Wakil Pradana','Wakil Pradani','Sekretaris','Bendahara') then
+      raise exception 'Jabatan Dewan Ambalan "%" tidak dikenal.', v_jab;
+    end if;
+    if not exists (select 1 from public.profiles where username = v_user and role = 'penguji' and jabatan = 'Dewan Ambalan') then
+      raise exception 'Anggota "%" bukan Dewan Ambalan.', v_user;
+    end if;
+    if v_jab in ('Pradana', 'Pradani') then
+      select nama into v_lain from public.profiles where jabatan_dewan = v_jab and username <> v_user limit 1;
+      if found then raise exception '% sudah dijabat oleh %. Kosongkan jabatan itu lebih dulu.', v_jab, v_lain; end if;
+    end if;
+    update public.profiles set jabatan_dewan = nullif(v_jab, '') where username = v_user and role = 'penguji' and jabatan = 'Dewan Ambalan';
+    get diagnostics v_k = row_count;
+    v_n := v_n + v_k;
+  end loop;
+  return v_n;
+end $$;
+
+-- Berita acara sidang memuat QR verifikasi. Token dan kode dibuat saat berita acara pertama kali dicetak (idempoten: cetak ulang memakai yang sama).
+-- Dewan Ambalan, Pembina, dan Admin Gudep. Mengembalikan { token, kode }. Token dijawab sg_verifikasi_token; kode dijawab sg_verifikasi_kode.
+create function public.sg_sidang_token(p_id int) returns jsonb
+language plpgsql security definer set search_path = public as
+$$
+declare v_s public.sidang_dk; v_token text;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pengurus() then raise exception 'Hanya Dewan Ambalan, Pembina, atau Admin Gudep yang dapat mencetak berita acara.'; end if;
+  select * into v_s from public.sidang_dk where id = p_id;
+  if not found then raise exception 'Catatan sidang tidak ditemukan.'; end if;
+  if v_s.token is null then
+    v_token := sigarda.token_acak();
+    update public.sidang_dk set token = v_token, kode = sigarda.kode_verifikasi(array[v_token, 'berita_acara_sidang', v_s.nomor_ba])
+    where id = p_id and token is null;
+    select * into v_s from public.sidang_dk where id = p_id;
+  end if;
+  return jsonb_build_object('token', v_s.token, 'kode', v_s.kode);
+end $$;
+-- ===== akhir fungsi jabatan dewan =====
+
 -- ===== Materi SKU (Pembina dan Admin Gudep) =====
 create function public.sg_materi_simpan(
   p_id uuid, p_judul text, p_deskripsi text, p_tautan text, p_file_id text, p_resource_key text,
@@ -2284,6 +2346,7 @@ $$
 declare
   v_t text := lower(btrim(coalesce(p_token, ''))); v_g public.sku_progress; v_s public.sertifikat_tingkat; v_unit public.sku_unit;
   v_nama text; v_agama text; v_pen text; v_jab text; v_pen_id uuid; v_tgl date; v_total int; v_d public.dokumen_terbit;
+  v_b public.sidang_dk; v_nis text; v_kelas text; v_pembina text;
 begin
   if v_t !~ '^[0-9a-f]{32}$' then return jsonb_build_object('ditemukan', false); end if;
 
@@ -2321,13 +2384,24 @@ begin
       'nama', v_d.peserta_nama, 'nis', v_d.payload ->> 'nis', 'kelas', v_d.payload ->> 'kelas', 'agama', v_d.payload ->> 'agama',
       'guru', v_d.payload -> 'guru' ->> 'nama', 'butir', coalesce(v_d.payload -> 'butir', '[]'::jsonb), 'kode', v_d.kode, 'diterbitkan', v_d.dibuat_pada);
   end if;
+
+  -- Berita acara sidang (token dibuat saat dicetak). Catatan sidang yang dihapus tidak lagi dijawab.
+  select * into v_b from public.sidang_dk where token = v_t;
+  if found then
+    select nama, nis, kelas into v_nama, v_nis, v_kelas from public.profiles where id = v_b.peserta_id;
+    select nama, jabatan into v_pen, v_jab from public.profiles where id = v_b.dibuat_oleh;
+    select nilai #>> '{pembina,nama}' into v_pembina from public.pengaturan where kunci = 'gudep.data';
+    return jsonb_build_object('ditemukan', true, 'jenis', 'dokumen', 'jenis_dokumen', 'berita_acara_sidang', 'dicabut', false, 'nomor', v_b.nomor_ba, 'tanggal', v_b.tanggal,
+      'dibuat_oleh', v_pen, 'jabatan_pembuat', v_jab, 'penanda_tangan', nullif(v_b.ketua_nama, ''), 'jabatan_penanda_tangan', v_b.ketua_sebutan, 'pembina', nullif(v_pembina, ''),
+      'nama', v_nama, 'nis', v_nis, 'kelas', v_kelas, 'tingkat', v_b.tingkat, 'keputusan', v_b.keputusan, 'kode', v_b.kode, 'diterbitkan', v_b.dibuat_pada);
+  end if;
   return jsonb_build_object('ditemukan', false);
 end $$;
 
 create function public.sg_verifikasi_kode(p_kode text) returns jsonb
 language plpgsql stable security definer set search_path = public as
 $$
-declare v_k text := upper(btrim(coalesce(p_kode, ''))); v_tingkat text; v_no int; v_tgl date; v_d public.dokumen_terbit;
+declare v_k text := upper(btrim(coalesce(p_kode, ''))); v_tingkat text; v_no int; v_tgl date; v_d public.dokumen_terbit; v_b public.sidang_dk;
 begin
   if v_k !~ '^VRF-[0-9A-F]{7}$' then return jsonb_build_object('ditemukan', false); end if;
   select u.tingkat, u.butir_no, g.tanggal_uji into v_tingkat, v_no, v_tgl
@@ -2336,7 +2410,11 @@ begin
   if not found then
     -- Kode dokumen terbit: hanya jenis, nomor, tanggal, dan status (tanpa nama)
     select * into v_d from public.dokumen_terbit where kode = v_k order by dibuat_pada limit 1;
-    if not found then return jsonb_build_object('ditemukan', false); end if;
+    if not found then
+      select * into v_b from public.sidang_dk where kode = v_k order by dibuat_pada limit 1;
+      if not found then return jsonb_build_object('ditemukan', false); end if;
+      return jsonb_build_object('ditemukan', true, 'jenis', 'dokumen', 'jenis_dokumen', 'berita_acara_sidang', 'nomor', v_b.nomor_ba, 'tanggal', v_b.tanggal, 'dicabut', false);
+    end if;
     return jsonb_build_object('ditemukan', true, 'jenis', 'dokumen', 'jenis_dokumen', v_d.jenis, 'nomor', v_d.nomor, 'tanggal', v_d.tanggal, 'dicabut', v_d.dicabut_pada is not null);
   end if;
   return jsonb_build_object('ditemukan', true, 'tingkat', v_tingkat, 'butir_no', v_no, 'tanggal', v_tgl);
@@ -2363,8 +2441,9 @@ end $$;
 -- Identitas Gugus Depan dan pejabatnya disimpan sebagai satu objek JSON pada pengaturan 'gudep.data' (dibaca semua pengguna yang sudah masuk
 -- lewat kebijakan baca_pengaturan; diubah hanya Admin Gudep lewat sg_gudep_simpan). Belum ada baris = aplikasi memakai nilai bawaan (src/config.js).
 --   teks   : nama, singkat (nama ambalan), sekolah, alamat, kota, nomorGudep, kwarran, kwarcab, kodeSurat, telepon, email
---   orang  : pembina (Pembina Gudep / Ka Gudep, surat intern sekolah), kamabigus (Kepala Sekolah / Kamabigus, surat keluar sekolah),
---            pradana, pradani; masing-masing { jabatan, nama, nta, nip }
+--   orang  : pembina (Pembina Gudep / Ka Gudep, surat intern sekolah), kamabigus (Kepala Sekolah / Kamabigus, surat keluar sekolah);
+--            masing-masing { jabatan, nama, nta, nip }. Pradana dan Pradani TIDAK disimpan di sini: diambil dari anggota Dewan Ambalan
+--            (jabatan_dewan). Kunci pradana dan pradani tetap diterima (klien lama) tetapi diabaikan.
 -- Aturan isian sama dengan periksaGudep di src/lib/gudepLogic.js (dijaga oleh pengujian).
 create function public.sg_gudep_simpan(p_nilai jsonb) returns void
 language plpgsql security definer set search_path = public as
@@ -2408,7 +2487,7 @@ begin
       v_h := v_h || jsonb_build_object(v_f, v_v);
     end loop;
     if v_k = 'pembina' and (v_h ->> 'nama' = '' or v_h ->> 'jabatan' = '') then raise exception 'Nama dan jabatan Pembina Gudep wajib diisi.'; end if;
-    v_baru := v_baru || jsonb_build_object(v_k, v_h);
+    if v_k in ('pembina', 'kamabigus') then v_baru := v_baru || jsonb_build_object(v_k, v_h); end if;
   end loop;
 
   insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada) values ('gudep.data', v_baru, auth.uid(), now())
@@ -2424,18 +2503,18 @@ $$
     (select jsonb_strip_nulls(jsonb_build_object('nama', p.nilai -> 'nama', 'singkat', p.nilai -> 'singkat', 'sekolah', p.nilai -> 'sekolah', 'kota', p.nilai -> 'kota'))
      from public.pengaturan p where p.kunci = 'gudep.data'), '{}'::jsonb)
 $$;
--- Ketua sidang untuk berita acara: Pradana pada data gudep (nama dan jabatan). Bila Admin belum menyimpan data gudep, atau nama/jabatan Pradana kosong,
+-- Ketua sidang untuk berita acara: anggota Dewan Ambalan berjabatan Pradana (nama; sebutan "Pradana Dewan Ambalan"). Bila belum ada Pradana,
 -- dipakai pengaturan lama sidang.nama_ketua dan sidang.sebutan_ketua (bawaan: kosong dan "Ketua Dewan Penegak / Pemangku Adat").
--- Cermin ketuaSidang di src/lib/gudepLogic.js (dijaga oleh pengujian).
+-- Cermin ketuaSidang di src/lib/dewanLogic.js (dijaga oleh pengujian).
 create function sigarda.ketua_sidang(out o_nama text, out o_sebutan text) language plpgsql stable security definer set search_path = public as
 $$
-declare v_g jsonb;
 begin
-  select nilai into v_g from public.pengaturan where kunci = 'gudep.data';
-  o_nama := sigarda.rapikan(v_g -> 'pradana' ->> 'nama');
-  o_sebutan := sigarda.rapikan(v_g -> 'pradana' ->> 'jabatan');
-  if o_nama = '' then o_nama := sigarda.pengaturan_teks('sidang.nama_ketua', ''); end if;
-  if o_sebutan = '' then o_sebutan := sigarda.pengaturan_teks('sidang.sebutan_ketua', 'Ketua Dewan Penegak / Pemangku Adat'); end if;
+  select sigarda.rapikan(nama), 'Pradana Dewan Ambalan' into o_nama, o_sebutan
+  from public.profiles where role = 'penguji' and jabatan = 'Dewan Ambalan' and jabatan_dewan = 'Pradana' limit 1;
+  if not found then
+    o_nama := sigarda.pengaturan_teks('sidang.nama_ketua', '');
+    o_sebutan := sigarda.pengaturan_teks('sidang.sebutan_ketua', 'Ketua Dewan Penegak / Pemangku Adat');
+  end if;
 end $$;
 -- ===== akhir fungsi gudep =====
 
@@ -2681,11 +2760,11 @@ grant execute on function
   public.sg_absen_buat_sesi(date), public.sg_absen_set(date, uuid, text),
   public.sg_absen_set_banyak(date, uuid[], text, boolean), public.sg_absen_hapus_sesi(date),
   public.sg_anggota_ubah(uuid, text, text, text, text, boolean),
-  public.sg_anggota_nta_atur(jsonb), public.sg_anggota_agama_atur(jsonb),
+  public.sg_anggota_nta_atur(jsonb), public.sg_anggota_agama_atur(jsonb), public.sg_anggota_jabatan_dewan_atur(jsonb),
   public.sg_materi_simpan(uuid, text, text, text, text, text, text[], jsonb),
   public.sg_materi_hapus(uuid), public.sg_materi_geser(uuid, int),
   public.sg_pengaturan_simpan(text, jsonb),
-  public.sg_sidang_simpan(uuid, text, date, text, text, text, text, text, text, text), public.sg_sidang_hapus(int),
+  public.sg_sidang_simpan(uuid, text, date, text, text, text, text, text, text, text), public.sg_sidang_hapus(int), public.sg_sidang_token(int),
   public.sg_sidang_urut_atur(int, int),
   public.sg_raport_pengaturan_simpan(jsonb),
   public.sg_raport_simpan(uuid, text, text, text, int, text[], int, text, text, text, boolean),

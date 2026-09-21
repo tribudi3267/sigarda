@@ -2,6 +2,7 @@ import { useGudep } from '../lib/gudepStore';
 import { INDEKS_POIN } from '../data/skuData';
 import { fmtTanggal } from '../lib/format';
 import { alamatDasar, labelUnit, urlVerifikasi } from '../lib/verifikasiLogic';
+import BlokTtd from './BlokTtd';
 import KodeQr from './KodeQr';
 import { KopSurat } from './DokumenSku';
 
@@ -98,11 +99,7 @@ export default function SuratPengantarAgama({ dokumen: d }) {
             <p>QR hanya membuktikan surat diterbitkan aplikasi; surat sah bila bertanda tangan dan berstempel.</p>
           </div>
         </div>
-        <div className="text-center text-sm">
-          <p>{d.penandaTanganJabatan}</p>
-          <div className="h-24" aria-hidden="true" />
-          <p className="font-bold underline">{d.penandaTanganNama}</p>
-        </div>
+        <BlokTtd orang={{ jabatan: d.penandaTanganJabatan, nama: d.penandaTanganNama }} />
       </div>
     </article>
   );

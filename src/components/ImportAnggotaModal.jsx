@@ -111,7 +111,9 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
               ? 'Kolom wajib: Nama Lengkap, NIS, Rombel (X-01 sampai XII-10), Sangga, Agama. NIS menjadi nama pengguna untuk masuk. NTA dan PIN Awal boleh dikosongkan.'
               : kelompok === 'pembina'
                 ? 'Kolom wajib: Nama Lengkap. Agama (sebaiknya diisi, untuk butir agama), Nama Pengguna, dan PIN Awal boleh dikosongkan.'
-                : 'Kolom wajib: Nama Lengkap. Nama Pengguna dan PIN Awal boleh dikosongkan (dibuat otomatis).'}</li>
+                : kelompok === 'dewan'
+                  ? 'Kolom wajib: Nama Lengkap. Jabatan Dewan (Pradana, Pradani, dan seterusnya), NTA, Nama Pengguna, dan PIN Awal boleh dikosongkan.'
+                  : 'Kolom wajib: Nama Lengkap. Nama Pengguna dan PIN Awal boleh dikosongkan (dibuat otomatis).'}</li>
             <li>Unggah file di bawah, periksa pratinjaunya, lalu impor. Maksimal {MAKS_BARIS} baris.</li>
           </ol>
 
@@ -149,6 +151,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
                   <th className="px-3 py-2 font-semibold">Baris</th>
                   <th className="px-3 py-2 font-semibold">Nama</th>
                   {kelompok === 'pembina' && <th className="px-3 py-2 font-semibold">Agama</th>}
+                  {kelompok === 'dewan' && <th className="px-3 py-2 font-semibold">Jabatan</th>}
                   {penegak && (
                     <>
                       <th className="px-3 py-2 font-semibold">Rombel</th>
@@ -165,6 +168,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
                     <td className="px-3 py-2 text-pramuka-500">{r.no}</td>
                     <td className="px-3 py-2 font-semibold">{r.data.nama || '-'}</td>
                     {kelompok === 'pembina' && <td className="px-3 py-2">{r.data.agama || r.data.agamaAsli || '-'}</td>}
+                    {kelompok === 'dewan' && <td className="px-3 py-2">{r.data.jabatanDewan || r.data.jabatanAsli || '-'}</td>}
                     {penegak && (
                       <>
                         <td className="px-3 py-2">{r.data.kelas || '-'}</td>

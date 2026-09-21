@@ -4,7 +4,7 @@
  * Server menyimpan data dalam tabel (snake_case). Seluruh halaman aplikasi memakai bentuk data
  * bersarang berikut, sehingga lapisan ini menjembataninya:
  *
- *   users[]                        { id, username, role, nama, nis, kelas, sangga, agama, jabatan, calonGaruda, nta,
+ *   users[]                        { id, username, role, nama, nis, kelas, sangga, agama, jabatan, jabatanDewan, calonGaruda, nta,
  *                                    wajibGantiPin, pinDireset:{oleh,waktu}, pinDiubah, dibuat }
  *   progress[pesertaId][skuId]     { status, jadwal, pengujiId, tanggalUji, nilai, catatan, catatanPeserta,
  *                                    verifikasi, diverifikasiPada, riwayat:[{waktu,teks,oleh}] }
@@ -28,6 +28,7 @@ export function petaProfil(r) {
     sangga: atau(r.sangga),
     agama: atau(r.agama),
     jabatan: atau(r.jabatan),
+    jabatanDewan: atau(r.jabatan_dewan),
     calonGaruda: r.calon_garuda ? tgl(r.calon_garuda) : undefined,
     nta: atau(r.nta),
     wajibGantiPin: r.wajib_ganti_pin !== false,

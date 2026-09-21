@@ -8,6 +8,7 @@ import {
 import { bolehResetPin, validasiPinBaru } from '../lib/pinLogic';
 import { periksaBaris, POLA_NTA } from '../lib/importAnggota';
 import { normalisasiRombel, PESAN_ROMBEL } from '../lib/rombelLogic';
+import { rencanaJabatanDewan } from '../lib/dewanLogic';
 import { bolehKelolaMateri, validasiMateri } from '../lib/materiLogic';
 import { hariIni } from '../lib/format';
 import { resetGudep, setGudep, tambahGudep } from '../lib/gudepStore';
@@ -453,6 +454,13 @@ export function AppProvider({ children }) {
     return r;
   };
 
+  /** Token dan kode QR Berita Acara Sidang (dibuat bila belum ada). Hasil: { ok, data: { token, kode } } atau { ok: false, pesan }, tanpa toast. */
+  const tokenSidang = async (id) => {
+    const r = await api().tokenSidang(id);
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  };
+
   /** Riwayat penilaian instrumen satu butir (dibuka dari rincian nilai). Hasil { ok, data } atau { ok: false, pesan }, tanpa toast. */
   const muatPenilaian = async (pesertaId, skuId) => {
     const r = await api().muatPenilaian(pesertaId, skuId);
@@ -675,9 +683,11 @@ export function AppProvider({ children }) {
       if (!baku && !(kelas && kelas.toLowerCase() === String(kelasLama ?? '').toLowerCase())) return { ok: false, pesan: PESAN_ROMBEL };
       data = { ...data, kelas: baku || kelas };
     }
-    // NTA diperiksa sebelum apa pun disimpan, agar data lain tidak tersimpan sebagian
+    // NTA (Penegak dan Dewan Ambalan) diperiksa sebelum apa pun disimpan, agar data lain tidak tersimpan sebagian
+    const anggotaDewan = data.role === 'penguji' && data.jabatan === 'Dewan Ambalan';
+    const punyaNta = data.role === 'peserta' || anggotaDewan;
     const ntaCek = String(data.nta ?? '').trim();
-    if (data.role === 'peserta' && ntaCek && !POLA_NTA.test(ntaCek)) {
+    if (punyaNta && ntaCek && !POLA_NTA.test(ntaCek)) {
       return { ok: false, pesan: 'NTA tidak valid: maksimal 40 karakter (huruf, angka, titik, garis miring, strip, spasi).' };
     }
 
@@ -689,7 +699,7 @@ export function AppProvider({ children }) {
       const baris = r.hasil?.[0];
       if (!baris?.ok) return { ok: false, pesan: baris?.pesan ?? 'Akun belum dapat dibuat.' };
       // NTA diisi sesudah akun ada (fungsi terpisah, khusus Admin). Bila gagal, akun tetap dibuat dan Admin diberi tahu.
-      const nta = data.role === 'peserta' ? String(data.nta ?? '').trim() : '';
+      const nta = punyaNta ? String(data.nta ?? '').trim() : '';
       let peringatan = '';
       if (nta) {
         const n = await api().aturNta([{ username: baris.username, nta }]);
@@ -699,6 +709,11 @@ export function AppProvider({ children }) {
       if (data.role === 'penguji' && data.jabatan === 'Pembina' && data.agama) {
         const g = await api().aturAgamaPembina([{ username: baris.username, agama: data.agama }]);
         if (!g.ok) peringatan = `${peringatan ? `${peringatan} ` : ''}Agama belum tersimpan: ${g.pesan}`;
+      }
+      // Jabatan Dewan Ambalan juga diisi sesudah akun ada. Pradana/Pradani yang masih dipegang orang lain dikosongkan pada permintaan yang sama.
+      if (anggotaDewan && data.jabatanDewan) {
+        const j = await api().aturJabatanDewan(rencanaJabatanDewan(db.users, { id: '', username: baris.username }, data.jabatanDewan).daftar);
+        if (!j.ok) peringatan = `${peringatan ? `${peringatan} ` : ''}Jabatan belum tersimpan: ${j.pesan}`;
       }
       await segarkan.users();
       notify(peringatan ? `Anggota baru ditambahkan, tetapi ${peringatan}` : 'Anggota baru ditambahkan. PIN awal wajib diganti saat login pertama.', peringatan ? 'err' : 'ok');
@@ -718,12 +733,22 @@ export function AppProvider({ children }) {
     }
     // NTA hanya dikirim bila berubah (server lama tanpa migrasi NTA tetap dapat mengubah data lain)
     const ntaBaru = String(data.nta ?? '').trim();
-    if (lama?.role === 'peserta' && data.nta !== undefined && ntaBaru !== (lama.nta ?? '')) {
+    const lamaPunyaNta = lama?.role === 'peserta' || (lama?.role === 'penguji' && lama.jabatan === 'Dewan Ambalan');
+    if (lamaPunyaNta && data.nta !== undefined && ntaBaru !== (lama.nta ?? '')) {
       const n = await api().aturNta([{ username: usernameBaru || lama.username, nta: ntaBaru }]);
       if (!n.ok) {
         await segarkan.users();
         if (n.sesiBerakhir) await sesiBerakhir();
         return { ok: false, pesan: `Data anggota tersimpan, tetapi NTA belum: ${n.pesan}` };
+      }
+    }
+    // Jabatan Dewan Ambalan hanya dikirim bila berubah (Pradana/Pradani yang dipegang orang lain dikosongkan pada permintaan yang sama)
+    if (anggotaDewan && data.jabatanDewan !== undefined && (data.jabatanDewan || '') !== (lama?.jabatanDewan || '')) {
+      const j = await api().aturJabatanDewan(rencanaJabatanDewan(db.users, { id: data.id, username: usernameBaru || lama.username }, data.jabatanDewan || '').daftar);
+      if (!j.ok) {
+        await segarkan.users();
+        if (j.sesiBerakhir) await sesiBerakhir();
+        return { ok: false, pesan: `Data anggota tersimpan, tetapi jabatan belum: ${j.pesan}` };
       }
     }
     await segarkan.users();
@@ -763,7 +788,16 @@ export function AppProvider({ children }) {
         if (!g.ok) peringatan = `Agama ${daftarAgama.length} Pembina belum tersimpan: ${g.pesan}`;
       }
     }
-    if (kelompok === 'peserta' && daftar.length) {
+    if (kelompok === 'dewan' && daftar.length) {
+      // Jabatan Dewan Ambalan (opsional) sesudah akun dibuat; jabatan tunggal (Pradana, Pradani) tidak boleh ganda (sudah diperiksa saat pratinjau).
+      const jabatanPerBaris = new Map(siap.map(({ no, data }) => [no, data.jabatanDewan ?? '']));
+      const daftarJabatan = daftar.map((h) => ({ username: h.username, jabatan: jabatanPerBaris.get(h.no) ?? '' })).filter((x) => x.jabatan);
+      if (daftarJabatan.length) {
+        const j = await api().aturJabatanDewan(daftarJabatan);
+        if (!j.ok) peringatan = `Jabatan ${daftarJabatan.length} anggota Dewan belum tersimpan: ${j.pesan}`;
+      }
+    }
+    if ((kelompok === 'peserta' || kelompok === 'dewan') && daftar.length) {
       const ntaPerBaris = new Map(siap.map(({ no, data }) => [no, String(data.nta ?? '').trim()]));
       const daftarNta = daftar.map((h) => ({ username: h.username, nta: ntaPerBaris.get(h.no) ?? '' })).filter((x) => x.nta);
       if (daftarNta.length) {
@@ -930,7 +964,7 @@ export function AppProvider({ children }) {
     raport: db.raport, bolehRaport, muatRaport, simpanRaport, hapusRaport, simpanPengaturanRaport,
     instrumen: db.instrumen, instrumenGalat: db.instrumenGalat, instrumenSiap, bolehKelolaInstrumen, pastikanInstrumen, simpanInstrumen, statusInstrumen, simpanPengaturanInstrumen,
     sesiUjian: db.sesiUjian, sesiUjianGalat: db.sesiUjianGalat, sesiUjianSiap, pastikanSesiUjian, simpanSesiUjian, ubahStatusSesiUjian, hapusSesiUjian, bolehHapusSesi,
-    muatUlangProgress, tokenSuratTingkat, muatPenilaian,
+    muatUlangProgress, tokenSuratTingkat, tokenSidang, muatPenilaian,
     asisten: db.asisten, pengaturanIuran: db.pengaturanIuran, simpanPengaturanIuran, dewanAmbalan, asistenSaya, pencatatIuran, penunjukAsisten, versiIuran, bacaIuran, catatIuranSusulan, aturIuran, aturIuranBanyak, simpanKas, aturAsisten,
     daftarPeserta, peranUser, bolehKelolaAbsen,
     login, logout,

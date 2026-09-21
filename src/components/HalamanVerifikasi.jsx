@@ -80,6 +80,25 @@ function Dicabut({ d }) {
 function HasilDokumen({ d }) {
   const G = useGudep();
   if (d.dicabut) return <Dicabut d={d} />;
+  if (d.jenis_dokumen === 'berita_acara_sidang') {
+    return (
+      <Sah judul={JUDUL_DOKUMEN.berita_acara_sidang}>
+        <Baris label="Nomor">{d.nomor}</Baris>
+        <Baris label="Tanggal sidang">{fmtTanggal(d.tanggal)}</Baris>
+        <Baris label="Diterbitkan oleh">{G.nama}</Baris>
+        <Baris label="Dicatat oleh">{d.dibuat_oleh ?? '-'}{d.jabatan_pembuat ? `, ${d.jabatan_pembuat}` : ''}</Baris>
+        <Baris label="Ketua sidang">{d.penanda_tangan ? `${d.penanda_tangan}, ${d.jabatan_penanda_tangan}` : d.jabatan_penanda_tangan}</Baris>
+        {d.pembina && <Baris label="Pembina">{d.pembina}</Baris>}
+        <Baris label="Penegak">{d.nama}{d.nis ? `, NIS ${d.nis}` : ''}{d.kelas ? `, kelas ${d.kelas}` : ''}</Baris>
+        <Baris label="Tingkat">SKU Penegak {d.tingkat}</Baris>
+        <Baris label="Keputusan">{d.keputusan === 'layak' ? 'Layak dan lulus untuk dilantik' : 'Ditunda / remedi'}</Baris>
+        {d.kode && <Baris label="Kode verifikasi"><span className="font-mono">{d.kode}</span></Baris>}
+        <p className="py-2.5 text-xs leading-relaxed text-pramuka-600">
+          QR ini membuktikan berita acara tercatat di aplikasi. Berita acara dinyatakan sah bila bertanda tangan dan berstempel {G.nama}.
+        </p>
+      </Sah>
+    );
+  }
   const butir = Array.isArray(d.butir) ? d.butir : [];
   return (
     <Sah judul={JUDUL_DOKUMEN[d.jenis_dokumen] ?? 'Dokumen terbit'}>

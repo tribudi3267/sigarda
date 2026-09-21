@@ -1,8 +1,9 @@
 import { useGudep } from '../lib/gudepStore';
 import { namaAmbalan } from '../lib/gudepLogic';
 import { PERIODE } from '../lib/absensiLogic';
-import { fmtTanggal, hariIni } from '../lib/format';
+import { hariIni } from '../lib/format';
 import { PREDIKAT } from '../lib/raportLogic';
+import BlokTtd from './BlokTtd';
 import { KopSurat } from './DokumenSku';
 
 // "Ambalan Gajah Mada/..." dipakai apa adanya; bila nama tidak diawali kata Ambalan, kata itu ditambahkan.
@@ -46,14 +47,8 @@ export function LembarRaport({ baris, tahunAjaran, semester, tanggal }) {
         </p>
       </div>
 
-      <p className="mt-8 text-right text-sm">{G.kota}, {fmtTanggal(tanggal ?? hariIni())}</p>
-      <div className="mt-1 text-center text-sm">
-        <div className="ml-auto w-64">
-          <p>{G.pembina.jabatan}</p>
-          <div className="h-16" />
-          <p className="font-bold underline">{G.pembina.nama}</p>
-          {G.pembina.nta && <p className="text-xs">NTA {G.pembina.nta}</p>}
-        </div>
+      <div className="mt-8 flex justify-end">
+        <BlokTtd orang={G.pembina} tanggal={tanggal ?? hariIni()} className="w-64" />
       </div>
     </article>
   );

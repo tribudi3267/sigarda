@@ -45,8 +45,8 @@ const bandingkan = (nama, pa, pb) => {
   }
 };
 
-// Skema "sesudah dokumen" = skema.sql terbaru (dibuat dari inti.sql).
-const A = await baru(`${P}/supabase/skema.sql`);
+// Skema "sesudah migrasi data gudep" = skema.sql pada commit 3817628 (bukan skema.sql terbaru: migrasi sesudahnya mengubah fungsi yang sama).
+const A = await baru('git:3817628');
 const pa = await potret(A);
 ok(pa.fungsi.some((x) => x.proname === 'sg_gudep_simpan') && pa.fungsi.some((x) => x.proname === 'sg_gudep_publik'), 'skema baru memuat sg_gudep_simpan dan sg_gudep_publik');
 
