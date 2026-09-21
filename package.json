@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "skema": "node scripts/buat-skema.mjs",
+    "periksa": "node scripts/buat-periksa.mjs",
     "uji": "node uji/jalankan.mjs"
   },
   "dependencies": {

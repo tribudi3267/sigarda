@@ -296,7 +296,7 @@ create table public.dokumen_urut (          -- penghitung nomor dokumen per jeni
 create table public.notifikasi (
   id bigint generated always as identity primary key,
   penerima_id uuid not null references public.profiles(id) on delete cascade,
-  jenis text not null check (jenis in ('ajukan','alih','mulai','hasil','pengingat','lama','sesi','surat')),
+  jenis text not null check (jenis in ('ajukan','alih','mulai','hasil','pengingat','lama','sesi','surat','tes')),   -- 'tes' = notifikasi uji dari tombol di halaman Notifikasi
   judul text not null check (char_length(judul) between 1 and 120),
   isi text not null default '' check (char_length(isi) <= 300),
   tautan jsonb not null default '{}'::jsonb,                        -- { tab: 'antrian' | 'sku' | 'beranda' | 'cetak' }
@@ -3466,6 +3466,30 @@ begin
 end $$;
 
 -- Mendaftarkan perangkat ini untuk akun yang sedang masuk. Perangkat yang sama (endpoint) dialihkan ke akun ini bila sebelumnya milik akun lain.
+-- ===== Notifikasi uji: fungsi =====
+-- Tombol "Kirim notifikasi uji" di halaman Notifikasi (semua peran): membuat satu notifikasi jenis 'tes' untuk pemanggil sendiri. Pemicu yang sama dengan
+-- notifikasi sungguhan (notifikasi_push -> pg_net -> Edge Function notif-push) mengirimnya ke perangkat yang berlangganan, sehingga seluruh jalur dapat diuji
+-- tanpa menunggu kejadian nyata. Dibatasi 5 kali per 10 menit. Hasil { id, perangkat (jumlah perangkat berlangganan), terkonfigurasi (push_atur sudah dijalankan),
+-- pg_net (ekstensi terpasang) } agar klien dapat menjelaskan bila tidak ada yang terkirim; push_status pada baris notifikasi terisi kemudian oleh Edge Function.
+create function public.sg_notifikasi_tes() returns jsonb
+language plpgsql security definer set search_path = public as
+$$
+declare v_uid uuid := auth.uid(); v_id bigint;
+begin
+  perform sigarda.wajib_aktif();
+  if (select count(*) from public.notifikasi where penerima_id = v_uid and jenis = 'tes' and dibuat > now() - interval '10 minutes') >= 5 then
+    raise exception 'Terlalu sering. Tunggu beberapa menit sebelum mengirim notifikasi uji lagi.';
+  end if;
+  insert into public.notifikasi (penerima_id, jenis, judul, isi, tautan)
+  values (v_uid, 'tes', 'Notifikasi uji', 'Bila Anda membaca ini, notifikasi SIGARDA berfungsi di perangkat ini.', '{"tab":"notifikasi"}'::jsonb)
+  returning id into v_id;
+  return jsonb_build_object('id', v_id,
+    'perangkat', (select count(*) from public.push_langganan where penerima_id = v_uid),
+    'terkonfigurasi', exists (select 1 from public.push_konfigurasi),
+    'pg_net', to_regnamespace('net') is not null);
+end $$;
+-- ===== akhir fungsi notifikasi uji =====
+
 create function public.sg_push_simpan(p_endpoint text, p_p256dh text, p_auth text, p_agen text default '') returns void
 language plpgsql security definer set search_path = public as
 $$
@@ -3690,7 +3714,7 @@ grant execute on function
   public.sg_dokumen_surat_agama_terbit(uuid, text[], bigint, text, date, text, text, text, text, text), public.sg_dokumen_cabut(bigint, text),
   public.sg_gudep_simpan(jsonb),
   public.sg_naik_kelas(text, jsonb, boolean), public.sg_naik_kelas_batalkan(bigint), public.sg_anggota_status_atur(uuid, text, text, text),
-  public.sg_notifikasi_tandai(bigint[]), public.sg_push_kunci(), public.sg_push_simpan(text, text, text, text), public.sg_push_hapus(text), public.sg_push_ringkasan(),
+  public.sg_notifikasi_tandai(bigint[]), public.sg_push_kunci(), public.sg_push_simpan(text, text, text, text), public.sg_push_hapus(text), public.sg_push_ringkasan(), public.sg_notifikasi_tes(),
   public.sg_penugasan_peserta_atur(text, uuid, uuid[], text), public.sg_kepengurusan_terapkan(jsonb, boolean, boolean), public.sg_dewan_lama_arsipkan(uuid[], boolean)
   to authenticated;
 -- Fungsi yang boleh dipanggil tanpa login (hanya membaca): verifikasi keaslian dokumen dan identitas gudep yang tampil di halaman masuk

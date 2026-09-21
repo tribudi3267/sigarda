@@ -3,7 +3,7 @@ import { Icon } from './ui';
 
 export default function TingkatTabs({ nilai, onUbah, kunciLaksana = false }) {
   return (
-    <div role="tablist" aria-label="Tingkat SKU" className="no-print inline-flex rounded-lg bg-pramuka-100 p-1">
+    <div role="tablist" aria-label="Tingkat SKU" className="no-print inline-flex flex-wrap rounded-lg bg-pramuka-100 p-1">
       {DAFTAR_TINGKAT.map((t) => (
         <button
           key={t}

@@ -5,8 +5,16 @@
 import { buatKlienFake, siapkanPg } from './klienFake';
 import { isiDataContoh, isiStatusContoh } from './seedLokal';
 import { isiInstrumenContoh } from './instrumenContoh';
+import { bacaParameterUji } from './parameterUji';
+import { masukCepat } from './masukCepat';
+import { isiSekolahPenuh } from './sekolahPenuh';
 
-const NAMA_DB = 'sigarda-lokal';
+const NAMA_DB_DASAR = 'sigarda-lokal';
+const NAMA_DB_PENUH = 'sigarda-lokal-penuh'; // ?data=penuh: data sekolah penuh (ratusan Penegak), terpisah dari data contoh biasa
+const hapusDb = (nama) => new Promise((selesai) => {
+  const req = indexedDB.deleteDatabase(`/pglite/${nama}`);
+  req.onsuccess = req.onerror = req.onblocked = () => selesai();
+});
 const KUNCI_SESI = 'sigarda_lokal_sesi';
 
 const penyimpanSesi = {
@@ -19,6 +27,9 @@ const penyimpanSesi = {
 };
 
 export async function bootLokal() {
+  const uji = bacaParameterUji(window.location.search);
+  const NAMA_DB = uji.penuh ? NAMA_DB_PENUH : NAMA_DB_DASAR;
+  if (uji.ulang) await hapusDb(NAMA_DB);
   const [{ PGlite }, stub, skema] = await Promise.all([
     import('@electric-sql/pglite'),
     import('../../supabase/lokal/stub.sql?raw'),
@@ -33,18 +44,29 @@ export async function bootLokal() {
     await isiDataContoh(pg);
     await isiStatusContoh(pg);
     await isiInstrumenContoh(pg);
+    if (uji.penuh) {
+      document.title = 'Menyiapkan data sekolah penuh...';
+      const ringkas = await isiSekolahPenuh(pg, { kemajuan: (teks) => console.info('[data penuh]', teks) });
+      console.info('[data penuh] selesai', ringkas);
+      document.title = 'SIGARDA';
+    }
   }
 
+  const klien = buatKlienFake(pg, penyimpanSesi);
+  // Masuk cepat tanpa PIN untuk pengujian (?masuk=pembina). Parameter dibuang dari alamat agar muat ulang tidak mengulanginya.
+  if (uji.masuk) {
+    const r = await masukCepat(pg, klien, uji.masuk);
+    if (!r.ok) console.warn('[masuk cepat]', r.pesan);
+  }
+  if (uji.masuk || uji.ulang) window.history.replaceState(null, '', window.location.pathname + (uji.penuh ? '?data=penuh' : ''));
+
   return {
-    klien: buatKlienFake(pg, penyimpanSesi),
+    klien,
     /** Menghapus seluruh data lokal lalu memuat ulang halaman (data contoh dibuat lagi). */
     async reset() {
       penyimpanSesi.simpan(null);
       await pg.close();
-      await new Promise((selesai) => {
-        const req = indexedDB.deleteDatabase(`/pglite/${NAMA_DB}`);
-        req.onsuccess = req.onerror = req.onblocked = () => selesai();
-      });
+      await hapusDb(NAMA_DB);
       window.location.reload();
     },
   };

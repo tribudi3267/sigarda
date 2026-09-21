@@ -32,7 +32,7 @@ export default function Iuran() {
         <p className="text-sm text-pramuka-600">Iuran rutin latihan Jumat, dicatat oleh Dewan Ambalan atau asisten bendahara.</p>
       </div>
 
-      <div role="tablist" aria-label="Bagian iuran" className="mb-4 inline-flex rounded-lg bg-pramuka-100 p-1">
+      <div role="tablist" aria-label="Bagian iuran" className="mb-4 inline-flex flex-wrap rounded-lg bg-pramuka-100 p-1">
         {tab.map((t) => (
           <button
             key={t.id}

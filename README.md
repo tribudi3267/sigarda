@@ -176,6 +176,8 @@ area tanda tangan sengaja dikosongkan; QR hanya membuktikan surat itu benar dite
 sehingga semua jalur tercakup: **pengajuan uji** (penguji tujuan, atau semua penguji yang sah bila masuk antrian rombel), **dialihkan**, **pengujian dimulai** dan **hasil tersedia** (untuk Penegak; isi *tanpa* menyebut lulus atau ulang),
 **jadwal sesi ujian** (Penegak yang dimasukkan; menyimpan ulang sesi tidak menggandakan), dan **surat pengantar guru agama terbit**. Pengingat harian pukul 07.00 WIB (pg_cron): **H-1** pengujian dan sesi ujian, dan **pengajuan menunggu lebih dari 3 hari**.
 Notifikasi berumur lebih dari 90 hari dibersihkan otomatis. Data lama tidak memicu apa pun; hanya peristiwa baru.
+**Kirim notifikasi uji** (tahap L0; migrasi `2026-09-tes-notifikasi.sql`): tombol di halaman Notifikasi membuat satu notifikasi untuk diri sendiri lewat jalur yang sama dengan notifikasi sungguhan (pemicu, pg_net, Edge Function `notif-push`), lalu menampilkan hasilnya:
+terkirim, gagal, atau penyebab yang perlu diperbaiki (push belum dikonfigurasi, pg_net belum aktif, belum ada perangkat, atau Edge Function tidak menjawab dalam 20 detik). Dibatasi 5 kali per 10 menit. Bagian **Kapan notifikasi muncul?** di halaman yang sama mendaftar kejadian pemicunya menurut peran.
 
 **Web Push** (notifikasi muncul di HP walau aplikasi tertutup) memerlukan langkah sekali di Supabase. Tanpa langkah ini aplikasi tetap jalan; halaman Notifikasi menjelaskan bahwa push belum diatur.
 1. Jalankan `supabase/migrasi/2026-09-notifikasi.sql` di SQL Editor (sesudah `2026-09-jabatan-dewan.sql`). Migrasi mencoba mengaktifkan `pg_net` dan `pg_cron`; bila pesan menyebut salah satunya belum aktif, aktifkan di **Dashboard > Integrations**, lalu jalankan migrasi sekali lagi (aman diulang).
@@ -344,6 +346,8 @@ Prasyarat: Node.js 18 atau lebih baru.
 ```bash
 npm install
 npm run dev:lokal    # mode lokal: TANPA Supabase, data di browser ini saja, akun contoh tampil di halaman masuk
+                     # uji tanpa PIN: http://localhost:5199/?masuk=pembina  (juga admin, dewan, 10231, 10008 Penegak berjabatan, 10007 Calon Garuda)
+                     # data sekolah penuh (700 Penegak + 150 alumni, untuk uji kinerja): ?data=penuh&masuk=pembina  (pertama kali ~1 menit; ?ulang=1 membuat ulang)
 npm run dev          # memakai Supabase (butuh .env.local, lihat bagian berikutnya)
 npm run build        # hasil produksi di folder dist/
 npm run skema        # membuat ulang supabase/skema.sql dari supabase/sumber/inti.sql + data butir SKU
@@ -502,6 +506,12 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
 - [`2026-09-dewan-penegak.sql`](supabase/migrasi/2026-09-dewan-penegak.sql): Dewan Ambalan sebagai atribut Penegak (fase 6b). `profiles.jabatan_dewan` menjadi isian bebas (2 sampai 60 karakter) dan boleh dipegang akun Penegak aktif; `sigarda.pengurus`, `sigarda.dewan`, dan `sigarda.bisa_menguji` mengikutsertakan Penegak berjabatan; aturan penguji berdasar penugasan (`sigarda.penguji_peran_ok`, `penguji_sah`, `ditugaskan`);
   tabel `penugasan_peserta` (penugasan khusus per Penegak) dan `kepengurusan_log`; kolom `penugasan_log.peserta_id/peserta_nama`; fungsi `sg_penugasan_peserta_atur`, `sg_kepengurusan_terapkan`, `sg_dewan_lama_arsipkan`; `sg_penugasan_atur`, `sg_penugasan_salin`, dan `sg_anggota_jabatan_dewan_atur` kini juga untuk Pembina; `sg_anggota_status_atur` dan `sg_naik_kelas` mencabut jabatan otomatis; `baca_profil` memperlihatkan Penegak berjabatan kepada semua pengguna.
   Jalankan **setelah** `2026-09-naik-kelas.sql` (bila belum, berhenti dengan pesan yang menuntun). **Edge Function `sigarda` PERLU di-deploy ulang** (salin `supabase/functions/sigarda/index.ts`; pencatatan hasil uji dan reset PIN kini mengenali Penegak berjabatan Dewan): tanpa itu Penegak berjabatan tidak dapat mencatat hasil uji (pesan "Hanya Pembina atau Dewan Ambalan"). Akun Dewan lama dibiarkan berfungsi sampai diarsipkan. Tidak menghapus data; aman dijalankan berulang. Jalankan **sebelum** `git push`.
+
+- [`2026-09-tes-notifikasi.sql`](supabase/migrasi/2026-09-tes-notifikasi.sql): notifikasi uji (tahap L0). `notifikasi.jenis` menerima 'tes' dan fungsi `sg_notifikasi_tes` (tombol "Kirim notifikasi uji", dibatasi 5 kali per 10 menit). Jalankan **setelah** `2026-09-dewan-penegak.sql`. Edge Function **tidak berubah**. Tidak menghapus data; aman diulang. Jalankan sebelum `git push` (tombolnya memanggil fungsi ini).
+
+**Memeriksa pemasangan.** Sesudah menjalankan migrasi dan men-deploy Edge Function, jalankan [`supabase/demo/periksa_pemasangan.sql`](supabase/demo/periksa_pemasangan.sql) di SQL Editor (hanya membaca; aman diulang). Hasilnya ringkasan per kategori (tabel, kolom, batasan, indeks, kebijakan akses, pemicu, fungsi) lalu daftar yang bermasalah:
+`KURANG` (belum ada, migrasi belum dijalankan), `BEDA` (ada tetapi isi fungsi bukan versi terbaru, jalankan ulang migrasi yang menimpanya), `HAK BEDA` atau `RLS BEDA`; ditambah pemeriksaan lingkungan notifikasi (pg_net, pg_cron, jadwal pengingat, konfigurasi push). Semua OK = database mutakhir.
+Edge Function tidak dapat diperiksa dari SQL: barisnya bertanda PERIKSA MANUAL (Dashboard > Edge Functions: waktu deploy terakhir). Berkas ini dibuat otomatis dari skema terbaru (`npm run periksa`, ulangi tiap `inti.sql` berubah; pengujian `periksa-pemasangan` gagal bila usang).
 
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 

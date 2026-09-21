@@ -5,7 +5,39 @@
 import { fmtTanggal } from './format';
 
 export const LABEL_JENIS = {
-  ajukan: 'Pengajuan', alih: 'Dialihkan', mulai: 'Pengujian', hasil: 'Hasil', pengingat: 'Pengingat', lama: 'Menunggu lama', sesi: 'Sesi ujian', surat: 'Surat',
+  ajukan: 'Pengajuan', alih: 'Dialihkan', mulai: 'Pengujian', hasil: 'Hasil', pengingat: 'Pengingat', lama: 'Menunggu lama', sesi: 'Sesi ujian', surat: 'Surat', tes: 'Uji',
+};
+
+/**
+ * Penjelasan hasil "Kirim notifikasi uji". `hasil` = { perangkat, terkonfigurasi, pg_net } dari server; `pushStatus` = null (belum ada laporan),
+ * 'dikirim' atau 'gagal' (dilaporkan Edge Function notif-push); `habisWaktu` = sudah menunggu cukup lama tanpa laporan.
+ * Mengembalikan { tingkat: 'ok' | 'tunggu' | 'galat', teks }.
+ */
+export function penjelasanTes(hasil, pushStatus = null, habisWaktu = false) {
+  if (!hasil?.terkonfigurasi) return { tingkat: 'galat', teks: 'Notifikasi uji masuk ke daftar di bawah, tetapi server belum diatur untuk mengirim ke HP. Admin: jalankan select sigarda.push_atur(...) di SQL Editor (lihat README, bagian Notifikasi).' };
+  if (!hasil.pg_net) return { tingkat: 'galat', teks: 'Ekstensi pg_net belum aktif di database, sehingga tidak ada yang dikirim ke HP. Admin: aktifkan lewat Database > Extensions, lalu jalankan ulang migrasi notifikasi.' };
+  if (!hasil.perangkat) return { tingkat: 'galat', teks: 'Belum ada perangkat yang mengaktifkan notifikasi untuk akun ini. Tekan "Aktifkan notifikasi" di perangkat yang ingin dipakai (iPhone: pasang ke Layar Utama lebih dulu), lalu coba lagi.' };
+  if (pushStatus === 'dikirim') return { tingkat: 'ok', teks: 'Terkirim ke layanan notifikasi. Seharusnya muncul di HP dalam beberapa detik. Bila tidak muncul: periksa izin notifikasi, mode hemat baterai, dan (iPhone) apakah aplikasi dipasang di Layar Utama.' };
+  if (pushStatus === 'gagal') return { tingkat: 'galat', teks: 'Pengiriman gagal. Penyebab umum: kunci VAPID atau alamat fungsi tidak cocok, atau perangkat sudah tidak berlaku (matikan lalu aktifkan lagi notifikasi). Admin: periksa log Edge Function notif-push.' };
+  if (habisWaktu) return { tingkat: 'galat', teks: 'Belum ada laporan dari server push setelah 20 detik. Admin: pastikan Edge Function notif-push sudah di-deploy (Verify JWT dimatikan) dan rahasia NOTIF_RAHASIA sama dengan yang diisi lewat sigarda.push_atur.' };
+  return { tingkat: 'tunggu', teks: 'Mengirim...' };
+}
+
+/** Kejadian yang memunculkan notifikasi, per peran (untuk keterangan "Kapan notifikasi muncul"). */
+export const KAPAN_NOTIFIKASI = {
+  penegak: [
+    'Penguji mulai menguji butir yang Anda ajukan.',
+    'Hasil penilaian butir Anda sudah dicatat (isi tidak menyebut lulus atau ulang).',
+    'Anda dimasukkan ke sesi ujian bersama.',
+    'Surat pengantar guru agama untuk Anda terbit.',
+    'Pengingat pukul 07.00 WIB sehari sebelum jadwal pengujian atau sesi ujian Anda.',
+  ],
+  penguji: [
+    'Penegak mengajukan pengujian kepada Anda, atau ke antrian rombel yang Anda tangani.',
+    'Pengujian dialihkan kepada Anda, atau masuk antrian rombel.',
+    'Pengajuan menunggu lebih dari 3 hari tanpa penguji yang mulai menguji (sekali per pengajuan).',
+    'Pengingat pukul 07.00 WIB sehari sebelum jadwal pengujian yang menjadi tugas Anda.',
+  ],
 };
 
 export const jumlahBelumDibaca = (daftar = []) => daftar.filter((n) => !n.dibaca).length;

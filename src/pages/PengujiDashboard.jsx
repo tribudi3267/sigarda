@@ -21,8 +21,8 @@ function usePenugasanKini() {
 
 function Dashboard({ onNav }) {
   const { user, users, progress, dokumen } = useApp();
-  const penugasan = usePenugasanKini();
-  const antrian = antrianPengujian(progress, users, user.id, penugasan, dokumen ?? []);
+  const { penugasan, penugasanPeserta } = usePenugasanKini();
+  const antrian = antrianPengujian(progress, users, user.id, penugasan, dokumen ?? [], penugasanPeserta);
   const menunggu = antrian.filter((a) => a.entry.status === 'diajukan').length;
 
   return (

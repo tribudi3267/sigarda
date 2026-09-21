@@ -643,7 +643,7 @@ export default function Raport() {
 
       <div className="no-print mb-4 flex flex-wrap items-center gap-3">
         <PilihPeriode nilai={{ ...per, periode: semester }} ubah={setPer} tanpaSetahun />
-        <div role="tablist" aria-label="Menu raport" className="inline-flex rounded-lg bg-pramuka-100 p-1">
+        <div role="tablist" aria-label="Menu raport" className="inline-flex flex-wrap rounded-lg bg-pramuka-100 p-1">
           {TAB.map(([k, v]) => (
             <button
               key={k}

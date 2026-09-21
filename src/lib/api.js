@@ -392,6 +392,15 @@ export function buatApi(klien) {
     tandaiNotifikasi: (ids = null) => rpc('sg_notifikasi_tandai', { p_ids: ids && ids.length ? ids : null }),
     /** Kunci publik VAPID (teks) atau null bila push belum diatur di server. */
     kunciPush: () => rpc('sg_push_kunci'),
+    /** Membuat notifikasi uji untuk diri sendiri (memicu jalur push yang sama dengan notifikasi sungguhan). Hasil { id, perangkat, terkonfigurasi, pg_net }. */
+    kirimNotifikasiTes: () => rpc('sg_notifikasi_tes'),
+    /** Satu notifikasi milik sendiri menurut id (untuk membaca push_status sesudah notifikasi uji). */
+    muatNotifikasiId: (id) =>
+      muat(async () => {
+        const { data, error } = await klien.from('notifikasi').select('*').eq('id', id).limit(1);
+        if (error) throw error;
+        return susunNotifikasi(data ?? [])[0] ?? null;
+      }),
     /** Mendaftarkan perangkat ini: { endpoint, p256dh, auth, agen }. Perangkat yang sama dialihkan ke akun yang masuk. */
     simpanPush: (d) => rpc('sg_push_simpan', { p_endpoint: d.endpoint, p_p256dh: d.p256dh, p_auth: d.auth, p_agen: d.agen ?? '' }),
     hapusPush: (endpoint) => rpc('sg_push_hapus', { p_endpoint: endpoint }),

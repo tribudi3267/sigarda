@@ -221,7 +221,7 @@ export default function PenugasanRombel({ bolehUbah = false, onPerbaruiRombel })
             </div>
           )}
 
-          <div role="tablist" aria-label="Kelas" className="mb-3 inline-flex rounded-lg bg-pramuka-100 p-1">
+          <div role="tablist" aria-label="Kelas" className="mb-3 inline-flex flex-wrap rounded-lg bg-pramuka-100 p-1">
             {KELAS_ROMBEL.map((k) => (
               <button
                 key={k}

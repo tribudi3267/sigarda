@@ -1,4 +1,4 @@
-// Migrasi Dewan sebagai atribut Penegak (fase 6b): kesetaraan dengan skema baru, data utuh, idempoten, perilaku pada data lama, dan gagal jelas bila prasyarat belum ada.
+// Migrasi notifikasi uji (tahap L0): kesetaraan dengan skema baru, data utuh, idempoten, perilaku pada data lama, dan gagal jelas bila prasyarat belum ada.
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -11,8 +11,8 @@ const ok = (c, m) => { if (c) { l++; console.log('ok   :', m); } else { g++; con
 const stub = readFileSync(`${P}/supabase/lokal/stub.sql`, 'utf8');
 // Akhir baris disamakan (LF): checkout Windows dapat mengubah berkas menjadi CRLF, sedangkan skema lama dari git berakhir LF.
 const bersih = (s) => s.replace(/^﻿/, '').replace(/\r\n/g, '\n');
-const M = ['sidang-dk', 'sidang-format-nomor', 'raport', 'instrumen', 'verifikasi-sesi', 'nta-anggota', 'butir-agama-pembina', 'indeks-kode-verifikasi', 'iuran', 'penugasan', 'penegakan', 'dokumen', 'data-gudep', 'jabatan-dewan', 'notifikasi', 'jenis-kelamin', 'naik-kelas', 'dewan-penegak'].map((n) => bersih(readFileSync(`${P}/supabase/migrasi/2026-09-${n}.sql`, 'utf8')));
-const MP = M[17]; // hanya migrasi Dewan-Penegak yang diuji di sini
+const M = ['sidang-dk', 'sidang-format-nomor', 'raport', 'instrumen', 'verifikasi-sesi', 'nta-anggota', 'butir-agama-pembina', 'indeks-kode-verifikasi', 'iuran', 'penugasan', 'penegakan', 'dokumen', 'data-gudep', 'jabatan-dewan', 'notifikasi', 'jenis-kelamin', 'naik-kelas', 'dewan-penegak', 'tes-notifikasi'].map((n) => bersih(readFileSync(`${P}/supabase/migrasi/2026-09-${n}.sql`, 'utf8')));
+const MP = M[18]; // hanya migrasi notifikasi uji yang diuji di sini
 
 // Skema "sebelum migrasi" diambil dari riwayat git: 'git:<commit>' = supabase/skema.sql pada commit itu (commit TEPAT sebelum migrasi notifikasi).
 const skemaDari = (ref) => (ref.startsWith('git:') ? execFileSync('git', ['show', `${ref.slice(4)}:supabase/skema.sql`], { cwd: P, encoding: 'utf8', maxBuffer: 1 << 26 }) : readFileSync(ref, 'utf8'));
@@ -47,42 +47,32 @@ const bandingkan = (nama, pa, pb) => {
 };
 
 // Skema "sesudah naik kelas" = skema.sql terbaru (dibuat dari inti.sql).
-const A = await baru('git:9eb504d'); // skema tepat sesudah migrasi Dewan-Penegak (skema.sql terbaru sudah memuat migrasi sesudahnya)
+const A = await baru(`${P}/supabase/skema.sql`); // skema.sql terbaru = sesudah migrasi notifikasi uji
 const pa = await potret(A);
-ok(pa.fungsi.some((x) => x.proname === 'sg_kepengurusan_terapkan') && pa.fungsi.some((x) => x.proname === 'bisa_menguji') && pa.kolom.some((x) => x.table_name === 'penugasan_peserta') && pa.kolom.some((x) => x.table_name === 'penugasan_log' && x.column_name === 'peserta_id'), 'skema baru memuat sg_kepengurusan_terapkan, bisa_menguji, penugasan_peserta, dan penugasan_log.peserta_id');
+ok(pa.fungsi.some((x) => x.proname === 'sg_notifikasi_tes') && pa.batasan.some((x) => x.conname === 'notifikasi_jenis_check' && /tes/.test(x.def)), 'skema baru memuat sg_notifikasi_tes dan jenis notifikasi tes');
 
-const SEBELUM = 'git:cc55c61'; // commit TEPAT sebelum migrasi Dewan-Penegak (naik kelas sudah terbit)
+const SEBELUM = 'git:9eb504d'; // commit TEPAT sebelum migrasi notifikasi uji (Dewan-Penegak sudah terbit)
 
 console.log('--- Jalur 1: database Anda sekarang (sampai jenis kelamin), berisi data ---');
 const B1 = await baru(SEBELUM);
 await isiDataContoh(B1);
 await B1.query('update public.profiles set wajib_ganti_pin = false');
 const sebelum = await cacah(B1);
-ok((await B1.query(`select to_regclass('public.penugasan_peserta') t`)).rows[0].t === null, 'prasyarat: skema lama belum punya tabel penugasan_peserta');
+ok(!(await B1.query(`select conname, pg_get_constraintdef(oid) d from pg_constraint where conname = 'notifikasi_jenis_check'`)).rows[0].d.includes('tes'), 'prasyarat: skema lama belum menerima jenis notifikasi tes');
 await B1.exec(MP);
 ok(JSON.stringify(await cacah(B1)) === JSON.stringify(sebelum), 'jumlah data tidak berubah oleh migrasi: ' + JSON.stringify(sebelum));
-ok((await B1.query("select jabatan_dewan j from public.profiles where username = 'dewan'")).rows[0].j === 'Pradana', 'jabatan pada akun Dewan lama tetap ada sesudah migrasi (dicabut hanya lewat kepengurusan atau arsip)');
+ok((await B1.query("select count(*)::int n from public.profiles where role = 'admin'")).rows[0].n === 1, 'akun yang sudah ada tetap utuh sesudah migrasi');
 await B1.exec(MP); await B1.exec(MP);
 ok(JSON.stringify(await cacah(B1)) === JSON.stringify(sebelum), 'menjalankan migrasi tiga kali: data tetap sama');
 bandingkan('jalur 1', pa, await potret(B1));
 
 console.log('\n--- Sesudah migrasi: perilaku pada data lama ---');
 {
-  const admin = (await B1.query(`select id from public.profiles where role = 'admin'`)).rows[0].id;
-  const pembina = (await B1.query(`select id from public.profiles where username = 'pembina'`)).rows[0].id;
+  const ahmad = (await B1.query("select id from public.profiles where username = '10231'")).rows[0].id;
   const sebagai = async (uid, sql, args = []) => { try { return { ok: true, rows: (await sqlSebagai(B1, uid, sql, args)).rows }; } catch (e) { return { ok: false, pesan: e.message }; } };
-  let r = await sebagai(pembina, `select public.sg_anggota_jabatan_dewan_atur('[{"username":"10008","jabatan":"Ketua Bidang Kegiatan"}]'::jsonb) n`);
-  ok(r.ok && r.rows[0].n === 1, 'Pembina memberi jabatan bebas kepada Penegak pada database hasil migrasi');
-  r = await sebagai(pembina, `select public.sg_anggota_jabatan_dewan_atur('[{"username":"10119","jabatan":"Pradana"}]'::jsonb) n`);
-  ok(!r.ok && /Pradana sudah dijabat oleh/.test(r.pesan), 'Pradana yang masih dipegang akun Dewan lama tetap dijaga (Pradana tunggal)');
-  const nadia = (await B1.query("select id from public.profiles where username = '10008'")).rows[0].id;
-  r = await sebagai(nadia, `select count(*)::int n from public.sku_progress`);
-  ok(r.ok && r.rows[0].n > 20, 'Penegak berjabatan membaca data Penegak lain (hak pengurus)');
-  r = await sebagai(admin, `select public.sg_dewan_lama_arsipkan(array[(select id from public.profiles where username = 'dewan')]) n`);
-  ok(r.ok && r.rows[0].n === 1 && (await B1.query("select status, jabatan_dewan from public.profiles where username = 'dewan'")).rows[0].status === 'nonaktif', 'Admin mengarsipkan akun Dewan lama pada database hasil migrasi');
-  const dimas = (await B1.query("select id from public.profiles where username = '10118'")).rows[0].id;
-  r = await sebagai(pembina, `select public.sg_penugasan_peserta_atur(sigarda.tahun_ajaran_kini(), $1, array[$2]::uuid[], 'uji') n`, [dimas, pembina]);
-  ok(r.ok && r.rows[0].n === 1, 'penugasan khusus per Penegak berfungsi pada database hasil migrasi');
+  const r = await sebagai(ahmad, `select public.sg_notifikasi_tes() d`);
+  ok(r.ok && r.rows[0].d.id > 0 && r.rows[0].d.perangkat === 0, 'Penegak mengirim notifikasi uji pada database hasil migrasi');
+  ok((await B1.query("select jenis from public.notifikasi where id = $1", [r.rows[0].d.id])).rows[0].jenis === 'tes', 'notifikasi uji tersimpan dengan jenis tes');
 }
 
 console.log('\n--- Jalur 2: database sebelum Sidang, semua migrasi berurutan ---');
@@ -93,12 +83,12 @@ for (const m of M) await B2.exec(m);
 ok(JSON.stringify(await cacah(B2)) === JSON.stringify(s2), 'data tidak berubah oleh semua migrasi');
 bandingkan('jalur 2', pa, await potret(B2));
 
-console.log('\n--- Jalur 3: tanpa migrasi naik kelas: gagal jelas ---');
-const B3 = await baru('git:2a8ebc3'); // sebelum naik kelas (tanpa naik_kelas_log)
+console.log('\n--- Jalur 3: tanpa migrasi Dewan-Penegak: gagal jelas ---');
+const B3 = await baru('git:cc55c61'); // sebelum Dewan-Penegak (tanpa sg_kepengurusan_terapkan)
 let galat = null;
 try { await B3.exec(MP); } catch (e) { galat = e.message; await B3.exec('rollback'); }
 ok(/Jalankan lebih dulu skema dan migrasi/.test(galat ?? ''), 'pesan yang menuntun: ' + (galat ?? 'TIDAK GAGAL').slice(0, 100));
-ok((await B3.query(`select to_regclass('public.penugasan_peserta') t`)).rows[0].t === null, 'kegagalan membatalkan seluruh migrasi (tabel tidak tertambah)');
+ok((await B3.query(`select pg_get_constraintdef(oid) d from pg_constraint where conname = 'notifikasi_jenis_check'`)).rows[0].d.includes('tes') === false, 'kegagalan membatalkan seluruh migrasi (batasan tidak berubah)');
 
-console.log(`\nRINGKASAN MIGRASI DEWAN-PENEGAK: ${l} lulus, ${g} GAGAL`);
+console.log(`\nRINGKASAN MIGRASI TES-NOTIFIKASI: ${l} lulus, ${g} GAGAL`);
 process.exit(g ? 1 : 0);

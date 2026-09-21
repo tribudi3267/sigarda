@@ -19,7 +19,7 @@ const PERAN = new Set(['anon', 'authenticated', 'service_role']);
 export const MAKS_BARIS_POSTGREST = 1000;
 
 const heks = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
-async function hashPin(pin) {
+export async function hashPin(pin) {
   return heks(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`sigarda-lokal|${pin}`)));
 }
 

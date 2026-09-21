@@ -387,7 +387,7 @@ function RekapAbsensi() {
         <Angka nilai={ringkas.rendah} label={`Di bawah ${AMBANG_HADIR}%`} />
       </section>
 
-      <div role="tablist" aria-label="Tampilan rekap" className="no-print mb-3 inline-flex rounded-lg bg-pramuka-100 p-1">
+      <div role="tablist" aria-label="Tampilan rekap" className="no-print mb-3 inline-flex flex-wrap rounded-lg bg-pramuka-100 p-1">
         {[['ringkas', 'Ringkas'], ['jumat', 'Per Jumat']].map(([k, v]) => (
           <button
             key={k}
@@ -503,7 +503,7 @@ export function AbsensiPengurus() {
       <p className="mb-4 text-sm text-pramuka-600">
         Catat kehadiran latihan rutin setiap Jumat dan pantau rekapnya per semester atau per tahun ajaran.
       </p>
-      <div role="tablist" aria-label="Menu absensi" className="mb-4 inline-flex rounded-lg bg-pramuka-100 p-1">
+      <div role="tablist" aria-label="Menu absensi" className="mb-4 inline-flex flex-wrap rounded-lg bg-pramuka-100 p-1">
         {[['rekap', 'Rekap', 'tabel'], ['input', 'Catat absensi', 'absensi']].map(([k, v, ikon]) => (
           <button
             key={k}

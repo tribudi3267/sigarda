@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { LABEL_JENIS, tujuanNotifikasi, waktuRelatif } from '../lib/notifikasiLogic';
+import { KAPAN_NOTIFIKASI, LABEL_JENIS, tujuanNotifikasi, waktuRelatif } from '../lib/notifikasiLogic';
 import PerangkatNotifikasi from '../components/PerangkatNotifikasi';
 import RingkasanPerangkat from '../components/RingkasanPerangkat';
 import { Icon, Kosong } from '../components/ui';
@@ -68,6 +68,13 @@ export default function Notifikasi({ idMenu, onNav }) {
       </div>
 
       <PerangkatNotifikasi />
+      <details className="panel mb-5 p-4 text-sm">
+        <summary className="cursor-pointer font-semibold text-pramuka-900">Kapan notifikasi muncul?</summary>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-pramuka-700">
+          {KAPAN_NOTIFIKASI[user.role === 'peserta' ? 'penegak' : 'penguji'].map((t) => <li key={t}>{t}</li>)}
+        </ul>
+        <p className="mt-2 text-xs text-pramuka-500">Tombol <b>Kirim notifikasi uji</b> di atas membuat satu notifikasi untuk Anda sendiri, sehingga Anda dapat memastikan HP menerimanya tanpa menunggu kejadian di atas.</p>
+      </details>
       {pengurus && <RingkasanPerangkat />}
 
       <DaftarNotifikasi daftar={notifikasi} idMenu={idMenu} onBuka={buka} />

@@ -77,7 +77,7 @@ export default function CetakDokumen({ pesertaId: idAwal, bolehPilih, jenisAwal 
 
           {jenis !== 'surat' && <TingkatTabs nilai={tingkat} onUbah={setTingkat} />}
 
-          <div role="tablist" aria-label="Jenis dokumen" className="inline-flex rounded-lg bg-pramuka-100 p-1">
+          <div role="tablist" aria-label="Jenis dokumen" className="inline-flex flex-wrap rounded-lg bg-pramuka-100 p-1">
             {[['kartu', 'Kartu SKU'], ['stl', 'Surat Tanda Lulus'], ['surat', 'Surat pengantar agama']].map(([k, v]) => (
               <button
                 key={k}

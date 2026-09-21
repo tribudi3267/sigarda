@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { aktifkanPush, keadaanPush, nonaktifkanPush, sudahBerlangganan } from '../lib/pushClient';
+import { penjelasanTes } from '../lib/notifikasiLogic';
 import { Icon } from './ui';
 
 /**
@@ -8,12 +9,14 @@ import { Icon } from './ui';
  * Aturan privasi: menekan Keluar mematikan notifikasi di perangkat ini, jadi HP bersama tidak terus menerima notifikasi akun sebelumnya.
  */
 export default function PerangkatNotifikasi() {
-  const { api, notify } = useApp();
+  const { api, notify, segarkanNotifikasi } = useApp();
   const [keadaan] = useState(() => keadaanPush());
   const [server, setServer] = useState('cek'); // cek | siap | belum | galat
   const [aktif, setAktif] = useState(false);
   const [proses, setProses] = useState(false);
   const [tawaranPasang, setTawaranPasang] = useState(null);
+  const [tes, setTes] = useState(null); // null | { hasil, pushStatus, habisWaktu } (notifikasi uji terakhir)
+  const [mengujiTes, setMengujiTes] = useState(false);
 
   const periksa = useCallback(async () => {
     const [k, b] = await Promise.all([api().kunciPush(), sudahBerlangganan()]);
@@ -42,6 +45,25 @@ export default function PerangkatNotifikasi() {
     notify(r.ok ? 'Notifikasi dimatikan di perangkat ini.' : r.pesan, r.ok ? 'ok' : 'err');
     await periksa();
   };
+  /** Notifikasi uji: dibuat server, lalu status pengirimannya ditanyakan tiap 2 detik sampai 20 detik. */
+  const ujiNotifikasi = async () => {
+    setMengujiTes(true);
+    setTes(null);
+    const r = await api().kirimNotifikasiTes();
+    if (!r.ok) { setMengujiTes(false); notify(r.pesan, 'err'); return; }
+    const hasil = r.data;
+    segarkanNotifikasi();
+    setTes({ hasil, pushStatus: null, habisWaktu: false });
+    if (hasil.terkonfigurasi && hasil.pg_net && hasil.perangkat) {
+      for (let i = 0; i < 10; i += 1) {
+        await new Promise((selesai) => { setTimeout(selesai, 2000); });
+        const n = await api().muatNotifikasiId(hasil.id);
+        if (n.ok && n.data?.pushStatus) { setTes({ hasil, pushStatus: n.data.pushStatus, habisWaktu: false }); setMengujiTes(false); return; }
+      }
+      setTes({ hasil, pushStatus: null, habisWaktu: true });
+    }
+    setMengujiTes(false);
+  };
   const pasang = async () => {
     if (!tawaranPasang) return;
     tawaranPasang.prompt();
@@ -66,9 +88,16 @@ export default function PerangkatNotifikasi() {
           {aktif
             ? <button className="btn btn-outline btn-sm" onClick={matikan} disabled={proses}>Matikan</button>
             : <button className="btn btn-primary btn-sm" onClick={nyalakan} disabled={proses || server === 'belum' || keadaan.izin === 'denied'}><Icon nama="lonceng" className="h-4 w-4" /> Aktifkan notifikasi</button>}
+          <button className="btn btn-outline btn-sm" onClick={ujiNotifikasi} disabled={mengujiTes}>{mengujiTes ? 'Menguji...' : 'Kirim notifikasi uji'}</button>
           {tawaranPasang && <button className="btn btn-gold btn-sm" onClick={pasang}>Pasang aplikasi</button>}
         </div>
       </div>
+
+      {tes && (() => {
+        const j = penjelasanTes(tes.hasil, tes.pushStatus, tes.habisWaktu);
+        const warna = j.tingkat === 'ok' ? 'bg-emerald-50 text-emerald-900' : j.tingkat === 'galat' ? 'bg-amber-50 text-amber-950' : 'bg-pramuka-50 text-pramuka-800';
+        return <p role="status" className={`mt-3 rounded-md px-3 py-2 text-sm ${warna}`}>{j.teks}</p>;
+      })()}
 
       <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-pramuka-600">
         {server === 'belum' && <li>Notifikasi ke perangkat belum diatur di server oleh Admin. Pemberitahuan tetap muncul di daftar di bawah.</li>}

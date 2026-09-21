@@ -6,6 +6,7 @@ import { PIN_PANJANG } from '../lib/pinLogic';
 import { LOKAL } from '../lib/supabaseClient';
 import { alamatDasar } from '../lib/verifikasiLogic';
 import { PIN_DEMO } from '../lokal/pinDemo';
+import { AKUN_CEPAT, alamatMasukCepat } from '../lokal/parameterUji';
 import { FooterRingkas } from './Footer';
 import LogoMark from './LogoMark';
 import { Icon } from './ui';
@@ -127,6 +128,17 @@ export default function Login() {
                   <li>Dewan Ambalan: dewan, PIN {PIN_DEMO.dewan}</li>
                   <li>Admin Gudep: admin, PIN {PIN_DEMO.admin}</li>
                 </ul>
+                <p className="mt-2 font-semibold">Masuk cepat tanpa PIN (khusus uji lokal)</p>
+                <ul className="mt-1 space-y-0.5">
+                  {AKUN_CEPAT.map((a) => (
+                    <li key={a.kunci}><a className="font-semibold text-pramuka-800 underline" href={alamatMasukCepat(a.kunci, window.location.search)}>{a.label}</a></li>
+                  ))}
+                </ul>
+                <p className="mt-1.5">
+                  Data sekolah penuh (ratusan Penegak, untuk uji kinerja):{' '}
+                  <a className="font-semibold text-pramuka-800 underline" href="?data=penuh">buka dengan data penuh</a> (pertama kali butuh beberapa detik),{' '}
+                  <a className="font-semibold text-pramuka-800 underline" href="?">kembali ke data contoh</a>.
+                </p>
                 <button
                   type="button"
                   onClick={() => window.confirm('Hapus semua data lokal dan kembalikan ke data contoh?') && lokal.reset()}

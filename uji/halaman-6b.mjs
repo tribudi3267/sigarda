@@ -6,6 +6,7 @@ import { KonteksApp } from '../src/context/AppContext.jsx';
 import BilahTampilan from '../src/components/BilahTampilan.jsx';
 import PenugasanPenegak from '../src/components/PenugasanPenegak.jsx';
 import Kepengurusan from '../src/pages/Kepengurusan.jsx';
+import PengujiDashboard from '../src/pages/PengujiDashboard.jsx';
 import { tahunAjaranKini } from '../src/lib/rombelLogic.js';
 
 let gagal = 0, lulus = 0;
@@ -66,6 +67,26 @@ console.log('\n--- Kepengurusan ---');
   ok(arsip.includes('Aktifkan kembali') && !arsip.includes('Arsipkan 1 akun'), 'akun lama yang sudah diarsipkan: tombol aktifkan kembali');
   const kosong = tampil(h(Kepengurusan), { user: users[1], users: users.map((u) => ({ ...u, jabatanDewan: undefined })) });
   ok(kosong.includes('Belum ada pengurus Dewan'), 'tanpa pengurus: keterangan kosong');
+}
+
+console.log('\n--- Dashboard, Antrian, dan Peserta Pembina/Dewan (render tanpa galat) ---');
+{
+  const pembina = users[1];
+  const dewanEfektif = { ...users[3], role: 'penguji', jabatan: 'Dewan Ambalan', peranAsli: 'peserta' };
+  const progress = { p3: { 'BAN-05': { status: 'diajukan', jadwal: '2026-09-25', pengujiId: null, riwayat: [] } }, p1: { 'LAK-02': { status: 'proses', jadwal: '2026-09-24', pengujiId: 'pb', riwayat: [] } } };
+  const konteks = {
+    progress, dokumen: [], absensi: { sesi: {}, hadir: {} }, portofolio: {}, muatPenugasan: async () => ({ ok: true }), muatDokumen: async () => ({ ok: true }),
+    alihkanPengajuan: async () => ({ ok: true }), notify: () => {}, sidang: [], pengaturanIuran: {}, asisten: [], versiIuran: 0, semesterSiap: {}, pastikanAbsensi: async () => ({ ok: true }),
+  };
+  for (const [nama, u] of [['Pembina', pembina], ['Dewan (tampilan Dewan pada akun Penegak)', dewanEfektif]]) {
+    for (const mode of ['dashboard', 'antrian', 'peserta']) {
+      let hasil = '', galat = '';
+      try { hasil = tampil(h(PengujiDashboard, { mode, onBuka: () => {}, onNav: () => {} }), { ...konteks, user: u }); } catch (e) { galat = e.message; }
+      ok(galat === '' && hasil.length > 200, `${nama}: halaman ${mode} dirender tanpa galat${galat ? ': ' + galat : ''}`);
+    }
+  }
+  const dash = tampil(h(PengujiDashboard, { mode: 'dashboard', onBuka: () => {}, onNav: () => {} }), { ...konteks, user: pembina });
+  ok(dash.includes('Antrian pengujian SKU') && /\d+ menunggu/.test(dash), 'Dashboard menampilkan ringkasan antrian');
 }
 
 console.log(`\nRINGKASAN HALAMAN 6B: ${lulus} lulus, ${gagal} GAGAL`);

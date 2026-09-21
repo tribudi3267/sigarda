@@ -407,7 +407,7 @@ export default function KelolaInstrumen() {
         Instruksi dan panduan hanya terlihat penguji.
       </p>
 
-      <div role="tablist" aria-label="Menu instrumen" className="mb-4 inline-flex rounded-lg bg-pramuka-100 p-1">
+      <div role="tablist" aria-label="Menu instrumen" className="mb-4 inline-flex flex-wrap rounded-lg bg-pramuka-100 p-1">
         {TAB.map(([k, v]) => (
           <button
             key={k}

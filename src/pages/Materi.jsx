@@ -147,7 +147,7 @@ export default function Materi({ butirAwal = null, onKelola }) {
       ) : (
         <>
           <div className="mb-4 flex flex-wrap items-end gap-3">
-            <div role="group" aria-label="Tingkat SKU" className="inline-flex rounded-lg bg-pramuka-100 p-1">
+            <div role="group" aria-label="Tingkat SKU" className="inline-flex flex-wrap rounded-lg bg-pramuka-100 p-1">
               {['semua', ...DAFTAR_TINGKAT].map((t) => (
                 <button
                   key={t}

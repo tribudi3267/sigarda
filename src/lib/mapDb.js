@@ -322,5 +322,5 @@ export const susunDokumen = (baris = []) =>
 export const susunNotifikasi = (baris = []) =>
   baris.map((r) => ({
     id: Number(r.id), jenis: r.jenis, judul: r.judul, isi: r.isi ?? '', tautan: r.tautan ?? {}, dibuat: r.dibuat,
-    dibaca: !!r.dibaca_pada, dibacaPada: r.dibaca_pada ?? null,
+    dibaca: !!r.dibaca_pada, dibacaPada: r.dibaca_pada ?? null, pushStatus: r.push_status ?? null,
   }));
