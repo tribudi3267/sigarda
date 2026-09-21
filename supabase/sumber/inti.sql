@@ -19,7 +19,7 @@ set check_function_bodies = off;
 -- ---------------------------------------------------------------------------
 -- 0. Bersihkan versi lama
 -- ---------------------------------------------------------------------------
-drop table if exists public.iuran_kas, public.iuran_log, public.iuran, public.asisten_iuran,
+drop table if exists public.dokumen_terbit, public.dokumen_urut, public.iuran_kas, public.iuran_log, public.iuran, public.asisten_iuran,
   public.sesi_ujian_peserta, public.sesi_ujian_butir, public.sesi_ujian, public.sertifikat_tingkat, public.sku_penilaian, public.instrumen_panduan, public.instrumen_penguji, public.instrumen_kriteria, public.instrumen,
   public.raport, public.sidang_dk, public.sidang_urut, public.pengaturan,
   public.materi, public.portofolio_jurnal, public.portofolio,
@@ -210,6 +210,43 @@ create table public.guru_agama (
 );
 create unique index guru_agama_unik on public.guru_agama (agama, lower(nama));
 -- ===== akhir tabel penugasan =====
+
+-- ===== Dokumen terbit: tabel =====
+-- Dokumen resmi yang diterbitkan aplikasi dan keasliannya dapat diperiksa lewat QR (sg_verifikasi_token) atau kode VRF- (sg_verifikasi_kode).
+-- Saat ini satu jenis: surat pengantar ke guru agama (butir agama Penegak yang tidak punya Pembina seagama). Surat dicetak untuk tanda tangan
+-- dan stempel BASAH; QR hanya membuktikan surat itu benar diterbitkan aplikasi. Nama dan jabatan disalin (snapshot) agar tetap terbaca kelak.
+-- Nomor berasal dari penghitung per jenis dan tahun (dokumen_urut, tidak pernah dipakai ulang) atau diisi manual.
+create table public.dokumen_terbit (
+  id bigint generated always as identity primary key,
+  token text not null unique check (token ~ '^[0-9a-f]{32}$'),        -- token acak 128 bit untuk QR
+  kode text not null check (kode ~ '^VRF-[0-9A-F]{7}$'),              -- kode pendek tercetak (hanya menjawab sah atau tidak)
+  jenis text not null check (jenis in ('surat_pengantar_agama')),
+  nomor text not null unique check (char_length(nomor) between 1 and 80),
+  nomor_urut int,
+  tanggal date not null,
+  peserta_id uuid references public.profiles(id) on delete set null,
+  peserta_nama text not null,
+  penerbit text not null check (char_length(penerbit) between 1 and 120),
+  dibuat_oleh uuid references public.profiles(id) on delete set null,
+  dibuat_oleh_nama text not null,
+  dibuat_oleh_jabatan text not null default '',
+  penanda_tangan_nama text not null check (char_length(penanda_tangan_nama) between 1 and 120),
+  penanda_tangan_jabatan text not null check (char_length(penanda_tangan_jabatan) between 1 and 80),
+  payload jsonb not null default '{}'::jsonb,                         -- surat agama: { agama, nis, kelas, sangga, guru: { id, nama, keterangan }, butir: [id unit], catatan }
+  dibuat_pada timestamptz not null default now(),
+  dicabut_pada timestamptz,
+  dicabut_oleh uuid references public.profiles(id) on delete set null,
+  dicabut_alasan text not null default '' check (char_length(dicabut_alasan) <= 200)
+);
+create index dokumen_terbit_peserta_idx on public.dokumen_terbit (peserta_id, jenis);
+create index dokumen_terbit_kode_idx on public.dokumen_terbit (kode);
+create table public.dokumen_urut (          -- penghitung nomor dokumen per jenis dan tahun (tidak pernah dipakai ulang)
+  jenis text not null,
+  tahun int not null,
+  terakhir int not null default 0,
+  primary key (jenis, tahun)
+);
+-- ===== akhir tabel dokumen =====
 
 create table public.portofolio (
   peserta_id uuid not null references public.profiles(id) on delete cascade,
@@ -706,6 +743,8 @@ end $$;
 -- Aturan peran (berlaku saat memilih penguji DAN saat mencatat hasil): butir Laksana dan butir agama hanya Pembina; butir Bantara lain
 -- boleh Pembina atau Dewan Ambalan. Butir agama hanya untuk Pembina yang agamanya SAMA dengan Penegak. Selama belum ada satu pun
 -- Pembina yang agamanya terisi (masa peralihan, sebelum Admin mengisinya), semua Pembina dianggap sah seperti aturan lama.
+-- Pengecualian: bila ada surat pengantar ke guru agama yang masih berlaku untuk Penegak dan butir itu (sigarda.surat_agama_aktif), Pembina yang
+-- tidak seagama boleh mencatat hasil yang dinilai guru agama luar.
 create function sigarda.penguji_peran_ok(p_peserta uuid, p_penguji uuid, p_sku text) returns boolean
 language plpgsql stable security definer set search_path = public as
 $$
@@ -719,7 +758,7 @@ begin
   if v_agama_butir is not null
      and exists (select 1 from public.profiles b where b.role = 'penguji' and b.jabatan = 'Pembina' and b.agama is not null) then
     select agama into v_agama_peserta from public.profiles where id = p_peserta;
-    if v_u.agama is null or v_u.agama is distinct from v_agama_peserta then return false; end if;
+    if (v_u.agama is null or v_u.agama is distinct from v_agama_peserta) and not sigarda.surat_agama_aktif(p_peserta, p_sku) then return false; end if;
   end if;
   return true;
 end $$;
@@ -749,6 +788,18 @@ create function sigarda.penguji_boleh(p_peserta uuid, p_penguji uuid, p_sku text
 language sql stable security definer set search_path = public as
 $$ select exists (select 1 from sigarda.penguji_sah(p_peserta, p_sku) s where s.o_penguji = p_penguji) $$;
 -- ---- akhir bantu penegakan ----
+
+-- ---- Dokumen terbit: fungsi bantu (dicerminkan src/lib/dokumenLogic.js suratAgamaAktif; dijaga oleh pengujian) ----
+-- Ada surat pengantar agama yang belum dicabut untuk Penegak ini dan memuat butir (unit) itu?
+create function sigarda.surat_agama_aktif(p_peserta uuid, p_sku text) returns boolean
+language sql stable security definer set search_path = public as
+$$
+  select exists (
+    select 1 from public.dokumen_terbit d
+    where d.jenis = 'surat_pengantar_agama' and d.peserta_id = p_peserta and d.dicabut_pada is null and d.payload -> 'butir' @> jsonb_build_array(p_sku)
+  )
+$$;
+-- ---- akhir bantu dokumen ----
 
 -- ---------------------------------------------------------------------------
 -- 3. Row Level Security: baca sesuai peran, tanpa tulis langsung
@@ -784,6 +835,8 @@ alter table public.asisten_iuran enable row level security;
 alter table public.penugasan_rombel enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_penugasan_*
 alter table public.penugasan_log enable row level security;
 alter table public.guru_agama enable row level security;
+alter table public.dokumen_terbit enable row level security;   -- baca: pengurus dan pemilik; tulis: hanya fungsi sg_dokumen_*
+alter table public.dokumen_urut enable row level security;
 alter table public.login_gagal enable row level security;   -- tanpa kebijakan: hanya service_role
 
 -- Penegak melihat dirinya sendiri dan daftar penguji/admin; pengurus melihat semua.
@@ -829,6 +882,12 @@ create policy baca_portofolio on public.portofolio for select to authenticated
   using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
 create policy baca_jurnal on public.portofolio_jurnal for select to authenticated
   using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+
+-- Dokumen terbit: pengurus melihat semua; Penegak hanya dokumen tentang dirinya.
+create policy baca_dokumen on public.dokumen_terbit for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+create policy baca_dokumen_urut on public.dokumen_urut for select to authenticated
+  using ((select sigarda.aktif()) and (select sigarda.pengurus()));
 
 create policy baca_pengaturan on public.pengaturan for select to authenticated using ((select sigarda.aktif()));
 create policy baca_sidang on public.sidang_dk for select to authenticated using ((select sigarda.pengurus()));
@@ -996,7 +1055,7 @@ create function public.sg_sku_catat_internal(
   p_tanggal_uji date default null, p_nilai text default null, p_catatan text default ''
 ) returns void language plpgsql security definer set search_path = public as
 $$
-declare v_p public.profiles; v_kode text; v_cat text := btrim(coalesce(p_catatan, '')); v_lama public.sku_progress; v_ganti text := '';
+declare v_p public.profiles; v_kode text; v_cat text := btrim(coalesce(p_catatan, '')); v_lama public.sku_progress; v_ganti text := ''; v_luar text;
 begin
   if not exists (select 1 from public.profiles where id = p_oleh and role = 'penguji') then
     raise exception 'Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.';
@@ -1018,6 +1077,16 @@ begin
   select * into v_lama from public.sku_progress where peserta_id = p_peserta_id and sku_id = p_sku_id;
   if found and v_lama.status in ('diajukan', 'proses') and v_lama.penguji_id is not null and v_lama.penguji_id <> p_oleh and p_hasil in ('proses', 'lulus', 'ulang') then
     v_ganti := ' (menggantikan ' || coalesce((select nama from public.profiles where id = v_lama.penguji_id), 'penguji lain') || ')';
+  end if;
+  -- Butir agama yang dinilai guru agama luar (Pembina tidak seagama, sah karena ada surat pengantar): riwayat menyebut guru dan nomor surat.
+  if p_hasil in ('proses', 'lulus', 'ulang') and exists (select 1 from public.sku_unit where id = p_sku_id and agama is not null)
+     and exists (select 1 from public.profiles b where b.role = 'penguji' and b.jabatan = 'Pembina' and b.agama is not null)
+     and (select agama from public.profiles where id = p_oleh) is distinct from v_p.agama then
+    select ' (dinilai guru agama ' || coalesce(d.payload -> 'guru' ->> 'nama', '-') || ', surat nomor ' || d.nomor || ')' into v_luar
+    from public.dokumen_terbit d
+    where d.jenis = 'surat_pengantar_agama' and d.peserta_id = p_peserta_id and d.dicabut_pada is null and d.payload -> 'butir' @> jsonb_build_array(p_sku_id)
+    order by d.id desc limit 1;
+    v_ganti := v_ganti || coalesce(v_luar, '');
   end if;
   if p_hasil not in ('proses','lulus','ulang','reset') then raise exception 'Hasil pengujian tidak dikenal.'; end if;
   -- Butir dengan instrumen ditetapkan hanya boleh dinilai lewat sg_sku_catat_rubrik_internal (yang menyalakan penanda ini)
@@ -1813,27 +1882,29 @@ end $$;
 --   sidang.format_nomor   {no3}/DK/{tahun}
 --   sidang.nama_ketua     (kosong: dicetak garis untuk tanda tangan)
 --   sidang.sebutan_ketua  Ketua Dewan Penegak / Pemangku Adat
+--   surat.format_nomor    {no3}/SP/{tahun}  (nomor surat pengantar agama; tanpa kode {tingkat}; hanya Pembina atau Admin yang mengubah)
 create function public.sg_pengaturan_simpan(p_kunci text, p_nilai jsonb) returns void
 language plpgsql security definer set search_path = public as
 $$
 declare v text; v_tok text;
 begin
   perform sigarda.wajib_aktif();
-  if p_kunci is null or p_kunci not in ('sidang.format_nomor', 'sidang.nama_ketua', 'sidang.sebutan_ketua') then
+  if p_kunci is null or p_kunci not in ('sidang.format_nomor', 'sidang.nama_ketua', 'sidang.sebutan_ketua', 'surat.format_nomor') then
     raise exception 'Pengaturan tidak dikenal.';
   end if;
   if not sigarda.pengurus() then raise exception 'Hanya Dewan Ambalan, Pembina, atau Admin Gudep yang dapat mengubah pengaturan sidang.'; end if;
+  if p_kunci = 'surat.format_nomor' and not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina atau Admin Gudep yang dapat mengubah format nomor surat.'; end if;
   if p_nilai is null or jsonb_typeof(p_nilai) <> 'string' then raise exception 'Nilai pengaturan tidak sah.'; end if;
   v := sigarda.rapikan(p_nilai #>> '{}');
 
-  if p_kunci = 'sidang.format_nomor' then
+  if p_kunci in ('sidang.format_nomor', 'surat.format_nomor') then
     if v = '' then raise exception 'Format nomor wajib diisi.'; end if;
     if char_length(v) > 80 then raise exception 'Format nomor maksimal 80 karakter.'; end if;
     if v !~ '^[A-Za-z0-9 /._(){}-]+$' then
       raise exception 'Format nomor hanya boleh berisi huruf, angka, spasi, dan tanda / . - _ ( ) serta kode dalam kurung kurawal.';
     end if;
     for v_tok in select (regexp_matches(v, '\{[^}]*\}', 'g'))[1] loop
-      if v_tok not in ('{no}', '{no2}', '{no3}', '{no4}', '{no5}', '{no6}', '{tahun}', '{bulan}', '{romawi}', '{tingkat}') then
+      if v_tok not in ('{no}', '{no2}', '{no3}', '{no4}', '{no5}', '{no6}', '{tahun}', '{bulan}', '{romawi}') and not (v_tok = '{tingkat}' and p_kunci = 'sidang.format_nomor') then
         raise exception 'Kode % tidak dikenal. Kode yang tersedia: {no} {no2} {no3} {no4} {no5} {no6} {tahun} {bulan} {romawi} {tingkat}.', v_tok;
       end if;
     end loop;
@@ -2212,7 +2283,7 @@ language plpgsql stable security definer set search_path = public as
 $$
 declare
   v_t text := lower(btrim(coalesce(p_token, ''))); v_g public.sku_progress; v_s public.sertifikat_tingkat; v_unit public.sku_unit;
-  v_nama text; v_agama text; v_pen text; v_jab text; v_pen_id uuid; v_tgl date; v_total int;
+  v_nama text; v_agama text; v_pen text; v_jab text; v_pen_id uuid; v_tgl date; v_total int; v_d public.dokumen_terbit;
 begin
   if v_t !~ '^[0-9a-f]{32}$' then return jsonb_build_object('ditemukan', false); end if;
 
@@ -2237,19 +2308,37 @@ begin
     return jsonb_build_object('ditemukan', true, 'jenis', 'tingkat', 'nama', v_nama, 'tingkat', v_s.tingkat, 'jumlah_butir', v_total,
       'tanggal', v_tgl, 'penguji', v_pen, 'jabatan_penguji', v_jab, 'diterbitkan', v_s.diterbitkan_pada);
   end if;
+
+  -- Dokumen terbit (surat pengantar agama, dst.): dokumen yang dicabut tetap dijawab, tetapi ditandai dicabut dan tanpa data Penegak.
+  select * into v_d from public.dokumen_terbit where token = v_t;
+  if found then
+    if v_d.dicabut_pada is not null then
+      return jsonb_build_object('ditemukan', true, 'jenis', 'dokumen', 'jenis_dokumen', v_d.jenis, 'nomor', v_d.nomor, 'dicabut', true, 'dicabut_pada', v_d.dicabut_pada);
+    end if;
+    return jsonb_build_object('ditemukan', true, 'jenis', 'dokumen', 'jenis_dokumen', v_d.jenis, 'dicabut', false, 'nomor', v_d.nomor, 'tanggal', v_d.tanggal,
+      'penerbit', v_d.penerbit, 'dibuat_oleh', v_d.dibuat_oleh_nama, 'jabatan_pembuat', v_d.dibuat_oleh_jabatan,
+      'penanda_tangan', v_d.penanda_tangan_nama, 'jabatan_penanda_tangan', v_d.penanda_tangan_jabatan,
+      'nama', v_d.peserta_nama, 'nis', v_d.payload ->> 'nis', 'kelas', v_d.payload ->> 'kelas', 'agama', v_d.payload ->> 'agama',
+      'guru', v_d.payload -> 'guru' ->> 'nama', 'butir', coalesce(v_d.payload -> 'butir', '[]'::jsonb), 'kode', v_d.kode, 'diterbitkan', v_d.dibuat_pada);
+  end if;
   return jsonb_build_object('ditemukan', false);
 end $$;
 
 create function public.sg_verifikasi_kode(p_kode text) returns jsonb
 language plpgsql stable security definer set search_path = public as
 $$
-declare v_k text := upper(btrim(coalesce(p_kode, ''))); v_tingkat text; v_no int; v_tgl date;
+declare v_k text := upper(btrim(coalesce(p_kode, ''))); v_tingkat text; v_no int; v_tgl date; v_d public.dokumen_terbit;
 begin
   if v_k !~ '^VRF-[0-9A-F]{7}$' then return jsonb_build_object('ditemukan', false); end if;
   select u.tingkat, u.butir_no, g.tanggal_uji into v_tingkat, v_no, v_tgl
   from public.sku_progress g join public.sku_unit u on u.id = g.sku_id
   where g.verifikasi = v_k and g.status = 'lulus' order by g.tanggal_uji nulls last limit 1;
-  if not found then return jsonb_build_object('ditemukan', false); end if;
+  if not found then
+    -- Kode dokumen terbit: hanya jenis, nomor, tanggal, dan status (tanpa nama)
+    select * into v_d from public.dokumen_terbit where kode = v_k order by dibuat_pada limit 1;
+    if not found then return jsonb_build_object('ditemukan', false); end if;
+    return jsonb_build_object('ditemukan', true, 'jenis', 'dokumen', 'jenis_dokumen', v_d.jenis, 'nomor', v_d.nomor, 'tanggal', v_d.tanggal, 'dicabut', v_d.dicabut_pada is not null);
+  end if;
   return jsonb_build_object('ditemukan', true, 'tingkat', v_tingkat, 'butir_no', v_no, 'tanggal', v_tgl);
 end $$;
 
@@ -2269,6 +2358,114 @@ begin
   select token into v_token from public.sertifikat_tingkat where peserta_id = p_peserta_id and tingkat = p_tingkat;
   return v_token;
 end $$;
+
+-- ===== Dokumen terbit: fungsi aksi =====
+-- Menerbitkan surat pengantar ke guru agama untuk butir agama Penegak yang tidak punya Pembina seagama (Pembina atau Admin Gudep).
+-- Surat dicetak untuk tanda tangan dan stempel basah; QR memuat token (sg_verifikasi_token). Selama surat berlaku, Pembina mana pun boleh
+-- mencatat hasil butir-butir itu (yang dinilai guru agama); riwayat menyebut nama guru dan nomor surat. Hanya butir agama milik Penegak itu.
+-- Nomor: dari format pengaturan 'surat.format_nomor' (bawaan {no3}/SP/{tahun}) dan penghitung per tahun, atau diisi manual (p_nomor_manual).
+-- Mengembalikan { id, token, nomor }.
+create function public.sg_dokumen_surat_agama_terbit(
+  p_peserta_id uuid, p_butir text[], p_guru_id bigint, p_guru_nama text, p_tanggal date,
+  p_penerbit text, p_penanda_nama text, p_penanda_jabatan text, p_nomor_manual text default null, p_catatan text default ''
+) returns jsonb language plpgsql security definer set search_path = public as
+$$
+declare
+  v_uid uuid := auth.uid(); v_p public.profiles; v_pembuat public.profiles; v_butir text[]; v_guru_id bigint; v_guru text; v_guru_ket text := '';
+  v_manual text := sigarda.rapikan(p_nomor_manual); v_cat text := btrim(coalesce(p_catatan, '')); v_penerbit text := sigarda.rapikan(p_penerbit);
+  v_nama text := sigarda.rapikan(p_penanda_nama); v_jab text := sigarda.rapikan(p_penanda_jabatan);
+  v_tahun int; v_urut int; v_nomor text; v_token text := sigarda.token_acak(); v_id bigint; v_b text;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina atau Admin Gudep yang dapat menerbitkan surat pengantar.'; end if;
+  select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';
+  if not found or v_p.agama is null then raise exception 'Peserta tidak ditemukan.'; end if;
+  select * into v_pembuat from public.profiles where id = v_uid;
+  if exists (select 1 from public.profiles where role = 'penguji' and jabatan = 'Pembina' and agama = v_p.agama) then
+    raise exception 'Ada Pembina yang seagama (%) dengan Penegak ini; butir agama diuji oleh Pembina tersebut, jadi surat pengantar tidak diperlukan.', v_p.agama;
+  end if;
+
+  select coalesce(array_agg(distinct b order by b), '{}') into v_butir from unnest(coalesce(p_butir, '{}')) b;
+  if cardinality(v_butir) = 0 then raise exception 'Pilih sedikitnya satu butir agama.'; end if;
+  if cardinality(v_butir) > 30 then raise exception 'Maksimal 30 butir per surat.'; end if;
+  foreach v_b in array v_butir loop
+    if not exists (select 1 from public.sku_unit where id = v_b and agama = v_p.agama) then
+      raise exception 'Butir % bukan butir agama % milik Penegak ini.', v_b, v_p.agama;
+    end if;
+    if exists (select 1 from public.sku_progress where peserta_id = p_peserta_id and sku_id = v_b and status = 'lulus') then
+      raise exception 'Butir % sudah lulus; tidak perlu surat pengantar.', v_b;
+    end if;
+    if sigarda.surat_agama_aktif(p_peserta_id, v_b) then
+      raise exception 'Butir % sudah tercantum pada surat pengantar yang masih berlaku. Cabut surat itu lebih dulu bila perlu membuat ulang.', v_b;
+    end if;
+  end loop;
+
+  if p_guru_id is not null then
+    select id, nama, keterangan into v_guru_id, v_guru, v_guru_ket from public.guru_agama where id = p_guru_id and agama = v_p.agama;
+    if not found then raise exception 'Guru agama yang dipilih tidak terdaftar untuk agama %.', v_p.agama; end if;
+  else
+    v_guru := sigarda.rapikan(p_guru_nama);
+    if v_guru = '' then raise exception 'Pilih guru agama atau tulis namanya.'; end if;
+    if char_length(v_guru) > 120 then raise exception 'Nama guru agama maksimal 120 karakter.'; end if;
+  end if;
+  if p_tanggal is null or p_tanggal < date '2000-01-01' or p_tanggal > sigarda.hari_ini() + 30 then raise exception 'Tanggal surat tidak valid.'; end if;
+  if v_penerbit = '' or char_length(v_penerbit) > 120 then raise exception 'Nama penerbit wajib diisi (maksimal 120 karakter).'; end if;
+  if v_nama = '' or char_length(v_nama) > 120 then raise exception 'Nama penanda tangan wajib diisi (maksimal 120 karakter).'; end if;
+  if v_jab = '' or char_length(v_jab) > 80 then raise exception 'Jabatan penanda tangan wajib diisi (maksimal 80 karakter).'; end if;
+  if char_length(v_cat) > 300 then raise exception 'Catatan maksimal 300 karakter.'; end if;
+
+  v_tahun := extract(year from p_tanggal)::int;
+  if v_manual <> '' then
+    if char_length(v_manual) > 80 then raise exception 'Nomor surat maksimal 80 karakter.'; end if;
+    v_nomor := v_manual;
+  else
+    insert into public.dokumen_urut as u (jenis, tahun, terakhir) values ('surat_pengantar_agama', v_tahun, 1)
+    on conflict (jenis, tahun) do update set terakhir = u.terakhir + 1
+    returning u.terakhir into v_urut;
+    v_nomor := sigarda.format_nomor(sigarda.pengaturan_teks('surat.format_nomor', '{no3}/SP/{tahun}'), v_urut, p_tanggal, '');
+  end if;
+  if exists (select 1 from public.dokumen_terbit where nomor = v_nomor) then raise exception 'Nomor surat % sudah dipakai.', v_nomor; end if;
+
+  insert into public.dokumen_terbit (
+    token, kode, jenis, nomor, nomor_urut, tanggal, peserta_id, peserta_nama, penerbit, dibuat_oleh, dibuat_oleh_nama, dibuat_oleh_jabatan,
+    penanda_tangan_nama, penanda_tangan_jabatan, payload
+  ) values (
+    v_token, sigarda.kode_verifikasi(array[v_token, 'surat_pengantar_agama', v_nomor]), 'surat_pengantar_agama', v_nomor, v_urut, p_tanggal,
+    p_peserta_id, v_p.nama, v_penerbit, v_uid, v_pembuat.nama, coalesce(v_pembuat.jabatan, ''), v_nama, v_jab,
+    jsonb_build_object('agama', v_p.agama, 'nis', coalesce(v_p.nis, ''), 'kelas', coalesce(v_p.kelas, ''), 'sangga', coalesce(v_p.sangga, ''),
+      'guru', jsonb_build_object('id', v_guru_id, 'nama', v_guru, 'keterangan', v_guru_ket), 'butir', to_jsonb(v_butir), 'catatan', v_cat)
+  ) returning id into v_id;
+
+  foreach v_b in array v_butir loop
+    insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh)
+    values (p_peserta_id, v_b, 'Surat pengantar nomor ' || v_nomor || ' diterbitkan untuk guru agama ' || v_guru, v_uid);
+  end loop;
+  return jsonb_build_object('id', v_id, 'token', v_token, 'nomor', v_nomor);
+end $$;
+
+-- Mencabut surat (mis. salah isi atau Pembina seagama sudah ada). Setelah dicabut, hasil butir tidak lagi dapat dicatat lewat surat itu,
+-- dan QR-nya menjawab "dicabut". Alasan wajib dan tercatat di riwayat butir.
+create function public.sg_dokumen_cabut(p_id bigint, p_alasan text) returns void
+language plpgsql security definer set search_path = public as
+$$
+declare v_d public.dokumen_terbit; v_alasan text := sigarda.rapikan(p_alasan); v_b text;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina atau Admin Gudep yang dapat mencabut surat.'; end if;
+  select * into v_d from public.dokumen_terbit where id = p_id;
+  if not found then raise exception 'Dokumen tidak ditemukan.'; end if;
+  if v_d.dicabut_pada is not null then raise exception 'Dokumen ini sudah dicabut.'; end if;
+  if v_alasan = '' then raise exception 'Isi alasan pencabutan.'; end if;
+  if char_length(v_alasan) > 200 then raise exception 'Alasan maksimal 200 karakter.'; end if;
+  update public.dokumen_terbit set dicabut_pada = now(), dicabut_oleh = auth.uid(), dicabut_alasan = v_alasan where id = p_id;
+  if v_d.peserta_id is not null then
+    for v_b in select jsonb_array_elements_text(v_d.payload -> 'butir') loop
+      insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh)
+      values (v_d.peserta_id, v_b, 'Surat pengantar nomor ' || v_d.nomor || ' dicabut. Alasan: ' || v_alasan, auth.uid());
+    end loop;
+  end if;
+end $$;
+-- ===== akhir fungsi dokumen =====
 
 -- ===== Sesi ujian (Dewan Ambalan, Pembina, Admin) =====
 -- Menyimpan satu sesi beserta butir dan pesertanya (id kosong = sesi baru). Butir dan peserta diganti seluruhnya sesuai daftar.
@@ -2395,7 +2592,7 @@ grant select on public.profiles, public.sku_butir, public.sku_unit, public.pf_it
   public.instrumen, public.instrumen_kriteria, public.instrumen_penguji, public.instrumen_panduan, public.sku_penilaian,
   public.sesi_ujian, public.sesi_ujian_butir, public.sesi_ujian_peserta,
   public.iuran, public.iuran_log, public.iuran_kas, public.asisten_iuran,
-  public.penugasan_rombel, public.penugasan_log, public.guru_agama to authenticated;
+  public.penugasan_rombel, public.penugasan_log, public.guru_agama, public.dokumen_terbit, public.dokumen_urut to authenticated;
 
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function
@@ -2425,7 +2622,8 @@ grant execute on function
   public.sg_iuran_pengaturan(), public.sg_iuran_pengaturan_simpan(jsonb), public.sg_iuran_ringkas(uuid, date), public.sg_iuran_susulan(uuid, date, int, int),
   public.sg_penugasan_atur(text, uuid, text[], boolean), public.sg_penugasan_salin(text, text), public.sg_rombel_perbarui(jsonb),
   public.sg_guru_agama_simpan(bigint, text, text, text), public.sg_guru_agama_hapus(bigint),
-  public.sg_penguji_pilihan(text, uuid), public.sg_sku_alihkan(uuid, text, uuid, text)
+  public.sg_penguji_pilihan(text, uuid), public.sg_sku_alihkan(uuid, text, uuid, text),
+  public.sg_dokumen_surat_agama_terbit(uuid, text[], bigint, text, date, text, text, text, text, text), public.sg_dokumen_cabut(bigint, text)
   to authenticated;
 -- Verifikasi keaslian dokumen: satu-satunya fungsi yang boleh dipanggil tanpa login (hanya membaca)
 grant execute on function public.sg_verifikasi_token(text), public.sg_verifikasi_kode(text) to anon, authenticated;

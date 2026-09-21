@@ -34,7 +34,7 @@ export function useApp() {
   return ctx;
 }
 
-const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '', asisten: [], pengaturanIuran: PENGATURAN_IURAN_BAWAAN, penugasan: {}, guruAgama: [] };
+const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '', asisten: [], pengaturanIuran: PENGATURAN_IURAN_BAWAAN, penugasan: {}, guruAgama: [], dokumen: null };
 const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi waktu Edge Function)
 const JEDA_SEGARKAN_MS = 30000;
 
@@ -830,6 +830,31 @@ export function AppProvider({ children }) {
     return r;
   };
 
+  /* ---------------- Dokumen terbit (surat pengantar ke guru agama) ---------------- */
+  const MSG_SURAT = 'Hanya Pembina atau Admin Gudep yang dapat menerbitkan dan mencabut surat pengantar.';
+  const bolehSurat = user?.role === 'admin' || (user?.role === 'penguji' && user.jabatan === 'Pembina');
+
+  /** Memuat dokumen terbit (pengurus: semua; Penegak: miliknya). Mengembalikan { ok }. Aman dipanggil berulang. */
+  const muatDokumen = useCallback(async () => {
+    const mulaiGenerasi = generasi.current;
+    const r = await api().muatDokumen();
+    if (mulaiGenerasi !== generasi.current) return { ok: true };
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      // fungsi/tabel belum ada (migrasi belum dijalankan): dianggap tidak ada dokumen
+      setDb((d) => ({ ...d, dokumen: d.dokumen ?? [] }));
+      return { ok: false, pesan: r.pesan };
+    }
+    setDb((d) => ({ ...d, dokumen: r.data }));
+    return { ok: true };
+  }, [sesiBerakhir]);
+
+  const terbitkanSuratAgama = (data) =>
+    bolehSurat ? aksi(api().terbitkanSuratAgama(data), { sesudah: () => muatDokumen() }) : Promise.resolve(ditolak(notify, MSG_SURAT));
+
+  const cabutDokumen = (id, alasan) =>
+    bolehSurat ? aksi(api().cabutDokumen(id, alasan), { sukses: 'Surat dicabut.', sesudah: () => muatDokumen() }) : Promise.resolve(ditolak(notify, MSG_SURAT));
+
   const aturPenugasan = (tahunAjaran, pengujiId, rombel, ada) =>
     user?.role === 'admin'
       ? aksi(api().aturPenugasan(tahunAjaran, pengujiId, rombel, ada), { sesudah: () => muatPenugasan(tahunAjaran) })
@@ -898,6 +923,7 @@ export function AppProvider({ children }) {
     buatSesiAbsen, setStatusAbsen, tandaiBanyakAbsen, hapusSesiAbsen, semesterSiap, pastikanAbsensi,
     gantiPin, resetPin,
     simpanAnggota, imporAnggota, hapusAnggota, perbaruiRombel,
+    dokumen: db.dokumen, muatDokumen, terbitkanSuratAgama, cabutDokumen, bolehSurat,
     penugasan: db.penugasan, guruAgama: db.guruAgama, muatPenugasan, muatLogPenugasan, aturPenugasan, salinPenugasan, simpanGuruAgama, hapusGuruAgama,
     muatUlang: muatSemua,
     notify, toast,

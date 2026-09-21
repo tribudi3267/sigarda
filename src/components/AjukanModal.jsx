@@ -88,7 +88,7 @@ export default function AjukanModal({ poin, onTutup }) {
       {kosong && (
         <p role="alert" className="-mt-2 mb-4 text-sm font-medium text-red-700">
           {pilihan.agamaButir
-            ? 'Belum ada Pembina yang seagama dengan Anda. Hubungi Admin Gudep atau Pembina.'
+            ? 'Belum ada Pembina yang seagama dengan Anda. Hubungi Pembina: surat pengantar ke guru agama dapat diterbitkan agar butir ini bisa dinilai.'
             : 'Belum ada penguji yang dapat menguji butir ini untuk rombel Anda. Hubungi Admin Gudep.'}
         </p>
       )}

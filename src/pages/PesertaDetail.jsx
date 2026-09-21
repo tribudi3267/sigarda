@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { bolehMenilaiPoin, hitungProgres, laksanaTerbuka } from '../lib/skuLogic';
+import { perluSuratAgama, suratAgamaAktif } from '../lib/dokumenLogic';
 import SkuChecklist from '../components/SkuChecklist';
 import TingkatTabs from '../components/TingkatTabs';
 import UjiModal from '../components/UjiModal';
@@ -8,7 +9,8 @@ import { Avatar, BadgePeran, Icon, Kosong, ProgressBar } from '../components/ui'
 
 /** Halaman rincian satu peserta. Pembina/Dewan Ambalan dapat menilai, admin hanya melihat. */
 export default function PesertaDetail({ pesertaId, onKembali, onCetak, onBukaPortofolio, onBukaMateri }) {
-  const { daftarPeserta, progress, user, users } = useApp();
+  const { daftarPeserta, progress, user, users, dokumen, muatDokumen, bolehSurat } = useApp();
+  useEffect(() => { if (user.role !== 'peserta') muatDokumen(); }, [user.role, muatDokumen]); // surat pengantar agama memengaruhi siapa yang boleh menilai butir agama
   const [tingkat, setTingkat] = useState('Bantara');
   const [uji, setUji] = useState(null);
 
@@ -21,17 +23,29 @@ export default function PesertaDetail({ pesertaId, onKembali, onCetak, onBukaPor
 
   const renderAksi = (poin, entry) => {
     if (!bisaMenguji) return null;
-    if (!bolehMenilaiPoin(user, poin, { users, peserta })) return <span className="text-xs font-semibold text-pramuka-500">{poin.agama ? 'Butir agama dinilai Pembina seagama' : 'Butir Laksana dinilai Pembina'}</span>;
+    if (!bolehMenilaiPoin(user, poin, { users, peserta, dokumen })) {
+      const bisaSurat = poin.agama && bolehSurat && perluSuratAgama(users, peserta) && entry.status !== 'lulus';
+      return (
+        <span className="flex flex-col items-end gap-1 text-xs font-semibold text-pramuka-500">
+          {poin.agama ? 'Butir agama dinilai Pembina seagama' : 'Butir Laksana dinilai Pembina'}
+          {bisaSurat && <button className="btn btn-outline btn-sm" onClick={() => onCetak(peserta.id, 'surat')}>Surat pengantar guru agama</button>}
+        </span>
+      );
+    }
+    const lewatSurat = poin.agama && suratAgamaAktif(dokumen, peserta.id, poin.id) && (user.agama ?? null) !== peserta.agama;
     const terkunci = poin.tingkat === 'Laksana' && !laksanaBuka && entry.status !== 'lulus';
     return (
-      <button
-        className={`btn btn-sm ${entry.status === 'lulus' ? 'btn-outline' : 'btn-primary'}`}
-        disabled={terkunci}
-        title={terkunci ? 'Peserta belum menyelesaikan seluruh butir Bantara' : undefined}
-        onClick={() => setUji({ poin })}
-      >
-        {entry.status === 'lulus' ? 'Tinjau' : 'Nilai poin'}
-      </button>
+      <span className="flex flex-col items-end gap-1">
+        <button
+          className={`btn btn-sm ${entry.status === 'lulus' ? 'btn-outline' : 'btn-primary'}`}
+          disabled={terkunci}
+          title={terkunci ? 'Peserta belum menyelesaikan seluruh butir Bantara' : undefined}
+          onClick={() => setUji({ poin })}
+        >
+          {entry.status === 'lulus' ? 'Tinjau' : 'Nilai poin'}
+        </button>
+        {lewatSurat && entry.status !== 'lulus' && <span className="text-[11px] font-semibold text-pramuka-500">Dinilai guru agama (surat pengantar)</span>}
+      </span>
     );
   };
 

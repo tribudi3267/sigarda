@@ -141,10 +141,10 @@ for (const [nama, kk] of [['Pembina', K.pembina], ['Dewan Ambalan', K.dewan], ['
 }
 {
   const g = await K.pembina.a.muatGuruAgama();
-  ok(g.ok && g.data.length === 2 && g.data[0].agama && g.data[0].nama, 'Pembina membaca daftar guru agama');
+  ok(g.ok && g.data.length === 4 && g.data[0].agama && g.data[0].nama, 'Pembina membaca daftar guru agama');
   ok((await K.ahmad.a.muatGuruAgama()).data.length === 0, 'Penegak tidak melihat guru agama (RLS)');
   const ca = cakupanAgama(users, g.data);
-  ok(ca.length === 6 && ca.find((x) => x.agama === 'Hindu').guru.length === 1 && ca.find((x) => x.agama === 'Hindu').perluSurat === true, 'cakupan agama: Hindu punya Penegak, tanpa Pembina seagama -> perlu surat, ada 1 guru');
+  ok(ca.length === 6 && ca.find((x) => x.agama === 'Hindu').guru.length === 2 && ca.find((x) => x.agama === 'Hindu').perluSurat === true, 'cakupan agama: Hindu punya Penegak, tanpa Pembina seagama -> perlu surat, ada 2 guru (1 dari data contoh, 1 ditambahkan di atas)');
   ok(ca.find((x) => x.agama === 'Khonghucu').penegak === 0 && ca.find((x) => x.agama === 'Khonghucu').perluSurat === false, 'agama tanpa Penegak tidak memerlukan surat');
 }
 ok((await K.admin.a.hapusGuruAgama(idGuru)).ok && (await q('select count(*)::int n from public.guru_agama where id = $1', [idGuru]))[0].n === 0, 'Admin menghapus guru agama');

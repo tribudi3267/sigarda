@@ -1,5 +1,7 @@
 // Menyusun supabase/migrasi/2026-09-penegakan.sql dari bagian-bagian di supabase/sumber/inti.sql (satu sumber kebenaran).
 // Jalankan: node scripts/migrasi/2026-09-penegakan.mjs
+// CATATAN: JANGAN dijalankan ulang sesudah 2026-09-dokumen.sql ada: sigarda.penguji_peran_ok dan sg_sku_catat_internal berubah di sana,
+// jadi berkas penegakan yang sudah dijalankan pengguna akan berbeda dari hasil penyusunan ulang.
 import { ambil, gantiFungsi, tulisMigrasi } from './bantu.mjs';
 
 const bantu = ambil('-- ---- Penegakan penugasan penguji: fungsi bantu', '-- ---- akhir bantu penegakan ----', true);

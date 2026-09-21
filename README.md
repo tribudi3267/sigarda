@@ -52,7 +52,7 @@ Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Adm
 | Anggota | | | Tambah, ubah, hapus anggota; import Excel dan unduh template (Penegak, Dewan Ambalan, Pembina); perbarui rombel Penegak; tab **Penugasan** (penguji per rombel, guru agama) |
 | Reset PIN (menu akun) | | Sesuai kewenangan (lihat di bawah) | Semua kecuali Admin |
 | Pengaturan akun (menu akun) | Ganti PIN sendiri | Ganti PIN sendiri | Ganti PIN sendiri |
-| Cetak | Kartu SKU, Surat Tanda Lulus | Idem | Idem |
+| Cetak | Kartu SKU, Surat Tanda Lulus, Surat pengantar agama (milik sendiri) | Idem; **Pembina** dan **Admin** dapat menerbitkan dan mencabut surat pengantar | Idem |
 
 ### Masuk, nama pengguna, dan PIN
 - **Nama pengguna** untuk masuk: Penegak memakai **NIS**; Dewan Ambalan, Pembina, dan Admin memakai nama pengguna yang
@@ -117,7 +117,19 @@ Aturan dihitung di server (`sigarda.penguji_sah`) dan dicerminkan di layar (`src
 - **Butir agama** hanya oleh Pembina yang **agamanya sama** dengan Penegak. **Masa peralihan:** selama belum ada satu pun Pembina yang agamanya terisi, semua Pembina masih dianggap sah (aturan lama). Begitu Admin mengisi agama
   seorang Pembina, aturan seagama berlaku untuk semua: Pembina tanpa agama tidak lagi dapat menguji butir agama. Bila tidak ada Pembina seagama, Penegak melihat pesan agar menghubungi Admin atau Pembina
   (surat pengantar ke guru agama menyusul di fase 2a).
-- Yang belum termasuk fase ini: pengecualian per Penegak, notifikasi, dan surat pengantar.
+- Yang belum termasuk fase ini: pengecualian per Penegak dan notifikasi. Surat pengantar ke guru agama ada di bagian berikut (fase 2a).
+
+### Surat pengantar ke guru agama dan dokumen terbit (fase 2a)
+Butir agama (sub-butir Butir 1) hanya dinilai Pembina yang seagama. Bila tidak ada Pembina yang seagama dengan seorang Penegak, Pembina atau Admin Gudep menerbitkan **surat pengantar ke guru agama**: buka
+**Cetak > Surat pengantar agama** (atau tombol *Surat pengantar guru agama* pada butir agama di halaman Peserta), pilih butir, guru agama (terdaftar oleh Admin di Anggota > Penugasan, atau tulis namanya), tanggal, penanda tangan, lalu
+**Terbitkan surat**. Surat A4 memuat kop gudep, nomor, data Penegak, tabel butir dengan kolom kosong untuk hasil dan paraf guru, serta QR dan kode verifikasi. **Surat adalah TEMPLATE untuk tanda tangan dan stempel basah**:
+area tanda tangan sengaja dikosongkan; QR hanya membuktikan surat itu benar diterbitkan aplikasi (bukan tanda tangan elektronik tersertifikasi), dan surat sah bila bertanda tangan dan berstempel.
+- **Nomor** otomatis dari format `surat.format_nomor` (bawaan `{no3}/SP/{tahun}`; kode {no}..{no6}, {tahun}, {bulan}, {romawi}; diubah di panel *Format nomor surat*), memakai penghitung per tahun yang tidak dipakai ulang, atau diisi manual.
+- **Mencatat hasil.** Guru agama menulis hasil pada surat; Pembina mencatatnya di aplikasi seperti biasa. Selama ada surat yang berlaku, Pembina yang tidak seagama boleh mencatat hanya butir yang tercantum pada surat itu
+  (Dewan Ambalan tetap tidak boleh); riwayat butir menulis "(dinilai guru agama NAMA, surat nomor NOMOR)".
+- **Mencabut.** Pembina atau Admin mencabut surat dengan alasan (tercatat di riwayat butir); hasil butir tidak lagi dapat dicatat lewat surat itu dan QR-nya menjawab "dicabut". Surat baru dapat dibuat untuk butir yang sama.
+- **Verifikasi** (halaman publik, tanpa login): QR menampilkan nomor, penerbit, pembuat, penanda tangan, data Penegak, guru, dan butir; kode VRF- hanya menjawab jenis, nomor, dan tanggal (tanpa nama).
+- Surat tidak diperlukan (dan ditolak server) bila sudah ada Pembina yang seagama. Tabel `dokumen_terbit` dibangun umum agar jenis dokumen lain dapat ditambahkan kelak.
 
 ### Materi SKU dari Google Drive
 Pembina dan Admin Gudep melampirkan **tautan berbagi** file PDF di Google Drive; aplikasi tidak menyimpan file, hanya tautannya.
@@ -381,6 +393,8 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
   Jalankan **setelah** `2026-09-iuran.sql` (bila belum, berhenti dengan pesan yang menuntun). **Edge Function tidak perlu di-deploy ulang** (tanda tangan `sg_profil_buat_internal` tetap). Sebelum migrasi dijalankan, aplikasi baru tetap berjalan: tab Penugasan menampilkan pesan bahwa basis data belum diperbarui, dan kelas Penegak masih boleh berformat lama (validasi rombel baru berlaku di server setelah migrasi; pemeriksaan di layar sudah berlaku lebih dulu).
 - [`2026-09-penegakan.sql`](supabase/migrasi/2026-09-penegakan.sql): penegakan penugasan penguji (fase 1b). Menambah fungsi bantu `sigarda.penguji_peran_ok`, `penguji_sah`, `penguji_boleh`, fungsi `sg_penguji_pilihan` (daftar penguji yang sah beserta beban antrian) dan `sg_sku_alihkan` (Pembina atau Admin mengalihkan pengajuan, alasan tercatat), serta memperbarui `sg_sku_ajukan` (hanya penguji yang sah; penguji kosong = antrian rombel) dan `sg_sku_catat_internal` (butir Laksana hanya Pembina, butir agama hanya Pembina seagama, riwayat "menggantikan NAMA"). Tidak mengubah tabel atau data.
   Jalankan **setelah** `2026-09-penugasan.sql` (bila belum, berhenti dengan pesan yang menuntun). **Edge Function tidak perlu di-deploy ulang** (tanda tangan `sg_sku_catat_internal` tetap). **Jalankan migrasi ini sebelum `git push` kode fase 1b**: tanpa fungsi `sg_penguji_pilihan`, formulir Ajukan pengujian Penegak tidak dapat memuat daftar penguji. Sebelum agama seorang Pembina diisi, aturan butir agama tetap seperti lama (masa peralihan).
+- [`2026-09-dokumen.sql`](supabase/migrasi/2026-09-dokumen.sql): dokumen terbit dan surat pengantar ke guru agama (fase 2a). Menambah tabel `dokumen_terbit` dan `dokumen_urut` (RLS baca: pengurus dan pemilik), fungsi `sg_dokumen_surat_agama_terbit` dan `sg_dokumen_cabut`, fungsi bantu `sigarda.surat_agama_aktif`, dan memperbarui `sigarda.penguji_peran_ok`, `sg_sku_catat_internal` (Pembina tidak seagama boleh mencatat butir agama yang tercantum pada surat berlaku; riwayat menyebut guru dan nomor surat), `sg_verifikasi_token` dan `sg_verifikasi_kode` (ikut menjawab dokumen terbit) serta `sg_pengaturan_simpan` (kunci baru `surat.format_nomor`). Tidak mengubah data yang ada.
+  Jalankan **setelah** `2026-09-penegakan.sql` (bila belum, berhenti dengan pesan yang menuntun). **Edge Function tidak perlu di-deploy ulang.** **Jalankan migrasi ini sebelum `git push` kode fase 2a**: tanpa tabel `dokumen_terbit`, tab Surat pengantar agama tidak dapat memuat surat (halaman lain tetap berjalan).
 
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 
@@ -428,7 +442,7 @@ sku-bukateja/
 Skema SQL dan logika Edge Function dijalankan pada Postgres sungguhan (PGlite) dengan klien tiruan yang meniru peran Supabase, RLS, dan batas 1000 baris.
 Yang diuji: siapa boleh membaca apa, penulisan langsung ditolak untuk semua peran, semua fungsi `sg_*` (aturan SKU, absensi, portofolio, materi, anggota),
 hak reset PIN, pembatasan login, kewajiban ganti PIN, dan pemetaan data ke bentuk yang dipakai halaman.
-Jalankan semuanya dengan `npm run uji` (atau sebagian: `npm run uji -- iuran api`; `PENUH=40` menampilkan 40 baris terakhir keluaran). Berkas pengujian ada di [`uji/`](uji); pengujian migrasi memakai skema lama dari riwayat git (`git:<commit>`; mis. `migrasi-penegakan` memakai `git:496687c`, commit tepat sebelum fase penegakan). Pengujian membandingkan isi fungsi dengan md5 setelah akhir baris disamakan (LF), sehingga hasilnya sama di checkout Windows (CRLF). Pengujian `instrumen` dilewati kecuali `ISI_INSTRUMEN` menunjuk berkas SQL isi instrumen (rahasia, tidak ada di repositori).
+Jalankan semuanya dengan `npm run uji` (atau sebagian: `npm run uji -- iuran api`; `PENUH=40` menampilkan 40 baris terakhir keluaran). Berkas pengujian ada di [`uji/`](uji); pengujian migrasi memakai skema lama dari riwayat git (`git:<commit>`; mis. `migrasi-dokumen` memakai `git:428ec5a`, commit tepat sebelum fase dokumen). Pengujian membandingkan isi fungsi dengan md5 setelah akhir baris disamakan (LF), sehingga hasilnya sama di checkout Windows (CRLF). Pengujian `instrumen` dilewati kecuali `ISI_INSTRUMEN` menunjuk berkas SQL isi instrumen (rahasia, tidak ada di repositori).
 Yang **tidak** dapat diuji tanpa proyek Supabase sungguhan: perilaku GoTrue (mis. penerimaan email `.invalid`), PostgREST, dan runtime Deno. Gunakan "Uji cepat" di atas setelah pemasangan.
 
 ### Data demo untuk pengujian di Supabase

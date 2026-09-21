@@ -32,3 +32,6 @@ export function labelUnit(skuId) {
 }
 
 export const teksUnit = (skuId) => INDEKS_POIN[skuId]?.teks ?? '';
+
+/** Judul jenis dokumen terbit pada halaman verifikasi. */
+export const JUDUL_DOKUMEN = { surat_pengantar_agama: 'Surat pengantar ke guru agama' };

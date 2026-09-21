@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ambilKlien, GALAT_KONFIGURASI } from '../lib/supabaseClient';
 import { buatApi } from '../lib/api';
-import { alamatDasar, labelUnit, POLA_KODE, POLA_TOKEN, teksUnit } from '../lib/verifikasiLogic';
+import { alamatDasar, JUDUL_DOKUMEN, labelUnit, POLA_KODE, POLA_TOKEN, teksUnit } from '../lib/verifikasiLogic';
 import { fmtTanggal } from '../lib/format';
 import { APP, GUDEP } from '../config';
 import { FooterRingkas } from './Footer';
@@ -58,7 +58,47 @@ function TidakSah() {
   );
 }
 
+/** Dokumen yang dicabut tetap dijawab (agar pemegang tahu), tetapi tidak dinyatakan sah dan tanpa data Penegak. */
+function Dicabut({ d }) {
+  return (
+    <div className="animasi-naik overflow-hidden rounded-xl border border-red-300 bg-white shadow-sm" role="alert">
+      <div className="flex items-center gap-3 bg-red-50 px-4 py-3.5">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-700 text-white"><Icon nama="tutup" className="h-5 w-5" /></span>
+        <div className="leading-tight">
+          <p className="text-base font-bold text-red-900">Dokumen dicabut</p>
+          <p className="text-xs text-red-800">{JUDUL_DOKUMEN[d.jenis_dokumen] ?? 'Dokumen'} nomor {d.nomor}</p>
+        </div>
+      </div>
+      <p className="px-4 py-3 text-sm leading-relaxed text-pramuka-700">
+        Dokumen ini pernah diterbitkan tetapi sudah dicabut dan tidak berlaku lagi{d.dicabut_pada ? ` (${fmtTanggal(d.dicabut_pada)})` : ''}. Hubungi Pembina Gudep bila perlu penjelasan.
+      </p>
+    </div>
+  );
+}
+
+function HasilDokumen({ d }) {
+  if (d.dicabut) return <Dicabut d={d} />;
+  const butir = Array.isArray(d.butir) ? d.butir : [];
+  return (
+    <Sah judul={JUDUL_DOKUMEN[d.jenis_dokumen] ?? 'Dokumen terbit'}>
+      <Baris label="Nomor">{d.nomor}</Baris>
+      <Baris label="Tanggal surat">{fmtTanggal(d.tanggal)}</Baris>
+      <Baris label="Diterbitkan oleh">{d.penerbit}</Baris>
+      <Baris label="Dibuat oleh">{d.dibuat_oleh}{d.jabatan_pembuat ? `, ${d.jabatan_pembuat}` : ''}</Baris>
+      <Baris label="Penanda tangan">{d.penanda_tangan}, {d.jabatan_penanda_tangan}</Baris>
+      <Baris label="Penegak">{d.nama}{d.nis ? `, NIS ${d.nis}` : ''}{d.kelas ? `, kelas ${d.kelas}` : ''}{d.agama ? `, agama ${d.agama}` : ''}</Baris>
+      {d.guru && <Baris label="Ditujukan kepada">Guru agama {d.guru}</Baris>}
+      {butir.length > 0 && <Baris label="Butir">{butir.map((id) => `${labelUnit(id)} (${id.startsWith('LAK') ? 'Laksana' : 'Bantara'})`).join(', ')}</Baris>}
+      {d.kode && <Baris label="Kode verifikasi"><span className="font-mono">{d.kode}</span></Baris>}
+      <p className="py-2.5 text-xs leading-relaxed text-pramuka-600">
+        QR ini membuktikan surat diterbitkan oleh aplikasi. Surat dinyatakan sah bila bertanda tangan dan berstempel {GUDEP.nama}.
+      </p>
+    </Sah>
+  );
+}
+
 function HasilToken({ d }) {
+  if (d.jenis === 'dokumen') return <HasilDokumen d={d} />;
   if (d.jenis === 'tingkat') {
     return (
       <Sah judul={`Surat Tanda Lulus SKU Penegak ${d.tingkat}`}>
@@ -84,6 +124,19 @@ function HasilToken({ d }) {
 }
 
 function HasilKode({ d }) {
+  if (d.jenis === 'dokumen') {
+    if (d.dicabut) return <Dicabut d={d} />;
+    return (
+      <Sah judul="Kode verifikasi terdaftar">
+        <Baris label="Dokumen">{JUDUL_DOKUMEN[d.jenis_dokumen] ?? 'Dokumen terbit'}</Baris>
+        <Baris label="Nomor">{d.nomor}</Baris>
+        <Baris label="Tanggal surat">{fmtTanggal(d.tanggal)}</Baris>
+        <p className="py-2.5 text-xs leading-relaxed text-pramuka-600">
+          Kode pendek hanya menjawab sah atau tidak, tanpa nama. Untuk melihat data lengkap, pindai QR pada dokumen.
+        </p>
+      </Sah>
+    );
+  }
   return (
     <Sah judul="Kode verifikasi terdaftar">
       <Baris label="Tingkat">SKU Penegak {d.tingkat}</Baris>

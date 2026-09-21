@@ -101,14 +101,14 @@ export const laksanaTerbuka = (progress, peserta) => tingkatSelesai(progress, pe
 /**
  * Butir agama (sub-butir Butir 1, `poin.agama` terisi) dan butir Laksana hanya dinilai Pembina; butir Bantara lain dinilai Pembina atau
  * Dewan Ambalan. Aturan yang sama ditegakkan di server (sg_sku_catat_internal dan sg_sku_ajukan); ini hanya untuk menyembunyikan aksi
- * yang pasti ditolak. Bila `konteks = { users, peserta }` diberikan, butir agama juga menuntut Pembina yang seagama dengan Penegak
- * (setelah ada Pembina yang agamanya terisi).
+ * yang pasti ditolak. Bila `konteks = { users, peserta, dokumen }` diberikan, butir agama juga menuntut Pembina yang seagama dengan Penegak
+ * (setelah ada Pembina yang agamanya terisi), kecuali ada surat pengantar ke guru agama yang berlaku (`dokumen`).
  */
 export const PESAN_BUTIR_AGAMA = 'Butir agama hanya dapat dinilai oleh Pembina.';
 export const PESAN_BUTIR_LAKSANA = 'Butir Laksana hanya dapat dinilai oleh Pembina.';
 export const bolehMenilaiPoin = (user, poin, konteks) => {
   if (user?.role !== 'penguji') return false;
-  if (konteks) return pengujiPeranOk(konteks.users, konteks.peserta, user, poin);
+  if (konteks) return pengujiPeranOk(konteks.users, konteks.peserta, user, poin, konteks.dokumen);
   return user.jabatan === 'Pembina' || (!poin?.agama && poin?.tingkat !== 'Laksana');
 };
 /** Pesan untuk penguji yang tidak boleh menilai butir ini (agama lebih dulu, lalu Laksana). */
@@ -260,7 +260,7 @@ export function catatHasilUji(progress, { peserta, skuId, pengujiId, hasil, tang
  * antrian bersama rombel (pengajuan tanpa penguji tujuan) yang sah dinilainya. Kesahan itu memakai `penugasan` (baris penugasan tahun
  * ajaran berjalan); tanpa `penugasan` semua antrian bersama ditampilkan (aturan lama). `bersama` = belum ada penguji tujuan.
  */
-export function antrianPengujian(progress, users, pengujiId = null, penugasan = null) {
+export function antrianPengujian(progress, users, pengujiId = null, penugasan = null, dokumen = []) {
   const hasil = [];
   for (const u of users) {
     if (u.role !== 'peserta') continue;
@@ -270,7 +270,7 @@ export function antrianPengujian(progress, users, pengujiId = null, penugasan = 
       const poin = cariPoin(skuId);
       if (!poin) continue;
       const bersama = !entry.pengujiId;
-      if (pengujiId && bersama && penugasan && !pengujiSah({ users, penugasan, peserta: u, poin }).penguji.some((x) => x.id === pengujiId)) continue;
+      if (pengujiId && bersama && penugasan && !pengujiSah({ users, penugasan, peserta: u, poin, dokumen }).penguji.some((x) => x.id === pengujiId)) continue;
       hasil.push({ peserta: u, poin, entry, bersama });
     }
   }

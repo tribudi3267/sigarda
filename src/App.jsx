@@ -117,6 +117,7 @@ function Shell() {
   const { user, peranUser, status, galatMuat } = useApp();
   const [tab, setTab] = useState(null);
   const [fokusId, setFokusId] = useState(null); // peserta yang sedang dibuka penguji/admin
+  const [jenisCetak, setJenisCetak] = useState('kartu'); // tab awal halaman Cetak (kartu | stl | surat)
   const [tingkat, setTingkat] = useState('Bantara');
   const [materiButir, setMateriButir] = useState(null); // butir SKU yang dituju tombol "Materi"
   const [kelolaId, setKelolaId] = useState(null); // materi yang langsung dibuka di Kelola Materi ('baru' = tambah)
@@ -142,6 +143,7 @@ function Shell() {
   const pilihTab = (t) => {
     setTab(t);
     setFokusId(null);
+    setJenisCetak('kartu');
     setMateriButir(null);
     setKelolaId(null);
   };
@@ -162,7 +164,7 @@ function Shell() {
     setTab(t);
     setFokusId(id);
   };
-  const bukaCetak = (id) => pindah('cetak', id);
+  const bukaCetak = (id, jenis = 'kartu') => { setJenisCetak(jenis); pindah('cetak', id); };
 
   let isi;
   if (tabAktif === 'akun') {
@@ -188,9 +190,10 @@ function Shell() {
   } else if (tabAktif === 'cetak') {
     isi = (
       <CetakDokumen
-        key={fokusId ?? user.id}
+        key={`${fokusId ?? user.id}|${jenisCetak}`}
         pesertaId={user.role === 'peserta' ? user.id : fokusId ?? undefined}
         bolehPilih={user.role !== 'peserta'}
+        jenisAwal={jenisCetak}
       />
     );
   } else if (user.role === 'peserta') {

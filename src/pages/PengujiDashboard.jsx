@@ -11,16 +11,16 @@ import { Avatar, Badge, BadgePeran, Icon, Kosong, ProgressBar, TeksPoin } from '
 
 /** Baris penugasan tahun ajaran berjalan untuk menyaring antrian bersama rombel; dimuat sekali. null selama belum termuat (aturan lama). */
 function usePenugasanKini() {
-  const { penugasan, muatPenugasan } = useApp();
+  const { penugasan, muatPenugasan, muatDokumen } = useApp();
   const ta = tahunAjaranKini();
-  useEffect(() => { muatPenugasan(ta); }, [ta, muatPenugasan]);
+  useEffect(() => { muatPenugasan(ta); muatDokumen(); }, [ta, muatPenugasan, muatDokumen]); // dokumen: surat pengantar agama ikut menentukan penguji yang sah
   return penugasan[ta] ?? null;
 }
 
 function Dashboard({ onNav }) {
-  const { user, users, progress } = useApp();
+  const { user, users, progress, dokumen } = useApp();
   const penugasan = usePenugasanKini();
-  const antrian = antrianPengujian(progress, users, user.id, penugasan);
+  const antrian = antrianPengujian(progress, users, user.id, penugasan, dokumen ?? []);
   const menunggu = antrian.filter((a) => a.entry.status === 'diajukan').length;
 
   return (
@@ -46,14 +46,14 @@ function Dashboard({ onNav }) {
 }
 
 function Antrian({ onBuka }) {
-  const { user, users, progress } = useApp();
+  const { user, users, progress, dokumen } = useApp();
   const [semua, setSemua] = useState(false);
   const [uji, setUji] = useState(null);
   const [alih, setAlih] = useState(null);
   const penugasan = usePenugasanKini();
   const namaOrang = (id) => users.find((u) => u.id === id)?.nama ?? 'penguji';
 
-  const antrian = antrianPengujian(progress, users, semua ? null : user.id, penugasan);
+  const antrian = antrianPengujian(progress, users, semua ? null : user.id, penugasan, dokumen ?? []);
   const menunggu = antrian.filter((a) => a.entry.status === 'diajukan').length;
 
   return (
@@ -76,7 +76,7 @@ function Antrian({ onBuka }) {
       ) : (
         <ul className="panel divide-y divide-pramuka-100">
           {antrian.map(({ peserta, poin, entry, bersama }) => {
-            const boleh = bolehMenilaiPoin(user, poin, { users, peserta });
+            const boleh = bolehMenilaiPoin(user, poin, { users, peserta, dokumen });
             return (
             <li key={`${peserta.id}-${poin.id}`} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 gap-3">

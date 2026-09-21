@@ -2,25 +2,36 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { hitungProgres, tingkatSelesai } from '../lib/skuLogic';
 import { KartuSku, SuratTandaLulus } from '../components/DokumenSku';
+import PanelSuratAgama from '../components/PanelSuratAgama';
+import SuratPengantarAgama from '../components/SuratPengantarAgama';
 import TingkatTabs from '../components/TingkatTabs';
 import { Icon, Kosong } from '../components/ui';
 
 /**
- * Cetak kartu SKU dan Surat Tanda Lulus.
+ * Cetak kartu SKU, Surat Tanda Lulus, dan surat pengantar ke guru agama.
  * PDF: klik "Cetak", lalu pilih "Simpan sebagai PDF" pada dialog cetak browser.
  */
-export default function CetakDokumen({ pesertaId: idAwal, bolehPilih }) {
-  const { daftarPeserta, progress, tokenSuratTingkat } = useApp();
+export default function CetakDokumen({ pesertaId: idAwal, bolehPilih, jenisAwal = 'kartu' }) {
+  const { daftarPeserta, progress, tokenSuratTingkat, dokumen, muatDokumen, bolehSurat, muatSidang } = useApp();
   const daftar = [...daftarPeserta].sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
 
   const [id, setId] = useState(idAwal ?? daftar[0]?.id);
-  const [jenis, setJenis] = useState('kartu');
+  const [jenis, setJenis] = useState(jenisAwal);
+  const [suratId, setSuratId] = useState(null); // surat pengantar agama yang dipilih untuk dicetak
   const [tingkat, setTingkat] = useState('Bantara');
   const [surat, setSurat] = useState({ kunci: '', token: null, galat: '' }); // token QR Surat Tanda Lulus untuk peserta dan tingkat `kunci`
 
   const peserta = daftarPeserta.find((u) => u.id === id);
   const selesai = peserta ? tingkatSelesai(progress, peserta, tingkat) : false;
   const kunciSurat = `${peserta?.id}|${tingkat}`;
+
+  // Surat pengantar agama: dokumen dimuat begitu tab dibuka; Pembina dan Admin juga memerlukan pengaturan (format nomor).
+  useEffect(() => {
+    if (jenis !== 'surat') return;
+    muatDokumen();
+    if (bolehSurat) muatSidang();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jenis]);
 
   // Surat Tanda Lulus memuat QR: token surat diminta (dan dibuat bila belum ada) begitu surat dibuka.
   useEffect(() => {
@@ -37,7 +48,9 @@ export default function CetakDokumen({ pesertaId: idAwal, bolehPilih }) {
 
   const h = hitungProgres(progress, peserta, tingkat);
   const suratSiap = surat.kunci === kunciSurat; // hasil permintaan token sudah untuk pilihan yang tampil sekarang
-  const bisaCetak = jenis === 'kartu' || selesai;
+  const daftarSurat = (dokumen ?? []).filter((d) => d.pesertaId === peserta.id).sort((a, b) => b.id - a.id);
+  const suratPilih = jenis === 'surat' ? daftarSurat.find((d) => d.id === suratId) ?? daftarSurat[0] ?? null : null;
+  const bisaCetak = jenis === 'kartu' || (jenis === 'surat' ? !!suratPilih : selesai);
   const menungguToken = jenis === 'stl' && selesai && !suratSiap;
 
   return (
@@ -54,10 +67,10 @@ export default function CetakDokumen({ pesertaId: idAwal, bolehPilih }) {
             </select>
           )}
 
-          <TingkatTabs nilai={tingkat} onUbah={setTingkat} />
+          {jenis !== 'surat' && <TingkatTabs nilai={tingkat} onUbah={setTingkat} />}
 
           <div role="tablist" aria-label="Jenis dokumen" className="inline-flex rounded-lg bg-pramuka-100 p-1">
-            {[['kartu', 'Kartu SKU'], ['stl', 'Surat Tanda Lulus']].map(([k, v]) => (
+            {[['kartu', 'Kartu SKU'], ['stl', 'Surat Tanda Lulus'], ['surat', 'Surat pengantar agama']].map(([k, v]) => (
               <button
                 key={k}
                 role="tab"
@@ -75,7 +88,9 @@ export default function CetakDokumen({ pesertaId: idAwal, bolehPilih }) {
           </button>
         </div>
 
-        {!bisaCetak && (
+        {jenis === 'surat' && <PanelSuratAgama key={peserta.id} peserta={peserta} terpilihId={suratPilih?.id ?? null} setTerpilihId={setSuratId} />}
+
+        {!bisaCetak && jenis !== 'surat' && (
           <p className="jahitan mt-3 rounded-lg bg-white px-4 py-3 text-sm text-pramuka-700">
             Surat Tanda Lulus {tingkat} baru bisa dicetak setelah seluruh butir lulus. Saat ini {h.lulus} dari {h.total} butir lulus.
           </p>
@@ -90,9 +105,9 @@ export default function CetakDokumen({ pesertaId: idAwal, bolehPilih }) {
 
       {bisaCetak && (
         <div className="overflow-x-auto pb-4">
-          {jenis === 'kartu'
-            ? <KartuSku peserta={peserta} tingkat={tingkat} />
-            : <SuratTandaLulus peserta={peserta} tingkat={tingkat} token={suratSiap ? surat.token : null} />}
+          {jenis === 'kartu' && <KartuSku peserta={peserta} tingkat={tingkat} />}
+          {jenis === 'stl' && <SuratTandaLulus peserta={peserta} tingkat={tingkat} token={suratSiap ? surat.token : null} />}
+          {jenis === 'surat' && <SuratPengantarAgama dokumen={suratPilih} />}
         </div>
       )}
     </div>

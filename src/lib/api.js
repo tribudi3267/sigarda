@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogPenugasan, susunMateri, susunPenilaian, susunPenugasan, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogPenugasan, susunMateri, susunPenilaian, susunPenugasan, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -318,6 +318,18 @@ export function buatApi(klien) {
     muatLogPenugasan: (tahunAjaran) =>
       muat(async () => susunLogPenugasan(await ambilSemua('penugasan_log', { filter: [['tahun_ajaran', tahunAjaran]], urut: ['id'] }))),
     muatGuruAgama: () => muat(async () => susunGuruAgama(await ambilSemua('guru_agama', { urut: ['agama', 'nama'] }))),
+    /** Dokumen terbit (surat pengantar guru agama): pengurus melihat semua, Penegak hanya miliknya (RLS). */
+    muatDokumen: () => muat(async () => susunDokumen(await ambilSemua('dokumen_terbit', { urut: ['id'] }))),
+    /**
+     * Menerbitkan surat pengantar ke guru agama (Pembina atau Admin). guruId (guru terdaftar) atau guruNama (ditulis). Mengembalikan { id, token, nomor }.
+     */
+    terbitkanSuratAgama: (d) =>
+      rpc('sg_dokumen_surat_agama_terbit', {
+        p_peserta_id: d.pesertaId, p_butir: d.butir, p_guru_id: d.guruId ?? null, p_guru_nama: d.guruNama ?? '', p_tanggal: d.tanggal,
+        p_penerbit: d.penerbit, p_penanda_nama: d.penandaNama, p_penanda_jabatan: d.penandaJabatan, p_nomor_manual: d.nomorManual || null, p_catatan: d.catatan ?? '',
+      }),
+    /** Mencabut dokumen terbit dengan alasan (Pembina atau Admin). */
+    cabutDokumen: (id, alasan) => rpc('sg_dokumen_cabut', { p_id: id, p_alasan: alasan ?? '' }),
     /** Menambah (ada = true) atau mencabut (false) penugasan satu penguji pada beberapa rombel (Admin). Mengembalikan jumlah perubahan nyata. */
     aturPenugasan: (tahunAjaran, pengujiId, rombel, ada) =>
       rpc('sg_penugasan_atur', { p_tahun_ajaran: tahunAjaran, p_penguji_id: pengujiId, p_rombel: rombel, p_ada: ada }),

@@ -1,4 +1,4 @@
-// Migrasi fase 1b (penegakan penugasan): kesetaraan dengan skema baru, data utuh, idempoten, dan perilaku pada data lama.
+// Migrasi fase 2a (dokumen terbit dan surat pengantar guru agama): kesetaraan dengan skema baru, data utuh, idempoten, dan perilaku pada data lama.
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -11,14 +11,14 @@ const ok = (c, m) => { if (c) { l++; console.log('ok   :', m); } else { g++; con
 const stub = readFileSync(`${P}/supabase/lokal/stub.sql`, 'utf8');
 // Akhir baris disamakan (LF): checkout Windows dapat mengubah berkas menjadi CRLF, sedangkan skema lama dari git berakhir LF.
 const bersih = (s) => s.replace(/^﻿/, '').replace(/\r\n/g, '\n');
-const M = ['sidang-dk', 'sidang-format-nomor', 'raport', 'instrumen', 'verifikasi-sesi', 'nta-anggota', 'butir-agama-pembina', 'indeks-kode-verifikasi', 'iuran', 'penugasan', 'penegakan'].map((n) => bersih(readFileSync(`${P}/supabase/migrasi/2026-09-${n}.sql`, 'utf8')));
-const MP = M[10]; // hanya migrasi penegakan yang diuji di sini
+const M = ['sidang-dk', 'sidang-format-nomor', 'raport', 'instrumen', 'verifikasi-sesi', 'nta-anggota', 'butir-agama-pembina', 'indeks-kode-verifikasi', 'iuran', 'penugasan', 'penegakan', 'dokumen'].map((n) => bersih(readFileSync(`${P}/supabase/migrasi/2026-09-${n}.sql`, 'utf8')));
+const MP = M[11]; // hanya migrasi dokumen yang diuji di sini
 
-// Skema "sebelum migrasi" diambil dari riwayat git: 'git:<commit>' = supabase/skema.sql pada commit itu (commit TEPAT sebelum fase 1b).
+// Skema "sebelum migrasi" diambil dari riwayat git: 'git:<commit>' = supabase/skema.sql pada commit itu (commit TEPAT sebelum fase 2a).
 const skemaDari = (ref) => (ref.startsWith('git:') ? execFileSync('git', ['show', `${ref.slice(4)}:supabase/skema.sql`], { cwd: P, encoding: 'utf8', maxBuffer: 1 << 26 }) : readFileSync(ref, 'utf8'));
 const baru = async (skemaFile) => { const db = new PGlite(); await siapkanPg(db, { sqlStub: stub, sqlSkema: bersih(skemaDari(skemaFile)) }); return db; };
 const cacah = async (db) => (await db.query(`select (select count(*) from public.profiles)::int p, (select count(*) from public.sku_progress)::int s, (select count(*) from public.sku_riwayat)::int r, (select count(*) from auth.users)::int u`)).rows[0];
-const TABEL = `('pengaturan','sidang_dk','sidang_urut','profiles','raport','instrumen','instrumen_kriteria','instrumen_penguji','instrumen_panduan','sku_penilaian','sku_progress','sku_riwayat','sertifikat_tingkat','sesi_ujian','sesi_ujian_butir','sesi_ujian_peserta','iuran','iuran_log','iuran_kas','asisten_iuran','penugasan_rombel','penugasan_log','guru_agama')`;
+const TABEL = `('pengaturan','sidang_dk','sidang_urut','profiles','raport','instrumen','instrumen_kriteria','instrumen_penguji','instrumen_panduan','sku_penilaian','sku_progress','sku_riwayat','sertifikat_tingkat','sesi_ujian','sesi_ujian_butir','sesi_ujian_peserta','iuran','iuran_log','iuran_kas','asisten_iuran','penugasan_rombel','penugasan_log','guru_agama','dokumen_terbit','dokumen_urut')`;
 const potret = async (db) => {
   const q = async (sql) => (await db.query(sql)).rows;
   return {
@@ -45,23 +45,23 @@ const bandingkan = (nama, pa, pb) => {
   }
 };
 
-// Skema "sesudah penegakan" = skema.sql pada commit tepat sesudah fase 1b.
-const A = await baru('git:428ec5a'); // skema tepat sesudah fase 1b (supabase/skema.sql terbaru sudah memuat fase berikutnya)
+// Skema "sesudah dokumen" = skema.sql terbaru (dibuat dari inti.sql).
+const A = await baru(`${P}/supabase/skema.sql`);
 const pa = await potret(A);
-ok(pa.fungsi.some((x) => x.proname === 'sg_sku_alihkan') && pa.fungsi.some((x) => x.proname === 'penguji_sah'), 'skema baru memuat sg_sku_alihkan dan sigarda.penguji_sah');
+ok(pa.fungsi.some((x) => x.proname === 'sg_dokumen_surat_agama_terbit') && pa.kolom.some((x) => x.table_name === 'dokumen_terbit'), 'skema baru memuat sg_dokumen_surat_agama_terbit dan tabel dokumen_terbit');
 
-const SEBELUM = 'git:496687c'; // commit TEPAT sebelum fase penegakan (sudah memuat penugasan)
+const SEBELUM = 'git:428ec5a'; // commit TEPAT sebelum fase dokumen (sudah memuat penegakan)
 
-console.log('--- Jalur 1: database Anda sekarang (sampai penugasan), berisi data ---');
+console.log('--- Jalur 1: database Anda sekarang (sampai penegakan), berisi data ---');
 const B1 = await baru(SEBELUM);
 await isiDataContoh(B1);
 await B1.query('update public.profiles set wajib_ganti_pin = false');
 const sebelum = await cacah(B1);
-const fungsiLama = (await B1.query(`select md5(prosrc) m from pg_proc where proname = 'sg_sku_ajukan'`)).rows[0].m;
-ok((await B1.query(`select count(*)::int n from pg_proc where proname in ('sg_sku_alihkan', 'sg_penguji_pilihan')`)).rows[0].n === 0, 'prasyarat: skema lama belum punya sg_sku_alihkan dan sg_penguji_pilihan');
+const fungsiLama = (await B1.query(`select md5(prosrc) m from pg_proc where proname = 'sg_verifikasi_token'`)).rows[0].m;
+ok((await B1.query(`select count(*)::int n from pg_proc where proname in ('sg_dokumen_surat_agama_terbit', 'sg_dokumen_cabut')`)).rows[0].n === 0, 'prasyarat: skema lama belum punya fungsi dokumen');
 await B1.exec(MP);
 ok(JSON.stringify(await cacah(B1)) === JSON.stringify(sebelum), 'jumlah data tidak berubah oleh migrasi: ' + JSON.stringify(sebelum));
-ok((await B1.query(`select md5(prosrc) m from pg_proc where proname = 'sg_sku_ajukan'`)).rows[0].m !== fungsiLama, 'sg_sku_ajukan diperbarui');
+ok((await B1.query(`select md5(prosrc) m from pg_proc where proname = 'sg_verifikasi_token'`)).rows[0].m !== fungsiLama, 'sg_verifikasi_token diperbarui');
 await B1.exec(MP); await B1.exec(MP);
 ok(JSON.stringify(await cacah(B1)) === JSON.stringify(sebelum), 'menjalankan migrasi tiga kali: data tetap sama');
 bandingkan('jalur 1', pa, await potret(B1));
@@ -71,26 +71,20 @@ console.log('\n--- Sesudah migrasi: perilaku pada data lama ---');
   const id = async (sql, a = []) => (await B1.query(sql, a)).rows[0].id;
   const pembina = await id(`select id from public.profiles where role = 'penguji' and jabatan = 'Pembina'`);
   const dewan = await id(`select id from public.profiles where role = 'penguji' and jabatan = 'Dewan Ambalan'`);
-  const admin = await id(`select id from public.profiles where role = 'admin'`);
   const rina = await id(`select id from public.profiles where username = '10119'`);
-  const made = await id(`select id from public.profiles where username = '10121'`);
   const sebagai = async (uid, sql, args = []) => { try { return { ok: true, rows: (await sqlSebagai(B1, uid, sql, args)).rows }; } catch (e) { return { ok: false, pesan: e.message }; } };
-  // Made (XI-02): hanya Dewan bertugas (penugasan contoh). Memilih Pembina untuk butir Bantara biasa: ditolak; antrian rombel: diterima.
-  await B1.query(`delete from public.sku_progress where peserta_id = $1 and sku_id = 'BAN-12'`, [made]);
-  let r = await sebagai(made, `select public.sg_sku_ajukan('BAN-12', current_date, $1::uuid, '')`, [pembina]);
-  ok(!r.ok && /tidak bertugas pada rombel/.test(r.pesan), 'Penegak XI-02 tidak dapat memilih Pembina yang tidak bertugas di rombelnya');
-  r = await sebagai(made, `select public.sg_sku_ajukan('BAN-12', current_date, null, '')`);
-  ok(r.ok && (await B1.query(`select penguji_id from public.sku_progress where peserta_id = $1 and sku_id = 'BAN-12'`, [made])).rows[0].penguji_id === null, 'pengajuan tanpa penguji (antrian rombel) diterima');
-  r = await sebagai(pembina, `select public.sg_sku_alihkan($1, 'BAN-12', $2, 'Pembina berhalangan')`, [made, dewan]);
-  ok(r.ok && (await B1.query(`select penguji_id from public.sku_progress where peserta_id = $1 and sku_id = 'BAN-12'`, [made])).rows[0].penguji_id === dewan, 'Pembina mengalihkan pengajuan ke Dewan');
-  r = await sebagai(dewan, `select public.sg_sku_alihkan($1, 'BAN-12', $2, 'coba')`, [made, pembina]);
-  ok(!r.ok && /Hanya Pembina atau Admin/.test(r.pesan), 'Dewan tidak dapat mengalihkan');
-  r = await sebagai(admin, `select public.sg_penguji_pilihan('BAN-12', $1) d`, [made]);
-  ok(r.ok && r.rows[0].d.penguji.length === 1 && r.rows[0].d.penguji[0].id === dewan, 'Admin membaca daftar penguji sah untuk Penegak XI-02: hanya Dewan');
-  r = await sebagai(rina, `select public.sg_sku_ajukan('LAK-03', current_date, $1::uuid, '')`, [dewan]);
-  ok(!r.ok, 'butir Laksana kepada Dewan ditolak (atau sudah diajukan): ' + (r.pesan ?? '').slice(0, 60));
-  r = await sebagai(null, `select public.sg_penguji_pilihan('BAN-12') d`);
-  ok(!r.ok, 'tanpa login: ditolak');
+  // Rina (Katolik) tidak punya Pembina seagama (Pembina contoh beragama Islam): surat pengantar diterbitkan, lalu Pembina mencatat hasil butir agamanya.
+  let r = await sebagai(dewan, `select public.sg_dokumen_surat_agama_terbit($1, array['BAN-01-KAT-1'], null, 'Guru X', current_date, 'Gudep', 'Pembina', 'Pembina Gudep')`, [rina]);
+  ok(!r.ok && /Hanya Pembina atau Admin/.test(r.pesan), 'Dewan Ambalan tidak dapat menerbitkan surat');
+  await B1.query(`delete from public.sku_progress where peserta_id = $1 and sku_id = 'BAN-01-KAT-1'`, [rina]);
+  r = await sebagai(pembina, `select public.sg_dokumen_surat_agama_terbit($1, array['BAN-01-KAT-1'], null, 'Yohanes Wibowo', current_date, 'Gugus Depan SMAN 1 Bukateja', 'Diana', 'Pembina Gudep') d`, [rina]);
+  ok(r.ok && /^001\/SP\/\d{4}$/.test(r.rows[0].d.nomor) && /^[0-9a-f]{32}$/.test(r.rows[0].d.token), 'Pembina menerbitkan surat: nomor otomatis ' + (r.rows[0]?.d?.nomor ?? r.pesan));
+  const token = r.rows?.[0]?.d?.token;
+  r = await sebagai(null, `select public.sg_verifikasi_token($1) d`, [token]);
+  ok(r.ok && r.rows[0].d.ditemukan && r.rows[0].d.jenis === 'dokumen' && r.rows[0].d.nama === 'Rina Wulandari', 'QR surat terverifikasi tanpa login');
+  const catat = () => B1.query(`select public.sg_sku_catat_internal($1, $2, 'BAN-01-KAT-1', 'proses', current_date, null, '')`, [pembina, rina]);
+  await catat();
+  ok(/dinilai guru agama Yohanes Wibowo, surat nomor 001/.test((await B1.query(`select teks from public.sku_riwayat where peserta_id = $1 and sku_id = 'BAN-01-KAT-1' order by id desc limit 1`, [rina])).rows[0].teks), 'Pembina mencatat butir agama lewat surat: riwayat menyebut guru dan nomor surat');
 }
 
 console.log('\n--- Jalur 2: database sebelum Sidang, semua migrasi berurutan ---');
@@ -101,11 +95,11 @@ for (const m of M) await B2.exec(m);
 ok(JSON.stringify(await cacah(B2)) === JSON.stringify(s2), 'data tidak berubah oleh semua migrasi');
 bandingkan('jalur 2', pa, await potret(B2));
 
-console.log('\n--- Jalur 3: tanpa migrasi penugasan: gagal jelas ---');
-const B3 = await baru('git:b804088');
+console.log('\n--- Jalur 3: tanpa migrasi penegakan: gagal jelas ---');
+const B3 = await baru('git:e83a8d3');
 let galat = null;
 try { await B3.exec(MP); } catch (e) { galat = e.message; await B3.exec('rollback'); }
 ok(/Jalankan lebih dulu skema dan migrasi/.test(galat ?? ''), 'pesan yang menuntun: ' + (galat ?? 'TIDAK GAGAL').slice(0, 100));
 
-console.log(`\nRINGKASAN MIGRASI PENEGAKAN: ${l} lulus, ${g} GAGAL`);
+console.log(`\nRINGKASAN MIGRASI DOKUMEN: ${l} lulus, ${g} GAGAL`);
 process.exit(g ? 1 : 0);

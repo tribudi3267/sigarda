@@ -267,3 +267,23 @@ export const susunLogPenugasan = (baris = []) =>
 /** Baris guru_agama -> [{ id, agama, nama, keterangan }] */
 export const susunGuruAgama = (baris = []) =>
   baris.map((r) => ({ id: Number(r.id), agama: r.agama, nama: r.nama, keterangan: r.keterangan ?? '' }));
+
+/**
+ * Baris dokumen_terbit -> [{ id, token, kode, jenis, nomor, nomorUrut, tanggal, pesertaId, pesertaNama, penerbit, dibuatOlehNama, dibuatOlehJabatan,
+ *   penandaTanganNama, penandaTanganJabatan, agama, nis, kelas, sangga, guru: { id, nama, keterangan }, butir: [id unit], catatan, dibuatPada,
+ *   dicabutPada, dicabutAlasan }] (id kecil ke besar)
+ */
+export const susunDokumen = (baris = []) =>
+  baris.map((r) => {
+    const p = r.payload ?? {};
+    return {
+      id: Number(r.id), token: r.token, kode: r.kode, jenis: r.jenis, nomor: r.nomor, nomorUrut: r.nomor_urut ?? null, tanggal: tgl(r.tanggal),
+      pesertaId: r.peserta_id ?? null, pesertaNama: r.peserta_nama, penerbit: r.penerbit,
+      dibuatOlehNama: r.dibuat_oleh_nama, dibuatOlehJabatan: r.dibuat_oleh_jabatan ?? '',
+      penandaTanganNama: r.penanda_tangan_nama, penandaTanganJabatan: r.penanda_tangan_jabatan,
+      agama: p.agama ?? '', nis: p.nis ?? '', kelas: p.kelas ?? '', sangga: p.sangga ?? '',
+      guru: { id: p.guru?.id ?? null, nama: p.guru?.nama ?? '', keterangan: p.guru?.keterangan ?? '' },
+      butir: Array.isArray(p.butir) ? p.butir : [], catatan: p.catatan ?? '',
+      dibuatPada: r.dibuat_pada, dicabutPada: r.dicabut_pada ?? null, dicabutAlasan: r.dicabut_alasan ?? '',
+    };
+  });

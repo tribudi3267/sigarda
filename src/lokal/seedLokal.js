@@ -40,6 +40,10 @@ export async function isiDataContoh(pg) {
   await pg.query("update public.profiles set agama = 'Islam' where id = $1", [p('u-penguji-1')]);
   if ((await pg.query("select to_regclass('public.penugasan_rombel') as t")).rows[0].t) { // skema lama (uji migrasi) belum punya
     const ta = (await pg.query('select sigarda.tahun_ajaran_kini() as t')).rows[0].t;
+    // Guru agama contoh (rujukan surat pengantar): Penegak Katolik dan Hindu tidak punya Pembina seagama pada data contoh
+    for (const [agama, nama, ket] of [['Katolik', 'Yohanes Wibowo, S.Ag.', ''], ['Hindu', 'Ni Made Suarni, S.Ag.', '']]) {
+      await pg.query('insert into public.guru_agama (agama, nama, keterangan) values ($1, $2, $3)', [agama, nama, ket]);
+    }
     const tugas = [['X-01', 'u-penguji-1'], ['XI-01', 'u-penguji-1'], ['XII-01', 'u-penguji-1'], ['X-01', 'u-penguji-2'], ['X-02', 'u-penguji-2'], ['XI-02', 'u-penguji-2']];
     for (const [rombel, pid] of tugas) {
       await pg.query('insert into public.penugasan_rombel (tahun_ajaran, rombel, penguji_id, ditetapkan_oleh) values ($1, $2, $3, $4)', [ta, rombel, p(pid), p('u-admin')]);

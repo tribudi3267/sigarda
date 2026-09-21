@@ -11,6 +11,7 @@
  */
 import { AGAMA } from '../data/skuData';
 import { hariIni } from './format';
+import { suratAgamaAktif } from './dokumenLogic';
 
 export const KELAS_ROMBEL = ['X', 'XI', 'XII'];
 export const ROMBEL_PER_KELAS = 10;
@@ -116,13 +117,14 @@ export const tahunAjaranKini = (tanggalIso = hariIni()) => {
 /**
  * Aturan peran penguji untuk satu butir (berlaku saat memilih penguji DAN mencatat hasil): butir Laksana dan butir agama hanya Pembina;
  * butir Bantara lain boleh Pembina atau Dewan Ambalan. Butir agama hanya untuk Pembina yang agamanya sama dengan Penegak; selama belum ada
- * satu pun Pembina yang agamanya terisi (masa peralihan), semua Pembina dianggap sah. Cermin sigarda.penguji_peran_ok.
+ * satu pun Pembina yang agamanya terisi (masa peralihan), semua Pembina dianggap sah. Pengecualian: bila ada surat pengantar ke guru agama
+ * yang masih berlaku untuk Penegak dan butir itu (`dokumen`), Pembina yang tidak seagama boleh mencatat hasilnya. Cermin sigarda.penguji_peran_ok.
  */
-export function pengujiPeranOk(users, peserta, penguji, poin) {
+export function pengujiPeranOk(users, peserta, penguji, poin, dokumen = []) {
   if (!penguji || penguji.role !== 'penguji' || !poin) return false;
   if (penguji.jabatan !== 'Pembina' && (poin.tingkat === 'Laksana' || poin.agama)) return false;
   if (poin.agama && users.some((u) => u.role === 'penguji' && u.jabatan === 'Pembina' && u.agama)) {
-    if (!penguji.agama || penguji.agama !== peserta?.agama) return false;
+    if ((!penguji.agama || penguji.agama !== peserta?.agama) && !suratAgamaAktif(dokumen, peserta?.id, poin.id)) return false;
   }
   return true;
 }
@@ -133,8 +135,8 @@ export function pengujiPeranOk(users, peserta, penguji, poin) {
  * diatur, kelas format lama, atau tak seorang pun yang bertugas boleh menguji butir itu): semua penguji yang memenuhi aturan peran.
  * Cermin sigarda.penguji_sah. Mengembalikan { penguji: [pengguna], dariRombel }.
  */
-export function pengujiSah({ users, penugasan = [], peserta, poin }) {
-  const layak = (u) => pengujiPeranOk(users, peserta, u, poin);
+export function pengujiSah({ users, penugasan = [], peserta, poin, dokumen = [] }) {
+  const layak = (u) => pengujiPeranOk(users, peserta, u, poin, dokumen);
   if (rombelSah(peserta?.kelas)) {
     const ditugaskan = new Set(penugasan.filter((b) => b.rombel === peserta.kelas).map((b) => b.pengujiId));
     const dariRombel = users.filter((u) => ditugaskan.has(u.id) && layak(u));
