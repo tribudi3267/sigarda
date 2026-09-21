@@ -25,10 +25,23 @@ const backendLokal = (aktif) => ({
   },
 });
 
+/**
+ * Versi terbit: tiap build punya ID unik (juga tertanam di kode sebagai __BUILD_ID__) dan menerbitkan version.json berisi ID itu. Aplikasi yang
+ * masih terbuka memeriksanya berkala dan menawarkan "Muat ulang" (lihat src/lib/versi.js). Hanya untuk build produksi.
+ */
+const ID_BUILD = (process.env.GITHUB_SHA || '').slice(0, 8) + Date.now().toString(36);
+const versiTerbit = (aktif) => ({
+  name: 'sigarda-versi',
+  generateBundle() {
+    if (aktif) this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ id: ID_BUILD }) });
+  },
+});
+
 // VITE_BASE dipakai saat deploy ke GitHub Pages, mis. VITE_BASE=/sigarda/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode, command }) => ({
   base: process.env.VITE_BASE || '/',
-  plugins: [backendLokal(mode === 'lokal'), react()],
+  plugins: [backendLokal(mode === 'lokal'), versiTerbit(command === 'build' && mode !== 'lokal'), react()],
+  define: { __BUILD_ID__: JSON.stringify(command === 'build' && mode !== 'lokal' ? ID_BUILD : '') },
   // Edge Function memakai alamat gaya Deno ("npm:..."); di sini dialihkan ke paket yang terpasang (mode lokal).
   resolve: { alias: { 'npm:@supabase/supabase-js@2': '@supabase/supabase-js' } },
   // PGlite memuat berkas .wasm sendiri; jangan diproses ulang oleh pra-bundel Vite.

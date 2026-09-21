@@ -45,8 +45,8 @@ const bandingkan = (nama, pa, pb) => {
   }
 };
 
-// Skema "sesudah jabatan Dewan" = skema.sql terbaru (dibuat dari inti.sql).
-const A = await baru(`${P}/supabase/skema.sql`);
+// Skema "sesudah jabatan Dewan" = skema.sql pada commit sesudah migrasi ini (6676a4a); skema terbaru sudah memuat migrasi notifikasi.
+const A = await baru('git:6676a4a');
 const pa = await potret(A);
 ok(pa.fungsi.some((x) => x.proname === 'sg_anggota_jabatan_dewan_atur') && pa.fungsi.some((x) => x.proname === 'sg_sidang_token'), 'skema baru memuat sg_anggota_jabatan_dewan_atur dan sg_sidang_token');
 

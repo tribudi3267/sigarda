@@ -4,6 +4,7 @@ import { STATUS_ABSEN } from '../lib/absensiLogic';
 import { STATUS_PF } from '../data/portofolioData';
 import { labelPoin } from '../data/skuData';
 import { inisial } from '../lib/format';
+import { teksLencana } from '../lib/notifikasiLogic';
 
 const IKON = {
   beranda: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
@@ -47,8 +48,23 @@ const IKON = {
   sidang: '<line x1="12" y1="3" x2="12" y2="21"/><line x1="5" y1="7" x2="19" y2="7"/><path d="M5 7l-3 7a3 3 0 0 0 6 0z"/><path d="M19 7l-3 7a3 3 0 0 0 6 0z"/><line x1="8" y1="21" x2="16" y2="21"/>',
   iuran: '<circle cx="12" cy="12" r="9"/><path d="M14.7 9.2a2.7 2.2 0 0 0-2.7-1.4c-1.5 0-2.7.8-2.7 2s1.2 1.7 2.7 2 2.7.8 2.7 2-1.2 2-2.7 2a2.7 2.2 0 0 1-2.7-1.4"/><line x1="12" y1="6" x2="12" y2="7.8"/><line x1="12" y1="16.2" x2="12" y2="18"/>',
   penugasan: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><polyline points="15 17.5 17 19.5 21 15.5"/>',
+  lonceng: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
   sesi: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><polyline points="7 14 9 16 13 12"/><line x1="15" y1="15" x2="18" y2="15"/>',
 };
+
+/**
+ * Lencana angka pada menu (mis. notifikasi belum dibaca). `posisi` selalu mengandung "relative" atau "absolute": teks sr-only di dalamnya
+ * memerlukan induk berposisi agar tidak lolos dari pembungkus dan melebarkan halaman.
+ */
+export function LencanaMenu({ jumlah, posisi = 'relative' }) {
+  if (!(jumlah > 0)) return null;
+  return (
+    <span className={`${posisi} inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-emas px-1 text-[10px] font-bold leading-[1.1rem] text-pramuka-900 ring-2 ring-pramuka-800`}>
+      <span aria-hidden="true">{teksLencana(jumlah)}</span>
+      <span className="sr-only">, {jumlah} belum dibaca</span>
+    </span>
+  );
+}
 
 export function Icon({ nama, className = 'h-5 w-5' }) {
   return (

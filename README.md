@@ -38,6 +38,7 @@ Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Adm
 | Menu | Penegak | Dewan Ambalan / Pembina | Admin |
 |---|---|---|---|
 | Dashboard | Beranda progres SKU. Calon Garuda: dashboard jurnal portofolio | Antrian uji, progres per rombel, rekap absensi, rekap portofolio | Rekap anggota, absensi, portofolio, kelulusan SKU |
+| Notifikasi | Kotak Notifikasi (jadwal ujian, pengujian dimulai, hasil tersedia, surat terbit), pengaturan notifikasi di perangkat | Pengajuan uji, dialihkan, pengingat, pengajuan menunggu lama; Pembina juga melihat perangkat anggota | Sama dengan Pembina |
 | Poin SKU | Lihat butir, ajukan uji; tombol **Materi** pada butir yang punya materi | Menilai butir (wajib PIN) | Lihat |
 | Materi | Baca materi (pratinjau PDF Google Drive, daftar isi, saringan tingkat dan butir) | Sama | Sama |
 | Kelola Materi | | Hanya **Pembina**: tambah, ubah, urutkan, hapus | Tambah, ubah, urutkan, hapus |
@@ -161,6 +162,29 @@ area tanda tangan sengaja dikosongkan; QR hanya membuktikan surat itu benar dite
 - **Papan sesi**: tombol *Hanya rombel saya* muncul bila sesi memuat Penegak dari rombel Anda dan dari rombel lain; ringkasan angka di atas papan tetap seluruh sesi.
 - **Dashboard Pembina dan Dewan**: kartu **Progres per rombel** untuk tiap rombel tugas: jumlah Penegak, rata-rata progres Bantara dan Laksana, yang sudah selesai tiap tingkat, pengajuan menunggu dan sedang diuji, penguji bertugas, dan daftar Penegak
   (ketuk nama untuk membuka detail). Tanpa penugasan, semua rombel yang punya Penegak ditampilkan; *Tampilkan semua rombel* tersedia bagi yang punya penugasan. Logika di `src/lib/rombelLogic.js` dan `src/lib/progresRombel.js`, dijaga pengujian `rombel-saya`.
+
+### Notifikasi dan aplikasi terpasang (PWA)
+**Kotak Notifikasi** (menu *Notifikasi*, lencana angka pada menu dan judul tab) bekerja di semua peran tanpa pengaturan tambahan, setelah migrasi `2026-09-notifikasi.sql`. Notifikasi dibuat **pemicu di basis data** (bukan di tiap fungsi),
+sehingga semua jalur tercakup: **pengajuan uji** (penguji tujuan, atau semua penguji yang sah bila masuk antrian rombel), **dialihkan**, **pengujian dimulai** dan **hasil tersedia** (untuk Penegak; isi *tanpa* menyebut lulus atau ulang),
+**jadwal sesi ujian** (Penegak yang dimasukkan; menyimpan ulang sesi tidak menggandakan), dan **surat pengantar guru agama terbit**. Pengingat harian pukul 07.00 WIB (pg_cron): **H-1** pengujian dan sesi ujian, dan **pengajuan menunggu lebih dari 3 hari**.
+Notifikasi berumur lebih dari 90 hari dibersihkan otomatis. Data lama tidak memicu apa pun; hanya peristiwa baru.
+
+**Web Push** (notifikasi muncul di HP walau aplikasi tertutup) memerlukan langkah sekali di Supabase. Tanpa langkah ini aplikasi tetap jalan; halaman Notifikasi menjelaskan bahwa push belum diatur.
+1. Jalankan `supabase/migrasi/2026-09-notifikasi.sql` di SQL Editor (sesudah `2026-09-jabatan-dewan.sql`). Migrasi mencoba mengaktifkan `pg_net` dan `pg_cron`; bila pesan menyebut salah satunya belum aktif, aktifkan di **Dashboard > Integrations**, lalu jalankan migrasi sekali lagi (aman diulang).
+2. Buat kunci VAPID di komputer: `npx web-push generate-vapid-keys`. Simpan kunci **privat** (jangan dibagikan, jangan di-commit); kunci **publik** dipakai di langkah 4.
+3. **Edge Functions > Deploy a new function > Via Editor**, nama `notif-push` (persis), isi dengan [`supabase/functions/notif-push/index.ts`](supabase/functions/notif-push/index.ts), **Deploy**, lalu **matikan "Verify JWT"** (pemanggilnya basis data; pemeriksaan memakai rahasia bersama). CLI: `supabase functions deploy notif-push --no-verify-jwt`.
+   Secrets (Edge Functions > Secrets): `NOTIF_RAHASIA` (karangan sendiri, minimal 16 karakter), `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (mis. `mailto:pembina@sekolah.sch.id`).
+4. Beri tahu basis data alamat fungsi dan kuncinya (SQL Editor, sekali; jalankan lagi bila salah satunya berganti):
+   `select sigarda.push_atur('https://KODE.supabase.co/functions/v1/notif-push', '<NOTIF_RAHASIA yang sama>', '<kunci publik VAPID>');`
+5. Buka aplikasi di HP, menu **Notifikasi**, ketuk **Aktifkan notifikasi**. Admin dan Pembina melihat berapa anggota yang sudah punya perangkat (dan daftar yang belum) di halaman yang sama.
+
+Aturan dan batas: (1) **Keluar menghentikan notifikasi di perangkat itu** (langganan dihapus di server dan di peramban), agar HP bersama tidak terus menerima notifikasi akun sebelumnya; yang hanya menutup tab atau sesinya kedaluwarsa tetap menerima. Masuk lagi di perangkat yang sama mengaktifkannya kembali
+tanpa izin ulang. (2) **iPhone dan iPad**: push hanya bekerja bila aplikasi dipasang lewat *Bagikan > Tambah ke Layar Utama* dan dibuka dari sana (iOS 16.4 ke atas); halaman Notifikasi menampilkan petunjuknya. (3) Sebagian HP Android menunda notifikasi karena penghemat baterai. (4) Tidak ada saluran yang menjamin notifikasi dibaca; yang terjamin: tersimpan di Kotak Notifikasi.
+(5) Isi push singkat dan tidak menyebut hasil penilaian (layar kunci HP dapat dilihat orang lain).
+
+**Aplikasi terpasang (PWA).** Aplikasi dapat dipasang di layar utama (Chrome/Edge: tombol *Pasang aplikasi* di halaman Notifikasi atau menu peramban; iPhone: Tambah ke Layar Utama), dengan ikon SIGARDA (`public/ikon-*.png`, dibuat dari lambang di `public/favicon.svg`).
+Service worker (`public/sw.js`) hanya menangani push dan klik notifikasi: **tidak ada cache**, jadi data Supabase tidak tersimpan di perangkat dan halaman selalu versi terbaru. Setiap build menerbitkan `version.json`; aplikasi yang terbuka memeriksanya tiap 10 menit dan menampilkan ajakan **Versi baru SIGARDA tersedia, Muat ulang**.
+Service worker tidak didaftarkan pada `npm run dev` dan `npm run dev:lokal` (mode lokal tetap punya Kotak Notifikasi, tanpa push). Pengujian: `notifikasi`, `notifikasi-klien`, `notif-push`, `migrasi-notifikasi`.
 
 ### Materi SKU dari Google Drive
 Pembina dan Admin Gudep melampirkan **tautan berbagi** file PDF di Google Drive; aplikasi tidak menyimpan file, hanya tautannya.
@@ -430,6 +454,8 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
   Jalankan **setelah** `2026-09-dokumen.sql` (bila belum, berhenti dengan pesan yang menuntun). Aman dijalankan ulang: bila versi sebelumnya sudah dijalankan, jalankan berkas ini sekali lagi. **Edge Function tidak perlu di-deploy ulang.** Sebelum migrasi dijalankan aplikasi baru tetap berjalan dengan nilai bawaan; hanya penyimpanan di menu Data Gudep yang belum berfungsi.
 - [`2026-09-jabatan-dewan.sql`](supabase/migrasi/2026-09-jabatan-dewan.sql): jabatan Dewan Ambalan dan QR Berita Acara Sidang. Menambah kolom `profiles.jabatan_dewan` (Pradana, Pradani, Wakil Pradana, Wakil Pradani, Sekretaris, Bendahara; Pradana dan Pradani masing-masing satu pemegang) dan fungsi `sg_anggota_jabatan_dewan_atur` (Admin). `sigarda.ketua_sidang` kini mengambil ketua dari anggota berjabatan Pradana (cadangan: pengaturan lama). `sg_gudep_simpan` tidak lagi menyimpan Pradana dan Pradani (kunci lama tetap diterima dan diabaikan). Kolom `sidang_dk.token` dan `sidang_dk.kode` serta fungsi `sg_sidang_token`; `sg_verifikasi_token` dan `sg_verifikasi_kode` ikut menjawab berita acara sidang.
   Jalankan **setelah** `2026-09-data-gudep.sql` (bila belum, berhenti dengan pesan yang menyebut apa yang belum ada). Berkas ini juga menerbitkan ulang `sigarda.ketua_sidang` dan `sg_sidang_simpan`, jadi tetap berjalan walau yang dijalankan dulu adalah versi awal `2026-09-data-gudep.sql`. Aman dijalankan ulang. **Edge Function tidak perlu di-deploy ulang.** **Jalankan migrasi ini sebelum `git push` kode ini**: tanpa kolom baru, daftar anggota gagal dimuat. Sesudahnya, **isi Jabatan Dewan Ambalan** (menu Anggota > Dewan Ambalan > ubah): nama Pradana/Pradani yang sebelumnya diketik di Data Gudep tidak dipakai lagi.
+- [`2026-09-notifikasi.sql`](supabase/migrasi/2026-09-notifikasi.sql): notifikasi dan Web Push (PWA). Menambah tabel `notifikasi` (dibaca pemiliknya), `push_langganan` dan `push_konfigurasi` (tanpa kebijakan baca), pemicu pembuat notifikasi pada `sku_progress`, `sesi_ujian_peserta`, dan `dokumen_terbit`, `sigarda.notif_pengingat` (dijadwalkan pg_cron), pemicu pengirim push lewat pg_net, `sigarda.push_atur`, serta fungsi `sg_notifikasi_tandai`, `sg_push_kunci`, `sg_push_simpan`, `sg_push_hapus`, `sg_push_ringkasan`, `sg_push_ambil_internal`, `sg_push_hasil_internal`. Tidak mengubah fungsi atau data yang ada.
+  Jalankan **setelah** `2026-09-jabatan-dewan.sql` (bila belum, berhenti dengan pesan yang menuntun). Edge Function `sigarda` **tidak berubah**; Web Push memerlukan Edge Function **baru** `notif-push` (lihat bagian *Notifikasi dan aplikasi terpasang*). Aman diulang (mis. sesudah mengaktifkan pg_net atau pg_cron).
 
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 

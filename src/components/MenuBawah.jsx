@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Icon } from './ui';
+import { Icon, LencanaMenu } from './ui';
 
 /**
  * Panah penunjuk bahwa masih ada menu tersembunyi di sisi itu. Muncul hanya bila memang ada yang tersembunyi dan hilang
@@ -80,8 +80,11 @@ export default function MenuBawah({ nav, tab, setTab }) {
                 }`}
               >
                 {/* Menu yang sedang dibuka: ikon dibayangi cahaya emas yang berdenyut, senada dengan panah geser */}
-                <span className={`flex h-6 w-10 items-center justify-center rounded-full ${tab === n.id ? 'ikon-aktif text-pramuka-900' : ''}`}>
-                  <Icon nama={n.ikon} className="h-5 w-5" />
+                <span className="relative">
+                  <span className={`flex h-6 w-10 items-center justify-center rounded-full ${tab === n.id ? 'ikon-aktif text-pramuka-900' : ''}`}>
+                    <Icon nama={n.ikon} className="h-5 w-5" />
+                  </span>
+                  <LencanaMenu jumlah={n.lencana} posisi="absolute -right-0.5 -top-1" />
                 </span>
                 {n.label}
               </button>

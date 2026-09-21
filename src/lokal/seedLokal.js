@@ -97,4 +97,6 @@ export async function isiDataContoh(pg) {
   }
   await pg.query('insert into public.portofolio select * from json_populate_recordset(null::public.portofolio, $1::json)', [JSON.stringify(pf)]);
   await pg.query('insert into public.portofolio_jurnal (peserta_id, item_id, waktu, teks, oleh) select peserta_id, item_id, waktu, teks, oleh from json_populate_recordset(null::public.portofolio_jurnal, $1::json)', [JSON.stringify(jurnal)]);
+  // Pemicu notifikasi ikut menyala saat data contoh dimasukkan; itu bukan peristiwa nyata, jadi Kotak Notifikasi dimulai kosong.
+  if ((await pg.query("select to_regclass('public.notifikasi') as t")).rows[0].t) await pg.query('delete from public.notifikasi');
 }

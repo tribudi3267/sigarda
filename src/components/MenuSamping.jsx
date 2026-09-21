@@ -2,7 +2,7 @@ import { APP } from '../config';
 import { useGudep } from '../lib/gudepStore';
 import LogoMark from './LogoMark';
 import MenuAkun from './MenuAkun';
-import { Icon } from './ui';
+import { Icon, LencanaMenu } from './ui';
 
 /**
  * Menu samping kiri (layar md ke atas: tablet, laptop, PC). Kelompok menurut fungsi, dapat diciutkan menjadi ikon saja,
@@ -53,8 +53,12 @@ export default function MenuSamping({ grup, tab, setTab, ciut, setCiut, pertama 
                       } ${aktif ? 'bg-pramuka-900 text-emas-light' : 'text-pramuka-200 hover:bg-pramuka-700 hover:text-pramuka-50'}`}
                     >
                       {aktif && <span className="absolute inset-y-1.5 left-0 w-1 rounded-r bg-emas" aria-hidden="true" />}
-                      <Icon nama={n.ikon} className="h-[18px] w-[18px] shrink-0" />
+                      <span className="relative shrink-0">
+                        <Icon nama={n.ikon} className="h-[18px] w-[18px]" />
+                        {ciut && <LencanaMenu jumlah={n.lencana} posisi="absolute -right-2 -top-1.5" />}
+                      </span>
                       {ciut ? <span className="sr-only">{n.label}</span> : <span className="truncate">{n.label}</span>}
+                      {!ciut && <span className="ml-auto"><LencanaMenu jumlah={n.lencana} /></span>}
                     </button>
                   </li>
                 );

@@ -65,6 +65,7 @@ class Bangun {
   in(k, arr) { this.p.push(parameter(arr)); this.w.push(`${this.#id(k)}::text = any($${this.p.length}::text[])`); return this; }
   order(k, { ascending = true } = {}) { this.urut.push(`${this.#id(k)} ${ascending ? 'asc' : 'desc'}`); return this; }
   range(a, b) { this.a = a; this.b = b; return this; }
+  limit(n) { this.a = this.a ?? 0; this.b = this.a + n - 1; return this; }
   maybeSingle() { this.satu = 'maybe'; return this; }
   single() { this.satu = 'single'; return this; }
   #id(k) { if (!IDENT.test(k)) throw new Error('kolom tidak sah'); return k; }

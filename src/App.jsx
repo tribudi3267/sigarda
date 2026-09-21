@@ -24,6 +24,8 @@ import Penugasan from './pages/Penugasan';
 import DataGudep from './pages/DataGudep';
 import SesiUjian from './pages/SesiUjian';
 import Iuran from './pages/Iuran';
+import Notifikasi from './pages/Notifikasi';
+import BannerVersi from './components/BannerVersi';
 import HalamanVerifikasi from './components/HalamanVerifikasi';
 import { parameterVerifikasi } from './lib/verifikasiLogic';
 import { bolehKelolaMateri } from './lib/materiLogic';
@@ -31,14 +33,14 @@ import LogoMark from './components/LogoMark';
 
 /**
  * Menu per peran, dikelompokkan menurut fungsinya (tampil sebagai kelompok di menu samping, dan berurutan di menu bawah ponsel).
- *  Utama            : Dashboard (Penegak: Beranda atau Garuda)
+ *  Utama            : Dashboard (Penegak: Beranda atau Garuda), Notifikasi (semua peran; lencana = belum dibaca)
  *  Pengujian SKU    : Penegak: Poin SKU, Cetak. Dewan/Pembina: Antrian, Peserta, Sesi, Instrumen dan Penugasan (Pembina), Sidang, Cetak. Admin: Sesi, Instrumen, Sidang, Cetak
  *  Kegiatan Ambalan : Absensi, Iuran (semua peran), Portofolio (pengurus), Raport (Pembina dan Admin)
  *  Materi           : Materi, Kelola Materi (Pembina dan Admin)
  *  Pengelolaan      : Anggota (Admin)
  * Akun saya dan Reset PIN anggota (pengurus) tidak ada di daftar ini: keduanya di menu akun (nama pengguna di menu samping atau header).
  */
-function buatNav(user, peran) {
+function buatNav(user, peran, belumDibaca = 0) {
   const materi = { id: 'materi', label: 'Materi', ikon: 'buku' };
   const kelola = { id: 'kelolamateri', label: 'Kelola Materi', ikon: 'pustaka' };
   const raport = { id: 'raport', label: 'Raport', ikon: 'raport' };
@@ -51,10 +53,11 @@ function buatNav(user, peran) {
   const cetak = { id: 'cetak', label: 'Cetak', ikon: 'cetak' };
   const penugasan = { id: 'penugasan', label: 'Penugasan', ikon: 'penugasan' };
   const kelolaBoleh = bolehKelolaMateri(user);
+  const notifikasi = { id: 'notifikasi', label: 'Notifikasi', ikon: 'lonceng', lencana: belumDibaca };
 
   if (user.role === 'peserta') {
     return [
-      { judul: 'Utama', item: [peran === 'calon-garuda' ? { id: 'beranda', label: 'Garuda', ikon: 'bintang' } : { id: 'beranda', label: 'Beranda', ikon: 'beranda' }] },
+      { judul: 'Utama', item: [peran === 'calon-garuda' ? { id: 'beranda', label: 'Garuda', ikon: 'bintang' } : { id: 'beranda', label: 'Beranda', ikon: 'beranda' }, notifikasi] },
       { judul: 'Pengujian SKU', item: [{ id: 'sku', label: 'Poin SKU', ikon: 'daftar' }, cetak] },
       { judul: 'Kegiatan Ambalan', item: [absensi, iuran] },
       { judul: 'Materi', item: [materi] },
@@ -62,14 +65,14 @@ function buatNav(user, peran) {
   }
   if (user.role === 'penguji') {
     return [
-      { judul: 'Utama', item: [{ id: 'dashboard', label: 'Dashboard', ikon: 'dashboard' }] },
+      { judul: 'Utama', item: [{ id: 'dashboard', label: 'Dashboard', ikon: 'dashboard' }, notifikasi] },
       { judul: 'Pengujian SKU', item: [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }, { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, sesi, ...(kelolaBoleh ? [instrumen, penugasan] : []), sidang, cetak] },
       { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, ...(kelolaBoleh ? [raport] : [])] },
       { judul: 'Materi', item: [materi, ...(kelolaBoleh ? [kelola] : [])] },
     ];
   }
   return [
-    { judul: 'Utama', item: [{ id: 'rekap', label: 'Dashboard', ikon: 'dashboard' }] },
+    { judul: 'Utama', item: [{ id: 'rekap', label: 'Dashboard', ikon: 'dashboard' }, notifikasi] },
     { judul: 'Pengujian SKU', item: [sesi, instrumen, sidang, cetak] },
     { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, raport] },
     { judul: 'Materi', item: [materi, kelola] },
@@ -115,7 +118,7 @@ function LayarStatus({ status, galat }) {
 }
 
 function Shell() {
-  const { user, peranUser, status, galatMuat } = useApp();
+  const { user, peranUser, status, galatMuat, belumDibaca, segarkanNotifikasi } = useApp();
   const [tab, setTab] = useState(null);
   const [fokusId, setFokusId] = useState(null); // peserta yang sedang dibuka penguji/admin
   const [jenisCetak, setJenisCetak] = useState('kartu'); // tab awal halaman Cetak (kartu | stl | surat)
@@ -130,12 +133,42 @@ function Shell() {
     setKelolaId(null);
   }, [user?.id]);
 
+  // Klik notifikasi push membuka aplikasi di Kotak Notifikasi: lewat alamat ?buka=notifikasi (aplikasi tertutup) atau pesan service worker (sudah terbuka).
+  useEffect(() => {
+    if (!user) return undefined;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('buka') === 'notifikasi') {
+      setTab('notifikasi');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    const layanan = navigator.serviceWorker;
+    const saatPesan = (e) => {
+      if (e.data?.type === 'notifikasi-baru') segarkanNotifikasi(); // push tiba saat aplikasi terbuka
+      if (e.data?.type !== 'buka-notifikasi') return;
+      setTab('notifikasi');
+      setFokusId(null);
+      segarkanNotifikasi();
+    };
+    layanan?.addEventListener('message', saatPesan);
+    return () => layanan?.removeEventListener('message', saatPesan);
+  }, [user?.id, segarkanNotifikasi]);
+
+  // Jumlah belum dibaca juga pada judul tab dan ikon aplikasi terpasang
+  useEffect(() => {
+    const dasar = 'SIGARDA - Sistem Informasi Garuda dan SKU Penegak';
+    document.title = user && belumDibaca > 0 ? `(${belumDibaca}) ${dasar}` : dasar;
+    try {
+      if (user && belumDibaca > 0) navigator.setAppBadge?.(belumDibaca);
+      else navigator.clearAppBadge?.();
+    } catch { /* tidak didukung */ }
+  }, [user, belumDibaca]);
+
   if (status !== 'siap') return <LayarStatus status={status} galat={galatMuat} />;
   if (!user) return <Login />;
   // PIN awal dari admin atau PIN hasil reset wajib diganti sebelum aplikasi dapat dipakai
   if (user.wajibGantiPin) return <GantiPinWajib />;
 
-  const grup = buatNav(user, peranUser);
+  const grup = buatNav(user, peranUser, belumDibaca);
   const nav = grup.flatMap((g) => g.item);
   // Bila menu yang dipilih tidak ada lagi (mis. peran berubah), kembali ke menu pertama. Akun saya dan Reset PIN dibuka dari menu akun.
   const halamanAkun = tab === 'akun' || (tab === 'resetpin' && user.role !== 'peserta');
@@ -172,6 +205,8 @@ function Shell() {
     isi = <Akun />;
   } else if (tabAktif === 'resetpin' && user.role !== 'peserta') {
     isi = <ResetPin />;
+  } else if (tabAktif === 'notifikasi') {
+    isi = <Notifikasi idMenu={nav.map((n) => n.id)} onNav={pindah} />;
   } else if (tabAktif === 'sidang' && user.role !== 'peserta') {
     isi = <Sidang />;
   } else if (tabAktif === 'iuran') {
@@ -246,6 +281,7 @@ export default function App() {
     <AppProvider>
       <Shell />
       <Toast />
+      <BannerVersi />
     </AppProvider>
   );
 }

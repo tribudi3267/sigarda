@@ -288,3 +288,10 @@ export const susunDokumen = (baris = []) =>
       dibuatPada: r.dibuat_pada, dicabutPada: r.dicabut_pada ?? null, dicabutAlasan: r.dicabut_alasan ?? '',
     };
   });
+
+/** Baris notifikasi -> [{ id, jenis, judul, isi, tautan, dibuat, dibaca, dibacaPada }] (baru ke lama) */
+export const susunNotifikasi = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), jenis: r.jenis, judul: r.judul, isi: r.isi ?? '', tautan: r.tautan ?? {}, dibuat: r.dibuat,
+    dibaca: !!r.dibaca_pada, dibacaPada: r.dibaca_pada ?? null,
+  }));

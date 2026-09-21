@@ -13,6 +13,8 @@ import { bolehKelolaMateri, validasiMateri } from '../lib/materiLogic';
 import { hariIni } from '../lib/format';
 import { resetGudep, setGudep, tambahGudep } from '../lib/gudepStore';
 import { PENGATURAN_IURAN_BAWAAN, gabungPengaturanIuran } from '../lib/iuranLogic';
+import { jumlahBelumDibaca, tandaiLokal } from '../lib/notifikasiLogic';
+import { berhentiPushPerangkat, pulihkanPush } from '../lib/pushClient';
 
 /**
  * STATE APLIKASI
@@ -36,9 +38,10 @@ export function useApp() {
   return ctx;
 }
 
-const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '', asisten: [], pengaturanIuran: PENGATURAN_IURAN_BAWAAN, penugasan: {}, guruAgama: [], dokumen: null };
+const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '', asisten: [], pengaturanIuran: PENGATURAN_IURAN_BAWAAN, penugasan: {}, guruAgama: [], dokumen: null, notifikasi: [] };
 const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi waktu Edge Function)
 const JEDA_SEGARKAN_MS = 30000;
+const JEDA_NOTIFIKASI_MS = 60000; // Kotak Notifikasi ditarik ulang tiap menit selama halaman terlihat
 
 const ditolak = (notify, pesan) => {
   notify(pesan, 'err');
@@ -124,11 +127,12 @@ export function AppProvider({ children }) {
     const a = api();
     const mulaiGenerasi = generasi.current;
     const daftarKunci = [...new Set([semesterDari(hariIni()), ...semesterRef.current])];
-    const [u, p, sesi, pf, m, asisten, pengIuran, gudep, ...hadir] = await Promise.all([
+    const [u, p, sesi, pf, m, asisten, pengIuran, gudep, notif, ...hadir] = await Promise.all([
       a.muatProfil(), a.muatProgress(), a.muatSesiAbsen(), a.muatPortofolio(), a.muatMateri(),
       a.muatAsisten(), // penunjukan asisten bendahara: tidak wajib (basis data lama belum punya tabelnya), jadi tidak ikut pemeriksaan gagal
       a.muatPengaturanIuran(), // pengaturan iuran: bila fungsinya belum ada dipakai nilai bawaan
       a.muatGudep(), // data gudep: tidak wajib; belum tersimpan = nilai bawaan dari src/config.js
+      a.muatNotifikasi(), // Kotak Notifikasi: tidak wajib (basis data lama belum punya tabelnya)
       ...daftarKunci.map((k) => { const r = rentangKunci(k); return a.muatHadirRentang(r.mulai, r.akhir); }),
     ]);
     const gagal = [u, p, sesi, pf, m, ...hadir].find((r) => !r.ok);
@@ -138,7 +142,7 @@ export function AppProvider({ children }) {
     if (gudep.ok) setGudep(gudep.data);
     setDb((d) => ({
       ...d, // sidang dan pengaturan dimuat terpisah (muatSidang) dan tidak boleh hilang saat penyegaran
-      users: u.data, progress: p.data, portofolio: pf.data, materi: m.data, asisten: asisten.ok ? asisten.data : [], pengaturanIuran: pengIuran.ok ? gabungPengaturanIuran(pengIuran.data) : PENGATURAN_IURAN_BAWAAN,
+      users: u.data, progress: p.data, portofolio: pf.data, materi: m.data, asisten: asisten.ok ? asisten.data : [], notifikasi: notif.ok ? notif.data : d.notifikasi, pengaturanIuran: pengIuran.ok ? gabungPengaturanIuran(pengIuran.data) : PENGATURAN_IURAN_BAWAAN,
       absensi: gabungHadirSemester(d.absensi, sesi.data, daftarKunci, hadirGabung),
     }));
     tandaiSiap(daftarKunci);
@@ -187,6 +191,7 @@ export function AppProvider({ children }) {
       return r;
     }
     setSesiId(id);
+    pulihkanPush(api()); // izin notifikasi yang sudah ada: perangkat ini diaktifkan kembali untuk akun yang masuk (tidak menampilkan permintaan izin)
     return { ok: true };
   }, [muatSemua]);
 
@@ -226,6 +231,27 @@ export function AppProvider({ children }) {
       window.removeEventListener('focus', saatTampil);
     };
   }, [sesiId, muatSemua]);
+
+  /** Menarik Kotak Notifikasi tanpa toast bila gagal (dipakai pewaktu, saat halaman dibuka, dan pesan dari service worker). */
+  const segarkanNotifikasi = useCallback(async () => {
+    const g = generasi.current;
+    const r = await api()?.muatNotifikasi();
+    if (r?.ok && g === generasi.current) setDb((d) => ({ ...d, notifikasi: r.data }));
+    return r?.ok ?? false;
+  }, []);
+  useEffect(() => {
+    if (!sesiId) return undefined;
+    const t = setInterval(() => { if (document.visibilityState === 'visible') segarkanNotifikasi(); }, JEDA_NOTIFIKASI_MS);
+    return () => clearInterval(t);
+  }, [sesiId, segarkanNotifikasi]);
+
+  /** Menandai dibaca (ids kosong = semua): tampilan langsung berubah, lalu server; bila server menolak, dimuat ulang. */
+  const tandaiNotifikasi = useCallback(async (ids = null) => {
+    setDb((d) => ({ ...d, notifikasi: tandaiLokal(d.notifikasi, ids) }));
+    const r = await api()?.tandaiNotifikasi(ids);
+    if (!r?.ok) await segarkanNotifikasi();
+    return r?.ok ?? false;
+  }, [segarkanNotifikasi]);
 
   // Penyegaran sebagian. Bila gagal (mis. koneksi), data lama dipertahankan.
   const segarkan = useMemo(() => {
@@ -281,6 +307,7 @@ export function AppProvider({ children }) {
   };
 
   const logout = async () => {
+    await berhentiPushPerangkat(api()); // Keluar menghentikan notifikasi di perangkat ini (aturan privasi HP bersama)
     await api()?.keluar();
     setSesiId(null);
     kosongkan();
@@ -977,6 +1004,7 @@ export function AppProvider({ children }) {
     dokumen: db.dokumen, muatDokumen, terbitkanSuratAgama, cabutDokumen, bolehSurat,
     penugasan: db.penugasan, guruAgama: db.guruAgama, muatPenugasan, muatLogPenugasan, aturPenugasan, salinPenugasan, simpanGuruAgama, hapusGuruAgama,
     muatUlang: muatSemua,
+    notifikasi: db.notifikasi, belumDibaca: jumlahBelumDibaca(db.notifikasi), segarkanNotifikasi, tandaiNotifikasi, api,
     notify, toast,
   };
 

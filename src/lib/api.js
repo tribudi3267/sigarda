@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogPenugasan, susunMateri, susunPenilaian, susunPenugasan, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -345,6 +345,24 @@ export function buatApi(klien) {
     salinPenugasan: (dari, ke) => rpc('sg_penugasan_salin', { p_dari: dari, p_ke: ke }),
     simpanGuruAgama: (g) => rpc('sg_guru_agama_simpan', { p_id: g.id ?? null, p_agama: g.agama, p_nama: g.nama, p_keterangan: g.keterangan ?? '' }),
     hapusGuruAgama: (id) => rpc('sg_guru_agama_hapus', { p_id: id }),
+
+    /* ---------------------- Notifikasi dan Web Push ---------------------- */
+    /** Notifikasi milik sendiri (RLS), terbaru lebih dulu, maksimal `batas`. */
+    muatNotifikasi: (batas = 60) =>
+      muat(async () => {
+        const { data, error } = await klien.from('notifikasi').select('*').order('id', { ascending: false }).limit(batas);
+        if (error) throw error;
+        return susunNotifikasi(data ?? []);
+      }),
+    /** Menandai dibaca: daftar id, atau tanpa argumen = semua milik sendiri. Mengembalikan jumlah yang berubah. */
+    tandaiNotifikasi: (ids = null) => rpc('sg_notifikasi_tandai', { p_ids: ids && ids.length ? ids : null }),
+    /** Kunci publik VAPID (teks) atau null bila push belum diatur di server. */
+    kunciPush: () => rpc('sg_push_kunci'),
+    /** Mendaftarkan perangkat ini: { endpoint, p256dh, auth, agen }. Perangkat yang sama dialihkan ke akun yang masuk. */
+    simpanPush: (d) => rpc('sg_push_simpan', { p_endpoint: d.endpoint, p_p256dh: d.p256dh, p_auth: d.auth, p_agen: d.agen ?? '' }),
+    hapusPush: (endpoint) => rpc('sg_push_hapus', { p_endpoint: endpoint }),
+    /** Pembina dan Admin: { total, aktif, tanpa: [{ id, nama, peran, kelas }], terkonfigurasi }. */
+    ringkasanPush: () => rpc('sg_push_ringkasan'),
 
     /* ------------------------------- Materi ------------------------------- */
     simpanMateri: (m) =>

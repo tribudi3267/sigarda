@@ -1,0 +1,16 @@
+{
+  "name": "SIGARDA - Sistem Informasi Garuda dan SKU Penegak",
+  "short_name": "SIGARDA",
+  "description": "Pengujian SKU Bantara dan Laksana serta portofolio Penegak Garuda, Gugus Depan SMAN 1 Bukateja.",
+  "lang": "id",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#45291a",
+  "theme_color": "#45291a",
+  "icons": [
+    { "src": "ikon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "ikon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "ikon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
