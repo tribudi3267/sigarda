@@ -36,7 +36,7 @@ export async function susunPeriksa(akar) {
     from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' order by 2`);
   const kolom = await q(`select table_name t, column_name k, data_type tipe from information_schema.columns where table_schema = 'public'
     and table_name in (select relname from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r') order by 1, 2`);
-  const batasan = await q(`select conrelid::regclass::text t, conname n, pg_get_constraintdef(oid) d from pg_constraint where connamespace = 'public'::regnamespace and conrelid <> 0 order by 1, 2`);
+  const batasan = await q(`select conrelid::regclass::text t, conname n, pg_get_constraintdef(oid) d from pg_constraint where connamespace = 'public'::regnamespace and conrelid <> 0 and contype <> 'n' order by 1, 2`); // NOT NULL (contype 'n') hanya tercatat di PostgreSQL 18 ke atas: dilewati agar tidak jadi temuan palsu di versi lain
   const indeks = await q(`select tablename t, indexname n from pg_indexes where schemaname = 'public' order by 1, 2`);
   const kebijakan = await q(`select tablename t, policyname n, qual from pg_policies where schemaname = 'public' order by 1, 2`);
   const pemicu = await q(`select tgrelid::regclass::text t, tgname n from pg_trigger where not tgisinternal and tgrelid in (select oid from pg_class where relnamespace = 'public'::regnamespace) order by 1, 2`);

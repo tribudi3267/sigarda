@@ -19,7 +19,7 @@ export function penjelasanTes(hasil, pushStatus = null, habisWaktu = false) {
   if (!hasil.perangkat) return { tingkat: 'galat', teks: 'Belum ada perangkat yang mengaktifkan notifikasi untuk akun ini. Tekan "Aktifkan notifikasi" di perangkat yang ingin dipakai (iPhone: pasang ke Layar Utama lebih dulu), lalu coba lagi.' };
   if (pushStatus === 'dikirim') return { tingkat: 'ok', teks: 'Terkirim ke layanan notifikasi. Seharusnya muncul di HP dalam beberapa detik. Bila tidak muncul: periksa izin notifikasi, mode hemat baterai, dan (iPhone) apakah aplikasi dipasang di Layar Utama.' };
   if (pushStatus === 'gagal') return { tingkat: 'galat', teks: 'Pengiriman gagal. Penyebab umum: kunci VAPID atau alamat fungsi tidak cocok, atau perangkat sudah tidak berlaku (matikan lalu aktifkan lagi notifikasi). Admin: periksa log Edge Function notif-push.' };
-  if (habisWaktu) return { tingkat: 'galat', teks: 'Belum ada laporan dari server push setelah 20 detik. Admin: pastikan Edge Function notif-push sudah di-deploy (Verify JWT dimatikan) dan rahasia NOTIF_RAHASIA sama dengan yang diisi lewat sigarda.push_atur.' };
+  if (habisWaktu) return { tingkat: 'galat', teks: 'Belum ada laporan dari server push setelah 20 detik. Admin: jalankan supabase/demo/periksa_push.sql di SQL Editor untuk melihat jawaban Edge Function notif-push (penyebab umum: Verify JWT masih menyala, atau rahasia NOTIF_RAHASIA berbeda dengan yang diisi lewat sigarda.push_atur).' };
   return { tingkat: 'tunggu', teks: 'Mengirim...' };
 }
 

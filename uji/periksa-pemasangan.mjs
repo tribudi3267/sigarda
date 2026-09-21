@@ -140,5 +140,29 @@ console.log('\n--- Penjelasan hasil uji (klien) ---');
   ok(LABEL_JENIS.tes === 'Uji' && KAPAN_NOTIFIKASI.penegak.length >= 4 && KAPAN_NOTIFIKASI.penguji.length >= 4, 'label jenis uji dan daftar kejadian per peran');
 }
 
+console.log('\n--- NOT NULL bukan batasan (PostgreSQL 18 mencatatnya di pg_constraint) ---');
+ok(!berkas.includes('_not_null'), 'berkas periksa tidak memuat batasan bernama *_not_null (temuan palsu 229 baris pada Supabase PostgreSQL 15/17)');
+
+console.log('\n--- periksa_push.sql (diagnosis push; hanya membaca) ---');
+{
+  const push = bersih(readFileSync(`${P}/supabase/demo/periksa_push.sql`, 'utf8'));
+  ok(/HANYA MEMBACA/.test(push) && !/\b(insert|update|delete|drop|alter|truncate)\b\s+(into|table|from|function)/i.test(push.replace(/^--.*$/gm, '')), 'berkas hanya membaca');
+  const D = await baru('kini');
+  await D.exec('create schema net; create table net._http_response (id bigint, status_code int, content_type text, headers jsonb, content text, timed_out boolean, error_msg text, created timestamptz default now())');
+  let r = (await D.query(push)).rows;
+  ok(r.some((x) => x.bagian === 'Konfigurasi' && /belum diisi/.test(x.keterangan)) && r.some((x) => x.bagian === 'Respons pg_net terbaru' && /TIDAK ADA respons/.test(x.keterangan)), 'tanpa konfigurasi dan tanpa respons: keduanya dilaporkan');
+  ok(r.filter((x) => x.bagian === 'Petunjuk').length === 7, 'petunjuk pembacaan hasil ikut ditampilkan');
+  await D.exec("insert into public.push_konfigurasi (url, rahasia, kunci_publik) values ('https://abcdefgh.supabase.co/functions/v1/notif-push', 'rahasia-rahasia-rahasia-rahasia', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')");
+  await D.exec(`insert into net._http_response (id, status_code, content, timed_out, error_msg) values (1, 401, '{"code":401,"message":"Missing authorization header"}', false, null), (2, null, null, true, 'Timeout was reached')`);
+  r = (await D.query(push)).rows;
+  const k = r.find((x) => x.bagian === 'Konfigurasi');
+  ok(k && /panjang rahasia: 31/.test(k.keterangan) && !/rahasia-rahasia/.test(JSON.stringify(r)), 'konfigurasi tampil tanpa membocorkan rahasia (hanya panjangnya)');
+  ok(r.some((x) => x.bagian === 'Respons pg_net terbaru' && /HTTP 401/.test(x.keterangan) && /Missing authorization header/.test(x.keterangan)) && r.some((x) => /WAKTU HABIS/.test(x.keterangan) && /Timeout/.test(x.keterangan)), 'respons pg_net (401 dan waktu habis) tampil beserta isinya');
+  ok(!r.some((x) => /PERHATIAN: alamat fungsi/.test(x.keterangan)), 'alamat fungsi yang benar tidak diberi peringatan');
+  await D.exec("update public.push_konfigurasi set url = 'https://abcdefgh.supabase.co/functions/v1/push'");
+  ok((await D.query(push)).rows.some((x) => /PERHATIAN: alamat fungsi/.test(x.keterangan)), 'alamat fungsi yang salah nama diberi peringatan');
+  await D.exec("insert into public.notifikasi (penerima_id, jenis, judul) select id, 'tes', 'Notifikasi uji' from public.profiles limit 1").catch(() => {});
+}
+
 console.log(`\nRINGKASAN PERIKSA-PEMASANGAN: ${lulus} lulus, ${gagal} GAGAL`);
 process.exit(gagal ? 1 : 0);
