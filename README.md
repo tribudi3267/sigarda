@@ -557,7 +557,9 @@ Yang **tidak** dapat diuji tanpa proyek Supabase sungguhan: perilaku GoTrue (mis
 Bantara penuh, Bantara dan Laksana penuh, Laksana sebagian, butir menunggu/diuji/diulang, butir agama lulus sebagian (menguji blokir "Layak" pada Sidang), Calon Garuda dengan portofolio, dan Khonghucu.
 Jalankan di SQL Editor **sesudah semua migrasi** (skrip ini mengisi kolom token QR); aman diulang (akun tidak digandakan, data SKU demo direset). Tidak menyentuh anggota asli. Setelah selesai menguji, jalankan
 [`supabase/demo/hapus_data_demo.sql`](supabase/demo/hapus_data_demo.sql), yang menghapus hanya akun ber-NIS `9900xx` dengan nama berawalan "Demo " beserta seluruh datanya.
-Skrip membuat akun langsung di `auth.users`; bila gagal di proyek Anda, buat 8 akun itu lewat Anggota > Import Excel lalu jalankan skrip lagi (akun yang sudah ada dilewati, datanya tetap diisi).
+Untuk **mengosongkan semua akun sebelum dipakai pengguna sungguhan** (kecuali Admin Gudep), jalankan [`supabase/demo/pratinjau_hapus_semua_akun.sql`](supabase/demo/pratinjau_hapus_semua_akun.sql) (hanya membaca; menampilkan apa yang dipertahankan dan dihapus), lalu
+[`supabase/demo/hapus_semua_akun_kecuali_admin.sql`](supabase/demo/hapus_semua_akun_kecuali_admin.sql) (bawaannya menolak berjalan sampai `v_konfirmasi` diubah menjadi `'YA'`; satu pernyataan, semua atau tidak sama sekali; struktur tidak disentuh; dijaga pengujian `hapus-akun`). Buat cadangan lebih dulu.
+Skrip demo membuat akun langsung di `auth.users`; bila gagal di proyek Anda, buat 8 akun itu lewat Anggota > Import Excel lalu jalankan skrip lagi (akun yang sudah ada dilewati, datanya tetap diisi).
 
 ## Menyesuaikan untuk Gudep
 
