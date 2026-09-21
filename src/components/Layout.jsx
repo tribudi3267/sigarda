@@ -55,7 +55,7 @@ export default function Layout({ nav, grup, tab, setTab, children }) {
 
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-10 pt-5">{children}</main>
 
-        <Footer />
+        <Footer ciut={ciut} />
       </div>
 
       <MenuBawah nav={nav} tab={tab} setTab={setTab} />
