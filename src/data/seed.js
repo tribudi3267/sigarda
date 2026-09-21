@@ -114,8 +114,13 @@ function buatProgress() {
     riwayat: [{ waktu: `${tanggalLalu(5)}T10:00:00.000Z`, teks: 'Perlu diulang', oleh: PEMBINA }],
   };
   progress['u-p3'][unitButir(peta['u-p3'], 'Laksana', 6)[0].id] = {
-    status: 'diajukan', jadwal: iso(besok), pengujiId: DEWAN, catatanPeserta: '',
+    status: 'diajukan', jadwal: iso(besok), pengujiId: PEMBINA, catatanPeserta: '',
     riwayat: [{ waktu: new Date().toISOString(), teks: `Mengajukan pengujian untuk ${iso(besok)}`, oleh: 'u-p3' }],
+  };
+  // Antrian bersama rombel (belum ada penguji tujuan): butir Laksana hanya Pembina, jadi Pembina mana pun yang sah dapat mengambilnya
+  progress['u-p4'][unitButir(peta['u-p4'], 'Laksana', 3)[0].id] = {
+    status: 'diajukan', jadwal: iso(besok), pengujiId: null, catatanPeserta: '',
+    riwayat: [{ waktu: new Date().toISOString(), teks: `Mengajukan pengujian untuk ${iso(besok)} (antrian rombel)`, oleh: 'u-p4' }],
   };
   return progress;
 }

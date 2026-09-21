@@ -26,6 +26,7 @@
  */
 import { TINGKAT, INDEKS_POIN, unitButir } from '../data/skuData';
 import { kodeVerifikasi } from './format';
+import { pengujiPeranOk, pengujiSah } from './rombelLogic';
 
 export const STATUS = {
   belum: { label: 'Belum diuji', kelas: 'bg-stone-100 text-stone-700 ring-stone-300' },
@@ -98,11 +99,20 @@ export const tingkatSelesai = (progress, peserta, tingkat) => {
 export const laksanaTerbuka = (progress, peserta) => tingkatSelesai(progress, peserta, 'Bantara');
 
 /**
- * Butir agama (sub-butir Butir 1, `poin.agama` terisi) hanya dinilai Pembina; butir lain dinilai Pembina atau Dewan Ambalan.
- * Aturan yang sama ditegakkan di server (sg_sku_catat_internal dan sg_sku_ajukan); ini hanya untuk menyembunyikan aksi yang pasti ditolak.
+ * Butir agama (sub-butir Butir 1, `poin.agama` terisi) dan butir Laksana hanya dinilai Pembina; butir Bantara lain dinilai Pembina atau
+ * Dewan Ambalan. Aturan yang sama ditegakkan di server (sg_sku_catat_internal dan sg_sku_ajukan); ini hanya untuk menyembunyikan aksi
+ * yang pasti ditolak. Bila `konteks = { users, peserta }` diberikan, butir agama juga menuntut Pembina yang seagama dengan Penegak
+ * (setelah ada Pembina yang agamanya terisi).
  */
 export const PESAN_BUTIR_AGAMA = 'Butir agama hanya dapat dinilai oleh Pembina.';
-export const bolehMenilaiPoin = (user, poin) => user?.role === 'penguji' && (!poin?.agama || user.jabatan === 'Pembina');
+export const PESAN_BUTIR_LAKSANA = 'Butir Laksana hanya dapat dinilai oleh Pembina.';
+export const bolehMenilaiPoin = (user, poin, konteks) => {
+  if (user?.role !== 'penguji') return false;
+  if (konteks) return pengujiPeranOk(konteks.users, konteks.peserta, user, poin);
+  return user.jabatan === 'Pembina' || (!poin?.agama && poin?.tingkat !== 'Laksana');
+};
+/** Pesan untuk penguji yang tidak boleh menilai butir ini (agama lebih dulu, lalu Laksana). */
+export const pesanTidakBolehMenilai = (poin) => (poin?.agama ? PESAN_BUTIR_AGAMA : PESAN_BUTIR_LAKSANA);
 
 /** Memenuhi syarat mencalonkan diri: seluruh SKU Bantara dan Laksana lulus. */
 export const layakGaruda = (progress, peserta) =>
@@ -155,13 +165,13 @@ export function ajukanPengujian(progress, { peserta, skuId, jadwal, pengujiId, c
   const cek = bisaDiajukan(progress, peserta, skuId);
   if (!cek.ok) throw new Error(cek.alasan);
   if (!jadwal) throw new Error('Tanggal pengujian wajib diisi.');
-  if (!pengujiId) throw new Error('Pilih penguji terlebih dulu.');
+  // pengujiId kosong = antrian bersama rombel (penguji yang sah mana pun mengambilnya lewat "Mulai uji")
   return tulis(
     progress,
     peserta.id,
     skuId,
-    { status: 'diajukan', jadwal, pengujiId, catatanPeserta: catatan.trim() },
-    `Mengajukan pengujian untuk ${jadwal}`,
+    { status: 'diajukan', jadwal, pengujiId: pengujiId || null, catatanPeserta: catatan.trim() },
+    `Mengajukan pengujian untuk ${jadwal}${pengujiId ? '' : ' (antrian rombel)'}`,
     peserta.id
   );
 }
@@ -245,8 +255,12 @@ export function catatHasilUji(progress, { peserta, skuId, pengujiId, hasil, tang
 
 /* ---------- Kueri untuk dashboard ---------- */
 
-/** Daftar pengajuan/pengujian yang masih berjalan, urut jadwal terdekat. */
-export function antrianPengujian(progress, users, pengujiId = null) {
+/**
+ * Daftar pengajuan/pengujian yang masih berjalan, urut jadwal terdekat. Bila `pengujiId` diberikan: yang ditujukan kepadanya, ditambah
+ * antrian bersama rombel (pengajuan tanpa penguji tujuan) yang sah dinilainya. Kesahan itu memakai `penugasan` (baris penugasan tahun
+ * ajaran berjalan); tanpa `penugasan` semua antrian bersama ditampilkan (aturan lama). `bersama` = belum ada penguji tujuan.
+ */
+export function antrianPengujian(progress, users, pengujiId = null, penugasan = null) {
   const hasil = [];
   for (const u of users) {
     if (u.role !== 'peserta') continue;
@@ -254,7 +268,10 @@ export function antrianPengujian(progress, users, pengujiId = null) {
       if (entry.status !== 'diajukan' && entry.status !== 'proses') continue;
       if (pengujiId && entry.pengujiId && entry.pengujiId !== pengujiId) continue;
       const poin = cariPoin(skuId);
-      if (poin) hasil.push({ peserta: u, poin, entry });
+      if (!poin) continue;
+      const bersama = !entry.pengujiId;
+      if (pengujiId && bersama && penugasan && !pengujiSah({ users, penugasan, peserta: u, poin }).penguji.some((x) => x.id === pengujiId)) continue;
+      hasil.push({ peserta: u, poin, entry, bersama });
     }
   }
   return hasil.sort((a, b) => (a.entry.jadwal ?? '9999').localeCompare(b.entry.jadwal ?? '9999'));

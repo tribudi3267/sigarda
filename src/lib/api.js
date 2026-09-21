@@ -255,6 +255,20 @@ export function buatApi(klien) {
     ajukan: ({ skuId, jadwal, pengujiId, catatan }) =>
       rpc('sg_sku_ajukan', { p_sku_id: skuId, p_jadwal: jadwal || null, p_penguji_id: pengujiId || null, p_catatan: catatan ?? '' }),
     batalkanAjuan: (skuId) => rpc('sg_sku_batal', { p_sku_id: skuId }),
+    /**
+     * Penguji yang sah untuk satu butir beserta beban antrian masing-masing (aturan dihitung di server). Penegak: untuk dirinya;
+     * Pembina dan Admin dapat menyebut pesertaId (dipakai saat mengalihkan). Hasil: { sumber: 'rombel'|'semua', rombel, agamaButir,
+     * penguji: [{ id, nama, jabatan, agama, beban }] }.
+     */
+    pengujiPilihan: async (skuId, pesertaId = null) => {
+      const r = await rpc('sg_penguji_pilihan', { p_sku_id: skuId, p_peserta_id: pesertaId });
+      if (!r.ok) return r;
+      const d = r.data ?? {};
+      return { ok: true, data: { sumber: d.sumber, rombel: d.rombel ?? null, agamaButir: !!d.agama_butir, penguji: d.penguji ?? [] } };
+    },
+    /** Pembina atau Admin mengalihkan pengajuan ke penguji lain (pengujiId kosong = antrian bersama rombel); alasan wajib. */
+    alihkanPengajuan: ({ pesertaId, skuId, pengujiId, alasan }) =>
+      rpc('sg_sku_alihkan', { p_peserta_id: pesertaId, p_sku_id: skuId, p_penguji_id: pengujiId || null, p_alasan: alasan ?? '' }),
     catatHasil: (d) => edge('catat-hasil', d),
     daftarCalonGaruda: () => rpc('sg_calon_garuda_daftar'),
 

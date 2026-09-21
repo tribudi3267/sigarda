@@ -5,7 +5,7 @@ import { useIuranRingkas } from '../hooks/useIuran';
 import PanelIuranSku from './PanelIuranSku';
 import { NILAI } from '../config';
 import { hitungSkorInstrumen } from '../lib/instrumenLogic';
-import { PESAN_BUTIR_AGAMA, bolehMenilaiPoin, getEntry } from '../lib/skuLogic';
+import { bolehMenilaiPoin, getEntry, pesanTidakBolehMenilai } from '../lib/skuLogic';
 import { hariIni } from '../lib/format';
 import InstrumenNilai from './InstrumenNilai';
 import { Badge, Field, Modal, TeksPoin } from './ui';
@@ -223,12 +223,12 @@ function IsiUji({ pesertaId, poin, instr, pengaturan, tanggalAwal, onTutup }) {
 
 /** Penguji menilai satu poin. PIN penguji berfungsi sebagai verifikasi digital. Butir berinstrumen ditetapkan dinilai lewat instrumen. */
 export default function UjiModal({ pesertaId, poin, tanggalAwal = null, onTutup }) {
-  const { user } = useApp();
+  const { user, users } = useApp();
   const { instrumen, siap, pengaturan } = useInstrumen();
-  if (!bolehMenilaiPoin(user, poin)) {
+  if (!bolehMenilaiPoin(user, poin, { users, peserta: users.find((u) => u.id === pesertaId) })) {
     return (
       <Modal buka tutup={onTutup} judul="Penilaian poin SKU" aksi={<button className="btn btn-outline" onClick={onTutup}>Tutup</button>}>
-        <p role="alert" className="py-4 text-sm text-pramuka-800">{PESAN_BUTIR_AGAMA} Minta Pembina menilai butir ini.</p>
+        <p role="alert" className="py-4 text-sm text-pramuka-800">{pesanTidakBolehMenilai(poin)} Minta Pembina{poin.agama ? ' yang seagama' : ''} menilai butir ini.</p>
       </Modal>
     );
   }

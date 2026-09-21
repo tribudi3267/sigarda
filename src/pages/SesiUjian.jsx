@@ -6,7 +6,7 @@ import {
   STATUS_SESI, STATUS_TUGAS, daftarButirKatalog, dariPengajuan, periksaSesi, ringkasButirSesi, ringkasSesi, tugasSesi,
 } from '../lib/sesiLogic';
 import { fmtHariTanggal, hariIni } from '../lib/format';
-import { PESAN_BUTIR_AGAMA, bolehMenilaiPoin } from '../lib/skuLogic';
+import { PESAN_BUTIR_AGAMA, PESAN_BUTIR_LAKSANA, bolehMenilaiPoin, pesanTidakBolehMenilai } from '../lib/skuLogic';
 
 const CHIP = 'inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset';
 const JEDA_PAPAN_MS = 15000;
@@ -265,6 +265,9 @@ function PapanSesi({ sesi, onKembali, onUbah }) {
       {bisaNilai && user?.jabatan !== 'Pembina' && (sesi.butir.includes('BAN-01') || sesi.butir.includes('LAK-01')) && (
         <p className="mt-3 rounded-lg bg-pramuka-50 px-4 py-2.5 text-sm text-pramuka-700 ring-1 ring-pramuka-200">{PESAN_BUTIR_AGAMA} Sub-butir agama pada papan ini dinilai oleh Pembina.</p>
       )}
+      {bisaNilai && user?.jabatan !== 'Pembina' && sesi.butir.some((b) => b.startsWith('LAK-')) && (
+        <p className="mt-3 rounded-lg bg-pramuka-50 px-4 py-2.5 text-sm text-pramuka-700 ring-1 ring-pramuka-200">{PESAN_BUTIR_LAKSANA} Butir Laksana pada papan ini dinilai oleh Pembina.</p>
+      )}
       {hilang > 0 && <p className="mt-3 rounded-lg bg-amber-50 px-4 py-2.5 text-sm text-amber-900 ring-1 ring-amber-300">{hilang} peserta pada sesi ini tidak lagi ada di daftar anggota dan dilewati.</p>}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -299,9 +302,9 @@ function PapanSesi({ sesi, onKembali, onUbah }) {
                       <span className="sr-only">: {STATUS_TUGAS[t.status].label}</span>
                     </>
                   );
-                  const izinButir = bolehMenilaiPoin(user, t.poin); // butir agama hanya dinilai Pembina
+                  const izinButir = bolehMenilaiPoin(user, t.poin); // butir agama dan butir Laksana hanya dinilai Pembina
                   const dapatDibuka = bisaNilai && izinButir && ['menunggu', 'proses', 'lulus', 'ulang'].includes(t.status);
-                  const catatanIzin = bisaNilai && !izinButir ? ` ${PESAN_BUTIR_AGAMA}` : '';
+                  const catatanIzin = bisaNilai && !izinButir ? ` ${pesanTidakBolehMenilai(t.poin)}` : '';
                   return (
                     <li key={t.poin.id}>
                       {dapatDibuka

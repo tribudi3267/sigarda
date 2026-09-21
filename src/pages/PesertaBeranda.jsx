@@ -154,7 +154,7 @@ export default function PesertaBeranda({ setTab, setTingkat }) {
                 </div>
                 <p className="mt-2 flex items-center gap-1.5 text-xs text-pramuka-600">
                   <Icon nama="kalender" className="h-3.5 w-3.5" />
-                  {poin.tingkat}, {fmtTanggal(entry.jadwal ?? entry.tanggalUji)}, penguji {namaPenguji(entry.pengujiId)}
+                  {poin.tingkat}, {fmtTanggal(entry.jadwal ?? entry.tanggalUji)}, penguji {entry.pengujiId ? namaPenguji(entry.pengujiId) : 'antrian rombel'}
                 </p>
                 {entry.status === 'diajukan' && (
                   <button className="btn btn-outline btn-sm mt-2" onClick={() => batalkanAjuan(poin.id)}>

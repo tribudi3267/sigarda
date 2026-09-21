@@ -62,7 +62,7 @@ export default function SkuChecklist({ tingkat, peserta, renderAksi, onBukaMater
           <Badge status={entry.status} />
           {entry.status === 'diajukan' && (
             <span className="text-xs text-pramuka-600">
-              Jadwal {fmtTanggal(entry.jadwal)}, penguji {namaOrang(entry.pengujiId)}
+              Jadwal {fmtTanggal(entry.jadwal)}, penguji {entry.pengujiId ? namaOrang(entry.pengujiId) : 'antrian rombel'}
             </span>
           )}
           {entry.status === 'proses' && (

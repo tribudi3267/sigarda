@@ -1,15 +1,26 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { PESAN_BUTIR_AGAMA, antrianPengujian, bolehMenilaiPoin, hitungProgres } from '../lib/skuLogic';
+import { antrianPengujian, bolehMenilaiPoin, hitungProgres, pesanTidakBolehMenilai } from '../lib/skuLogic';
+import { tahunAjaranKini } from '../lib/rombelLogic';
 import { fmtTanggal } from '../lib/format';
 import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
+import AlihkanModal from '../components/AlihkanModal';
 import RingkasanGudep from '../components/RingkasanGudep';
 import UjiModal from '../components/UjiModal';
 import { Avatar, Badge, BadgePeran, Icon, Kosong, ProgressBar, TeksPoin } from '../components/ui';
 
+/** Baris penugasan tahun ajaran berjalan untuk menyaring antrian bersama rombel; dimuat sekali. null selama belum termuat (aturan lama). */
+function usePenugasanKini() {
+  const { penugasan, muatPenugasan } = useApp();
+  const ta = tahunAjaranKini();
+  useEffect(() => { muatPenugasan(ta); }, [ta, muatPenugasan]);
+  return penugasan[ta] ?? null;
+}
+
 function Dashboard({ onNav }) {
   const { user, users, progress } = useApp();
-  const antrian = antrianPengujian(progress, users, user.id);
+  const penugasan = usePenugasanKini();
+  const antrian = antrianPengujian(progress, users, user.id, penugasan);
   const menunggu = antrian.filter((a) => a.entry.status === 'diajukan').length;
 
   return (
@@ -23,7 +34,7 @@ function Dashboard({ onNav }) {
         <div>
           <p className="font-semibold text-pramuka-900">Antrian pengujian SKU</p>
           <p className="text-sm text-pramuka-600">
-            {menunggu} menunggu, {antrian.length - menunggu} sedang diuji (ditujukan kepada Anda)
+            {menunggu} menunggu, {antrian.length - menunggu} sedang diuji (ditujukan kepada Anda atau antrian rombel Anda)
           </p>
         </div>
         <button className="btn btn-primary btn-sm" onClick={() => onNav('antrian')}>Buka antrian</button>
@@ -38,8 +49,11 @@ function Antrian({ onBuka }) {
   const { user, users, progress } = useApp();
   const [semua, setSemua] = useState(false);
   const [uji, setUji] = useState(null);
+  const [alih, setAlih] = useState(null);
+  const penugasan = usePenugasanKini();
+  const namaOrang = (id) => users.find((u) => u.id === id)?.nama ?? 'penguji';
 
-  const antrian = antrianPengujian(progress, users, semua ? null : user.id);
+  const antrian = antrianPengujian(progress, users, semua ? null : user.id, penugasan);
   const menunggu = antrian.filter((a) => a.entry.status === 'diajukan').length;
 
   return (
@@ -58,10 +72,12 @@ function Antrian({ onBuka }) {
       </div>
 
       {antrian.length === 0 ? (
-        <Kosong judul="Antrian kosong" teks="Belum ada peserta yang mengajukan pengujian kepada Anda." />
+        <Kosong judul="Antrian kosong" teks="Belum ada peserta yang mengajukan pengujian kepada Anda atau ke antrian rombel Anda." />
       ) : (
         <ul className="panel divide-y divide-pramuka-100">
-          {antrian.map(({ peserta, poin, entry }) => (
+          {antrian.map(({ peserta, poin, entry, bersama }) => {
+            const boleh = bolehMenilaiPoin(user, poin, { users, peserta });
+            return (
             <li key={`${peserta.id}-${poin.id}`} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 gap-3">
                 <Avatar nama={peserta.nama} />
@@ -73,26 +89,33 @@ function Antrian({ onBuka }) {
                     <Badge status={entry.status} />
                     <Icon nama="kalender" className="h-3.5 w-3.5" />
                     {fmtTanggal(entry.jadwal ?? entry.tanggalUji)}
+                    {bersama && <span className="rounded bg-sky-50 px-1.5 py-0.5 font-semibold text-sky-800 ring-1 ring-inset ring-sky-300">Antrian rombel</span>}
+                    {!bersama && entry.pengujiId !== user.id && <span>Penguji: {namaOrang(entry.pengujiId)}</span>}
                   </p>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   className="btn btn-primary btn-sm"
-                  disabled={!bolehMenilaiPoin(user, poin)}
-                  title={bolehMenilaiPoin(user, poin) ? undefined : PESAN_BUTIR_AGAMA}
+                  disabled={!boleh}
+                  title={boleh ? undefined : pesanTidakBolehMenilai(poin)}
                   onClick={() => setUji({ pesertaId: peserta.id, poin })}
                 >
                   Nilai
                 </button>
+                {user.jabatan === 'Pembina' && (
+                  <button className="btn btn-outline btn-sm" onClick={() => setAlih({ peserta, poin, entry })}>Alihkan</button>
+                )}
                 <button className="btn btn-outline btn-sm" onClick={() => onBuka(peserta.id)}>Lihat peserta</button>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 
       {uji && <UjiModal pesertaId={uji.pesertaId} poin={uji.poin} onTutup={() => setUji(null)} />}
+      {alih && <AlihkanModal peserta={alih.peserta} poin={alih.poin} entry={alih.entry} onTutup={() => setAlih(null)} />}
     </div>
   );
 }

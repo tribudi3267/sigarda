@@ -54,6 +54,8 @@ ok(cocok(await batal(kDewan, 'BAN-02'), /Hanya peserta/), 'penguji tidak bisa me
 console.log('\n--- SKU: penguji mencatat hasil (Edge, verifikasi PIN) ---');
 const PIN_DEWAN = (await edge(kAdmin, { aksi: 'reset-pin', targetId: dewanId })).pin;
 const { k: kDewanB } = await masuk('rizky.dewan', PIN_DEWAN);
+const PIN_PEMBINA = (await edge(kAdmin, { aksi: 'reset-pin', targetId: pembinaId })).pin;
+const { k: kPembinaB } = await masuk((await satu('select username u from public.profiles where id=$1', [pembinaId])).u, PIN_PEMBINA);
 await pg.query('update public.profiles set wajib_ganti_pin = false');
 const catat = (k, o) => edge(k, { aksi: 'catat-hasil', pesertaId: p1, skuId: 'BAN-02', tanggalUji: hariIni, nilai: 'Baik', catatan: '', pin: PIN_DEWAN, ...o });
 await ajukan(kP1, 'BAN-02');
@@ -91,6 +93,8 @@ ok(r.ok, 'reset dengan alasan berhasil');
 const rs = await satu(`select status, nilai, verifikasi, tanggal_uji from public.sku_progress where peserta_id=$1 and sku_id='BAN-02'`, [p1]);
 ok(rs.status === 'belum' && rs.nilai === null && rs.verifikasi === null && rs.tanggal_uji === null, 'setelah reset: kembali bersih');
 r = await catat(kDewanB, { hasil: 'proses', pesertaId: p1, skuId: 'LAK-03' });
+ok(!r.ok && /Butir Laksana hanya dapat dinilai oleh Pembina/.test(r.pesan), 'Dewan Ambalan tidak dapat menguji butir Laksana: ' + r.pesan);
+r = await catat(kPembinaB, { hasil: 'proses', pesertaId: p1, skuId: 'LAK-03', pin: PIN_PEMBINA });
 ok(!r.ok && /belum menyelesaikan seluruh butir Bantara/.test(r.pesan), 'Laksana tidak bisa diuji sebelum Bantara lulus semua');
 r = await catat(kDewanB, { hasil: 'proses', pesertaId: p1, skuId: 'BAN-01-HIN-1' });
 ok(!r.ok && /tidak ditemukan/.test(r.pesan), 'sub-butir agama lain ditolak');
@@ -106,7 +110,8 @@ await svc.rpc('sg_kunci_lepas_internal', { p_username: 'rizky.dewan' });
 console.log('\n--- Pencalonan Garuda dan portofolio ---');
 ok(cocok(await kP1.rpc('sg_calon_garuda_daftar'), /harus lulus lebih dulu/), 'belum boleh mencalonkan diri sebelum semua SKU lulus');
 await luluskan(p1, 'Bantara');
-ok(!galat(await ajukan(kP1, 'LAK-02')), 'setelah Bantara lulus semua, Laksana bisa diajukan');
+ok(cocok(await ajukan(kP1, 'LAK-02'), /Butir Laksana hanya dapat diuji oleh Pembina/), 'Laksana tidak dapat diajukan ke Dewan Ambalan');
+ok(!galat(await ajukan(kP1, 'LAK-02', { penguji: pembinaId })), 'setelah Bantara lulus semua, Laksana bisa diajukan (kepada Pembina)');
 ok(cocok(await kP1.rpc('sg_calon_garuda_daftar'), /harus lulus lebih dulu/), 'Bantara saja belum cukup');
 ok(cocok(await kP1.rpc('sg_pf_ubah', { p_item_id: 'PF-01', p_status: 'siap' }), /khusus Penegak Calon Garuda/), 'portofolio terkunci sebelum jadi Calon Garuda');
 await luluskan(p1, 'Laksana');
@@ -245,7 +250,7 @@ ok((await satu('select calon_garuda::text d from public.profiles where id=$1', [
 ok(!galat(await ub(kAdmin, p1, { p_nama: 'Ahmad Fauzi', p_kelas: 'X-01', p_sangga: 'Sangga Elang', p_calon_garuda: false })) && (await satu('select calon_garuda from public.profiles where id=$1', [p1])).calon_garuda === null, 'pencalonan dapat dicabut');
 // ganti agama mempengaruhi kelulusan
 await luluskan(p2, 'Bantara');
-ok(!galat(await ajukan(kP2, 'LAK-02')), 'Islam + semua unit Islam lulus -> Laksana terbuka');
+ok(!galat(await ajukan(kP2, 'LAK-02', { penguji: pembinaId })), 'Islam + semua unit Islam lulus -> Laksana terbuka');
 await pg.query(`update public.sku_progress set status='belum' where peserta_id=$1 and sku_id='LAK-02'`, [p2]);
 await ub(kAdmin, p2, { p_agama: 'Hindu' });
 ok(cocok(await ajukan(kP2, 'LAK-02'), /Selesaikan seluruh butir Bantara/), 'setelah agama diganti ke Hindu, sub-butir Hindu belum lulus -> Laksana kembali terkunci');

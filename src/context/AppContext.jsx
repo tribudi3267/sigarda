@@ -312,6 +312,19 @@ export function AppProvider({ children }) {
   const batalkanAjuan = (skuId) =>
     aksi(api().batalkanAjuan(skuId), { sukses: 'Pengajuan dibatalkan.', sesudah: () => segarkan.progress(user.id) });
 
+  /** Penguji yang sah untuk satu butir (dihitung server) beserta beban antriannya. Mengembalikan { ok, data } atau { ok: false, pesan }. */
+  const pengujiPilihan = async (skuId, pesertaId = null) => {
+    const r = await api().pengujiPilihan(skuId, pesertaId);
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  };
+
+  /** Pembina atau Admin mengalihkan pengajuan ke penguji lain (atau ke antrian bersama rombel); alasan tercatat di riwayat. */
+  const alihkanPengajuan = (data) =>
+    user?.role === 'admin' || (user?.role === 'penguji' && user.jabatan === 'Pembina')
+      ? aksi(api().alihkanPengajuan(data), { sukses: 'Pengajuan dialihkan.', sesudah: () => segarkan.progress(data.pesertaId) })
+      : Promise.resolve(ditolak(notify, 'Hanya Pembina atau Admin Gudep yang dapat mengalihkan pengajuan.'));
+
   /**
    * Hanya penguji. PIN penguji diverifikasi di server (verifikasi digital). Bila `data.rincian` (nilai tiap kriteria instrumen) ikut dikirim,
    * server menghitung ulang skor dan saran, dan jawabannya memuat `rubrik: true`. Jawaban tanpa penanda itu berarti Edge Function belum
@@ -880,7 +893,7 @@ export function AppProvider({ children }) {
     asisten: db.asisten, pengaturanIuran: db.pengaturanIuran, simpanPengaturanIuran, dewanAmbalan, asistenSaya, pencatatIuran, penunjukAsisten, versiIuran, bacaIuran, catatIuranSusulan, aturIuran, aturIuranBanyak, simpanKas, aturAsisten,
     daftarPeserta, peranUser, bolehKelolaAbsen,
     login, logout,
-    ajukan, batalkanAjuan, catatHasil,
+    ajukan, batalkanAjuan, pengujiPilihan, alihkanPengajuan, catatHasil,
     daftarCalonGaruda, ubahPortofolio, catatPortofolioPenguji,
     buatSesiAbsen, setStatusAbsen, tandaiBanyakAbsen, hapusSesiAbsen, semesterSiap, pastikanAbsensi,
     gantiPin, resetPin,

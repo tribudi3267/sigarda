@@ -100,11 +100,24 @@ Server memeriksa semua baris sekaligus: satu baris keliru membatalkan seluruhnya
 
 **Penugasan** menetapkan Pembina dan Dewan Ambalan yang bertugas menguji tiap rombel, **per tahun ajaran**. Admin mengaturnya di **Anggota > Penugasan**: matriks penguji x rombel (satu tab per kelas; tombol
 Semua/Kosongkan per penguji), tombol **Salin dari tahun ajaran lalu** (menambah yang belum ada, tidak mencabut apa pun), peringatan rombel yang berisi Penegak tetapi belum punya penguji, dan **riwayat perubahan**
-(hanya bertambah). Pembina hanya melihat (menu **Penugasan**). Rombel tanpa penugasan tetap memakai aturan lama (semua penguji boleh menguji). **Fase ini hanya menyimpan dan menampilkan penugasan; belum ada aturan yang
-berubah bagi Penegak dan penguji** (penegakan menyusul di fase 1b).
+(hanya bertambah). Pembina hanya melihat (menu **Penugasan**). Rombel tanpa penugasan tetap memakai aturan lama (semua penguji boleh menguji). Penegakannya dijelaskan di bagian berikut (fase 1b).
 
 **Agama Pembina** diisi Admin (formulir ubah anggota, kolom opsional pada template import Pembina). Butir agama nanti hanya boleh diuji Pembina yang seagama dengan Penegak. Bagian bawah tab Penugasan menampilkan
 **cakupan agama**: jumlah Penegak, Pembina seagama, dan **guru agama** per agama (dikelola Admin), sebagai rujukan surat pengantar bila tidak ada Pembina yang seagama. Dewan Ambalan dan Admin tidak berAgama.
+
+### Penegakan penugasan: siapa yang boleh menguji (fase 1b)
+Aturan dihitung di server (`sigarda.penguji_sah`) dan dicerminkan di layar (`src/lib/rombelLogic.js`, `pengujiSah`); keduanya dijaga pengujian `penegakan`.
+- **Ketat saat memilih penguji.** Penegak yang mengajukan hanya dapat memilih penguji yang bertugas di rombelnya (tahun ajaran berjalan). Daftar dari server memuat **beban antrian** tiap penguji (yang teringan lebih dulu).
+  Bila rombel belum diatur, kelasnya masih berformat lama (`X`), atau tak seorang pun yang bertugas boleh menguji butir itu, berlaku aturan lama: semua penguji yang memenuhi aturan peran.
+- **Antrian rombel.** Pilihan pertama pada daftar penguji adalah "Antrian rombel": pengajuan tanpa penguji tujuan. Semua penguji yang sah melihatnya di menu **Antrian** (ditandai *Antrian rombel*)
+  dan penguji mana pun yang mengambilnya lewat **Mulai uji** menjadi pengujinya.
+- **Lunak saat mencatat hasil.** Penguji lain boleh menggantikan penguji tujuan; riwayat butir menulis `(menggantikan NAMA)`. Pembina dapat **mengalihkan** pengajuan (tombol *Alihkan* pada Antrian; alasan wajib dan
+  tercatat di riwayat) ke penguji lain atau kembali ke antrian rombel; Admin Gudep juga berwenang di server.
+- **Aturan peran.** Butir **Laksana** hanya diuji Pembina; **Dewan Ambalan hanya butir Bantara** (bukan butir agama). Aturan ini berlaku saat memilih penguji dan saat mencatat hasil.
+- **Butir agama** hanya oleh Pembina yang **agamanya sama** dengan Penegak. **Masa peralihan:** selama belum ada satu pun Pembina yang agamanya terisi, semua Pembina masih dianggap sah (aturan lama). Begitu Admin mengisi agama
+  seorang Pembina, aturan seagama berlaku untuk semua: Pembina tanpa agama tidak lagi dapat menguji butir agama. Bila tidak ada Pembina seagama, Penegak melihat pesan agar menghubungi Admin atau Pembina
+  (surat pengantar ke guru agama menyusul di fase 2a).
+- Yang belum termasuk fase ini: pengecualian per Penegak, notifikasi, dan surat pengantar.
 
 ### Materi SKU dari Google Drive
 Pembina dan Admin Gudep melampirkan **tautan berbagi** file PDF di Google Drive; aplikasi tidak menyimpan file, hanya tautannya.
@@ -366,6 +379,8 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
   Jalankan **setelah** migrasi instrumen dan verifikasi-sesi (bila belum, berhenti dengan pesan yang menuntun); disarankan sesudah `2026-09-indeks-kode-verifikasi.sql`. **Edge Function tidak berubah** (tanda tangan `sg_sku_catat_rubrik_internal` tetap). Sebelum migrasi dijalankan, aplikasi baru tetap berjalan: tab di menu Iuran menampilkan pesan bahwa basis data belum diperbarui, kartu iuran di dashboard tidak ditampilkan, baris iuran di Absensi tidak muncul, dan panel iuran pada lembar penilaian menampilkan pesan yang sama (halaman lain tidak terpengaruh). **Jangan mengulang migrasi instrumen atau sebelumnya sesudah ini**, karena akan menimpa `sg_instrumen_simpan` dan `sg_sku_catat_rubrik_internal` versi iuran. Bila instrumen dimuat ulang dari Excel yang berkolom "Sumber nilai", jalankan migrasi ini lebih dulu (SQL yang dihasilkan menyebut kolom `sumber` hanya untuk kriteria bersumber iuran).
 - [`2026-09-penugasan.sql`](supabase/migrasi/2026-09-penugasan.sql): rombel baku dan penugasan penguji per rombel (fase 1a). Menambah tabel `penugasan_rombel`, `penugasan_log` (riwayat, hanya bertambah), `guru_agama` (RLS baca untuk pengurus), fungsi bantu `sigarda.rombel_sah`, `rombel_baku`, `tahun_ajaran_sah`, `tahun_ajaran_kini`, `wajib_admin`, fungsi `sg_penugasan_atur`, `sg_penugasan_salin`, `sg_rombel_perbarui`, `sg_guru_agama_simpan`, `sg_guru_agama_hapus`, `sg_anggota_agama_atur`, dan memperbarui `sg_anggota_ubah` (kelas wajib rombel baku; menyimpan agama Pembina) serta `sg_profil_buat_internal` (kelas Penegak wajib rombel baku). Tidak menghapus atau mengubah data yang ada; kelas lama tetap dan dapat dirapikan lewat tombol **Perbarui rombel Penegak**.
   Jalankan **setelah** `2026-09-iuran.sql` (bila belum, berhenti dengan pesan yang menuntun). **Edge Function tidak perlu di-deploy ulang** (tanda tangan `sg_profil_buat_internal` tetap). Sebelum migrasi dijalankan, aplikasi baru tetap berjalan: tab Penugasan menampilkan pesan bahwa basis data belum diperbarui, dan kelas Penegak masih boleh berformat lama (validasi rombel baru berlaku di server setelah migrasi; pemeriksaan di layar sudah berlaku lebih dulu).
+- [`2026-09-penegakan.sql`](supabase/migrasi/2026-09-penegakan.sql): penegakan penugasan penguji (fase 1b). Menambah fungsi bantu `sigarda.penguji_peran_ok`, `penguji_sah`, `penguji_boleh`, fungsi `sg_penguji_pilihan` (daftar penguji yang sah beserta beban antrian) dan `sg_sku_alihkan` (Pembina atau Admin mengalihkan pengajuan, alasan tercatat), serta memperbarui `sg_sku_ajukan` (hanya penguji yang sah; penguji kosong = antrian rombel) dan `sg_sku_catat_internal` (butir Laksana hanya Pembina, butir agama hanya Pembina seagama, riwayat "menggantikan NAMA"). Tidak mengubah tabel atau data.
+  Jalankan **setelah** `2026-09-penugasan.sql` (bila belum, berhenti dengan pesan yang menuntun). **Edge Function tidak perlu di-deploy ulang** (tanda tangan `sg_sku_catat_internal` tetap). **Jalankan migrasi ini sebelum `git push` kode fase 1b**: tanpa fungsi `sg_penguji_pilihan`, formulir Ajukan pengujian Penegak tidak dapat memuat daftar penguji. Sebelum agama seorang Pembina diisi, aturan butir agama tetap seperti lama (masa peralihan).
 
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 
@@ -413,7 +428,7 @@ sku-bukateja/
 Skema SQL dan logika Edge Function dijalankan pada Postgres sungguhan (PGlite) dengan klien tiruan yang meniru peran Supabase, RLS, dan batas 1000 baris.
 Yang diuji: siapa boleh membaca apa, penulisan langsung ditolak untuk semua peran, semua fungsi `sg_*` (aturan SKU, absensi, portofolio, materi, anggota),
 hak reset PIN, pembatasan login, kewajiban ganti PIN, dan pemetaan data ke bentuk yang dipakai halaman.
-Jalankan semuanya dengan `npm run uji` (atau sebagian: `npm run uji -- iuran api`; `PENUH=40` menampilkan 40 baris terakhir keluaran). Berkas pengujian ada di [`uji/`](uji); pengujian migrasi memakai skema lama dari riwayat git (`git:<commit>`; mis. `migrasi-penugasan` memakai `git:b804088`, commit tepat sebelum fase penugasan). Pengujian membandingkan isi fungsi dengan md5 setelah akhir baris disamakan (LF), sehingga hasilnya sama di checkout Windows (CRLF). Pengujian `instrumen` dilewati kecuali `ISI_INSTRUMEN` menunjuk berkas SQL isi instrumen (rahasia, tidak ada di repositori).
+Jalankan semuanya dengan `npm run uji` (atau sebagian: `npm run uji -- iuran api`; `PENUH=40` menampilkan 40 baris terakhir keluaran). Berkas pengujian ada di [`uji/`](uji); pengujian migrasi memakai skema lama dari riwayat git (`git:<commit>`; mis. `migrasi-penegakan` memakai `git:496687c`, commit tepat sebelum fase penegakan). Pengujian membandingkan isi fungsi dengan md5 setelah akhir baris disamakan (LF), sehingga hasilnya sama di checkout Windows (CRLF). Pengujian `instrumen` dilewati kecuali `ISI_INSTRUMEN` menunjuk berkas SQL isi instrumen (rahasia, tidak ada di repositori).
 Yang **tidak** dapat diuji tanpa proyek Supabase sungguhan: perilaku GoTrue (mis. penerimaan email `.invalid`), PostgREST, dan runtime Deno. Gunakan "Uji cepat" di atas setelah pemasangan.
 
 ### Data demo untuk pengujian di Supabase

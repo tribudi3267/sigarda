@@ -8,7 +8,7 @@ import { Avatar, BadgePeran, Icon, Kosong, ProgressBar } from '../components/ui'
 
 /** Halaman rincian satu peserta. Pembina/Dewan Ambalan dapat menilai, admin hanya melihat. */
 export default function PesertaDetail({ pesertaId, onKembali, onCetak, onBukaPortofolio, onBukaMateri }) {
-  const { daftarPeserta, progress, user } = useApp();
+  const { daftarPeserta, progress, user, users } = useApp();
   const [tingkat, setTingkat] = useState('Bantara');
   const [uji, setUji] = useState(null);
 
@@ -21,7 +21,7 @@ export default function PesertaDetail({ pesertaId, onKembali, onCetak, onBukaPor
 
   const renderAksi = (poin, entry) => {
     if (!bisaMenguji) return null;
-    if (!bolehMenilaiPoin(user, poin)) return <span className="text-xs font-semibold text-pramuka-500">Butir agama dinilai Pembina</span>;
+    if (!bolehMenilaiPoin(user, poin, { users, peserta })) return <span className="text-xs font-semibold text-pramuka-500">{poin.agama ? 'Butir agama dinilai Pembina seagama' : 'Butir Laksana dinilai Pembina'}</span>;
     const terkunci = poin.tingkat === 'Laksana' && !laksanaBuka && entry.status !== 'lulus';
     return (
       <button

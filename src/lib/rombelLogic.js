@@ -6,9 +6,11 @@
  * sg_rombel_perbarui); di sini hanya untuk umpan balik cepat dan tampilan. Dijaga oleh uji/penugasan-klien.mjs.
  *
  * Penugasan (penugasan_rombel): Admin menetapkan Pembina dan Dewan Ambalan untuk tiap rombel per tahun ajaran. Rombel tanpa
- * penugasan tetap memakai aturan lama (semua penguji) sampai diatur (penegakan di fase 1b).
+ * penugasan tetap memakai aturan lama (semua penguji) sampai diatur. Penegakannya (siapa yang sah dipilih dan dinilai) ada di bagian
+ * "Penegakan penugasan" di bawah, yang mencerminkan sigarda.penguji_sah di server.
  */
 import { AGAMA } from '../data/skuData';
+import { hariIni } from './format';
 
 export const KELAS_ROMBEL = ['X', 'XI', 'XII'];
 export const ROMBEL_PER_KELAS = 10;
@@ -98,3 +100,45 @@ export function cakupanAgama(users, guruAgama = []) {
 
 /** Pembina yang agamanya belum diisi (butir agama tidak dapat diarahkan kepadanya sebelum diisi). */
 export const pembinaTanpaAgama = (users) => users.filter((u) => u.role === 'penguji' && u.jabatan === 'Pembina' && !u.agama);
+
+/* ------------------------------ Penegakan penugasan (fase 1b) ------------------------------ */
+
+/**
+ * Tahun ajaran berjalan menurut tanggal ISO: Juli sampai Desember = tahun ini/tahun depan, Januari sampai Juni = tahun lalu/tahun ini.
+ * Cermin sigarda.tahun_ajaran_kini.
+ */
+export const tahunAjaranKini = (tanggalIso = hariIni()) => {
+  const [y, m] = tanggalIso.split('-').map(Number);
+  const awal = m >= 7 ? y : y - 1;
+  return `${awal}/${awal + 1}`;
+};
+
+/**
+ * Aturan peran penguji untuk satu butir (berlaku saat memilih penguji DAN mencatat hasil): butir Laksana dan butir agama hanya Pembina;
+ * butir Bantara lain boleh Pembina atau Dewan Ambalan. Butir agama hanya untuk Pembina yang agamanya sama dengan Penegak; selama belum ada
+ * satu pun Pembina yang agamanya terisi (masa peralihan), semua Pembina dianggap sah. Cermin sigarda.penguji_peran_ok.
+ */
+export function pengujiPeranOk(users, peserta, penguji, poin) {
+  if (!penguji || penguji.role !== 'penguji' || !poin) return false;
+  if (penguji.jabatan !== 'Pembina' && (poin.tingkat === 'Laksana' || poin.agama)) return false;
+  if (poin.agama && users.some((u) => u.role === 'penguji' && u.jabatan === 'Pembina' && u.agama)) {
+    if (!penguji.agama || penguji.agama !== peserta?.agama) return false;
+  }
+  return true;
+}
+
+/**
+ * Penguji yang sah untuk satu Penegak dan satu butir. `penugasan` = baris penugasan tahun ajaran berjalan ([{ rombel, pengujiId }]).
+ * Bila rombel Penegak diatur dan ada penguji bertugas yang memenuhi aturan peran: hanya mereka (dariRombel true); bila tidak (rombel belum
+ * diatur, kelas format lama, atau tak seorang pun yang bertugas boleh menguji butir itu): semua penguji yang memenuhi aturan peran.
+ * Cermin sigarda.penguji_sah. Mengembalikan { penguji: [pengguna], dariRombel }.
+ */
+export function pengujiSah({ users, penugasan = [], peserta, poin }) {
+  const layak = (u) => pengujiPeranOk(users, peserta, u, poin);
+  if (rombelSah(peserta?.kelas)) {
+    const ditugaskan = new Set(penugasan.filter((b) => b.rombel === peserta.kelas).map((b) => b.pengujiId));
+    const dariRombel = users.filter((u) => ditugaskan.has(u.id) && layak(u));
+    if (dariRombel.length) return { penguji: dariRombel, dariRombel: true };
+  }
+  return { penguji: users.filter(layak), dariRombel: false };
+}

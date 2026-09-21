@@ -47,8 +47,8 @@ const bandingkan = (nama, pa, pb) => {
   }
 };
 
-// Skema "sesudah penugasan" = skema.sql terbaru (dibuat dari inti.sql).
-const A = await baru(`${P}/supabase/skema.sql`);
+// Skema "sesudah penugasan" = skema.sql pada commit tepat sesudah fase 1a.
+const A = await baru('git:496687c'); // skema tepat sesudah fase 1a (supabase/skema.sql terbaru sudah memuat fase berikutnya)
 const pa = await potret(A);
 ok(pa.kolom.some((x) => x.table_name === 'penugasan_rombel' && x.column_name === 'rombel') && pa.kolom.some((x) => x.table_name === 'guru_agama'), 'skema baru memuat tabel penugasan dan guru agama');
 
