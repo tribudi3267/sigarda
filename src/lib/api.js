@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunMateri, susunPenilaian, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogPenugasan, susunMateri, susunPenilaian, susunPenugasan, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -291,6 +291,26 @@ export function buatApi(klien) {
 
     /** NTA anggota (Admin). `daftar` = [{ username, nta }]; nta kosong menghapus. Mengembalikan jumlah anggota yang diperbarui. */
     aturNta: (daftar) => rpc('sg_anggota_nta_atur', { p_data: daftar }),
+    /** Agama Pembina (Admin). `daftar` = [{ username, agama }]; agama kosong menghapus. Hanya berlaku untuk Pembina. Mengembalikan jumlah yang diperbarui. */
+    aturAgamaPembina: (daftar) => rpc('sg_anggota_agama_atur', { p_data: daftar }),
+    /** Rombel banyak Penegak sekaligus (Admin). `daftar` = [{ username (NIS), rombel }]. Semua atau tidak sama sekali. Mengembalikan jumlah baris. */
+    perbaruiRombel: (daftar) => rpc('sg_rombel_perbarui', { p_data: daftar }),
+
+    /* ------------------- Penugasan penguji per rombel dan guru agama ------------------- */
+    /** Penugasan satu tahun ajaran (pengurus): [{ rombel, pengujiId, ditetapkanPada }]. */
+    muatPenugasan: (tahunAjaran) =>
+      muat(async () => susunPenugasan(await ambilSemua('penugasan_rombel', { filter: [['tahun_ajaran', tahunAjaran]], urut: ['rombel', 'penguji_id'] }))),
+    /** Riwayat penugasan satu tahun ajaran (pengurus), lama ke baru. */
+    muatLogPenugasan: (tahunAjaran) =>
+      muat(async () => susunLogPenugasan(await ambilSemua('penugasan_log', { filter: [['tahun_ajaran', tahunAjaran]], urut: ['id'] }))),
+    muatGuruAgama: () => muat(async () => susunGuruAgama(await ambilSemua('guru_agama', { urut: ['agama', 'nama'] }))),
+    /** Menambah (ada = true) atau mencabut (false) penugasan satu penguji pada beberapa rombel (Admin). Mengembalikan jumlah perubahan nyata. */
+    aturPenugasan: (tahunAjaran, pengujiId, rombel, ada) =>
+      rpc('sg_penugasan_atur', { p_tahun_ajaran: tahunAjaran, p_penguji_id: pengujiId, p_rombel: rombel, p_ada: ada }),
+    /** Menyalin penugasan tahun ajaran `dari` ke `ke` (Admin). Mengembalikan jumlah penugasan baru. */
+    salinPenugasan: (dari, ke) => rpc('sg_penugasan_salin', { p_dari: dari, p_ke: ke }),
+    simpanGuruAgama: (g) => rpc('sg_guru_agama_simpan', { p_id: g.id ?? null, p_agama: g.agama, p_nama: g.nama, p_keterangan: g.keterangan ?? '' }),
+    hapusGuruAgama: (id) => rpc('sg_guru_agama_hapus', { p_id: id }),
 
     /* ------------------------------- Materi ------------------------------- */
     simpanMateri: (m) =>

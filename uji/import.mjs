@@ -10,9 +10,9 @@ const ok = (c, m) => { if (c) { lulus++; console.log('ok   :', m); } else { gaga
 const users = [
   { id: 'a', role: 'admin', username: 'admin', nama: 'Admin Gudep' },
   { id: 'd', role: 'penguji', jabatan: 'Dewan Ambalan', username: 'rizky.dewan', nama: 'Rizky Dewan' },
-  { id: 's', role: 'peserta', username: '10231', nis: '10231', nama: 'Ahmad Fauzi', kelas: 'X' },
+  { id: 's', role: 'peserta', username: '10231', nis: '10231', nama: 'Ahmad Fauzi', kelas: 'X-01' },
 ];
-const k = { nis: '', kelas: 'X', sangga: 'E', agama: 'Islam', pin: '', username: '' };
+const k = { nis: '', kelas: 'X-01', sangga: 'E', agama: 'Islam', pin: '', username: '' };
 
 // Penegak
 let p = periksaBaris([

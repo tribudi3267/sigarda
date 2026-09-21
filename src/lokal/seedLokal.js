@@ -36,6 +36,20 @@ export async function isiDataContoh(pg) {
   const p = (id) => uuid[id] ?? null;
   const sekarang = new Date().toISOString();
 
+  // Agama Pembina contoh dan penugasan contoh (tahun ajaran berjalan). XII-02 sengaja tanpa penguji agar peringatannya terlihat.
+  await pg.query("update public.profiles set agama = 'Islam' where id = $1", [p('u-penguji-1')]);
+  if ((await pg.query("select to_regclass('public.penugasan_rombel') as t")).rows[0].t) { // skema lama (uji migrasi) belum punya
+    const ta = (await pg.query('select sigarda.tahun_ajaran_kini() as t')).rows[0].t;
+    const tugas = [['X-01', 'u-penguji-1'], ['XI-01', 'u-penguji-1'], ['XII-01', 'u-penguji-1'], ['X-01', 'u-penguji-2'], ['X-02', 'u-penguji-2'], ['XI-02', 'u-penguji-2']];
+    for (const [rombel, pid] of tugas) {
+      await pg.query('insert into public.penugasan_rombel (tahun_ajaran, rombel, penguji_id, ditetapkan_oleh) values ($1, $2, $3, $4)', [ta, rombel, p(pid), p('u-admin')]);
+      await pg.query(
+        "insert into public.penugasan_log (tahun_ajaran, rombel, penguji_id, penguji_nama, tindakan, oleh, oleh_nama) select $1, $2, id, nama, 'tambah', $4, 'Admin Gudep' from public.profiles where id = $3",
+        [ta, rombel, p(pid), p('u-admin')]
+      );
+    }
+  }
+
   const progress = [];
   const riwayat = [];
   for (const [pid, entri] of Object.entries(seed.progress)) {

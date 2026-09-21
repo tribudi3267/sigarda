@@ -10,7 +10,7 @@ import {
 } from '../src/lib/iuranLogic.js';
 import { susunIuranXlsx, namaFileIuran } from '../src/lib/exportLaporan.js';
 import { buatBufferXlsx } from '../src/lib/exportXlsx.js';
-import ExcelJS from '../node_modules/exceljs/excel.js';
+import ExcelJS from 'exceljs';
 
 const P = process.cwd().replace(/\\/g, '/');
 let gagal = 0, lulus = 0;

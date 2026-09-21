@@ -73,20 +73,22 @@ ok(!r.hasil[2].ok && /sudah dipakai/.test(r.hasil[2].pesan), 'username bentrok d
 const pembinaId = await uid('pak.budi');
 
 const pesertaBaris = [
-  { no: 2, nama: 'Ahmad Fauzi', nis: '10231', kelas: 'X', sangga: 'Sangga Elang', agama: 'Islam', pin: '739158' },
-  { no: 3, nama: 'Siti Nurhaliza', nis: '10232', kelas: 'x', sangga: 'sangga elang', agama: 'Islam', pin: '284615' },
-  { no: 4, nama: 'Dimas Prasetyo', nis: '10118', kelas: 'XI', sangga: 'Sangga Merak', agama: 'Protestan', pin: '517346' },
-  { no: 5, nama: 'Made Ayu', nis: '10121', kelas: 'XI', sangga: 'Sangga Merak', agama: 'Hindu', pin: '904271' },
-  { no: 6, nama: 'Kevin Wijaya', nis: '10234', kelas: 'X', sangga: 'Sangga Kasuari', agama: 'Khonghucu', pin: '162839' },
-  { no: 7, nama: 'Ganda NIS', nis: '10231', kelas: 'X', sangga: 'Sangga Elang', agama: 'Islam' },
-  { no: 8, nama: 'Tanpa NIS', nis: '', kelas: 'X', sangga: 'Sangga Elang', agama: 'Islam' },
-  { no: 9, nama: 'Agama Salah', nis: '10999', kelas: 'X', sangga: 'Sangga Elang', agama: 'Zoroaster' },
+  { no: 2, nama: 'Ahmad Fauzi', nis: '10231', kelas: 'X-01', sangga: 'Sangga Elang', agama: 'Islam', pin: '739158' },
+  { no: 3, nama: 'Siti Nurhaliza', nis: '10232', kelas: 'x-01', sangga: 'sangga elang', agama: 'Islam', pin: '284615' },
+  { no: 4, nama: 'Dimas Prasetyo', nis: '10118', kelas: 'XI-01', sangga: 'Sangga Merak', agama: 'Protestan', pin: '517346' },
+  { no: 5, nama: 'Made Ayu', nis: '10121', kelas: 'XI-01', sangga: 'Sangga Merak', agama: 'Hindu', pin: '904271' },
+  { no: 6, nama: 'Kevin Wijaya', nis: '10234', kelas: 'X-02', sangga: 'Sangga Kasuari', agama: 'Khonghucu', pin: '162839' },
+  { no: 7, nama: 'Ganda NIS', nis: '10231', kelas: 'X-01', sangga: 'Sangga Elang', agama: 'Islam' },
+  { no: 8, nama: 'Tanpa NIS', nis: '', kelas: 'X-01', sangga: 'Sangga Elang', agama: 'Islam' },
+  { no: 9, nama: 'Agama Salah', nis: '10999', kelas: 'X-01', sangga: 'Sangga Elang', agama: 'Zoroaster' },
   { no: 10, nama: 'Tanpa Kelas', nis: '10998', kelas: '', sangga: 'Sangga Elang', agama: 'Islam' },
+  { no: 11, nama: 'Kelas Lama', nis: '10997', kelas: 'X', sangga: 'Sangga Elang', agama: 'Islam' },
+  { no: 12, nama: 'Rombel Tak Ada', nis: '10996', kelas: 'X-11', sangga: 'Sangga Elang', agama: 'Islam' },
 ];
 r = await edge(kAdmin, { aksi: 'buat-akun', kelompok: 'peserta', baris: pesertaBaris });
 ok(r.hasil.slice(0, 5).every((x) => x.ok), 'peserta: 5 baris sah dibuat');
-ok(r.hasil.slice(5).every((x) => !x.ok), 'peserta: 4 baris tidak sah ditolak: ' + r.hasil.slice(5).map((x) => x.pesan).join(' | '));
-ok((await pg.query("select kelas, sangga from public.profiles where username='10232'")).rows[0].kelas === 'X' && (await pg.query("select sangga from public.profiles where username='10232'")).rows[0].sangga === 'Sangga Elang', 'kelas/sangga disamakan penulisannya dengan data yang ada');
+ok(r.hasil.slice(5).every((x) => !x.ok) && r.hasil.slice(5).length === 6 && /rombel/.test(r.hasil[9].pesan) && /rombel/.test(r.hasil[10].pesan), 'peserta: 6 baris tidak sah ditolak (termasuk kelas lama "X" dan rombel X-11): ' + r.hasil.slice(5).map((x) => x.pesan).join(' | '));
+ok((await pg.query("select kelas, sangga from public.profiles where username='10232'")).rows[0].kelas === 'X-01' && (await pg.query("select sangga from public.profiles where username='10232'")).rows[0].sangga === 'Sangga Elang', 'kelas/sangga disamakan penulisannya dengan data yang ada');
 ok((await pg.query("select count(*)::int c from auth.users where email like '10231%'")).rows[0].c === 1, 'baris NIS ganda tidak meninggalkan akun yatim');
 
 const p1 = await uid('10231'), p2 = await uid('10232'), p3 = await uid('10118'), p4 = await uid('10121'), p5 = await uid('10234');
@@ -99,7 +101,7 @@ ok(!!kDewan && !!kPembina && !!kP1, 'semua akun baru dapat masuk');
 
 console.log('\n--- WAJIB GANTI PIN ditegakkan di server ---');
 {
-  const b = await edge(kAdmin, { aksi: 'buat-akun', kelompok: 'peserta', baris: [{ nama: 'Baru Uji', nis: '77777', kelas: 'X', sangga: 'Sangga Elang', agama: 'Islam', pin: '405926' }] });
+  const b = await edge(kAdmin, { aksi: 'buat-akun', kelompok: 'peserta', baris: [{ nama: 'Baru Uji', nis: '77777', kelas: 'X-01', sangga: 'Sangga Elang', agama: 'Islam', pin: '405926' }] });
   ok(b.hasil[0].ok, 'akun baru untuk uji wajib ganti PIN dibuat');
   const { k: kB } = await masuk('77777', '405926');
   const idB = await uid('77777');
@@ -122,7 +124,7 @@ console.log('\n--- WAJIB GANTI PIN ditegakkan di server ---');
 }
 await pg.query('update public.profiles set wajib_ganti_pin = false');
 
-r = await edge(kDewan, { aksi: 'buat-akun', kelompok: 'peserta', baris: [{ nama: 'X', nis: '55555', kelas: 'X', sangga: 'S', agama: 'Islam' }] });
+r = await edge(kDewan, { aksi: 'buat-akun', kelompok: 'peserta', baris: [{ nama: 'X', nis: '55555', kelas: 'X-01', sangga: 'S', agama: 'Islam' }] });
 ok(!r.ok && /Hanya Admin/.test(r.pesan), 'Dewan Ambalan tidak boleh membuat akun');
 r = await edge(kP1, { aksi: 'buat-akun', kelompok: 'admin', baris: [{ nama: 'Peretas', username: 'peretas' }] });
 ok(!r.ok, 'Penegak tidak boleh membuat akun (termasuk admin)');

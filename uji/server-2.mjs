@@ -228,10 +228,10 @@ ok(!galat(await kPembina.rpc('sg_materi_hapus', { p_id: mid1 })) && (await urut(
 
 // =====================================================================
 console.log('\n--- Data anggota (Admin) ---');
-const ub = (k, pid, o = {}) => k.rpc('sg_anggota_ubah', { p_id: pid, p_nama: 'Siti N.', p_kelas: 'x', p_sangga: 'SANGGA ELANG', p_agama: 'Islam', p_calon_garuda: null, ...o });
+const ub = (k, pid, o = {}) => k.rpc('sg_anggota_ubah', { p_id: pid, p_nama: 'Siti N.', p_kelas: 'x-01', p_sangga: 'SANGGA ELANG', p_agama: 'Islam', p_calon_garuda: null, ...o });
 ok(!galat(await ub(kAdmin, p2)), 'Admin mengubah data Penegak');
 const a2 = await satu('select nama, kelas, sangga, agama, username from public.profiles where id=$1', [p2]);
-ok(a2.nama === 'Siti N.' && a2.kelas === 'X' && a2.sangga === 'Sangga Elang' && a2.username === '10232', 'nama diubah, kelas/sangga disamakan penulisannya, username tak berubah');
+ok(a2.nama === 'Siti N.' && a2.kelas === 'X-01' && a2.sangga === 'Sangga Elang' && a2.username === '10232', 'nama diubah, kelas/sangga disamakan penulisannya, username tak berubah');
 ok(cocok(await ub(kDewan, p2), /Hanya Admin/), 'Dewan tidak bisa mengubah anggota');
 ok(cocok(await ub(kP2, p2), /Hanya Admin/), 'Penegak tidak bisa mengubah dirinya lewat fungsi ini');
 ok(cocok(await ub(kAdmin, p2, { p_nama: '  ' }), /Nama wajib/), 'nama kosong ditolak');
@@ -240,9 +240,9 @@ ok(cocok(await ub(kAdmin, p2, { p_agama: 'Zoroaster' }), /Agama tidak dikenal/),
 ok(cocok(await ub(kAdmin, p2, { p_agama: '' }), /Agama wajib/), 'agama wajib');
 ok(cocok(await ub(kAdmin, p2, { p_calon_garuda: true }), /hanya untuk peserta yang seluruh SKU/), 'menetapkan Calon Garuda untuk yang belum lulus ditolak');
 ok((await satu('select agama from public.profiles where id=$1', [p2])).agama === 'Islam', 'penolakan membatalkan seluruh perubahan (atomik)');
-ok(!galat(await ub(kAdmin, p1, { p_nama: 'Ahmad Fauzi', p_kelas: 'X', p_sangga: 'Sangga Elang', p_calon_garuda: true })), 'peserta yang layak dapat ditetapkan Calon Garuda oleh admin');
+ok(!galat(await ub(kAdmin, p1, { p_nama: 'Ahmad Fauzi', p_kelas: 'X-01', p_sangga: 'Sangga Elang', p_calon_garuda: true })), 'peserta yang layak dapat ditetapkan Calon Garuda oleh admin');
 ok((await satu('select calon_garuda::text d from public.profiles where id=$1', [p1])).d === '2026-01-01', 'tanggal pencalonan yang sudah ada dipertahankan');
-ok(!galat(await ub(kAdmin, p1, { p_nama: 'Ahmad Fauzi', p_kelas: 'X', p_sangga: 'Sangga Elang', p_calon_garuda: false })) && (await satu('select calon_garuda from public.profiles where id=$1', [p1])).calon_garuda === null, 'pencalonan dapat dicabut');
+ok(!galat(await ub(kAdmin, p1, { p_nama: 'Ahmad Fauzi', p_kelas: 'X-01', p_sangga: 'Sangga Elang', p_calon_garuda: false })) && (await satu('select calon_garuda from public.profiles where id=$1', [p1])).calon_garuda === null, 'pencalonan dapat dicabut');
 // ganti agama mempengaruhi kelulusan
 await luluskan(p2, 'Bantara');
 ok(!galat(await ajukan(kP2, 'LAK-02')), 'Islam + semua unit Islam lulus -> Laksana terbuka');

@@ -10,7 +10,7 @@ import {
 } from '../src/lib/sesiLogic.js';
 import { alamatDasar, labelUnit, parameterVerifikasi, POLA_KODE, POLA_TOKEN, teksUnit, urlVerifikasi } from '../src/lib/verifikasiLogic.js';
 import { butirPeserta } from '../src/lib/skuLogic.js';
-import qrcode from '../node_modules/qrcode-generator/qrcode.js';
+import qrcode from 'qrcode-generator';
 
 const P = process.cwd().replace(/\\/g, '/');
 let gagal = 0, lulus = 0;

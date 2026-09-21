@@ -9,8 +9,9 @@ const SP = `${P}/.uji/tmp`;
 let g = 0, l = 0;
 const ok = (c, m) => { if (c) { l++; console.log('ok   :', m); } else { g++; console.log('GAGAL:', m); } };
 const stub = readFileSync(`${P}/supabase/lokal/stub.sql`, 'utf8');
-const bersih = (s) => s.replace(/^\uFEFF/, '');
-const M = ['sidang-dk', 'sidang-format-nomor', 'raport', 'instrumen', 'verifikasi-sesi', 'nta-anggota', 'butir-agama-pembina', 'indeks-kode-verifikasi', 'iuran'].map((n) => readFileSync(`${P}/supabase/migrasi/2026-09-${n}.sql`, 'utf8'));
+// Akhir baris disamakan (LF): checkout Windows dapat mengubah berkas menjadi CRLF, sedangkan skema lama dari git berakhir LF; isi fungsi dibandingkan lewat md5.
+const bersih = (s) => s.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+const M = ['sidang-dk', 'sidang-format-nomor', 'raport', 'instrumen', 'verifikasi-sesi', 'nta-anggota', 'butir-agama-pembina', 'indeks-kode-verifikasi', 'iuran'].map((n) => bersih(readFileSync(`${P}/supabase/migrasi/2026-09-${n}.sql`, 'utf8')));
 const M5 = M[8]; // hanya migrasi iuran yang diuji di sini
 
 // Skema "sebelum migrasi" diambil dari riwayat git: 'git:<commit>' = supabase/skema.sql pada commit itu (mis. git:e2236da = sebelum iuran).
@@ -45,7 +46,8 @@ const bandingkan = (nama, pa, pb) => {
   }
 };
 
-const A = await baru(`${P}/supabase/skema.sql`);
+// Skema "sesudah iuran" = commit tepat sebelum fase penugasan (skema.sql terbaru sudah memuat penugasan, yang diuji di uji/migrasi-penugasan.mjs).
+const A = await baru('git:b804088');
 const pa = await potret(A);
 ok(pa.kolom.some((x) => x.table_name === 'sku_progress' && x.column_name === 'verifikasi_token') && pa.kolom.filter((x) => x.table_name === 'sesi_ujian').length >= 8, 'skema baru memuat kolom token dan tabel sesi');
 

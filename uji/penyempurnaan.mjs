@@ -12,7 +12,7 @@ import { buatBufferXlsx } from '../src/lib/exportXlsx.js';
 import { daftarUnitInstrumen } from '../src/lib/instrumenLogic.js';
 import { INDEKS_POIN, hurufSub } from '../src/data/skuData.js';
 import { periksaBaris, bacaExcelAnggota, buatTemplateAnggota, POLA_NTA } from '../src/lib/importAnggota.js';
-import ExcelJS from '../node_modules/exceljs/excel.js';
+import ExcelJS from 'exceljs';
 
 const P = process.cwd().replace(/\\/g, '/');
 const SP = `${P}/.uji/tmp`;
@@ -148,7 +148,7 @@ const langsung = await K.admin.k.from('profiles').update({ nta: '1' }).eq('usern
 ok(!!langsung.error, 'penulisan langsung ke tabel profiles tetap ditolak untuk Admin');
 
 // integrasi dengan pembuatan akun (alur impor): akun dibuat lebih dulu, NTA menyusul
-const b = await K.admin.a.buatAkun('peserta', [{ no: 1, nama: 'Uji Nta Satu', nis: '99101', kelas: 'X', sangga: 'Sangga Elang', agama: 'Islam', username: '', pin: '' }, { no: 2, nama: 'Uji Nta Dua', nis: '99102', kelas: 'X', sangga: 'Sangga Elang', agama: 'Hindu', username: '', pin: '' }]);
+const b = await K.admin.a.buatAkun('peserta', [{ no: 1, nama: 'Uji Nta Satu', nis: '99101', kelas: 'X-01', sangga: 'Sangga Elang', agama: 'Islam', username: '', pin: '' }, { no: 2, nama: 'Uji Nta Dua', nis: '99102', kelas: 'X-01', sangga: 'Sangga Elang', agama: 'Hindu', username: '', pin: '' }]);
 ok(b.ok && b.hasil.every((h) => h.ok && h.username), 'buatAkun (impor): dua akun dibuat, hasil memuat username dan nomor baris');
 r = await nta(K.admin.a, b.hasil.map((h) => ({ username: h.username, nta: `NTA-${h.no}` })));
 p = await q(pg, `select username, nta from public.profiles where username in ('99101','99102') order by username`);
@@ -165,7 +165,7 @@ const wsT = wbT.getWorksheet('Anggota'); const kepala = []; wsT.getRow(1).eachCe
 ok(kepala.includes('NTA (opsional)') && kepala.indexOf('NTA (opsional)') < kepala.indexOf('PIN Awal (opsional)'), 'template Penegak memuat kolom NTA (opsional) sebelum PIN: ' + kepala.join(' | '));
 const kNta = kepala.indexOf('NTA (opsional)') + 1;
 ok(wsT.getCell(2, kNta).numFmt === '@', 'kolom NTA berformat teks');
-const bar = (no, nama, nis, ntaTeks) => { const rr = wsT.getRow(no); rr.getCell(kepala.indexOf('Nama Lengkap') + 1).value = nama; rr.getCell(kepala.indexOf('NIS') + 1).value = nis; rr.getCell(kepala.indexOf('Kelas') + 1).value = 'X'; rr.getCell(kepala.indexOf('Sangga') + 1).value = 'Sangga Elang'; rr.getCell(kepala.indexOf('Agama') + 1).value = 'Islam'; if (ntaTeks !== null) rr.getCell(kNta).value = ntaTeks; };
+const bar = (no, nama, nis, ntaTeks) => { const rr = wsT.getRow(no); rr.getCell(kepala.indexOf('Nama Lengkap') + 1).value = nama; rr.getCell(kepala.indexOf('NIS') + 1).value = nis; rr.getCell(kepala.indexOf('Rombel') + 1).value = 'X-01'; rr.getCell(kepala.indexOf('Sangga') + 1).value = 'Sangga Elang'; rr.getCell(kepala.indexOf('Agama') + 1).value = 'Islam'; if (ntaTeks !== null) rr.getCell(kNta).value = ntaTeks; };
 bar(2, 'Ada Nta', '88001', '11.03.10.701.00500'); bar(3, 'Tanpa Nta', '88002', null); bar(4, 'Nta Angka', '88003', 12345); bar(5, 'Nta Rusak', '88004', 'a;b');
 const bufIsi = await wbT.xlsx.writeBuffer();
 const dibaca = await bacaExcelAnggota(bufIsi, 'peserta');
@@ -178,7 +178,7 @@ const tplD = new ExcelJS.Workbook(); await tplD.xlsx.load(await buatTemplateAngg
 const kepD = []; tplD.getWorksheet('Anggota').getRow(1).eachCell((c) => kepD.push(c.value));
 ok(!kepD.some((h) => /NTA/.test(h)), 'template Dewan Ambalan tidak memuat NTA');
 // berkas Penegak lama (tanpa kolom NTA) tetap terbaca
-const tplLama = new ExcelJS.Workbook(); const wl = tplLama.addWorksheet('Anggota'); wl.addRow(['Nama Lengkap', 'NIS', 'Kelas', 'Sangga', 'Agama', 'PIN Awal (opsional)']); wl.addRow(['Budi Lama', '77001', 'XI', 'Sangga Merak', 'Islam', '']);
+const tplLama = new ExcelJS.Workbook(); const wl = tplLama.addWorksheet('Anggota'); wl.addRow(['Nama Lengkap', 'NIS', 'Kelas', 'Sangga', 'Agama', 'PIN Awal (opsional)']); wl.addRow(['Budi Lama', '77001', 'XI-01', 'Sangga Merak', 'Islam', '']);
 const lama = await bacaExcelAnggota(await tplLama.xlsx.writeBuffer(), 'peserta');
 ok(lama.length === 1 && lama[0].nta === '', 'berkas lama tanpa kolom NTA tetap dapat diimpor (NTA kosong)');
 

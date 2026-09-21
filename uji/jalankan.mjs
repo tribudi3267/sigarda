@@ -11,8 +11,11 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const akar = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Dicari lewat Node (bukan jalur tetap) agar juga jalan di git worktree, yang memakai node_modules milik repo induk.
+const supabaseJs = createRequire(import.meta.url).resolve('@supabase/supabase-js');
 const keluarDir = path.join(akar, '.uji');
 fs.mkdirSync(path.join(keluarDir, 'tmp'), { recursive: true });
 
@@ -29,7 +32,7 @@ for (const nama of daftar) {
     await build({
       entryPoints: [path.join(akar, 'uji', `${nama}.mjs`)], outfile: keluar, bundle: true, platform: 'node', format: 'esm',
       external: ['@electric-sql/pglite', 'exceljs', 'node:*'],
-      alias: { 'npm:@supabase/supabase-js@2': path.join(akar, 'node_modules/@supabase/supabase-js') },
+      alias: { 'npm:@supabase/supabase-js@2': supabaseJs },
       loader: { '.ts': 'ts' }, logLevel: 'silent',
       banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
     });
