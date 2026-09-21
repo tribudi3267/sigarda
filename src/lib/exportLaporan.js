@@ -19,6 +19,7 @@ const MERAH_MUDA = 'FFFEE2E2';
 const teksFilter = (filter) => {
   const bagian = [];
   if (filter.q) bagian.push(`pencarian "${filter.q}"`);
+  if (filter.rombel?.length) bagian.push(`rombel saya (${filter.rombel.join(', ')})`);
   if (filter.sangga) bagian.push(filter.sangga);
   if (filter.kelas) bagian.push(`kelas ${filter.kelas}`);
   if (filter.peran) bagian.push(PERAN[filter.peran].singkat);

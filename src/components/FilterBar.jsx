@@ -1,13 +1,19 @@
 import { useEffect, useMemo } from 'react';
 import { PERAN, URUTAN_PERAN } from '../lib/skuLogic';
 import { urutAlami, urutTeks } from '../lib/format';
+import { ringkasDaftarRombel } from '../lib/rombelLogic';
 import { Icon } from './ui';
 
-export const FILTER_AWAL = { q: '', sangga: '', kelas: '', peran: '', agama: '' };
+export const FILTER_AWAL = { q: '', sangga: '', kelas: '', peran: '', agama: '', saya: false };
 
+/**
+ * `f.rombel` (larik; diisi filterEfektif dari "rombel saya") membatasi ke rombel itu; kosong = tanpa batas.
+ * Halaman pengurus memakai useFilterRombel (src/hooks/useRombelSaya.js) agar filter ini menyala sejak awal bagi penguji yang punya rombel.
+ */
 export const terapkanFilter = (daftar, f) =>
   daftar.filter(
     (u) =>
+      (!f.rombel?.length || f.rombel.includes(u.kelas)) &&
       (!f.sangga || u.sangga === f.sangga) &&
       (!f.kelas || u.kelas === f.kelas) &&
       (!f.peran || u.peran === f.peran) &&
@@ -24,8 +30,9 @@ const TAMPIL_STANDAR = ['sangga', 'kelas', 'peran'];
  * Pilihan yang datanya sudah tidak ada akan dikosongkan sendiri.
  *
  * tampil: kolom mana saja yang dipakai, mis. ['sangga', 'kelas', 'peran'].
+ * rombelSaya: rombel tugas pengguna; bila ada, muncul tombol "Hanya rombel saya" (filter.saya). Memilih kelas tertentu mematikannya.
  */
-export default function FilterBar({ data, filter, setFilter, tampil = TAMPIL_STANDAR }) {
+export default function FilterBar({ data, filter, setFilter, tampil = TAMPIL_STANDAR, rombelSaya = [] }) {
   const opsi = useMemo(
     () => ({
       sangga: unik(data, 'sangga', urutTeks),
@@ -42,8 +49,9 @@ export default function FilterBar({ data, filter, setFilter, tampil = TAMPIL_STA
     if (salah.length) setFilter({ ...filter, ...Object.fromEntries(salah.map((k) => [k, ''])) });
   }, [opsi, filter, setFilter, tampil]);
 
-  const ubah = (k) => (e) => setFilter({ ...filter, [k]: e.target.value });
-  const aktif = filter.q || tampil.some((k) => filter[k]);
+  const ubah = (k) => (e) => setFilter({ ...filter, [k]: e.target.value, ...(k === 'kelas' && e.target.value ? { saya: false } : {}) });
+  const punyaRombel = rombelSaya.length > 0;
+  const aktif = filter.q || (filter.saya && punyaRombel) || tampil.some((k) => filter[k]);
 
   return (
     <div className="no-print flex flex-wrap items-center gap-2">
@@ -57,6 +65,23 @@ export default function FilterBar({ data, filter, setFilter, tampil = TAMPIL_STA
           aria-label="Cari nama atau NIS"
         />
       </div>
+
+      {punyaRombel && (
+        <label
+          className={`flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ring-1 ring-inset sm:w-auto ${
+            filter.saya ? 'bg-pramuka-800 text-pramuka-50 ring-pramuka-800' : 'bg-white text-pramuka-800 ring-pramuka-300 hover:bg-pramuka-50'
+          }`}
+          title={`Rombel tugas Anda: ${rombelSaya.join(', ')}`}
+        >
+          <input
+            type="checkbox"
+            className="h-4 w-4 shrink-0 accent-emas"
+            checked={!!filter.saya}
+            onChange={(e) => setFilter({ ...filter, saya: e.target.checked, ...(e.target.checked ? { kelas: '' } : {}) })}
+          />
+          <span className="min-w-0 truncate">Hanya rombel saya ({ringkasDaftarRombel(rombelSaya)})</span>
+        </label>
+      )}
 
       {tampil.includes('sangga') && (
         <select className="input w-full sm:w-44" value={filter.sangga} onChange={ubah('sangga')} aria-label="Filter sangga">

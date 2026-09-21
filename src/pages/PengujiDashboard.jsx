@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { antrianPengujian, bolehMenilaiPoin, hitungProgres, pesanTidakBolehMenilai } from '../lib/skuLogic';
-import { tahunAjaranKini } from '../lib/rombelLogic';
+import { ringkasDaftarRombel, rombelSaya as rombelDariPenugasan, tahunAjaranKini } from '../lib/rombelLogic';
+import { useFilterRombel } from '../hooks/useRombelSaya';
+import ProgresRombel from '../components/ProgresRombel';
 import { fmtTanggal } from '../lib/format';
 import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
 import AlihkanModal from '../components/AlihkanModal';
@@ -40,6 +42,8 @@ function Dashboard({ onNav }) {
         <button className="btn btn-primary btn-sm" onClick={() => onNav('antrian')}>Buka antrian</button>
       </section>
 
+      <ProgresRombel penugasan={penugasan} onNav={onNav} />
+
       <RingkasanGudep onNav={onNav} />
     </div>
   );
@@ -53,7 +57,12 @@ function Antrian({ onBuka }) {
   const penugasan = usePenugasanKini();
   const namaOrang = (id) => users.find((u) => u.id === id)?.nama ?? 'penguji';
 
-  const antrian = antrianPengujian(progress, users, semua ? null : user.id, penugasan, dokumen ?? []);
+  // Antrian saya (ditujukan kepada saya + antrian rombel saya) sudah sesuai rombel tugas. Rombel saya baru menyaring saat melihat antrian semua penguji.
+  const rombel = useMemo(() => rombelDariPenugasan(penugasan, user.id), [penugasan, user.id]);
+  const [hanyaSaya, setHanyaSaya] = useState(true);
+  const batasRombel = semua && hanyaSaya && rombel.length > 0;
+  const antrian = antrianPengujian(progress, users, semua ? null : user.id, penugasan, dokumen ?? [])
+    .filter((a) => !batasRombel || rombel.includes(a.peserta.kelas));
   const menunggu = antrian.filter((a) => a.entry.status === 'diajukan').length;
 
   return (
@@ -65,10 +74,18 @@ function Antrian({ onBuka }) {
             {menunggu} menunggu, {antrian.length - menunggu} sedang diuji
           </p>
         </div>
-        <label className="flex items-center gap-2 text-sm font-medium text-pramuka-700">
-          <input type="checkbox" className="h-4 w-4 accent-pramuka-800" checked={semua} onChange={(e) => setSemua(e.target.checked)} />
-          Tampilkan semua penguji
-        </label>
+        <div className="flex flex-col gap-1.5 sm:items-end">
+          <label className="flex items-center gap-2 text-sm font-medium text-pramuka-700">
+            <input type="checkbox" className="h-4 w-4 accent-pramuka-800" checked={semua} onChange={(e) => setSemua(e.target.checked)} />
+            Tampilkan semua penguji
+          </label>
+          {semua && rombel.length > 0 && (
+            <label className="flex items-center gap-2 text-sm font-medium text-pramuka-700">
+              <input type="checkbox" className="h-4 w-4 accent-pramuka-800" checked={hanyaSaya} onChange={(e) => setHanyaSaya(e.target.checked)} />
+              Hanya rombel saya ({ringkasDaftarRombel(rombel)})
+            </label>
+          )}
+        </div>
       </div>
 
       {antrian.length === 0 ? (
@@ -122,21 +139,21 @@ function Antrian({ onBuka }) {
 
 function DaftarPeserta({ onBuka }) {
   const { daftarPeserta, progress } = useApp();
-  const [filter, setFilter] = useState(FILTER_AWAL);
+  const { filter, setFilter, efektif, rombelSaya } = useFilterRombel();
 
   const daftar = useMemo(
-    () => terapkanFilter(daftarPeserta, filter).sort((a, b) => a.nama.localeCompare(b.nama, 'id')),
-    [daftarPeserta, filter]
+    () => terapkanFilter(daftarPeserta, efektif).sort((a, b) => a.nama.localeCompare(b.nama, 'id')),
+    [daftarPeserta, efektif]
   );
 
   return (
     <div className="animasi-naik">
       <h1 className="mb-1 text-2xl font-bold">Peserta</h1>
       <p className="mb-4 text-sm text-pramuka-600">{daftar.length} peserta ditemukan</p>
-      <div className="mb-4"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'peran', 'agama']} /></div>
+      <div className="mb-4"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'peran', 'agama']} rombelSaya={rombelSaya} /></div>
 
       {daftar.length === 0 ? (
-        <Kosong judul="Tidak ada peserta" teks="Ubah kata kunci, sangga, kelas, peran, atau agama pada filter." />
+        <Kosong judul="Tidak ada peserta" teks="Ubah kata kunci, sangga, kelas, peran, atau agama pada filter, atau matikan &quot;Hanya rombel saya&quot;." />
       ) : (
         <ul className="panel divide-y divide-pramuka-100">
           {daftar.map((u) => {

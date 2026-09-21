@@ -9,7 +9,8 @@ import {
 } from '../lib/raportLogic';
 import useAbsensiPeriode from '../hooks/useAbsensiPeriode';
 import CetakRaport from '../components/CetakRaport';
-import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
+import FilterBar, { terapkanFilter } from '../components/FilterBar';
+import { useFilterRombel } from '../hooks/useRombelSaya';
 import PilihPeriode, { periodeAwal } from '../components/PilihPeriode';
 import { Avatar, Icon, Kosong, Modal, MuatAbsensi } from '../components/ui';
 
@@ -329,7 +330,7 @@ function LembarRaport({ baris, tahunAjaran, semester, pengaturan, tutup }) {
 
 function TabNilai({ per, semester, pengaturan }) {
   const { daftarPeserta, progress, absensi, raport, notify } = useApp();
-  const [filter, setFilter] = useState(FILTER_AWAL);
+  const { filter, setFilter, efektif, rombelSaya } = useFilterRombel();
   const [buka, setBuka] = useState(null);
   const [cetak, setCetak] = useState(null);
   const [mengunduh, setMengunduh] = useState(false);
@@ -342,11 +343,11 @@ function TabNilai({ per, semester, pengaturan }) {
     [daftarPeserta, progress, absensi, per.ta, semester, tersimpan, pengaturan],
   );
   const tampil = useMemo(() => {
-    const ids = new Set(terapkanFilter(daftarPeserta, filter).map((u) => u.id));
+    const ids = new Set(terapkanFilter(daftarPeserta, efektif).map((u) => u.id));
     return semua
       .filter((b) => ids.has(b.peserta.id))
       .sort((a, b) => urutAlami(a.peserta.kelas ?? '', b.peserta.kelas ?? '') || a.peserta.nama.localeCompare(b.peserta.nama, 'id'));
-  }, [semua, daftarPeserta, filter]);
+  }, [semua, daftarPeserta, efektif]);
   const ringkas = ringkasBaris(tampil);
   const dinilai = tampil.filter((b) => b.status !== 'belum');
   const bukaBaris = buka ? semua.find((b) => b.peserta.id === buka) : null;
@@ -354,7 +355,7 @@ function TabNilai({ per, semester, pengaturan }) {
   const unduh = async () => {
     setMengunduh(true);
     try {
-      await unduhRaportXlsx({ tahunAjaran: per.ta, semester, baris: tampil, filter, pengaturan });
+      await unduhRaportXlsx({ tahunAjaran: per.ta, semester, baris: tampil, filter: efektif, pengaturan });
       notify('File Excel nilai raport diunduh.');
     } catch (e) {
       notify(`Gagal membuat file Excel: ${e.message}`, 'err');
@@ -401,7 +402,7 @@ function TabNilai({ per, semester, pengaturan }) {
         ))}
       </section>
 
-      <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['kelas', 'sangga']} /></div>
+      <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['kelas', 'sangga']} rombelSaya={rombelSaya} /></div>
 
       <div className="no-print mb-3 flex flex-wrap items-center gap-2">
         <button className="btn btn-gold btn-sm" onClick={unduh} disabled={mengunduh || tampil.length === 0}>
@@ -414,7 +415,7 @@ function TabNilai({ per, semester, pengaturan }) {
       </div>
 
       {tampil.length === 0 ? (
-        <Kosong judul="Tidak ada Penegak yang cocok" teks="Ubah atau bersihkan filter." />
+        <Kosong judul="Tidak ada Penegak yang cocok" teks="Ubah atau bersihkan filter, atau matikan &quot;Hanya rombel saya&quot;." />
       ) : (
         <>
           <ul className="panel divide-y divide-pramuka-100 md:hidden">

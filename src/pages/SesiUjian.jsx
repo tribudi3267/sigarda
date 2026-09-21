@@ -7,6 +7,8 @@ import {
 } from '../lib/sesiLogic';
 import { fmtHariTanggal, hariIni } from '../lib/format';
 import { PESAN_BUTIR_AGAMA, PESAN_BUTIR_LAKSANA, bolehMenilaiPoin, pesanTidakBolehMenilai } from '../lib/skuLogic';
+import { ringkasDaftarRombel } from '../lib/rombelLogic';
+import useRombelSaya from '../hooks/useRombelSaya';
 
 const CHIP = 'inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset';
 const JEDA_PAPAN_MS = 15000;
@@ -31,8 +33,12 @@ function EditorSesi({ awal, onTutup }) {
   const [cari, setCari] = useState('');
   const [proses, setProses] = useState(false);
   const [galat, setGalat] = useState('');
+  const rombel = useRombelSaya();
+  const [hanyaSaya, setHanyaSaya] = useState(!awal); // sesi baru: awalnya rombel saya; mengubah sesi lama: tampilkan semua agar pesertanya tak tersembunyi
+  const batasRombel = hanyaSaya && rombel.length > 0;
 
-  const tampil = semuaPeserta.filter((u) => !cari.trim() || `${u.nama} ${u.kelas ?? ''} ${u.sangga ?? ''} ${u.nis ?? ''}`.toLowerCase().includes(cari.trim().toLowerCase()));
+  const tampil = semuaPeserta.filter((u) => (!batasRombel || rombel.includes(u.kelas) || peserta.has(u.id))
+    && (!cari.trim() || `${u.nama} ${u.kelas ?? ''} ${u.sangga ?? ''} ${u.nis ?? ''}`.toLowerCase().includes(cari.trim().toLowerCase())));
   const ganti = (himpunan, set, id) => {
     const s = new Set(himpunan);
     if (s.has(id)) s.delete(id);
@@ -127,6 +133,12 @@ function EditorSesi({ awal, onTutup }) {
         </span>
       </div>
       <input className="input mt-2" type="search" value={cari} onChange={(e) => setCari(e.target.value)} placeholder="Cari nama, kelas, atau sangga" aria-label="Cari peserta" />
+      {rombel.length > 0 && (
+        <label className="mt-2 flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" className="h-4 w-4 shrink-0 accent-pramuka-800" checked={hanyaSaya} onChange={(e) => setHanyaSaya(e.target.checked)} />
+          <span className="min-w-0">Hanya rombel saya ({ringkasDaftarRombel(rombel)})</span>
+        </label>
+      )}
       <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-pramuka-200">
         {tampil.length === 0 && <p className="px-3 py-4 text-center text-sm text-pramuka-600">Tidak ada peserta yang cocok.</p>}
         {tampil.map((u) => (
@@ -161,6 +173,8 @@ function PapanSesi({ sesi, onKembali, onUbah }) {
   const [uji, setUji] = useState(null); // { pesertaId, poin }
   const [proses, setProses] = useState(false);
   const [terakhir, setTerakhir] = useState(() => new Date());
+  const rombel = useRombelSaya();
+  const [hanyaSaya, setHanyaSaya] = useState(true);
 
   const daftar = useMemo(() => tugasSesi(sesi, users, progress), [sesi, users, progress]);
   const ringkas = useMemo(() => ringkasSesi(daftar), [daftar]);
@@ -199,9 +213,15 @@ function PapanSesi({ sesi, onKembali, onUbah }) {
     if (r.ok) onKembali();
   };
 
+  // Rombel saya: tombol hanya muncul bila sesi memuat Penegak dari rombel penguji sekaligus dari rombel lain; ringkasan di atas tetap seluruh sesi.
+  const daftarSaya = daftar.filter((p) => rombel.includes(p.peserta.kelas));
+  const bisaSaring = daftarSaya.length > 0 && daftarSaya.length < daftar.length;
+  const batasRombel = hanyaSaya && bisaSaring;
+
   const kata = cari.trim().toLowerCase();
   const tampil = daftar.filter((p) => {
-    if (kata && !`${p.peserta.nama} ${p.peserta.kelas ?? ''} ${p.peserta.sangga ?? ''}`.toLowerCase().includes(kata)) return false;
+    if (batasRombel && !rombel.includes(p.peserta.kelas)) return false;
+    if (kata &&!`${p.peserta.nama} ${p.peserta.kelas ?? ''} ${p.peserta.sangga ?? ''}`.toLowerCase().includes(kata)) return false;
     if (belumSaja && !p.tugas.some((t) => t.status === 'menunggu' || t.status === 'proses')) return false;
     return true;
   });
@@ -275,6 +295,12 @@ function PapanSesi({ sesi, onKembali, onUbah }) {
         <label className="flex items-center gap-2 text-sm font-semibold">
           <input type="checkbox" checked={belumSaja} onChange={(e) => setBelumSaja(e.target.checked)} />Hanya yang belum selesai
         </label>
+        {bisaSaring && (
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" checked={hanyaSaya} onChange={(e) => setHanyaSaya(e.target.checked)} />
+            Hanya rombel saya ({ringkasDaftarRombel(rombel)}){batasRombel ? `, ${daftar.length - daftarSaya.length} peserta rombel lain disembunyikan` : ''}
+          </label>
+        )}
       </div>
 
       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-pramuka-600" aria-label="Keterangan warna">

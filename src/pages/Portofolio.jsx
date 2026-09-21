@@ -4,7 +4,8 @@ import { layakGaruda } from '../lib/skuLogic';
 import { rekapPortofolio, ringkasPortofolio } from '../lib/portofolioLogic';
 import { unduhPortofolioXlsx } from '../lib/exportLaporan';
 import { fmtTanggal } from '../lib/format';
-import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
+import FilterBar, { terapkanFilter } from '../components/FilterBar';
+import { useFilterRombel } from '../hooks/useRombelSaya';
 import PortofolioChecklist from '../components/PortofolioChecklist';
 import RekapKesiapan, { JurnalTerbaru } from '../components/RekapKesiapan';
 import { Avatar, Icon, Kosong, ProgressBar } from '../components/ui';
@@ -53,24 +54,24 @@ function Detail({ pesertaId, onKembali, onBukaSku }) {
 
 export default function PortofolioPengurus({ fokusId, onBuka, onKembali, onBukaSku }) {
   const { daftarPeserta, portofolio, progress, notify } = useApp();
-  const [filter, setFilter] = useState(FILTER_AWAL);
+  const { filter, setFilter, efektif, rombelSaya } = useFilterRombel();
   const [mengunduh, setMengunduh] = useState(false);
 
   const semua = useMemo(() => rekapPortofolio(portofolio, daftarPeserta), [portofolio, daftarPeserta]);
   const dataFilter = useMemo(() => semua.map((r) => r.user), [semua]);
   const rekap = useMemo(() => {
-    const ids = new Set(terapkanFilter(dataFilter, filter).map((u) => u.id));
+    const ids = new Set(terapkanFilter(dataFilter, efektif).map((u) => u.id));
     return semua.filter((r) => ids.has(r.user.id)).sort((a, b) => a.user.nama.localeCompare(b.user.nama, 'id'));
-  }, [semua, dataFilter, filter]);
+  }, [semua, dataFilter, efektif]);
   const ringkas = ringkasPortofolio(rekap);
-  const menunggu = daftarPeserta.filter((u) => u.peran !== 'calon-garuda' && layakGaruda(progress, u));
+  const menunggu = terapkanFilter(daftarPeserta, { rombel: efektif.rombel }).filter((u) => u.peran !== 'calon-garuda' && layakGaruda(progress, u));
 
   if (fokusId) return <Detail pesertaId={fokusId} onKembali={onKembali} onBukaSku={onBukaSku} />;
 
   const unduh = async () => {
     setMengunduh(true);
     try {
-      await unduhPortofolioXlsx({ rekap, portofolio, filter });
+      await unduhPortofolioXlsx({ rekap, portofolio, filter: efektif });
       notify('File Excel rekap portofolio diunduh.');
     } catch (e) {
       notify(`Gagal membuat file Excel: ${e.message}`, 'err');
@@ -114,14 +115,14 @@ export default function PortofolioPengurus({ fokusId, onBuka, onKembali, onBukaS
         </p>
       )}
 
-      <div className="mb-3"><FilterBar data={dataFilter} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas']} /></div>
+      <div className="mb-3"><FilterBar data={dataFilter} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas']} rombelSaya={rombelSaya} /></div>
 
       {rekap.length === 0 ? (
         <Kosong
           judul={semua.length === 0 ? 'Belum ada Calon Garuda' : 'Tidak ada data'}
           teks={semua.length === 0
             ? 'Peserta yang seluruh SKU Bantara dan Laksana-nya lulus dapat mendaftar sebagai Calon Garuda dari halaman Beranda mereka.'
-            : 'Ubah kata kunci, sangga, atau kelas pada filter.'}
+            : 'Ubah kata kunci, sangga, atau kelas pada filter, atau matikan "Hanya rombel saya".'}
         />
       ) : (
         <div className="panel overflow-x-auto">

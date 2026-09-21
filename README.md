@@ -37,7 +37,7 @@ Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Adm
 
 | Menu | Penegak | Dewan Ambalan / Pembina | Admin |
 |---|---|---|---|
-| Dashboard | Beranda progres SKU. Calon Garuda: dashboard jurnal portofolio | Antrian uji, rekap absensi, rekap portofolio | Rekap anggota, absensi, portofolio, kelulusan SKU |
+| Dashboard | Beranda progres SKU. Calon Garuda: dashboard jurnal portofolio | Antrian uji, progres per rombel, rekap absensi, rekap portofolio | Rekap anggota, absensi, portofolio, kelulusan SKU |
 | Poin SKU | Lihat butir, ajukan uji; tombol **Materi** pada butir yang punya materi | Menilai butir (wajib PIN) | Lihat |
 | Materi | Baca materi (pratinjau PDF Google Drive, daftar isi, saringan tingkat dan butir) | Sama | Sama |
 | Kelola Materi | | Hanya **Pembina**: tambah, ubah, urutkan, hapus | Tambah, ubah, urutkan, hapus |
@@ -152,6 +152,15 @@ area tanda tangan sengaja dikosongkan; QR hanya membuktikan surat itu benar dite
 - **Mencabut.** Pembina atau Admin mencabut surat dengan alasan (tercatat di riwayat butir); hasil butir tidak lagi dapat dicatat lewat surat itu dan QR-nya menjawab "dicabut". Surat baru dapat dibuat untuk butir yang sama.
 - **Verifikasi** (halaman publik, tanpa login): QR menampilkan nomor, penerbit, pembuat, penanda tangan, data Penegak, guru, dan butir; kode VRF- hanya menjawab jenis, nomor, dan tanggal (tanpa nama).
 - Surat tidak diperlukan (dan ditolak server) bila sudah ada Pembina yang seagama. Tabel `dokumen_terbit` dibangun umum agar jenis dokumen lain dapat ditambahkan kelak.
+
+### Rombel saya dan progres per rombel (fase 3)
+"Rombel saya" = rombel yang ditugaskan Admin kepada Pembina atau Dewan Ambalan pada tahun ajaran berjalan (Anggota > Penugasan). Hanya tampilan: server tidak berubah, tanpa migrasi, tanpa deploy Edge Function.
+- **Filter awal.** Pada **Peserta**, **Portofolio**, **Raport** dan pemilih peserta di **Sesi ujian**, tombol **Hanya rombel saya (XI-01, XI-02, ...)** menyala sejak halaman dibuka. Matikan untuk melihat semua; memilih kelas tertentu
+  pada filter juga mematikannya; **Bersihkan filter** menampilkan semua. Cetak dan Excel mengikuti filter (keterangan Excel menulis "rombel saya (...)"). Tanpa penugasan (Admin, penguji yang belum ditugaskan, atau penugasan belum termuat) tidak ada penyaringan.
+- **Antrian** sudah sesuai rombel tugas (ditujukan kepada Anda + antrian rombel Anda). Bila mencentang *Tampilkan semua penguji*, muncul *Hanya rombel saya* (menyala) untuk menyaring antrian penguji lain.
+- **Papan sesi**: tombol *Hanya rombel saya* muncul bila sesi memuat Penegak dari rombel Anda dan dari rombel lain; ringkasan angka di atas papan tetap seluruh sesi.
+- **Dashboard Pembina dan Dewan**: kartu **Progres per rombel** untuk tiap rombel tugas: jumlah Penegak, rata-rata progres Bantara dan Laksana, yang sudah selesai tiap tingkat, pengajuan menunggu dan sedang diuji, penguji bertugas, dan daftar Penegak
+  (ketuk nama untuk membuka detail). Tanpa penugasan, semua rombel yang punya Penegak ditampilkan; *Tampilkan semua rombel* tersedia bagi yang punya penugasan. Logika di `src/lib/rombelLogic.js` dan `src/lib/progresRombel.js`, dijaga pengujian `rombel-saya`.
 
 ### Materi SKU dari Google Drive
 Pembina dan Admin Gudep melampirkan **tautan berbagi** file PDF di Google Drive; aplikasi tidak menyimpan file, hanya tautannya.

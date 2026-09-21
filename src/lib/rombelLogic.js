@@ -10,7 +10,7 @@
  * "Penegakan penugasan" di bawah, yang mencerminkan sigarda.penguji_sah di server.
  */
 import { AGAMA } from '../data/skuData';
-import { hariIni } from './format';
+import { hariIni, urutAlami } from './format';
 import { suratAgamaAktif } from './dokumenLogic';
 
 export const KELAS_ROMBEL = ['X', 'XI', 'XII'];
@@ -101,6 +101,22 @@ export function cakupanAgama(users, guruAgama = []) {
 
 /** Pembina yang agamanya belum diisi (butir agama tidak dapat diarahkan kepadanya sebelum diisi). */
 export const pembinaTanpaAgama = (users) => users.filter((u) => u.role === 'penguji' && u.jabatan === 'Pembina' && !u.agama);
+
+/* ------------------------------ Rombel saya (fase 3) ------------------------------ */
+
+/** Rombel yang ditugaskan kepada satu penguji pada baris penugasan tahun ajaran berjalan, terurut (X-01, ..., XII-10). */
+export const rombelSaya = (penugasan, pengujiId) =>
+  [...new Set((penugasan ?? []).filter((b) => b.pengujiId === pengujiId).map((b) => b.rombel))].sort(urutAlami);
+
+/**
+ * Filter "rombel saya" untuk daftar Penegak: `saya` menyala dan penguji punya rombel tugas -> hanya rombel itu; selain itu tidak menyaring
+ * (penguji tanpa penugasan, Admin, atau penugasan belum termuat tetap melihat semua). Mengembalikan salinan filter dengan `rombel` (larik).
+ */
+export const filterEfektif = (filter, rombel = []) => ({ ...filter, rombel: filter.saya && rombel.length ? rombel : [] });
+
+/** Ringkas untuk lencana: ["XI-01", "XI-02", "XI-03", "XII-01"] dengan maks 3 menjadi "XI-01, XI-02, XI-03 (+1)". */
+export const ringkasDaftarRombel = (rombel, maks = 3) =>
+  rombel.length <= maks ? rombel.join(', ') : `${rombel.slice(0, maks).join(', ')} (+${rombel.length - maks})`;
 
 /* ------------------------------ Penegakan penugasan (fase 1b) ------------------------------ */
 
