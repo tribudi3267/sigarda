@@ -49,7 +49,7 @@ function HasilReset({ hasil, onTutup }) {
 
 /** Reset PIN. Admin: semua kecuali admin. Pembina: penegak dan Dewan Ambalan. Dewan Ambalan: penegak. */
 export default function ResetPin() {
-  const { user, users, daftarPeserta, resetPin } = useApp();
+  const { user, users, daftarPesertaSemua, resetPin } = useApp();
   const [filter, setFilter] = useState(FILTER_AWAL);
   const [hasil, setHasil] = useState(null);
   const [cari, setCari] = useState('');
@@ -67,10 +67,10 @@ export default function ResetPin() {
     const kata = normalisasiNama(cari);
     const dasar =
       aktif.id === 'peserta'
-        ? terapkanFilter(daftarPeserta, filter)
+        ? terapkanFilter(daftarPesertaSemua, filter)
         : users.filter((u) => cocokKelompok(aktif, u) && (!kata || normalisasiNama(u.nama).includes(kata)));
     return dasar.filter((u) => bolehResetPin(user, u)).sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
-  }, [aktif, daftarPeserta, users, filter, user, cari]);
+  }, [aktif, daftarPesertaSemua, users, filter, user, cari]);
 
   const namaOrang = (id) => users.find((u) => u.id === id)?.nama ?? '-';
 
@@ -115,7 +115,7 @@ export default function ResetPin() {
       )}
 
       {aktif?.id === 'peserta' && (
-        <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'peran', 'jk']} /></div>
+        <div className="mb-3"><FilterBar data={daftarPesertaSemua} filter={filter} setFilter={setFilter} tampil={['status', 'sangga', 'kelas', 'peran', 'jk']} /></div>
       )}
 
       {aktif && aktif.id !== 'peserta' && (

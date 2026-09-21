@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { APP } from '../config';
+import { useApp } from '../context/AppContext';
+import { KETERANGAN_STATUS, statusAnggota } from '../lib/naikKelasLogic';
 import { useGudep } from '../lib/gudepStore';
 import Footer from './Footer';
 import LogoMark from './LogoMark';
@@ -27,6 +29,7 @@ const bacaCiut = () => {
  */
 export default function Layout({ nav, grup, tab, setTab, children }) {
   const G = useGudep();
+  const { user, hanyaLihatSaya } = useApp();
   const [ciut, setCiutState] = useState(bacaCiut);
   const setCiut = (nilai) => {
     setCiutState(nilai);
@@ -55,7 +58,14 @@ export default function Layout({ nav, grup, tab, setTab, children }) {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-10 pt-5">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-10 pt-5">
+          {hanyaLihatSaya && (
+            <p role="status" className="no-print mb-4 rounded-md bg-amber-50 px-3 py-2.5 text-sm text-amber-950">
+              Akun Anda berstatus <b>{statusAnggota(user) === 'alumni' ? 'alumni' : 'nonaktif'}</b>. {KETERANGAN_STATUS[statusAnggota(user)]} Untuk aktif kembali, hubungi Pembina atau Admin Gudep.
+            </p>
+          )}
+          {children}
+        </main>
 
         <Footer ciut={ciut} />
       </div>

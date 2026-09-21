@@ -341,7 +341,7 @@ function InputAbsensi() {
 }
 
 function RekapAbsensi() {
-  const { daftarPeserta, absensi, notify } = useApp();
+  const { daftarPesertaSemua: daftarPeserta, absensi, notify } = useApp(); // semua status; yang ditampilkan disaring filter Status (bawaan Aktif)
   const [per, setPer] = useState(periodeAwal);
   const [filter, setFilter] = useState(FILTER_AWAL);
   const [tampil, setTampil] = useState('ringkas');
@@ -377,7 +377,7 @@ function RekapAbsensi() {
           <Icon nama="unduh" className="h-4 w-4" /> {mengunduh ? 'Menyiapkan...' : 'Unduh Excel (.xlsx)'}
         </button>
       </div>
-      <div className="mb-4"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} /></div>
+      <div className="mb-4"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['status', 'sangga', 'kelas', 'peran', 'jk']} /></div>
 
       {!abs.siap ? <MuatAbsensi galat={abs.galat} coba={abs.coba} /> : (<>
       <section className="panel mb-4 grid grid-cols-2 divide-pramuka-100 md:grid-cols-4 md:divide-x">

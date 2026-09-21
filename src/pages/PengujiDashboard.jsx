@@ -138,19 +138,19 @@ function Antrian({ onBuka }) {
 }
 
 function DaftarPeserta({ onBuka }) {
-  const { daftarPeserta, progress } = useApp();
+  const { daftarPesertaSemua, progress } = useApp();
   const { filter, setFilter, efektif, rombelSaya } = useFilterRombel();
 
   const daftar = useMemo(
-    () => terapkanFilter(daftarPeserta, efektif).sort((a, b) => a.nama.localeCompare(b.nama, 'id')),
-    [daftarPeserta, efektif]
+    () => terapkanFilter(daftarPesertaSemua, efektif).sort((a, b) => a.nama.localeCompare(b.nama, 'id')),
+    [daftarPesertaSemua, efektif]
   );
 
   return (
     <div className="animasi-naik">
       <h1 className="mb-1 text-2xl font-bold">Peserta</h1>
       <p className="mb-4 text-sm text-pramuka-600">{daftar.length} peserta ditemukan</p>
-      <div className="mb-4"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'peran', 'agama', 'jk']} rombelSaya={rombelSaya} /></div>
+      <div className="mb-4"><FilterBar data={daftarPesertaSemua} filter={filter} setFilter={setFilter} tampil={['status', 'sangga', 'kelas', 'peran', 'agama', 'jk']} rombelSaya={rombelSaya} /></div>
 
       {daftar.length === 0 ? (
         <Kosong judul="Tidak ada peserta" teks="Ubah kata kunci, sangga, kelas, peran, atau agama pada filter, atau matikan &quot;Hanya rombel saya&quot;." />

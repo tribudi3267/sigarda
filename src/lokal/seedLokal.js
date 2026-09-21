@@ -105,3 +105,14 @@ export async function isiDataContoh(pg) {
   // Pemicu notifikasi ikut menyala saat data contoh dimasukkan; itu bukan peristiwa nyata, jadi Kotak Notifikasi dimulai kosong.
   if ((await pg.query("select to_regclass('public.notifikasi') as t")).rows[0].t) await pg.query('delete from public.notifikasi');
 }
+
+/**
+ * Status anggota contoh (hanya `npm run dev:lokal`, tidak dipakai pengujian): satu Penegak nonaktif dan satu alumni, agar filter Status, banner hanya-lihat,
+ * dan halaman Naik Kelas terlihat. Dipanggil sesudah data contoh; aman bila skema lama belum punya kolom status.
+ */
+export async function isiStatusContoh(pg) {
+  const ada = (await pg.query("select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'status'")).rows.length;
+  if (!ada) return;
+  await pg.query("update public.profiles set status = 'nonaktif', status_pada = sigarda.hari_ini() where username = '10234'");
+  await pg.query("update public.profiles set status = 'alumni', status_pada = sigarda.hari_ini(), lulus_ta = '2025/2026' where username = '10010'");
+}

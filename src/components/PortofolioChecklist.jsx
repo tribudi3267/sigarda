@@ -20,13 +20,14 @@ const PILIHAN_STATUS = ['belum', 'proses', 'siap'];
  *   mode 'tinjau'  : Pembina/Dewan Ambalan meninjau dan memberi catatan, admin hanya melihat
  */
 export default function PortofolioChecklist({ pesertaId, mode }) {
-  const { portofolio, user, users, ubahPortofolio, catatPortofolioPenguji } = useApp();
+  const { portofolio, user, users, ubahPortofolio, catatPortofolioPenguji, hanyaLihatSaya } = useApp();
   const [filter, setFilter] = useState('semua');
   const [form, setForm] = useState(null); // { id, catatan, tautan } atau { id, catatanPenguji }
   const [jurnalId, setJurnalId] = useState(null);
 
   const syarat = FILTER.find((f) => f.id === filter).cocok;
   const bisaMenilai = mode === 'tinjau' && user.role === 'penguji';
+  const terkunci = mode === 'peserta' && hanyaLihatSaya; // nonaktif dan alumni hanya dapat melihat
   const namaOrang = (id) => users.find((u) => u.id === id)?.nama ?? '-';
 
   const buka = (it, item) => {
@@ -105,6 +106,7 @@ export default function PortofolioChecklist({ pesertaId, mode }) {
                             key={s}
                             type="button"
                             aria-pressed={item.status === s}
+                            disabled={terkunci}
                             onClick={() => ubahPortofolio(it.id, { status: s })}
                             className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${
                               item.status === s
@@ -191,7 +193,7 @@ export default function PortofolioChecklist({ pesertaId, mode }) {
                   )}
 
                   <div className="no-print mt-2 flex flex-wrap items-center gap-3">
-                    {(mode === 'peserta' || bisaMenilai) && (
+                    {((mode === 'peserta' && !terkunci) || bisaMenilai) && (
                       <button
                         onClick={() => buka(it, item)}
                         aria-expanded={terbuka}

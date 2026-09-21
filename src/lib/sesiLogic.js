@@ -125,7 +125,7 @@ export function dariPengajuan(progress, users) {
   const peserta = new Set();
   const butir = new Set();
   for (const u of users) {
-    if (u.role !== 'peserta') continue;
+    if (u.role !== 'peserta' || (u.status ?? 'aktif') !== 'aktif') continue;
     for (const [skuId, e] of Object.entries(progress[u.id] ?? {})) {
       if (e.status !== 'diajukan') continue;
       peserta.add(u.id);

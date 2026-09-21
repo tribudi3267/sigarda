@@ -5,15 +5,18 @@ import { ringkasDaftarRombel } from '../lib/rombelLogic';
 import { JENIS_KELAMIN, JK_BELUM_DIISI, labelJenisKelamin } from '../lib/jenisKelaminLogic';
 import { Icon } from './ui';
 
-export const FILTER_AWAL = { q: '', sangga: '', kelas: '', peran: '', agama: '', jk: '', saya: false };
+export const FILTER_AWAL = { q: '', sangga: '', kelas: '', peran: '', agama: '', jk: '', saya: false, status: 'aktif' };
+export const STATUS_SEMUA = 'semua';
 
 /**
  * `f.rombel` (larik; diisi filterEfektif dari "rombel saya") membatasi ke rombel itu; kosong = tanpa batas.
  * Halaman pengurus memakai useFilterRombel (src/hooks/useRombelSaya.js) agar filter ini menyala sejak awal bagi penguji yang punya rombel.
+ * `f.status` (aktif, nonaktif, alumni, atau 'semua'); tanpa isian = 'aktif', jadi Penegak nonaktif dan alumni tidak ikut kecuali diminta.
  */
 export const terapkanFilter = (daftar, f) =>
   daftar.filter(
     (u) =>
+      (f.status === STATUS_SEMUA || (u.status ?? 'aktif') === (f.status || 'aktif')) &&
       (!f.rombel?.length || f.rombel.includes(u.kelas)) &&
       (!f.sangga || u.sangga === f.sangga) &&
       (!f.kelas || u.kelas === f.kelas) &&
@@ -49,13 +52,14 @@ export default function FilterBar({ data, filter, setFilter, tampil = TAMPIL_STA
 
   // Bila nilai yang dipilih sudah tidak ada pada data (mis. anggota dihapus), kembalikan ke "semua"
   useEffect(() => {
-    const salah = tampil.filter((k) => filter[k] && !opsi[k].includes(filter[k]));
+    const salah = tampil.filter((k) => k !== 'status' && filter[k] && !opsi[k].includes(filter[k]));
     if (salah.length) setFilter({ ...filter, ...Object.fromEntries(salah.map((k) => [k, ''])) });
   }, [opsi, filter, setFilter, tampil]);
 
   const ubah = (k) => (e) => setFilter({ ...filter, [k]: e.target.value, ...(k === 'kelas' && e.target.value ? { saya: false } : {}) });
   const punyaRombel = rombelSaya.length > 0;
-  const aktif = filter.q || (filter.saya && punyaRombel) || tampil.some((k) => filter[k]);
+  const statusDipakai = tampil.includes('status');
+  const aktif = filter.q || (filter.saya && punyaRombel) || tampil.some((k) => k !== 'status' && filter[k]) || (statusDipakai && (filter.status ?? 'aktif') !== 'aktif');
 
   return (
     <div className="no-print flex flex-wrap items-center gap-2">
@@ -87,6 +91,14 @@ export default function FilterBar({ data, filter, setFilter, tampil = TAMPIL_STA
         </label>
       )}
 
+      {tampil.includes('status') && (
+        <select className="input w-full sm:w-44" value={filter.status ?? 'aktif'} onChange={ubah('status')} aria-label="Filter status anggota">
+          <option value="aktif">Status: Aktif</option>
+          <option value="nonaktif">Status: Nonaktif</option>
+          <option value="alumni">Status: Alumni</option>
+          <option value={STATUS_SEMUA}>Semua status</option>
+        </select>
+      )}
       {tampil.includes('sangga') && (
         <select className="input w-full sm:w-44" value={filter.sangga} onChange={ubah('sangga')} aria-label="Filter sangga">
           <option value="">Semua sangga</option>

@@ -21,7 +21,7 @@ const LencanaStatus = ({ status }) => <span className={`${CHIP} ${STATUS_SESI[st
 function EditorSesi({ awal, onTutup }) {
   const { users, progress, simpanSesiUjian } = useApp();
   const semuaPeserta = useMemo(
-    () => users.filter((u) => u.role === 'peserta').sort((a, b) => (a.kelas ?? '').localeCompare(b.kelas ?? '', 'id', { numeric: true }) || a.nama.localeCompare(b.nama, 'id')),
+    () => users.filter((u) => u.role === 'peserta' && (u.status ?? 'aktif') === 'aktif').sort((a, b) => (a.kelas ?? '').localeCompare(b.kelas ?? '', 'id', { numeric: true }) || a.nama.localeCompare(b.nama, 'id')),
     [users]
   );
   const [nama, setNama] = useState(awal?.nama ?? '');

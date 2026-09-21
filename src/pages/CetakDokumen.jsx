@@ -12,8 +12,10 @@ import { Icon, Kosong } from '../components/ui';
  * PDF: klik "Cetak", lalu pilih "Simpan sebagai PDF" pada dialog cetak browser.
  */
 export default function CetakDokumen({ pesertaId: idAwal, bolehPilih, jenisAwal = 'kartu' }) {
-  const { daftarPeserta, progress, tokenSuratTingkat, dokumen, muatDokumen, bolehSurat, muatSidang } = useApp();
-  const daftar = [...daftarPeserta].sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+  const { daftarPeserta, daftarPesertaSemua, progress, tokenSuratTingkat, dokumen, muatDokumen, bolehSurat, muatSidang } = useApp();
+  const [termasukArsip, setTermasukArsip] = useState(false); // pilihan peserta: sertakan nonaktif dan alumni (dokumen tetap dapat dicetak)
+  const awal = daftarPesertaSemua.find((u) => u.id === idAwal);
+  const daftar = [...(termasukArsip || (awal && (awal.status ?? 'aktif') !== 'aktif') ? daftarPesertaSemua : daftarPeserta)].sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
 
   const [id, setId] = useState(idAwal ?? daftar[0]?.id);
   const [jenis, setJenis] = useState(jenisAwal);
@@ -21,7 +23,7 @@ export default function CetakDokumen({ pesertaId: idAwal, bolehPilih, jenisAwal 
   const [tingkat, setTingkat] = useState('Bantara');
   const [surat, setSurat] = useState({ kunci: '', token: null, galat: '' }); // token QR Surat Tanda Lulus untuk peserta dan tingkat `kunci`
 
-  const peserta = daftarPeserta.find((u) => u.id === id);
+  const peserta = daftarPesertaSemua.find((u) => u.id === id);
   const selesai = peserta ? tingkatSelesai(progress, peserta, tingkat) : false;
   const kunciSurat = `${peserta?.id}|${tingkat}`;
 
@@ -63,8 +65,14 @@ export default function CetakDokumen({ pesertaId: idAwal, bolehPilih, jenisAwal 
         <div className="flex flex-wrap items-center gap-3">
           {bolehPilih && (
             <select className="input w-full sm:w-64" value={peserta.id} onChange={(e) => setId(e.target.value)} aria-label="Pilih peserta">
-              {daftar.map((u) => <option key={u.id} value={u.id}>{u.nama} (kelas {u.kelas})</option>)}
+              {daftar.map((u) => <option key={u.id} value={u.id}>{u.nama} (kelas {u.kelas}){(u.status ?? 'aktif') !== 'aktif' ? `, ${u.status}` : ''}</option>)}
             </select>
+          )}
+          {bolehPilih && (
+            <label className="flex items-center gap-2 text-sm text-pramuka-700">
+              <input type="checkbox" className="h-4 w-4 accent-emas" checked={termasukArsip} onChange={(e) => setTermasukArsip(e.target.checked)} />
+              Termasuk nonaktif dan alumni
+            </label>
           )}
 
           {jenis !== 'surat' && <TingkatTabs nilai={tingkat} onUbah={setTingkat} />}

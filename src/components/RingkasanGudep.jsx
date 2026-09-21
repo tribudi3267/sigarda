@@ -18,7 +18,7 @@ import KartuIuran from './KartuIuran';
  * onNav(tab, pesertaId?) berpindah ke menu terkait.
  */
 export default function RingkasanGudep({ onNav }) {
-  const { daftarPeserta, absensi, portofolio } = useApp();
+  const { daftarPeserta, daftarPesertaSemua, absensi, portofolio } = useApp();
 
   const ta = tahunAjaranDari(hariIni());
   const periode = periodeDari(hariIni());
@@ -37,6 +37,7 @@ export default function RingkasanGudep({ onNav }) {
   const pf = ringkasPortofolio(garuda);
 
   const jk = hitungJenisKelamin(daftarPeserta);
+  const arsip = { nonaktif: daftarPesertaSemua.filter((u) => u.status === 'nonaktif').length, alumni: daftarPesertaSemua.filter((u) => u.status === 'alumni').length };
   const perPeran = URUTAN_PERAN.map((p) => ({ peran: p, jumlah: daftarPeserta.filter((u) => u.peran === p).length }));
 
   return (
@@ -59,6 +60,9 @@ export default function RingkasanGudep({ onNav }) {
           Laki-laki <span className="font-semibold text-pramuka-800">{jk.L}</span>, perempuan <span className="font-semibold text-pramuka-800">{jk.P}</span>
           {jk.kosong > 0 && <>, <span className="font-semibold text-amber-700">{jk.kosong} belum diisi jenis kelaminnya</span></>}
         </p>
+        {(arsip.nonaktif > 0 || arsip.alumni > 0) && (
+          <p className="mt-1 text-xs text-pramuka-500">Tidak dihitung di atas: {arsip.nonaktif} nonaktif, {arsip.alumni} alumni (lihat di menu Anggota atau Peserta dengan filter Status).</p>
+        )}
       </section>
 
       <section aria-label="Rekap absensi">

@@ -3,7 +3,7 @@
  * Hanya dimuat saat VITE_BACKEND=lokal (`npm run dev:lokal`). Tidak ikut ke build produksi.
  */
 import { buatKlienFake, siapkanPg } from './klienFake';
-import { isiDataContoh } from './seedLokal';
+import { isiDataContoh, isiStatusContoh } from './seedLokal';
 import { isiInstrumenContoh } from './instrumenContoh';
 
 const NAMA_DB = 'sigarda-lokal';
@@ -31,6 +31,7 @@ export async function bootLokal() {
   if (!sudahAda) {
     await siapkanPg(pg, { sqlStub: stub.default, sqlSkema: skema.default });
     await isiDataContoh(pg);
+    await isiStatusContoh(pg);
     await isiInstrumenContoh(pg);
   }
 

@@ -84,11 +84,16 @@ export function AppProvider({ children }) {
   }, [toast]);
 
   const user = useMemo(() => db.users.find((u) => u.id === sesiId) ?? null, [db.users, sesiId]);
-  const daftarPeserta = useMemo(() => pesertaDenganPeran(db.progress, db.users), [db.progress, db.users]);
+  /** Semua Penegak (termasuk nonaktif dan alumni) dengan peran turunannya: untuk mencari satu orang, halaman Anggota, dan filter status. */
+  const daftarPesertaSemua = useMemo(() => pesertaDenganPeran(db.progress, db.users), [db.progress, db.users]);
+  /** Penegak yang AKTIF: daftar kerja (rekap, absensi, iuran, antrian, dashboard). Nonaktif dan alumni hanya dapat dilihat. */
+  const daftarPeserta = useMemo(() => daftarPesertaSemua.filter((u) => (u.status ?? 'aktif') === 'aktif'), [daftarPesertaSemua]);
   const peranUser = useMemo(
-    () => (user?.role === 'peserta' ? daftarPeserta.find((p) => p.id === user.id)?.peran ?? null : null),
-    [daftarPeserta, user]
+    () => (user?.role === 'peserta' ? daftarPesertaSemua.find((p) => p.id === user.id)?.peran ?? null : null),
+    [daftarPesertaSemua, user]
   );
+  /** Penegak yang sedang masuk berstatus nonaktif atau alumni: seluruh aksi tulis disembunyikan (server juga menolaknya). */
+  const hanyaLihatSaya = user?.role === 'peserta' && (user.status ?? 'aktif') !== 'aktif';
 
   /* ------------------------- Memuat dan menyegarkan ------------------------- */
   const api = () => apiRef.current;
@@ -498,7 +503,7 @@ export function AppProvider({ children }) {
 
   /* ------------- Iuran bumbung kepramukaan (dicatat Dewan Ambalan atau asisten bendahara) ------------- */
   const dewanAmbalan = user?.role === 'penguji' && user?.jabatan === 'Dewan Ambalan';
-  const asistenSaya = user?.role === 'peserta' && db.asisten.some((a) => a.pesertaId === user.id);
+  const asistenSaya = user?.role === 'peserta' && !hanyaLihatSaya && db.asisten.some((a) => a.pesertaId === user.id);
   const pencatatIuran = dewanAmbalan || asistenSaya;
   const penunjukAsisten = dewanAmbalan || (user?.role === 'penguji' && user?.jabatan === 'Pembina');
   const MSG_IURAN = 'Hanya Dewan Ambalan atau asisten bendahara yang dapat mencatat iuran.';
@@ -912,6 +917,54 @@ export function AppProvider({ children }) {
     return r;
   };
 
+  /* ---------------- Status anggota dan naik kelas (Admin; Pembina boleh mengaktifkan/nonaktifkan satu orang) ---------------- */
+  /**
+   * Kenaikan kelas massal. terapkan = false: pratinjau (tidak mengubah apa pun). true: menerapkan lalu menyegarkan data. Mengembalikan { ok, data } dengan
+   * data = { galat, ringkasan, baris, batch }; pesan galat ditampilkan pemanggil (bukan toast) agar dapat berdampingan dengan pratinjau.
+   */
+  const naikKelas = async (tahunAjaran, daftar, terapkan = false) => {
+    if (user?.role !== 'admin') return ditolak(notify, 'Hanya Admin Gudep yang dapat menaikkan kelas.');
+    const r = await api().naikKelas(tahunAjaran, daftar, terapkan);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    if (terapkan) {
+      await Promise.all([segarkan.users(), segarkan.progress?.()].filter(Boolean));
+      notify('Kenaikan kelas diterapkan.');
+    }
+    return r;
+  };
+  const batalkanNaikKelas = async (batchId) => {
+    if (user?.role !== 'admin') return ditolak(notify, 'Hanya Admin Gudep yang dapat membatalkan kenaikan kelas.');
+    const r = await api().batalkanNaikKelas(batchId);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    await segarkan.users();
+    notify(`Kenaikan kelas dibatalkan: ${r.data} Penegak dikembalikan.`);
+    return r;
+  };
+  /** Status satu Penegak: 'aktif' (rombel wajib), 'nonaktif', 'alumni' (hanya Admin). Pembina dan Admin. */
+  const aturStatusAnggota = async (id, statusBaru, rombel = null, catatan = '') => {
+    if (user?.role !== 'admin' && !(user?.role === 'penguji' && user.jabatan === 'Pembina')) return ditolak(notify, 'Hanya Pembina dan Admin Gudep yang dapat mengubah status anggota.');
+    const r = await api().aturStatusAnggota(id, statusBaru, rombel, catatan);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    await Promise.all([segarkan.users(), segarkan.progress?.()].filter(Boolean));
+    notify(statusBaru === 'aktif' ? 'Penegak diaktifkan kembali.' : statusBaru === 'alumni' ? 'Penegak ditetapkan sebagai alumni.' : 'Penegak dinonaktifkan.');
+    return r;
+  };
+  /** Riwayat kenaikan kelas dan perubahan status (pengurus): { batch, log }. */
+  const muatNaikKelas = async () => {
+    const r = await api().muatNaikKelas();
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  };
+
   /* ---------------- Penugasan penguji per rombel dan guru agama (Admin mengatur, pengurus melihat) ---------------- */
   const MSG_PENUGASAN = 'Hanya Admin Gudep yang dapat mengatur penugasan penguji.';
 
@@ -1031,7 +1084,8 @@ export function AppProvider({ children }) {
     sesiUjian: db.sesiUjian, sesiUjianGalat: db.sesiUjianGalat, sesiUjianSiap, pastikanSesiUjian, simpanSesiUjian, ubahStatusSesiUjian, hapusSesiUjian, bolehHapusSesi,
     muatUlangProgress, tokenSuratTingkat, tokenSidang, muatPenilaian,
     asisten: db.asisten, pengaturanIuran: db.pengaturanIuran, simpanPengaturanIuran, dewanAmbalan, asistenSaya, pencatatIuran, penunjukAsisten, versiIuran, bacaIuran, catatIuranSusulan, aturIuran, aturIuranBanyak, simpanKas, aturAsisten,
-    daftarPeserta, peranUser, bolehKelolaAbsen,
+    daftarPeserta, daftarPesertaSemua, peranUser, hanyaLihatSaya, bolehKelolaAbsen,
+    naikKelas, batalkanNaikKelas, aturStatusAnggota, muatNaikKelas,
     login, logout,
     ajukan, batalkanAjuan, pengujiPilihan, alihkanPengajuan, catatHasil,
     daftarCalonGaruda, ubahPortofolio, catatPortofolioPenguji,

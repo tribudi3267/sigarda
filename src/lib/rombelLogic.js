@@ -38,7 +38,7 @@ export function normalisasiRombel(teks) {
 }
 
 /** Penegak yang kelasnya belum berupa rombel baku (data lama: "X", "XI", "XII", dan sejenisnya). */
-export const pesertaRombelLama = (users) => users.filter((u) => u.role === 'peserta' && !rombelSah(u.kelas));
+export const pesertaRombelLama = (users) => users.filter((u) => u.role === 'peserta' && (u.status ?? 'aktif') === 'aktif' && !rombelSah(u.kelas));
 
 /* ------------------------------ Tahun ajaran ------------------------------ */
 
@@ -67,7 +67,7 @@ export const kunciPenugasan = (baris = []) => new Set(baris.map((b) => `${b.peng
 /** Jumlah Penegak per rombel baku: { 'X-01': 3, ... } (rombel format lama tidak dihitung). */
 export const jumlahPesertaPerRombel = (users) => {
   const h = {};
-  for (const u of users) if (u.role === 'peserta' && rombelSah(u.kelas)) h[u.kelas] = (h[u.kelas] ?? 0) + 1;
+  for (const u of users) if (u.role === 'peserta' && (u.status ?? 'aktif') === 'aktif' && rombelSah(u.kelas)) h[u.kelas] = (h[u.kelas] ?? 0) + 1;
   return h;
 };
 
@@ -92,7 +92,7 @@ export function ringkasRombel(baris, users) {
  */
 export function cakupanAgama(users, guruAgama = []) {
   return AGAMA.map((agama) => {
-    const penegak = users.filter((u) => u.role === 'peserta' && u.agama === agama).length;
+    const penegak = users.filter((u) => u.role === 'peserta' && (u.status ?? 'aktif') === 'aktif' && u.agama === agama).length;
     const pembina = users.filter((u) => u.role === 'penguji' && u.jabatan === 'Pembina' && u.agama === agama);
     const guru = guruAgama.filter((g) => g.agama === agama);
     return { agama, penegak, pembina, guru, perluSurat: penegak > 0 && pembina.length === 0 };

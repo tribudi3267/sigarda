@@ -11,7 +11,7 @@ import RekapKesiapan, { JurnalTerbaru } from '../components/RekapKesiapan';
 import { Avatar, Icon, Kosong, ProgressBar } from '../components/ui';
 
 function Detail({ pesertaId, onKembali, onBukaSku }) {
-  const { daftarPeserta } = useApp();
+  const { daftarPesertaSemua: daftarPeserta } = useApp();
   const peserta = daftarPeserta.find((u) => u.id === pesertaId);
   if (!peserta || peserta.peran !== 'calon-garuda') {
     return (

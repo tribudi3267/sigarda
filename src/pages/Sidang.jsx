@@ -53,7 +53,7 @@ function Pilihan({ nilai, ubah, opsi, label, kunci = false }) {
 /* ============================ Lembar sidang (jendela) ============================ */
 
 function LembarSidang({ pesertaId, tingkat, tutup, tersimpan }) {
-  const { daftarPeserta, users, progress, sidang, sidangUrut, pengaturan, simpanSidang } = useApp();
+  const { daftarPesertaSemua: daftarPeserta, users, progress, sidang, sidangUrut, pengaturan, simpanSidang } = useApp();
   const peserta = daftarPeserta.find((u) => u.id === pesertaId);
   const kes = useMemo(() => (peserta ? lembarKesiapan(progress, users, peserta, tingkat) : null), [progress, users, peserta, tingkat]);
   const pn = pengaturanSidang(pengaturan);

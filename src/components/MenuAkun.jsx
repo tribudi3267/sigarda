@@ -26,7 +26,9 @@ export default function MenuAkun({ varian, tab, setTab }) {
   const penunda = useRef(null);
   const posisi = varian === 'kartu' ? 'atas' : varian === 'ikon' ? 'samping' : 'bawah';
   const pengurus = user.role !== 'peserta';
-  const labelPeran = user.role === 'peserta' ? PERAN[peranUser]?.label ?? 'Penegak' : user.role === 'penguji' ? user.jabatan : 'Admin Gudep';
+  const labelPeran = user.role === 'peserta'
+    ? `${PERAN[peranUser]?.label ?? 'Penegak'}${(user.status ?? 'aktif') !== 'aktif' ? ` (${user.status === 'alumni' ? 'alumni' : 'nonaktif'})` : ''}`
+    : user.role === 'penguji' ? user.jabatan : 'Admin Gudep';
 
   const tutup = () => { clearTimeout(penunda.current); setBuka(false); setSematkan(false); };
 

@@ -22,6 +22,7 @@ import Raport from './pages/Raport';
 import KelolaInstrumen from './pages/KelolaInstrumen';
 import Penugasan from './pages/Penugasan';
 import DataGudep from './pages/DataGudep';
+import NaikKelas from './pages/NaikKelas';
 import SesiUjian from './pages/SesiUjian';
 import Iuran from './pages/Iuran';
 import Notifikasi from './pages/Notifikasi';
@@ -37,7 +38,7 @@ import LogoMark from './components/LogoMark';
  *  Pengujian SKU    : Penegak: Poin SKU, Cetak. Dewan/Pembina: Antrian, Peserta, Sesi, Instrumen dan Penugasan (Pembina), Sidang, Cetak. Admin: Sesi, Instrumen, Sidang, Cetak
  *  Kegiatan Ambalan : Absensi, Iuran (semua peran), Portofolio (pengurus), Raport (Pembina dan Admin)
  *  Materi           : Materi, Kelola Materi (Pembina dan Admin)
- *  Pengelolaan      : Anggota (Admin)
+ *  Pengelolaan      : Anggota, Naik Kelas, Data Gudep (Admin)
  * Akun saya dan Reset PIN anggota (pengurus) tidak ada di daftar ini: keduanya di menu akun (nama pengguna di menu samping atau header).
  */
 function buatNav(user, peran, belumDibaca = 0) {
@@ -76,7 +77,7 @@ function buatNav(user, peran, belumDibaca = 0) {
     { judul: 'Pengujian SKU', item: [sesi, instrumen, sidang, cetak] },
     { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, raport] },
     { judul: 'Materi', item: [materi, kelola] },
-    { judul: 'Pengelolaan', item: [{ id: 'anggota', label: 'Anggota', ikon: 'anggota' }, { id: 'gudep', label: 'Data Gudep', ikon: 'perisai' }] },
+    { judul: 'Pengelolaan', item: [{ id: 'anggota', label: 'Anggota', ikon: 'anggota' }, { id: 'naikkelas', label: 'Naik Kelas', ikon: 'naikkelas' }, { id: 'gudep', label: 'Data Gudep', ikon: 'perisai' }] },
   ];
 }
 function Toast() {
@@ -219,6 +220,8 @@ function Shell() {
     isi = <KelolaInstrumen />;
   } else if (tabAktif === 'gudep' && user.role === 'admin') {
     isi = <DataGudep />;
+  } else if (tabAktif === 'naikkelas' && user.role === 'admin') {
+    isi = <NaikKelas />;
   } else if (tabAktif === 'penugasan' && user.role === 'penguji' && user.jabatan === 'Pembina') {
     isi = <Penugasan />;
   } else if (tabAktif === 'materi') {

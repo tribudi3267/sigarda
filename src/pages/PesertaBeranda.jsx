@@ -10,7 +10,7 @@ import KartuIuran from '../components/KartuIuran';
 import { Badge, Icon, Kosong, Lencana, ProgressBar, TeksPoin } from '../components/ui';
 
 export default function PesertaBeranda({ setTab, setTingkat }) {
-  const { user, users, progress, absensi, peranUser, batalkanAjuan, daftarCalonGaruda } = useApp();
+  const { user, users, progress, absensi, peranUser, batalkanAjuan, daftarCalonGaruda, hanyaLihatSaya } = useApp();
 
   const bantara = hitungProgres(progress, user, 'Bantara');
   const laksana = hitungProgres(progress, user, 'Laksana');
@@ -64,7 +64,7 @@ export default function PesertaBeranda({ setTab, setTingkat }) {
         </div>
       </section>
 
-      {layakGaruda(progress, user) && (
+      {layakGaruda(progress, user) && !hanyaLihatSaya && (
         <section className="jahitan flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white p-4">
           <div>
             <p className="flex items-center gap-2 font-semibold text-pramuka-900">
@@ -156,7 +156,7 @@ export default function PesertaBeranda({ setTab, setTingkat }) {
                   <Icon nama="kalender" className="h-3.5 w-3.5" />
                   {poin.tingkat}, {fmtTanggal(entry.jadwal ?? entry.tanggalUji)}, penguji {entry.pengujiId ? namaPenguji(entry.pengujiId) : 'antrian rombel'}
                 </p>
-                {entry.status === 'diajukan' && (
+                {entry.status === 'diajukan' && !hanyaLihatSaya && (
                   <button className="btn btn-outline btn-sm mt-2" onClick={() => batalkanAjuan(poin.id)}>
                     Batalkan pengajuan
                   </button>

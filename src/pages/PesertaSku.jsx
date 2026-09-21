@@ -8,13 +8,14 @@ import AjukanModal from '../components/AjukanModal';
 import { Icon, ProgressBar } from '../components/ui';
 
 export default function PesertaSku({ tingkat, setTingkat, onBukaMateri }) {
-  const { user, progress, batalkanAjuan } = useApp();
+  const { user, progress, batalkanAjuan, hanyaLihatSaya } = useApp();
   const [ajukanPoin, setAjukanPoin] = useState(null);
 
   const terbuka = tingkat === 'Bantara' || laksanaTerbuka(progress, user);
   const h = hitungProgres(progress, user, tingkat);
 
   const renderAksi = (poin, entry) => {
+    if (hanyaLihatSaya) return null; // nonaktif dan alumni hanya dapat melihat
     if (entry.status === 'diajukan') {
       return (
         <button className="btn btn-outline btn-sm" onClick={() => batalkanAjuan(poin.id)}>

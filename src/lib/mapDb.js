@@ -30,6 +30,9 @@ export function petaProfil(r) {
     jabatan: atau(r.jabatan),
     jabatanDewan: atau(r.jabatan_dewan),
     jenisKelamin: atau(r.jenis_kelamin),
+    status: r.status ?? 'aktif',
+    statusPada: tgl(r.status_pada) ?? undefined,
+    lulusTa: atau(r.lulus_ta),
     calonGaruda: r.calon_garuda ? tgl(r.calon_garuda) : undefined,
     nta: atau(r.nta),
     wajibGantiPin: r.wajib_ganti_pin !== false,
@@ -265,6 +268,19 @@ export const susunLogPenugasan = (baris = []) =>
     id: Number(r.id), waktu: r.waktu, tahunAjaran: r.tahun_ajaran, rombel: r.rombel, pengujiId: r.penguji_id ?? null,
     pengujiNama: r.penguji_nama, tindakan: r.tindakan, catatan: r.catatan ?? '', olehNama: r.oleh_nama ?? '',
   }));
+
+/** Baris naik_kelas_batch -> [{ id, waktu, tahunAjaran, ringkasan, olehNama, dibatalkanPada }] (terbaru lebih dulu) */
+export const susunBatchNaikKelas = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), waktu: r.waktu, tahunAjaran: r.tahun_ajaran, ringkasan: r.ringkasan ?? {}, olehNama: r.oleh_nama ?? '', dibatalkanPada: r.dibatalkan_pada ?? null,
+  })).sort((a, b) => b.id - a.id);
+
+/** Baris naik_kelas_log -> [{ id, batchId, waktu, pesertaId, pesertaNama, nis, aksi, dariKelas, keKelas, dariStatus, keStatus, catatan, olehNama }] (terbaru lebih dulu) */
+export const susunLogNaikKelas = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), batchId: r.batch_id == null ? null : Number(r.batch_id), waktu: r.waktu, pesertaId: r.peserta_id ?? null, pesertaNama: r.peserta_nama, nis: r.nis ?? '',
+    aksi: r.aksi, dariKelas: r.dari_kelas ?? null, keKelas: r.ke_kelas ?? null, dariStatus: r.dari_status, keStatus: r.ke_status, catatan: r.catatan ?? '', olehNama: r.oleh_nama ?? '',
+  })).sort((a, b) => b.id - a.id);
 
 /** Baris guru_agama -> [{ id, agama, nama, keterangan }] */
 export const susunGuruAgama = (baris = []) =>

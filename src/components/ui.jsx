@@ -47,6 +47,7 @@ const IKON = {
   keluarTab: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
   sidang: '<line x1="12" y1="3" x2="12" y2="21"/><line x1="5" y1="7" x2="19" y2="7"/><path d="M5 7l-3 7a3 3 0 0 0 6 0z"/><path d="M19 7l-3 7a3 3 0 0 0 6 0z"/><line x1="8" y1="21" x2="16" y2="21"/>',
   iuran: '<circle cx="12" cy="12" r="9"/><path d="M14.7 9.2a2.7 2.2 0 0 0-2.7-1.4c-1.5 0-2.7.8-2.7 2s1.2 1.7 2.7 2 2.7.8 2.7 2-1.2 2-2.7 2a2.7 2.2 0 0 1-2.7-1.4"/><line x1="12" y1="6" x2="12" y2="7.8"/><line x1="12" y1="16.2" x2="12" y2="18"/>',
+  naikkelas: '<polyline points="17 11 12 6 7 11"/><line x1="12" y1="6" x2="12" y2="18"/><line x1="5" y1="21" x2="19" y2="21"/>',
   penugasan: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><polyline points="15 17.5 17 19.5 21 15.5"/>',
   lonceng: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
   sesi: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><polyline points="7 14 9 16 13 12"/><line x1="15" y1="15" x2="18" y2="15"/>',
@@ -92,6 +93,13 @@ export function Badge({ status }) {
 }
 
 const CHIP = 'inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset';
+
+const WARNA_STATUS = { aktif: 'bg-emerald-50 text-emerald-900 ring-emerald-200', nonaktif: 'bg-amber-50 text-amber-900 ring-amber-300', alumni: 'bg-pramuka-100 text-pramuka-800 ring-pramuka-300' };
+const LABEL_STATUS = { aktif: 'Aktif', nonaktif: 'Nonaktif', alumni: 'Alumni' };
+/** Lencana status keanggotaan Penegak (aktif, nonaktif, alumni). */
+export function BadgeStatus({ status = 'aktif' }) {
+  return <span className={`${CHIP} ${WARNA_STATUS[status] ?? WARNA_STATUS.aktif}`}>{LABEL_STATUS[status] ?? status}</span>;
+}
 
 /** Lencana peran: Penegak Calon Bantara, Calon Laksana, atau Calon Garuda. */
 export function BadgePeran({ peran, singkat = false }) {

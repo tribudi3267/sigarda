@@ -15,8 +15,9 @@ import ImportAnggotaModal from '../components/ImportAnggotaModal';
 import PenugasanRombel from '../components/PenugasanRombel';
 import PerbaruiRombelModal from '../components/PerbaruiRombelModal';
 import LengkapiJenisKelaminModal from '../components/LengkapiJenisKelaminModal';
+import UbahStatusModal from '../components/UbahStatusModal';
 import { LOKAL } from '../lib/supabaseClient';
-import { Avatar, BadgePeran, Field, Icon, Kosong, Modal } from '../components/ui';
+import { Avatar, BadgePeran, BadgeStatus, Field, Icon, Kosong, Modal } from '../components/ui';
 
 const BARU = { role: 'peserta', nama: '', jenisKelamin: '', nis: '', username: '', kelas: '', sangga: '', agama: AGAMA[0], jabatan: '', jabatanDewan: '', pin: '', nta: '' };
 const TAB_PENUGASAN = 'penugasan';
@@ -262,7 +263,7 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
 }
 
 export default function AdminAnggota() {
-  const { users, daftarPeserta, hapusAnggota, user, lokal } = useApp();
+  const { users, daftarPesertaSemua, hapusAnggota, user, lokal } = useApp();
   const [filter, setFilter] = useState(FILTER_AWAL);
   const [kelompok, setKelompok] = useState('peserta');
   const [form, setForm] = useState(null);
@@ -271,6 +272,7 @@ export default function AdminAnggota() {
   const [jkModal, setJkModal] = useState(false);
   const [cari, setCari] = useState('');
   const [akunBaru, setAkunBaru] = useState(null);
+  const [statusFor, setStatusFor] = useState(null); // Penegak yang statusnya sedang diubah
 
   const penugasan = kelompok === TAB_PENUGASAN;
   const aktif = KELOMPOK_PENGGUNA.find((k) => k.id === kelompok);
@@ -282,10 +284,10 @@ export default function AdminAnggota() {
       penugasan
         ? []
         : kelompok === 'peserta'
-        ? terapkanFilter(daftarPeserta, filter)
+        ? terapkanFilter(daftarPesertaSemua, filter)
         : users.filter((u) => cocokKelompok(aktif, u) && (!kata || normalisasiNama(u.nama).includes(kata)));
     return dasar.slice().sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
-  }, [kelompok, aktif, daftarPeserta, users, filter, cari]);
+  }, [kelompok, aktif, daftarPesertaSemua, users, filter, cari]);
 
   const hapus = (u) => {
     if (window.confirm(`Hapus ${u.nama}? Seluruh data progres, absensi, dan portofolionya ikut terhapus.`)) hapusAnggota(u.id);
@@ -352,7 +354,7 @@ export default function AdminAnggota() {
       )}
 
       {kelompok === 'peserta' && (
-        <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'peran', 'agama', 'jk']} /></div>
+        <div className="mb-3"><FilterBar data={daftarPesertaSemua} filter={filter} setFilter={setFilter} tampil={['status', 'sangga', 'kelas', 'peran', 'agama', 'jk']} /></div>
       )}
 
       {penugasan && <PenugasanRombel bolehUbah onPerbaruiRombel={() => setRombelModal(true)} />}
@@ -383,13 +385,18 @@ export default function AdminAnggota() {
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-pramuka-500">
                   {u.role === 'peserta' && (
                     <>
-                      NIS {u.nis || '-'}, {ketJk(u.jenisKelamin)}, rombel {u.kelas}, {u.sangga}, {u.agama}{u.nta ? `, NTA ${u.nta}` : ''} <BadgePeran peran={u.peran} singkat />
+                      NIS {u.nis || '-'}, {ketJk(u.jenisKelamin)}, rombel {u.kelas}, {u.sangga}, {u.agama}{u.nta ? `, NTA ${u.nta}` : ''} <BadgePeran peran={u.peran} singkat />{(u.status ?? 'aktif') !== 'aktif' && <BadgeStatus status={u.status} />}{u.status === 'alumni' && u.lulusTa ? ` lulus ${u.lulusTa}` : ''}
                     </>
                   )}
                   {u.role === 'penguji' && <>{u.jabatan}{u.jabatanDewan ? ` (${u.jabatanDewan})` : ''}, {ketJk(u.jenisKelamin)}{u.jabatan === 'Pembina' ? `, agama ${u.agama ?? 'belum diisi'}` : ''}{u.jabatan === 'Dewan Ambalan' && u.nta ? `, NTA ${u.nta}` : ''}, pengguna <span className="font-mono">{u.username}</span></>}
                   {u.role === 'admin' && <>Admin Gudep, {ketJk(u.jenisKelamin)}, pengguna <span className="font-mono">{u.username}</span></>}
                 </p>
               </div>
+              {u.role === 'peserta' && (
+                <button className="rounded-md px-2 py-1.5 text-xs font-semibold text-pramuka-700 ring-1 ring-inset ring-pramuka-300 hover:bg-pramuka-100" aria-label={`Status ${u.nama}`} onClick={() => setStatusFor(u)}>
+                  Status
+                </button>
+              )}
               <button className="rounded-md p-2 text-pramuka-600 hover:bg-pramuka-100" aria-label={`Ubah ${u.nama}`} onClick={() => setForm(u)}>
                 <Icon nama="ubah" className="h-4 w-4" />
               </button>
@@ -416,6 +423,7 @@ export default function AdminAnggota() {
         </div>
       )}
 
+      {statusFor && <UbahStatusModal peserta={statusFor} onTutup={() => setStatusFor(null)} />}
       {form && <FormAnggota awal={form} onTutup={() => setForm(null)} onAkunBaru={setAkunBaru} />}
       {akunBaru && <AkunBaru akun={akunBaru} onTutup={() => setAkunBaru(null)} />}
       {rombelModal && <PerbaruiRombelModal onTutup={() => setRombelModal(false)} />}

@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunBatchNaikKelas, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -313,6 +313,23 @@ export function buatApi(klien) {
     aturJabatanDewan: (daftar) => rpc('sg_anggota_jabatan_dewan_atur', { p_data: daftar }),
     /** Rombel banyak Penegak sekaligus (Admin). `daftar` = [{ username (NIS), rombel }]. Semua atau tidak sama sekali. Mengembalikan jumlah baris. */
     perbaruiRombel: (daftar) => rpc('sg_rombel_perbarui', { p_data: daftar }),
+
+    /* ------------------- Status anggota dan naik kelas (fase 6a) ------------------- */
+    /**
+     * Kenaikan kelas massal (Admin). `tahunAjaran` = tahun ajaran yang baru dimulai; `daftar` = [{ username (NIS), rombel, aksi: 'lanjut' | 'tidak_lanjut' | 'lulus' }].
+     * terapkan = false: pratinjau (tidak mengubah apa pun). true: semua atau tidak sama sekali. Hasil: { galat, ringkasan, baris: [...], batch }.
+     */
+    naikKelas: (tahunAjaran, daftar, terapkan = false) => rpc('sg_naik_kelas', { p_tahun_ajaran: tahunAjaran, p_data: daftar, p_terapkan: terapkan }),
+    /** Membatalkan kenaikan kelas terakhir (Admin). Mengembalikan jumlah Penegak yang dikembalikan. */
+    batalkanNaikKelas: (batchId) => rpc('sg_naik_kelas_batalkan', { p_batch: batchId }),
+    /** Status satu Penegak (Pembina dan Admin; alumni hanya Admin): status 'aktif' (rombel wajib), 'nonaktif', atau 'alumni'. */
+    aturStatusAnggota: (id, status, rombel = null, catatan = '') => rpc('sg_anggota_status_atur', { p_id: id, p_status: status, p_rombel: rombel, p_catatan: catatan }),
+    /** Riwayat kenaikan kelas dan perubahan status (pengurus): { batch: [...], log: [...] }, terbaru lebih dulu. */
+    muatNaikKelas: () =>
+      muat(async () => {
+        const [batch, log] = await Promise.all([ambilSemua('naik_kelas_batch', { urut: ['id'] }), ambilSemua('naik_kelas_log', { urut: ['id'] })]);
+        return { batch: susunBatchNaikKelas(batch), log: susunLogNaikKelas(log) };
+      }),
 
     /* ------------------- Penugasan penguji per rombel dan guru agama ------------------- */
     /** Penugasan satu tahun ajaran (pengurus): [{ rombel, pengujiId, ditetapkanPada }]. */

@@ -329,7 +329,7 @@ function LembarRaport({ baris, tahunAjaran, semester, pengaturan, tutup }) {
 /* ============================== Tab penilaian ============================== */
 
 function TabNilai({ per, semester, pengaturan }) {
-  const { daftarPeserta, progress, absensi, raport, notify } = useApp();
+  const { daftarPesertaSemua: daftarPeserta, progress, absensi, raport, notify } = useApp(); // semua status; yang ditampilkan disaring filter Status (bawaan Aktif)
   const { filter, setFilter, efektif, rombelSaya } = useFilterRombel();
   const [buka, setBuka] = useState(null);
   const [cetak, setCetak] = useState(null);
@@ -402,7 +402,7 @@ function TabNilai({ per, semester, pengaturan }) {
         ))}
       </section>
 
-      <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['kelas', 'sangga', 'jk']} rombelSaya={rombelSaya} /></div>
+      <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['status', 'kelas', 'sangga', 'jk']} rombelSaya={rombelSaya} /></div>
 
       <div className="no-print mb-3 flex flex-wrap items-center gap-2">
         <button className="btn btn-gold btn-sm" onClick={unduh} disabled={mengunduh || tampil.length === 0}>

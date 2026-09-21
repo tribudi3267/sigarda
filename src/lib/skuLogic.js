@@ -263,7 +263,7 @@ export function catatHasilUji(progress, { peserta, skuId, pengujiId, hasil, tang
 export function antrianPengujian(progress, users, pengujiId = null, penugasan = null, dokumen = []) {
   const hasil = [];
   for (const u of users) {
-    if (u.role !== 'peserta') continue;
+    if (u.role !== 'peserta' || (u.status ?? 'aktif') !== 'aktif') continue;
     for (const [skuId, entry] of Object.entries(progress[u.id] ?? {})) {
       if (entry.status !== 'diajukan' && entry.status !== 'proses') continue;
       if (pengujiId && entry.pengujiId && entry.pengujiId !== pengujiId) continue;
@@ -278,7 +278,7 @@ export function antrianPengujian(progress, users, pengujiId = null, penugasan = 
 }
 
 export function rekapAnggota(progress, users) {
-  return pesertaDenganPeran(progress, users).map((u) => ({
+  return pesertaDenganPeran(progress, users).filter((u) => (u.status ?? 'aktif') === 'aktif').map((u) => ({
     user: u,
     peran: u.peran,
     bantara: hitungProgres(progress, u, 'Bantara'),
