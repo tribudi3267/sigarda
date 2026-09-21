@@ -252,3 +252,18 @@ export const susunLembarIuran = (baris = []) =>
 
 /** Baris raport satu semester -> { [pesertaId]: baris } */
 export const susunRaport = (baris = []) => Object.fromEntries(baris.map((r) => [r.peserta_id, petaRaport(r)]));
+
+/** Baris penugasan_rombel -> [{ rombel, pengujiId, ditetapkanPada }] */
+export const susunPenugasan = (baris = []) =>
+  baris.map((r) => ({ rombel: r.rombel, pengujiId: r.penguji_id, ditetapkanPada: r.ditetapkan_pada }));
+
+/** Baris penugasan_log -> [{ id, waktu, tahunAjaran, rombel, pengujiId, pengujiNama, tindakan, catatan, olehNama }] (lama ke baru) */
+export const susunLogPenugasan = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), waktu: r.waktu, tahunAjaran: r.tahun_ajaran, rombel: r.rombel, pengujiId: r.penguji_id ?? null,
+    pengujiNama: r.penguji_nama, tindakan: r.tindakan, catatan: r.catatan ?? '', olehNama: r.oleh_nama ?? '',
+  }));
+
+/** Baris guru_agama -> [{ id, agama, nama, keterangan }] */
+export const susunGuruAgama = (baris = []) =>
+  baris.map((r) => ({ id: Number(r.id), agama: r.agama, nama: r.nama, keterangan: r.keterangan ?? '' }));

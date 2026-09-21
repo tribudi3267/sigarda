@@ -11,7 +11,7 @@ import { buatBufferXlsx } from '../src/lib/exportXlsx.js';
 import { daftarUnitInstrumen, periksaInstrumen } from '../src/lib/instrumenLogic.js';
 import { PENGATURAN_IURAN_BAWAAN, gabungPengaturanIuran, periksaPengaturanIuran, saranNilaiIuran, rekapPeserta, ringkasAgregat } from '../src/lib/iuranLogic.js';
 import { INDEKS_POIN, hurufSub } from '../src/data/skuData.js';
-import ExcelJS from '../node_modules/exceljs/excel.js';
+import ExcelJS from 'exceljs';
 
 const P = process.cwd().replace(/\\/g, '/');
 const SP = `${P}/.uji/tmp`;

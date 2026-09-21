@@ -24,7 +24,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
   const [galat, setGalat] = useState('');
   const [hasil, setHasil] = useState([]);
   const [ditolakServer, setDitolakServer] = useState([]);
-  const [peringatanNta, setPeringatanNta] = useState('');
+  const [peringatan, setPeringatan] = useState('');
   const [kemajuan, setKemajuan] = useState(null);
 
   const periksa = periksaBaris(baris, users, kelompok);
@@ -60,7 +60,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
     if (r.ok) {
       setHasil(r.daftar);
       setDitolakServer([...r.ditolakServer, ...(r.galatBerhenti ? [{ no: '-', pesan: r.galatBerhenti }] : [])]);
-      setPeringatanNta(r.peringatanNta ?? '');
+      setPeringatan(r.peringatan ?? '');
       setTahap('hasil');
     }
   };
@@ -79,7 +79,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
           { header: 'Nama', key: 'nama', lebar: 30 },
           { header: 'Nama Pengguna', key: 'username', lebar: 22 },
           ...(penegak ? [
-            { header: 'Kelas', key: 'kelas', lebar: 9, rata: 'center' },
+            { header: 'Rombel', key: 'kelas', lebar: 9, rata: 'center' },
             { header: 'Sangga', key: 'sangga', lebar: 20 },
           ] : []),
           { header: 'PIN Awal', key: 'pin', lebar: 12, rata: 'center' },
@@ -108,8 +108,10 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
           <ol className="list-decimal space-y-1 pl-5 text-sm text-pramuka-700">
             <li>Unduh template Excel {label}, lalu isi datanya (satu baris satu orang).</li>
             <li>{penegak
-              ? 'Kolom wajib: Nama Lengkap, NIS, Kelas, Sangga, Agama. NIS menjadi nama pengguna untuk masuk. NTA dan PIN Awal boleh dikosongkan.'
-              : 'Kolom wajib: Nama Lengkap. Nama Pengguna dan PIN Awal boleh dikosongkan (dibuat otomatis).'}</li>
+              ? 'Kolom wajib: Nama Lengkap, NIS, Rombel (X-01 sampai XII-10), Sangga, Agama. NIS menjadi nama pengguna untuk masuk. NTA dan PIN Awal boleh dikosongkan.'
+              : kelompok === 'pembina'
+                ? 'Kolom wajib: Nama Lengkap. Agama (sebaiknya diisi, untuk butir agama), Nama Pengguna, dan PIN Awal boleh dikosongkan.'
+                : 'Kolom wajib: Nama Lengkap. Nama Pengguna dan PIN Awal boleh dikosongkan (dibuat otomatis).'}</li>
             <li>Unggah file di bawah, periksa pratinjaunya, lalu impor. Maksimal {MAKS_BARIS} baris.</li>
           </ol>
 
@@ -146,9 +148,10 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
                 <tr>
                   <th className="px-3 py-2 font-semibold">Baris</th>
                   <th className="px-3 py-2 font-semibold">Nama</th>
+                  {kelompok === 'pembina' && <th className="px-3 py-2 font-semibold">Agama</th>}
                   {penegak && (
                     <>
-                      <th className="px-3 py-2 font-semibold">Kelas</th>
+                      <th className="px-3 py-2 font-semibold">Rombel</th>
                       <th className="px-3 py-2 font-semibold">Sangga</th>
                       <th className="px-3 py-2 font-semibold">Agama</th>
                     </>
@@ -161,6 +164,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
                   <tr key={r.no} className={r.siap ? '' : 'bg-red-50/70'}>
                     <td className="px-3 py-2 text-pramuka-500">{r.no}</td>
                     <td className="px-3 py-2 font-semibold">{r.data.nama || '-'}</td>
+                    {kelompok === 'pembina' && <td className="px-3 py-2">{r.data.agama || r.data.agamaAsli || '-'}</td>}
                     {penegak && (
                       <>
                         <td className="px-3 py-2">{r.data.kelas || '-'}</td>
@@ -197,7 +201,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
                 <tr>
                   <th className="px-3 py-2 font-semibold">Nama</th>
                   <th className="px-3 py-2 font-semibold">Nama pengguna</th>
-                  {penegak && <th className="px-3 py-2 font-semibold">Kelas</th>}
+                  {penegak && <th className="px-3 py-2 font-semibold">Rombel</th>}
                   <th className="px-3 py-2 font-semibold">PIN awal</th>
                 </tr>
               </thead>
@@ -213,7 +217,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
               </tbody>
             </table>
           </div>
-          {peringatanNta && <p role="alert" className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-950">{peringatanNta}</p>}
+          {peringatan && <p role="alert" className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-950">{peringatan}</p>}
           {ditolakServer.length > 0 && (
             <div role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
               <p className="font-semibold">{ditolakServer.length} baris ditolak server:</p>

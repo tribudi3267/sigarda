@@ -48,7 +48,8 @@ Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Adm
 | Raport | | Hanya **Pembina**: nilai ekstrakurikuler per semester, cetak per Penegak, Excel per kelas, pengaturan | Sama dengan Pembina |
 | Sesi ujian | Melihat jadwal ujian bersama yang mencantumkannya (di Beranda) | Buat jadwal, pilih butir dan peserta, pantau papan sesi, dan menilai langsung dari papan (Dewan Ambalan dan Pembina) | Buat dan pantau (tidak menilai). Hapus sesi: Pembina dan Admin |
 | Instrumen | Melihat daftar kriteria penilaian per butir (pada butir yang instrumennya ditetapkan) | Menilai dengan instrumen (skor 1-5 per kriteria) di lembar penilaian | Hanya **Pembina** dan Admin: kelola instrumen, tetapkan, pengaturan |
-| Anggota | | | Tambah, ubah, hapus anggota; import Excel dan unduh template (Penegak, Dewan Ambalan, Pembina) |
+| Penugasan | | Hanya **Pembina**: melihat penugasan penguji per rombel (tanpa mengubah) | Diatur di Anggota > tab Penugasan |
+| Anggota | | | Tambah, ubah, hapus anggota; import Excel dan unduh template (Penegak, Dewan Ambalan, Pembina); perbarui rombel Penegak; tab **Penugasan** (penguji per rombel, guru agama) |
 | Reset PIN (menu akun) | | Sesuai kewenangan (lihat di bawah) | Semua kecuali Admin |
 | Pengaturan akun (menu akun) | Ganti PIN sendiri | Ganti PIN sendiri | Ganti PIN sendiri |
 | Cetak | Kartu SKU, Surat Tanda Lulus | Idem | Idem |
@@ -80,15 +81,30 @@ Buka **Anggota**, pilih tab kelompoknya, lalu **Unduh template Excel**. Setiap k
 
 | Kelompok | Kolom template |
 |---|---|
-| Penegak | Nama Lengkap, **NIS (wajib, menjadi nama pengguna)**, Kelas, Sangga, Agama, NTA (opsional), PIN Awal (opsional) |
-| Dewan Ambalan, Pembina | Nama Lengkap, Nama Pengguna (opsional), PIN Awal (opsional) |
+| Penegak | Nama Lengkap, **NIS (wajib, menjadi nama pengguna)**, **Rombel** (X-01 sampai XII-10, daftar pilihan), Sangga, Agama, NTA (opsional), PIN Awal (opsional) |
+| Dewan Ambalan | Nama Lengkap, Nama Pengguna (opsional), PIN Awal (opsional) |
+| Pembina | Nama Lengkap, Nama Pengguna (opsional), Agama (opsional, disarankan diisi), PIN Awal (opsional) |
 
 Setelah diisi, klik **Import Excel**. Aplikasi menampilkan pratinjau per baris (siap atau dilewati beserta alasannya). Baris yang
-lolos dikirim ke server per 25 akun; server memeriksa ulang dan bisa menolak baris tertentu. Penulisan kelas dan sangga disamakan
-dengan data yang ada. Setelah impor, daftar **nama pengguna dan PIN awal** tampil satu kali dan dapat diunduh sebagai Excel.
+lolos dikirim ke server per 25 akun; server memeriksa ulang dan bisa menolak baris tertentu. Rombel dibakukan (mis. `xi 3` menjadi `XI-03`; selain rombel baku ditolak) dan penulisan sangga disamakan
+dengan data yang ada. Berkas template Penegak lama yang berjudul kolom "Kelas" tetap terbaca. Setelah impor, daftar **nama pengguna dan PIN awal** tampil satu kali dan dapat diunduh sebagai Excel.
 Maksimal 500 baris per impor.
 
 **NTA** (Nomor Tanda Anggota, mis. `11.03.10.701.00123`) opsional untuk Penegak: dapat diisi pada kolom template, pada formulir tambah atau ubah anggota, dan pada lembar sidang. Akun dibuat lebih dulu, lalu NTA disimpan lewat fungsi khusus Admin `sg_anggota_nta_atur` (migrasi `2026-09-nta-anggota.sql`); bila fungsi itu belum ada, akun tetap dibuat dan aplikasi memberi tahu bahwa NTA belum tersimpan. Berkas template lama tanpa kolom NTA tetap dapat diimpor.
+
+### Rombel baku dan penugasan penguji per rombel (fase 1a)
+Kolom kelas Penegak kini berisi **rombel**: `X-01` sampai `X-10`, `XI-01` sampai `XI-10`, `XII-01` sampai `XII-10` (30 rombel, dua angka). Server menolak isian lain saat akun dibuat atau diubah
+(huruf kecil dan spasi dibakukan: `xi 3` di Excel menjadi `XI-03` pada pratinjau; di server hanya huruf dan spasi yang dibakukan). Data lama (`X`, `XI`, `XII`) **tidak diubah otomatis**: di
+**Anggota > Penegak** muncul pemberitahuan dan tombol **Perbarui rombel Penegak** (pilih rombel per orang, atau unduh berkas Excel berisi Penegak berkelas lama, isi kolom Rombel, lalu unggah).
+Server memeriksa semua baris sekaligus: satu baris keliru membatalkan seluruhnya dan pesannya menyebut nomor barisnya.
+
+**Penugasan** menetapkan Pembina dan Dewan Ambalan yang bertugas menguji tiap rombel, **per tahun ajaran**. Admin mengaturnya di **Anggota > Penugasan**: matriks penguji x rombel (satu tab per kelas; tombol
+Semua/Kosongkan per penguji), tombol **Salin dari tahun ajaran lalu** (menambah yang belum ada, tidak mencabut apa pun), peringatan rombel yang berisi Penegak tetapi belum punya penguji, dan **riwayat perubahan**
+(hanya bertambah). Pembina hanya melihat (menu **Penugasan**). Rombel tanpa penugasan tetap memakai aturan lama (semua penguji boleh menguji). **Fase ini hanya menyimpan dan menampilkan penugasan; belum ada aturan yang
+berubah bagi Penegak dan penguji** (penegakan menyusul di fase 1b).
+
+**Agama Pembina** diisi Admin (formulir ubah anggota, kolom opsional pada template import Pembina). Butir agama nanti hanya boleh diuji Pembina yang seagama dengan Penegak. Bagian bawah tab Penugasan menampilkan
+**cakupan agama**: jumlah Penegak, Pembina seagama, dan **guru agama** per agama (dikelola Admin), sebagai rujukan surat pengantar bila tidak ada Pembina yang seagama. Dewan Ambalan dan Admin tidak berAgama.
 
 ### Materi SKU dari Google Drive
 Pembina dan Admin Gudep melampirkan **tautan berbagi** file PDF di Google Drive; aplikasi tidak menyimpan file, hanya tautannya.
@@ -348,6 +364,9 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
 - [`2026-09-indeks-kode-verifikasi.sql`](supabase/migrasi/2026-09-indeks-kode-verifikasi.sql): satu indeks (`sku_progress_verifikasi_idx`) untuk pencarian kode pendek `VRF-` pada halaman verifikasi publik, sehingga pemeriksaan kode tidak memindai seluruh tabel progres. Tidak mengubah tabel, fungsi, atau data; tidak unik (kode berasal dari hash 28 bit dan dapat kembar). Boleh dijalankan kapan saja setelah tabel `sku_progress` ada, disarankan sesudah `2026-09-butir-agama-pembina.sql`. Edge Function tidak berubah.
 - [`2026-09-iuran.sql`](supabase/migrasi/2026-09-iuran.sql): iuran bumbung kepramukaan. Menambah kolom `instrumen_kriteria.sumber`, tabel `iuran`, `iuran_log`, `iuran_kas`, `asisten_iuran` (beserta RLS baca-saja), fungsi `sg_iuran_set`, `sg_iuran_set_banyak`, `sg_iuran_lembar`, `sg_iuran_agregat`, `sg_iuran_kas_simpan`, `sg_asisten_iuran_atur`, `sg_iuran_ringkas`, `sg_iuran_susulan`, `sg_iuran_pengaturan`, `sg_iuran_pengaturan_simpan`, dan memperbarui `sg_instrumen_simpan`, `sg_sku_catat_rubrik_internal`, serta `sg_absen_hapus_sesi`. Tidak mengubah data yang ada.
   Jalankan **setelah** migrasi instrumen dan verifikasi-sesi (bila belum, berhenti dengan pesan yang menuntun); disarankan sesudah `2026-09-indeks-kode-verifikasi.sql`. **Edge Function tidak berubah** (tanda tangan `sg_sku_catat_rubrik_internal` tetap). Sebelum migrasi dijalankan, aplikasi baru tetap berjalan: tab di menu Iuran menampilkan pesan bahwa basis data belum diperbarui, kartu iuran di dashboard tidak ditampilkan, baris iuran di Absensi tidak muncul, dan panel iuran pada lembar penilaian menampilkan pesan yang sama (halaman lain tidak terpengaruh). **Jangan mengulang migrasi instrumen atau sebelumnya sesudah ini**, karena akan menimpa `sg_instrumen_simpan` dan `sg_sku_catat_rubrik_internal` versi iuran. Bila instrumen dimuat ulang dari Excel yang berkolom "Sumber nilai", jalankan migrasi ini lebih dulu (SQL yang dihasilkan menyebut kolom `sumber` hanya untuk kriteria bersumber iuran).
+- [`2026-09-penugasan.sql`](supabase/migrasi/2026-09-penugasan.sql): rombel baku dan penugasan penguji per rombel (fase 1a). Menambah tabel `penugasan_rombel`, `penugasan_log` (riwayat, hanya bertambah), `guru_agama` (RLS baca untuk pengurus), fungsi bantu `sigarda.rombel_sah`, `rombel_baku`, `tahun_ajaran_sah`, `tahun_ajaran_kini`, `wajib_admin`, fungsi `sg_penugasan_atur`, `sg_penugasan_salin`, `sg_rombel_perbarui`, `sg_guru_agama_simpan`, `sg_guru_agama_hapus`, `sg_anggota_agama_atur`, dan memperbarui `sg_anggota_ubah` (kelas wajib rombel baku; menyimpan agama Pembina) serta `sg_profil_buat_internal` (kelas Penegak wajib rombel baku). Tidak menghapus atau mengubah data yang ada; kelas lama tetap dan dapat dirapikan lewat tombol **Perbarui rombel Penegak**.
+  Jalankan **setelah** `2026-09-iuran.sql` (bila belum, berhenti dengan pesan yang menuntun). **Edge Function tidak perlu di-deploy ulang** (tanda tangan `sg_profil_buat_internal` tetap). Sebelum migrasi dijalankan, aplikasi baru tetap berjalan: tab Penugasan menampilkan pesan bahwa basis data belum diperbarui, dan kelas Penegak masih boleh berformat lama (validasi rombel baru berlaku di server setelah migrasi; pemeriksaan di layar sudah berlaku lebih dulu).
+
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 
 ## Struktur folder
@@ -394,7 +413,7 @@ sku-bukateja/
 Skema SQL dan logika Edge Function dijalankan pada Postgres sungguhan (PGlite) dengan klien tiruan yang meniru peran Supabase, RLS, dan batas 1000 baris.
 Yang diuji: siapa boleh membaca apa, penulisan langsung ditolak untuk semua peran, semua fungsi `sg_*` (aturan SKU, absensi, portofolio, materi, anggota),
 hak reset PIN, pembatasan login, kewajiban ganti PIN, dan pemetaan data ke bentuk yang dipakai halaman.
-Jalankan semuanya dengan `npm run uji` (atau sebagian: `npm run uji -- iuran api`; `PENUH=40` menampilkan 40 baris terakhir keluaran). Berkas pengujian ada di [`uji/`](uji); pengujian migrasi memakai skema lama dari riwayat git. Pengujian `instrumen` dilewati kecuali `ISI_INSTRUMEN` menunjuk berkas SQL isi instrumen (rahasia, tidak ada di repositori).
+Jalankan semuanya dengan `npm run uji` (atau sebagian: `npm run uji -- iuran api`; `PENUH=40` menampilkan 40 baris terakhir keluaran). Berkas pengujian ada di [`uji/`](uji); pengujian migrasi memakai skema lama dari riwayat git (`git:<commit>`; mis. `migrasi-penugasan` memakai `git:b804088`, commit tepat sebelum fase penugasan). Pengujian membandingkan isi fungsi dengan md5 setelah akhir baris disamakan (LF), sehingga hasilnya sama di checkout Windows (CRLF). Pengujian `instrumen` dilewati kecuali `ISI_INSTRUMEN` menunjuk berkas SQL isi instrumen (rahasia, tidak ada di repositori).
 Yang **tidak** dapat diuji tanpa proyek Supabase sungguhan: perilaku GoTrue (mis. penerimaan email `.invalid`), PostgREST, dan runtime Deno. Gunakan "Uji cepat" di atas setelah pemasangan.
 
 ### Data demo untuk pengujian di Supabase

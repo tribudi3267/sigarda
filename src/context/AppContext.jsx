@@ -7,6 +7,7 @@ import {
 } from '../lib/absensiLogic';
 import { bolehResetPin, validasiPinBaru } from '../lib/pinLogic';
 import { periksaBaris, POLA_NTA } from '../lib/importAnggota';
+import { normalisasiRombel, PESAN_ROMBEL } from '../lib/rombelLogic';
 import { bolehKelolaMateri, validasiMateri } from '../lib/materiLogic';
 import { hariIni } from '../lib/format';
 import { PENGATURAN_IURAN_BAWAAN, gabungPengaturanIuran } from '../lib/iuranLogic';
@@ -33,7 +34,7 @@ export function useApp() {
   return ctx;
 }
 
-const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '', asisten: [], pengaturanIuran: PENGATURAN_IURAN_BAWAAN };
+const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '', asisten: [], pengaturanIuran: PENGATURAN_IURAN_BAWAAN, penugasan: {}, guruAgama: [] };
 const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi waktu Edge Function)
 const JEDA_SEGARKAN_MS = 30000;
 
@@ -642,10 +643,19 @@ export function AppProvider({ children }) {
    * Tambah (tanpa id) atau ubah (dengan id) satu anggota. Anggota baru mengembalikan `akun` = { username, pin, nama }
    * yang harus ditampilkan sekali kepada admin. Kelas/sangga disamakan penulisannya oleh server.
    */
-  const simpanAnggota = async ({ peran: _turunan, ...data }) => {
+  const simpanAnggota = async ({ peran: _turunan, ...masuk }) => {
+    let data = masuk;
     if (user?.role !== 'admin') return { ok: false, pesan: 'Hanya Admin Gudep yang dapat mengelola anggota.' };
     const nama = data.nama?.trim();
     if (!nama) return { ok: false, pesan: 'Nama wajib diisi.' };
+    // Kelas Penegak wajib rombel baku. Kelas lama yang tidak diubah (mis. "X") dibiarkan agar data lain tetap dapat diubah.
+    if (data.role === 'peserta') {
+      const kelas = String(data.kelas ?? '').trim();
+      const baku = normalisasiRombel(kelas);
+      const kelasLama = data.id ? db.users.find((u) => u.id === data.id)?.kelas : undefined;
+      if (!baku && !(kelas && kelas.toLowerCase() === String(kelasLama ?? '').toLowerCase())) return { ok: false, pesan: PESAN_ROMBEL };
+      data = { ...data, kelas: baku || kelas };
+    }
     // NTA diperiksa sebelum apa pun disimpan, agar data lain tidak tersimpan sebagian
     const ntaCek = String(data.nta ?? '').trim();
     if (data.role === 'peserta' && ntaCek && !POLA_NTA.test(ntaCek)) {
@@ -665,6 +675,11 @@ export function AppProvider({ children }) {
       if (nta) {
         const n = await api().aturNta([{ username: baris.username, nta }]);
         if (!n.ok) peringatan = `NTA belum tersimpan: ${n.pesan}`;
+      }
+      // Agama Pembina juga diisi sesudah akun ada (Edge Function hanya membawa agama Penegak).
+      if (data.role === 'penguji' && data.jabatan === 'Pembina' && data.agama) {
+        const g = await api().aturAgamaPembina([{ username: baris.username, agama: data.agama }]);
+        if (!g.ok) peringatan = `${peringatan ? `${peringatan} ` : ''}Agama belum tersimpan: ${g.pesan}`;
       }
       await segarkan.users();
       notify(peringatan ? `Anggota baru ditambahkan, tetapi ${peringatan}` : 'Anggota baru ditambahkan. PIN awal wajib diganti saat login pertama.', peringatan ? 'err' : 'ok');
@@ -720,19 +735,27 @@ export function AppProvider({ children }) {
       kemajuan?.(Math.min(i + UKURAN_ROMBONGAN, kirim.length), kirim.length);
     }
     // NTA (opsional, hanya Penegak) diisi sesudah akun dibuat. Bila gagal, akun tetap ada dan Admin diberi tahu.
-    let peringatanNta = '';
+    let peringatan = '';
+    if (kelompok === 'pembina' && daftar.length) {
+      const agamaPerBaris = new Map(siap.map(({ no, data }) => [no, data.agama]));
+      const daftarAgama = daftar.map((h) => ({ username: h.username, agama: agamaPerBaris.get(h.no) ?? '' })).filter((x) => x.agama);
+      if (daftarAgama.length) {
+        const g = await api().aturAgamaPembina(daftarAgama);
+        if (!g.ok) peringatan = `Agama ${daftarAgama.length} Pembina belum tersimpan: ${g.pesan}`;
+      }
+    }
     if (kelompok === 'peserta' && daftar.length) {
       const ntaPerBaris = new Map(siap.map(({ no, data }) => [no, String(data.nta ?? '').trim()]));
       const daftarNta = daftar.map((h) => ({ username: h.username, nta: ntaPerBaris.get(h.no) ?? '' })).filter((x) => x.nta);
       if (daftarNta.length) {
         const n = await api().aturNta(daftarNta);
-        if (!n.ok) peringatanNta = `NTA ${daftarNta.length} anggota belum tersimpan: ${n.pesan}`;
+        if (!n.ok) peringatan = `NTA ${daftarNta.length} anggota belum tersimpan: ${n.pesan}`;
       }
     }
     if (daftar.length) await segarkan.users();
     if (!daftar.length) return ditolak(notify, galatBerhenti ?? ditolakServer[0]?.pesan ?? 'Tidak ada akun yang berhasil dibuat.');
     notify(`${daftar.length} anggota berhasil diimpor.`);
-    return { ok: true, daftar, ditolakServer, galatBerhenti, peringatanNta };
+    return { ok: true, daftar, ditolakServer, galatBerhenti, peringatan };
   };
 
   const hapusAnggota = async (id) => {
@@ -754,6 +777,67 @@ export function AppProvider({ children }) {
         }),
     });
   };
+
+  /**
+   * Memperbarui rombel banyak Penegak sekaligus. `daftar` = [{ username (NIS), rombel }] (sudah dibakukan). Server menolak seluruhnya bila ada
+   * satu baris keliru. Mengembalikan { ok, data: jumlah }.
+   */
+  const perbaruiRombel = async (daftar) => {
+    if (user?.role !== 'admin') return ditolak(notify, 'Hanya Admin Gudep yang dapat memperbarui rombel Penegak.');
+    const r = await api().perbaruiRombel(daftar);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    await segarkan.users();
+    notify(`Rombel ${r.data} Penegak diperbarui.`);
+    return r;
+  };
+
+  /* ---------------- Penugasan penguji per rombel dan guru agama (Admin mengatur, pengurus melihat) ---------------- */
+  const MSG_PENUGASAN = 'Hanya Admin Gudep yang dapat mengatur penugasan penguji.';
+
+  /** Memuat penugasan tahun ajaran ini dan daftar guru agama (pengurus). Mengembalikan { ok }. */
+  const muatPenugasan = useCallback(async (tahunAjaran) => {
+    const mulaiGenerasi = generasi.current;
+    const [p, g] = await Promise.all([api().muatPenugasan(tahunAjaran), api().muatGuruAgama()]);
+    if (mulaiGenerasi !== generasi.current) return { ok: true };
+    const gagal = [p, g].find((r) => !r.ok);
+    if (gagal) {
+      if (gagal.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: gagal.pesan };
+    }
+    setDb((d) => ({ ...d, penugasan: { ...d.penugasan, [tahunAjaran]: p.data }, guruAgama: g.data }));
+    return { ok: true };
+  }, [sesiBerakhir]);
+
+  const muatLogPenugasan = async (tahunAjaran) => {
+    const r = await api().muatLogPenugasan(tahunAjaran);
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  };
+
+  const aturPenugasan = (tahunAjaran, pengujiId, rombel, ada) =>
+    user?.role === 'admin'
+      ? aksi(api().aturPenugasan(tahunAjaran, pengujiId, rombel, ada), { sesudah: () => muatPenugasan(tahunAjaran) })
+      : Promise.resolve(ditolak(notify, MSG_PENUGASAN));
+
+  const salinPenugasan = (dari, ke) =>
+    user?.role === 'admin'
+      ? aksi(api().salinPenugasan(dari, ke), {
+        sesudah: async (r) => { await muatPenugasan(ke); notify(r.data > 0 ? `${r.data} penugasan disalin dari ${dari}.` : `Semua penugasan ${dari} sudah ada di ${ke}. Tidak ada yang ditambahkan.`); },
+      })
+      : Promise.resolve(ditolak(notify, MSG_PENUGASAN));
+
+  const simpanGuruAgama = (g) =>
+    user?.role === 'admin'
+      ? aksi(api().simpanGuruAgama(g), { sukses: 'Guru agama tersimpan.', sesudah: async () => { const r = await api().muatGuruAgama(); if (r.ok) setDb((d) => ({ ...d, guruAgama: r.data })); } })
+      : Promise.resolve(ditolak(notify, 'Hanya Admin Gudep yang dapat mengelola guru agama.'));
+
+  const hapusGuruAgama = (id) =>
+    user?.role === 'admin'
+      ? aksi(api().hapusGuruAgama(id), { sukses: 'Guru agama dihapus.', sesudah: async () => { const r = await api().muatGuruAgama(); if (r.ok) setDb((d) => ({ ...d, guruAgama: r.data })); } })
+      : Promise.resolve(ditolak(notify, 'Hanya Admin Gudep yang dapat mengelola guru agama.'));
 
   /* ---------------------- Materi SKU (Pembina dan Admin Gudep) ---------------------- */
   const izinMateri = bolehKelolaMateri(user);
@@ -800,7 +884,8 @@ export function AppProvider({ children }) {
     daftarCalonGaruda, ubahPortofolio, catatPortofolioPenguji,
     buatSesiAbsen, setStatusAbsen, tandaiBanyakAbsen, hapusSesiAbsen, semesterSiap, pastikanAbsensi,
     gantiPin, resetPin,
-    simpanAnggota, imporAnggota, hapusAnggota,
+    simpanAnggota, imporAnggota, hapusAnggota, perbaruiRombel,
+    penugasan: db.penugasan, guruAgama: db.guruAgama, muatPenugasan, muatLogPenugasan, aturPenugasan, salinPenugasan, simpanGuruAgama, hapusGuruAgama,
     muatUlang: muatSemua,
     notify, toast,
   };
