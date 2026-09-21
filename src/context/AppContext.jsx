@@ -10,6 +10,7 @@ import { periksaBaris, POLA_NTA } from '../lib/importAnggota';
 import { normalisasiRombel, PESAN_ROMBEL } from '../lib/rombelLogic';
 import { bolehKelolaMateri, validasiMateri } from '../lib/materiLogic';
 import { hariIni } from '../lib/format';
+import { resetGudep, setGudep, tambahGudep } from '../lib/gudepStore';
 import { PENGATURAN_IURAN_BAWAAN, gabungPengaturanIuran } from '../lib/iuranLogic';
 
 /**
@@ -97,6 +98,8 @@ export function AppProvider({ children }) {
     instrumenMuat.current = null;
     setSesiUjianSiap(false);
     sesiUjianMuat.current = null;
+    resetGudep();
+    api()?.muatGudepPublik().then((r) => { if (r.ok) tambahGudep(r.data); }); // identitas publik untuk halaman masuk
     setDb(DB_KOSONG);
   }, []);
 
@@ -120,16 +123,18 @@ export function AppProvider({ children }) {
     const a = api();
     const mulaiGenerasi = generasi.current;
     const daftarKunci = [...new Set([semesterDari(hariIni()), ...semesterRef.current])];
-    const [u, p, sesi, pf, m, asisten, pengIuran, ...hadir] = await Promise.all([
+    const [u, p, sesi, pf, m, asisten, pengIuran, gudep, ...hadir] = await Promise.all([
       a.muatProfil(), a.muatProgress(), a.muatSesiAbsen(), a.muatPortofolio(), a.muatMateri(),
       a.muatAsisten(), // penunjukan asisten bendahara: tidak wajib (basis data lama belum punya tabelnya), jadi tidak ikut pemeriksaan gagal
       a.muatPengaturanIuran(), // pengaturan iuran: bila fungsinya belum ada dipakai nilai bawaan
+      a.muatGudep(), // data gudep: tidak wajib; belum tersimpan = nilai bawaan dari src/config.js
       ...daftarKunci.map((k) => { const r = rentangKunci(k); return a.muatHadirRentang(r.mulai, r.akhir); }),
     ]);
     const gagal = [u, p, sesi, pf, m, ...hadir].find((r) => !r.ok);
     if (gagal) return gagal;
     if (mulaiGenerasi !== generasi.current) return { ok: true }; // pengguna sudah keluar selagi memuat
     const hadirGabung = Object.assign({}, ...hadir.map((h) => h.data));
+    if (gudep.ok) setGudep(gudep.data);
     setDb((d) => ({
       ...d, // sidang dan pengaturan dimuat terpisah (muatSidang) dan tidak boleh hilang saat penyegaran
       users: u.data, progress: p.data, portofolio: pf.data, materi: m.data, asisten: asisten.ok ? asisten.data : [], pengaturanIuran: pengIuran.ok ? gabungPengaturanIuran(pengIuran.data) : PENGATURAN_IURAN_BAWAAN,
@@ -191,6 +196,7 @@ export function AppProvider({ children }) {
         const { klien, lokal } = await ambilKlien();
         apiRef.current = buatApi(klien);
         lokalRef.current = lokal;
+        apiRef.current.muatGudepPublik().then((r) => { if (r.ok) tambahGudep(r.data); }); // nama gudep untuk halaman masuk (tanpa login)
         const id = await apiRef.current.sesiSaatIni();
         if (id) {
           const r = await mulaiSesi(id);
@@ -830,6 +836,16 @@ export function AppProvider({ children }) {
     return r;
   };
 
+  /* ---------------- Data gudep (Admin Gudep) ---------------- */
+  /** Menyimpan data gudep lalu memuat ulang salinan lengkap dari server (yang tampil di seluruh aplikasi = yang tersimpan). */
+  const simpanGudep = (nilai) =>
+    user?.role === 'admin'
+      ? aksi(api().simpanGudep(nilai), {
+        sukses: 'Data gudep tersimpan.',
+        sesudah: async () => { const r = await api().muatGudep(); if (r.ok) setGudep(r.data); },
+      })
+      : Promise.resolve(ditolak(notify, 'Hanya Admin Gudep yang dapat mengubah data gudep.'));
+
   /* ---------------- Dokumen terbit (surat pengantar ke guru agama) ---------------- */
   const MSG_SURAT = 'Hanya Pembina atau Admin Gudep yang dapat menerbitkan dan mencabut surat pengantar.';
   const bolehSurat = user?.role === 'admin' || (user?.role === 'penguji' && user.jabatan === 'Pembina');
@@ -923,6 +939,7 @@ export function AppProvider({ children }) {
     buatSesiAbsen, setStatusAbsen, tandaiBanyakAbsen, hapusSesiAbsen, semesterSiap, pastikanAbsensi,
     gantiPin, resetPin,
     simpanAnggota, imporAnggota, hapusAnggota, perbaruiRombel,
+    simpanGudep,
     dokumen: db.dokumen, muatDokumen, terbitkanSuratAgama, cabutDokumen, bolehSurat,
     penugasan: db.penugasan, guruAgama: db.guruAgama, muatPenugasan, muatLogPenugasan, aturPenugasan, salinPenugasan, simpanGuruAgama, hapusGuruAgama,
     muatUlang: muatSemua,

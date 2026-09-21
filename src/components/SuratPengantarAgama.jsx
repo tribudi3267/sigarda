@@ -1,4 +1,4 @@
-import { GUDEP } from '../config';
+import { useGudep } from '../lib/gudepStore';
 import { INDEKS_POIN } from '../data/skuData';
 import { fmtTanggal } from '../lib/format';
 import { alamatDasar, labelUnit, urlVerifikasi } from '../lib/verifikasiLogic';
@@ -13,6 +13,7 @@ const SEL = 'border border-pramuka-400 px-2 py-1 align-top';
  * surat sah bila bertanda tangan dan berstempel. `dokumen` = satu dokumen dari useApp().dokumen (lihat src/lib/dokumenLogic.js).
  */
 export default function SuratPengantarAgama({ dokumen: d }) {
+  const G = useGudep();
   const dicabut = !!d.dicabutPada;
   return (
     <article className="print-area relative mx-auto min-w-[660px] max-w-[794px] border border-pramuka-300 bg-white p-8 text-pramuka-900">
@@ -29,13 +30,13 @@ export default function SuratPengantarAgama({ dokumen: d }) {
           <dt>Lampiran</dt><dd>: -</dd>
           <dt>Perihal</dt><dd>: <b>Permohonan penilaian butir SKU bidang agama</b></dd>
         </dl>
-        <p className="shrink-0 text-right">{GUDEP.kota}, {fmtTanggal(d.tanggal)}</p>
+        <p className="shrink-0 text-right">{G.kota}, {fmtTanggal(d.tanggal)}</p>
       </div>
 
       <div className="mt-4 text-sm leading-snug">
         <p>Yth. Bapak/Ibu <b>{d.guru.nama}</b></p>
         <p>Guru Pendidikan Agama {d.agama}{d.guru.keterangan ? `, ${d.guru.keterangan}` : ''}</p>
-        <p>di {GUDEP.sekolah}</p>
+        <p>di {G.sekolah}</p>
       </div>
 
       <p className="mt-4 text-sm leading-relaxed">Dengan hormat,</p>

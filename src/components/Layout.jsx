@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { APP, GUDEP } from '../config';
+import { APP } from '../config';
+import { useGudep } from '../lib/gudepStore';
 import Footer from './Footer';
 import LogoMark from './LogoMark';
 import MenuAkun from './MenuAkun';
@@ -25,6 +26,7 @@ const bacaCiut = () => {
  * `nav` = daftar datar semua menu, `grup` = [{ judul, item }].
  */
 export default function Layout({ nav, grup, tab, setTab, children }) {
+  const G = useGudep();
   const [ciut, setCiutState] = useState(bacaCiut);
   const setCiut = (nilai) => {
     setCiutState(nilai);
@@ -46,7 +48,7 @@ export default function Layout({ nav, grup, tab, setTab, children }) {
               <LogoMark size={38} />
               <span className="min-w-0 leading-tight">
                 <span className="block font-display text-base font-bold tracking-[0.12em]">{APP.nama}</span>
-                <span className="block truncate text-[11px] text-pramuka-300">{GUDEP.singkat}</span>
+                <span className="block truncate text-[11px] text-pramuka-300">{G.singkat}</span>
               </span>
             </button>
             <MenuAkun varian="ringkas" tab={tab} setTab={setTab} />

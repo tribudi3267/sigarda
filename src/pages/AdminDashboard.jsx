@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { PERAN, rekapAnggota, rekapPerSangga } from '../lib/skuLogic';
 import { fmtTanggal, hariIni } from '../lib/format';
-import { GUDEP } from '../config';
+import { useGudep } from '../lib/gudepStore';
 import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
 import RingkasanGudep from '../components/RingkasanGudep';
 import { BadgePeran, Icon, Kosong, ProgressBar } from '../components/ui';
@@ -30,6 +30,7 @@ function unduhCsv(rekap) {
 }
 
 export default function AdminDashboard({ onBuka, onNav }) {
+  const G = useGudep();
   const { users, progress, daftarPeserta } = useApp();
   const [filter, setFilter] = useState(FILTER_AWAL);
 
@@ -55,7 +56,7 @@ export default function AdminDashboard({ onBuka, onNav }) {
     <div className="animasi-naik">
       <div className="print-only mb-4 border-b-2 border-pramuka-800 pb-2 text-center">
         <p className="text-lg font-bold">Rekapitulasi Kelulusan SKU Penegak</p>
-        <p className="text-sm">{GUDEP.nama}. Dicetak {fmtTanggal(hariIni())}</p>
+        <p className="text-sm">{G.nama}. Dicetak {fmtTanggal(hariIni())}</p>
       </div>
 
       <div className="no-print mb-4">

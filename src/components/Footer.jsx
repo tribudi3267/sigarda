@@ -1,4 +1,5 @@
-import { APP, GUDEP } from '../config';
+import { APP } from '../config';
+import { useGudep } from '../lib/gudepStore';
 import { TINGKAT } from '../data/skuData';
 import { ITEM_PORTOFOLIO } from '../data/portofolioData';
 import { LogoSigarda } from './LogoMark';
@@ -17,6 +18,7 @@ const KOLOM_MD_2 = 'md:grid-cols-2 lg:grid-cols-[1.3fr_1.2fr_1fr]';
 
 /** Footer aplikasi (setelah masuk). Ditampilkan di laptop dan ponsel; tidak ikut tercetak. `ciut` = menu samping sedang ciut. */
 export default function Footer({ ciut = false }) {
+  const G = useGudep();
   return (
     <footer className="no-print mt-auto border-t-4 border-emas bg-pramuka-900 pb-20 text-pramuka-200 md:pb-0">
       <div className="mx-auto max-w-6xl px-4 py-9">
@@ -24,7 +26,7 @@ export default function Footer({ ciut = false }) {
           <div>
             <LogoSigarda size={48} className="text-pramuka-50" />
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-pramuka-300">
-              {APP.tagline}, di {GUDEP.nama}.
+              {APP.tagline}, di {G.nama}.
             </p>
           </div>
 
@@ -53,17 +55,17 @@ export default function Footer({ ciut = false }) {
           <div className={ciut ? '' : 'md:col-span-2 lg:col-span-1'}>
             <h2 className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-emas-light">Gugus Depan</h2>
             <address className="space-y-1 text-sm not-italic leading-relaxed text-pramuka-300">
-              <p className="font-semibold text-pramuka-50">{GUDEP.nama}</p>
-              <p>{GUDEP.sekolah}</p>
-              <p>{GUDEP.alamat}</p>
-              <p>{GUDEP.kwarran}, {GUDEP.kwarcab}</p>
+              <p className="font-semibold text-pramuka-50">{G.nama}</p>
+              <p>{G.sekolah}</p>
+              <p>{G.alamat}</p>
+              <p>{G.kwarran}, {G.kwarcab}</p>
             </address>
           </div>
         </div>
 
         <div className="mt-9 flex flex-col gap-1.5 border-t border-pramuka-700 pt-4 text-xs text-pramuka-400 md:flex-row md:items-center md:justify-between">
           <p>
-            &copy; {new Date().getFullYear()} {GUDEP.nama}. {APP.nama} v{APP.versi}
+            &copy; {new Date().getFullYear()} {G.nama}. {APP.nama} v{APP.versi}
           </p>
           <p>Butir SKU mengacu pada Keputusan Kwarnas No. 198 Tahun 2011, Lampiran III (Golongan Penegak).</p>
         </div>
@@ -74,12 +76,13 @@ export default function Footer({ ciut = false }) {
 
 /** Footer ringkas untuk halaman masuk dan penggantian PIN. */
 export function FooterRingkas() {
+  const G = useGudep();
   return (
     <footer className="no-print border-t border-pramuka-700 bg-pramuka-900 px-4 py-4 text-center text-xs text-pramuka-400">
       <p>
         <span className="font-semibold tracking-wider text-emas-light">{APP.nama}</span> {APP.kepanjangan}
       </p>
-      <p className="mt-0.5">&copy; {new Date().getFullYear()} {GUDEP.nama}</p>
+      <p className="mt-0.5">&copy; {new Date().getFullYear()} {G.nama}</p>
     </footer>
   );
 }

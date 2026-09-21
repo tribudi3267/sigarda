@@ -318,6 +318,12 @@ export function buatApi(klien) {
     muatLogPenugasan: (tahunAjaran) =>
       muat(async () => susunLogPenugasan(await ambilSemua('penugasan_log', { filter: [['tahun_ajaran', tahunAjaran]], urut: ['id'] }))),
     muatGuruAgama: () => muat(async () => susunGuruAgama(await ambilSemua('guru_agama', { urut: ['agama', 'nama'] }))),
+    /** Data gudep lengkap (identitas dan pejabat) dari pengaturan gudep.data; null bila belum pernah disimpan. Untuk semua yang sudah masuk. */
+    muatGudep: () => muat(async () => (await ambilSemua('pengaturan', { filter: [['kunci', 'gudep.data']] }))[0]?.nilai ?? null),
+    /** Identitas gudep yang boleh dilihat tanpa login (nama gudep, ambalan, sekolah, kota); {} bila belum ada data. */
+    muatGudepPublik: () => rpc('sg_gudep_publik'),
+    /** Menyimpan data gudep (Admin Gudep). */
+    simpanGudep: (nilai) => rpc('sg_gudep_simpan', { p_nilai: nilai }),
     /** Dokumen terbit (surat pengantar guru agama): pengurus melihat semua, Penegak hanya miliknya (RLS). */
     muatDokumen: () => muat(async () => susunDokumen(await ambilSemua('dokumen_terbit', { urut: ['id'] }))),
     /**

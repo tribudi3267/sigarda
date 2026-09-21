@@ -1,10 +1,8 @@
-import { GUDEP } from '../config';
 import { fmtHariTanggal, fmtTanggal } from '../lib/format';
+import { namaAmbalan } from '../lib/gudepLogic';
+import { useGudep } from '../lib/gudepStore';
 import { HASIL_MAGANG, HASIL_TUGAS, labelButirBelum } from '../lib/sidangLogic';
 import { KopSurat } from './DokumenSku';
-
-// "Ambalan Gajah Mada/..." dipakai apa adanya; bila nama tidak diawali kata Ambalan, kata itu ditambahkan.
-const NAMA_AMBALAN = /^ambalan\b/i.test(GUDEP.singkat) ? GUDEP.singkat : `Ambalan ${GUDEP.singkat}`;
 
 // Kotak centang digambar dengan garis tepi (bukan teks "[ X ]") agar tidak pernah terpotong ke baris berikutnya di layar maupun cetakan.
 const Kotak = ({ isi }) => (
@@ -33,6 +31,8 @@ function Ttd({ jabatan, nama, nta }) {
  * Nama ketua dan sebutan jabatannya diambil dari catatan sidang (dicatat saat sidang), bukan dari pengaturan saat ini.
  */
 export default function BeritaAcaraSidang({ sidang, peserta }) {
+  const G = useGudep();
+  const NAMA_AMBALAN = namaAmbalan(G); // "Ambalan Gajah Mada/..." dipakai apa adanya; bila belum diawali kata Ambalan, kata itu ditambahkan
   const layak = sidang.keputusan === 'layak';
   const penuh = sidang.capaianTotal > 0 && sidang.capaianLulus === sidang.capaianTotal;
   const belum = labelButirBelum(sidang.butirBelum);
@@ -107,11 +107,11 @@ export default function BeritaAcaraSidang({ sidang, peserta }) {
       )}
 
       <p className="mt-6 text-center text-sm">Demikian berita acara ini dibuat untuk dipergunakan sebagaimana mestinya.</p>
-      <p className="mt-3 text-right text-sm">{GUDEP.kota}, {fmtTanggal(sidang.tanggal)}</p>
+      <p className="mt-3 text-right text-sm">{G.kota}, {fmtTanggal(sidang.tanggal)}</p>
       <p className="mt-1 text-center text-sm font-semibold">Membuat Keputusan,</p>
       <div className="mt-2 grid grid-cols-2 gap-8">
         <Ttd jabatan={sidang.ketuaSebutan} nama={sidang.ketuaNama} />
-        <Ttd jabatan="Pembina Pramuka Penegak" nama={GUDEP.pembina.nama} nta={GUDEP.pembina.nta} />
+        <Ttd jabatan="Pembina Pramuka Penegak" nama={G.pembina.nama} nta={G.pembina.nta} />
       </div>
     </article>
   );

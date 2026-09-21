@@ -7,6 +7,8 @@ import {
   labelButirBelum, lembarKesiapan, nomorUrutBerikutnya, OPSI_BULAN, OPSI_DIGIT, pengaturanSidang, PEMISAH, periksaFormatNomor, rapikan,
   SEBUTAN_KETUA_BAWAAN, sudahLayak, uraiFormat,
 } from '../lib/sidangLogic';
+import { ketuaSidang } from '../lib/gudepLogic';
+import { useGudep, useGudepTersimpan } from '../lib/gudepStore';
 import BeritaAcaraSidang from '../components/BeritaAcaraSidang';
 import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
 import { Avatar, Badge, Icon, Kosong, Modal, ProgressBar } from '../components/ui';
@@ -435,8 +437,10 @@ function PengaturanSidang() {
   const [mode, setMode] = useState(awalUrai ? 'pilihan' : 'manual');
   const [pilih, setPilih] = useState(awalUrai ?? PILIHAN_AWAL);
   const [formatManual, setFormatManual] = useState(awal.format);
-  const [namaKetua, setNamaKetua] = useState(awal.namaKetua);
-  const [sebutan, setSebutan] = useState(awal.sebutanKetua);
+  const gudep = useGudep();
+  const gudepTersimpan = useGudepTersimpan();
+  // Ketua sidang = Pradana pada Data Gudep (Admin); pengaturan lama hanya cadangan bila Data Gudep belum diisi
+  const ketua = ketuaSidang(gudep, { tersimpan: gudepTersimpan, namaLama: awal.namaKetua, sebutanLama: awal.sebutanKetua });
   const [proses, setProses] = useState(false);
   const tahunIni = Number(hariIni().slice(0, 4));
   const [tahunUrut, setTahunUrut] = useState(tahunIni);
@@ -450,8 +454,6 @@ function PengaturanSidang() {
     setMode(u ? 'pilihan' : 'manual');
     if (u) setPilih(u);
     setFormatManual(p.format);
-    setNamaKetua(p.namaKetua);
-    setSebutan(p.sebutanKetua);
   }, [pengaturan]);
 
   const ubahPilih = (bagian) => setPilih((p) => ({ ...p, ...bagian }));
@@ -467,8 +469,7 @@ function PengaturanSidang() {
 
   const format = mode === 'pilihan' ? bangunFormat(pilih) : rapikan(formatManual);
   const galatFormat = periksaFormatNomor(format);
-  const galatSebutan = rapikan(sebutan) ? '' : 'Sebutan jabatan wajib diisi.';
-  const berubah = format !== awal.format || rapikan(namaKetua) !== awal.namaKetua || rapikan(sebutan) !== awal.sebutanKetua;
+  const berubah = format !== awal.format;
 
   // Pratinjau memakai nomor urut SEBENARNYA yang akan dipakai berikutnya (dari penghitung di server) dan tanggal hari ini
   const tanggalContoh = hariIni();
@@ -480,11 +481,7 @@ function PengaturanSidang() {
 
   const simpan = async () => {
     setProses(true);
-    const daftar = [
-      [KUNCI_PENGATURAN.format, format, awal.format],
-      [KUNCI_PENGATURAN.namaKetua, rapikan(namaKetua), awal.namaKetua],
-      [KUNCI_PENGATURAN.sebutanKetua, rapikan(sebutan), awal.sebutanKetua],
-    ];
+    const daftar = [[KUNCI_PENGATURAN.format, format, awal.format]];
     let semuaBerhasil = true;
     for (const [kunci, nilai, lama] of daftar) {
       if (nilai === lama) continue;
@@ -616,22 +613,22 @@ function PengaturanSidang() {
 
       <section className="panel mb-4 p-4">
         <h2 className="text-base font-bold">Tanda tangan</h2>
-        <label htmlFor="nama-ketua" className="label mt-3">Nama Ketua Dewan Penegak</label>
-        <input id="nama-ketua" className="input" value={namaKetua} maxLength={120} onChange={(e) => setNamaKetua(e.target.value)} placeholder="Kosong = dicetak garis untuk tanda tangan" />
-        <label htmlFor="sebutan-ketua" className="label mt-3">Sebutan jabatan pada tanda tangan</label>
-        <input id="sebutan-ketua" className="input" value={sebutan} maxLength={80} onChange={(e) => setSebutan(e.target.value)} />
-        <p className="mt-1 text-xs text-pramuka-500">Bawaan: {SEBUTAN_KETUA_BAWAAN}. Ubah bila di ambalan Anda disebut Pradana, Pemangku Adat, dan sebagainya.</p>
-        {galatSebutan && <p role="alert" className="mt-1 text-xs font-medium text-red-700">{galatSebutan}</p>}
+        <p className="mt-2 text-sm text-pramuka-700">
+          Ketua sidang pada berita acara adalah <b>Pradana</b> menurut <b>Data Gudep</b>. Nama dan jabatannya diubah oleh Admin Gudep di menu <b>Data Gudep</b>{' '}
+          (mis. pada pergantian pengurus tahun ajaran baru); berita acara yang sudah dibuat tetap memuat nama saat sidang dicatat.
+          {!gudepTersimpan && ' Data Gudep belum diisi, jadi dipakai pengaturan lama (nama kosong dicetak garis untuk tanda tangan).'}
+          {gudepTersimpan && !ketua.nama && ' Nama Pradana pada Data Gudep masih kosong, sehingga dicetak garis untuk tanda tangan.'}
+        </p>
 
         <div className="mt-4 rounded-lg bg-pramuka-50 px-3 py-3 text-center text-sm">
           <p className="mb-1 text-xs text-pramuka-500">Pratinjau tanda tangan</p>
-          <p>{rapikan(sebutan) || SEBUTAN_KETUA_BAWAAN}</p>
+          <p>{ketua.sebutan || SEBUTAN_KETUA_BAWAAN}</p>
           <div className="h-10" />
-          <p className={rapikan(namaKetua) ? 'font-bold underline' : ''}>{rapikan(namaKetua) || '( ______________________________ )'}</p>
+          <p className={ketua.nama ? 'font-bold underline' : ''}>{ketua.nama || '( ______________________________ )'}</p>
         </div>
       </section>
 
-      <button className="btn btn-primary" disabled={!berubah || Boolean(galatFormat) || Boolean(galatSebutan) || proses} onClick={simpan}>
+      <button className="btn btn-primary" disabled={!berubah || Boolean(galatFormat) || proses} onClick={simpan}>
         {proses ? 'Menyimpan...' : 'Simpan pengaturan'}
       </button>
     </div>

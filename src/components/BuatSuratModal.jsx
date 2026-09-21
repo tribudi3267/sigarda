@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { GUDEP } from '../config';
+import { useGudep } from '../lib/gudepStore';
+import { penandaTanganSurat } from '../lib/gudepLogic';
 import { hariIni } from '../lib/format';
 import { unitBisaDisurati } from '../lib/dokumenLogic';
 import { tahunAjaranKini } from '../lib/rombelLogic';
@@ -15,6 +16,7 @@ const GURU_LAIN = 'lain';
  */
 export default function BuatSuratModal({ peserta, onTutup, onTerbit }) {
   const { progress, dokumen, guruAgama, muatPenugasan, terbitkanSuratAgama } = useApp();
+  const G = useGudep();
   useEffect(() => { muatPenugasan(tahunAjaranKini()); }, [muatPenugasan]); // daftar guru agama
 
   const unit = useMemo(() => unitBisaDisurati(progress, dokumen, peserta), [progress, dokumen, peserta]);
@@ -24,8 +26,9 @@ export default function BuatSuratModal({ peserta, onTutup, onTerbit }) {
   const [guru, setGuru] = useState('');           // id guru terdaftar atau GURU_LAIN
   const [guruNama, setGuruNama] = useState('');
   const [tanggal, setTanggal] = useState(hariIni());
-  const [penandaNama, setPenandaNama] = useState(GUDEP.pembina.nama);
-  const [penandaJabatan, setPenandaJabatan] = useState(GUDEP.pembina.jabatan);
+  const [jenisTtd, setJenisTtd] = useState('intern'); // intern = Pembina Gudep / Ka Gudep; keluar = Kamabigus / Kepala Sekolah; lain = isi sendiri
+  const [penandaNama, setPenandaNama] = useState(G.pembina.nama);
+  const [penandaJabatan, setPenandaJabatan] = useState(G.pembina.jabatan);
   const [nomorManual, setNomorManual] = useState('');
   const [catatan, setCatatan] = useState('');
   const [galat, setGalat] = useState('');
@@ -34,6 +37,13 @@ export default function BuatSuratModal({ peserta, onTutup, onTerbit }) {
   const guruTerpilih = guru || (guruDaftar[0] ? String(guruDaftar[0].id) : GURU_LAIN);
   const pakaiGuruLain = guruTerpilih === GURU_LAIN;
 
+  const pilihPenanda = (jenis) => {
+    setJenisTtd(jenis);
+    if (jenis === 'lain') return;
+    const o = penandaTanganSurat(G, jenis);
+    setPenandaNama(o.nama);
+    setPenandaJabatan(o.jabatan);
+  };
   const alih = (id) => setPilih((s) => { const b = new Set(s); if (b.has(id)) b.delete(id); else b.add(id); return b; });
   const bisaKirim = !sibuk && pilih.size > 0 && (!pakaiGuruLain || guruNama.trim()) && penandaNama.trim() && penandaJabatan.trim();
 
@@ -44,7 +54,7 @@ export default function BuatSuratModal({ peserta, onTutup, onTerbit }) {
     const r = await terbitkanSuratAgama({
       pesertaId: peserta.id, butir: unit.filter((p) => pilih.has(p.id)).map((p) => p.id),
       guruId: pakaiGuruLain ? null : Number(guruTerpilih), guruNama: pakaiGuruLain ? guruNama : '',
-      tanggal, penerbit: GUDEP.nama, penandaNama, penandaJabatan, nomorManual, catatan,
+      tanggal, penerbit: G.nama, penandaNama, penandaJabatan, nomorManual, catatan,
     });
     setSibuk(false);
     if (r.ok) onTerbit?.(r.data);
@@ -110,6 +120,14 @@ export default function BuatSuratModal({ peserta, onTutup, onTerbit }) {
         <Field label="Nomor surat (kosongkan = otomatis)" htmlFor="surat-nomor">
           <input id="surat-nomor" className="input" maxLength={80} value={nomorManual} onChange={(e) => setNomorManual(e.target.value)} placeholder="Otomatis" />
         </Field>
+        <Field label="Penanda tangan menurut jenis surat" htmlFor="surat-ttd-jenis" bantuan="Nama dan jabatan diambil dari Data Gudep (Admin dapat mengubahnya); tetap dapat disunting di bawah.">
+          <select id="surat-ttd-jenis" className="input" value={jenisTtd} onChange={(e) => pilihPenanda(e.target.value)}>
+            <option value="intern">Surat intern sekolah: {G.pembina.jabatan}</option>
+            <option value="keluar">Surat keluar sekolah: {G.kamabigus.jabatan}</option>
+            <option value="lain">Lain (isi sendiri)</option>
+          </select>
+        </Field>
+        <span className="hidden sm:block" aria-hidden="true" />
         <Field label="Penanda tangan" htmlFor="surat-ttd-nama">
           <input id="surat-ttd-nama" className="input" maxLength={120} value={penandaNama} onChange={(e) => setPenandaNama(e.target.value)} />
         </Field>

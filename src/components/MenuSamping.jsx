@@ -1,4 +1,5 @@
-import { APP, GUDEP } from '../config';
+import { APP } from '../config';
+import { useGudep } from '../lib/gudepStore';
 import LogoMark from './LogoMark';
 import MenuAkun from './MenuAkun';
 import { Icon } from './ui';
@@ -8,6 +9,7 @@ import { Icon } from './ui';
  * dan akun pengguna (nama tampilan) selalu ada di bagian bawah.
  */
 export default function MenuSamping({ grup, tab, setTab, ciut, setCiut, pertama }) {
+  const G = useGudep();
   return (
     <aside
       className={`no-print fixed inset-y-0 left-0 z-40 hidden flex-col bg-pramuka-800 text-pramuka-50 transition-[width] duration-200 md:flex ${ciut ? 'w-[4.5rem]' : 'w-60'}`}
@@ -23,7 +25,7 @@ export default function MenuSamping({ grup, tab, setTab, ciut, setCiut, pertama 
           {!ciut && (
             <span className="min-w-0 leading-tight">
               <span className="block font-display text-lg font-bold tracking-[0.12em]">{APP.nama}</span>
-              <span className="block truncate text-[11px] text-pramuka-300">{GUDEP.singkat}</span>
+              <span className="block truncate text-[11px] text-pramuka-300">{G.singkat}</span>
             </span>
           )}
         </button>

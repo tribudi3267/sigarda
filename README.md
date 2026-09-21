@@ -50,6 +50,7 @@ Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Adm
 | Instrumen | Melihat daftar kriteria penilaian per butir (pada butir yang instrumennya ditetapkan) | Menilai dengan instrumen (skor 1-5 per kriteria) di lembar penilaian | Hanya **Pembina** dan Admin: kelola instrumen, tetapkan, pengaturan |
 | Penugasan | | Hanya **Pembina**: melihat penugasan penguji per rombel (tanpa mengubah) | Diatur di Anggota > tab Penugasan |
 | Anggota | | | Tambah, ubah, hapus anggota; import Excel dan unduh template (Penegak, Dewan Ambalan, Pembina); perbarui rombel Penegak; tab **Penugasan** (penguji per rombel, guru agama) |
+| Data Gudep | | | Identitas gugus depan dan ambalan, alamat, kwartir, serta Pembina/Ka Gudep, Kamabigus/Kepala Sekolah, Pradana, Pradani beserta NTA (rujukan kop surat dan semua dokumen) |
 | Reset PIN (menu akun) | | Sesuai kewenangan (lihat di bawah) | Semua kecuali Admin |
 | Pengaturan akun (menu akun) | Ganti PIN sendiri | Ganti PIN sendiri | Ganti PIN sendiri |
 | Cetak | Kartu SKU, Surat Tanda Lulus, Surat pengantar agama (milik sendiri) | Idem; **Pembina** dan **Admin** dapat menerbitkan dan mencabut surat pengantar | Idem |
@@ -118,6 +119,17 @@ Aturan dihitung di server (`sigarda.penguji_sah`) dan dicerminkan di layar (`src
   seorang Pembina, aturan seagama berlaku untuk semua: Pembina tanpa agama tidak lagi dapat menguji butir agama. Bila tidak ada Pembina seagama, Penegak melihat pesan agar menghubungi Admin atau Pembina
   (surat pengantar ke guru agama menyusul di fase 2a).
 - Yang belum termasuk fase ini: pengecualian per Penegak dan notifikasi. Surat pengantar ke guru agama ada di bagian berikut (fase 2a).
+
+### Data Gudep (identitas dan pejabat diatur Admin)
+Identitas gugus depan dan pejabatnya **tidak lagi ditulis di kode**. Admin Gudep mengisinya di menu **Data Gudep** (Pengelolaan): nama gugus depan, nama ambalan, nama sekolah, nomor gudep, kode surat (awalan nomor Surat Tanda Lulus),
+alamat, kota (tempat surat), telepon dan email (opsional), kwartir ranting dan cabang, serta empat pejabat beserta **NTA** (dan NIP opsional untuk Pembina dan Kepala Sekolah):
+- **Pembina Gudep / Ka Gudep**: penanda tangan surat intern sekolah, kartu SKU, berita acara, dan raport ekstrakurikuler.
+- **Kamabigus / Kepala Sekolah**: penanda tangan surat keluar sekolah (dipilih pada dialog surat: "Surat intern" atau "Surat keluar").
+- **Pradana** dan **Pradani**: pimpinan Dewan Ambalan putra dan putri. Pradana menjadi **ketua sidang** pada berita acara (nama dan jabatannya disalin saat sidang dicatat; pengaturan nama ketua lama di halaman Sidang tidak dipakai lagi kecuali sebagai cadangan bila Pradana belum diisi) dan menandatangani Surat Tanda Lulus.
+Untuk pergantian pengurus atau pejabat pada tahun berikutnya, Admin cukup memperbarui isian ini: dokumen yang dibuat sesudahnya memakai data terbaru, sedangkan berita acara sidang dan surat pengantar yang sudah terbit tetap memuat nama saat dibuat.
+Pratinjau kop surat tampil langsung sebelum disimpan. Data tersimpan di basis data (pengaturan `gudep.data`) dan menjadi rujukan kop surat, tanda tangan, kota dan tanggal surat, halaman masuk, footer, menu, ekspor Excel, dan seluruh dokumen cetak.
+Selama belum pernah disimpan, aplikasi memakai nilai bawaan di `GUDEP_BAWAAN` pada `src/config.js`; setelah disimpan, isian yang dikosongkan tetap kosong. Halaman masuk dan verifikasi (tanpa login) hanya menerima nama gudep, ambalan, sekolah,
+dan kota (`sg_gudep_publik`); nama pejabat, NTA, alamat, dan kontak baru terbaca setelah masuk. Perubahan hanya oleh Admin (`sg_gudep_simpan`, semua isian diperiksa di server).
 
 ### Surat pengantar ke guru agama dan dokumen terbit (fase 2a)
 Butir agama (sub-butir Butir 1) hanya dinilai Pembina yang seagama. Bila tidak ada Pembina yang seagama dengan seorang Penegak, Pembina atau Admin Gudep menerbitkan **surat pengantar ke guru agama**: buka
@@ -395,6 +407,8 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
   Jalankan **setelah** `2026-09-penugasan.sql` (bila belum, berhenti dengan pesan yang menuntun). **Edge Function tidak perlu di-deploy ulang** (tanda tangan `sg_sku_catat_internal` tetap). **Jalankan migrasi ini sebelum `git push` kode fase 1b**: tanpa fungsi `sg_penguji_pilihan`, formulir Ajukan pengujian Penegak tidak dapat memuat daftar penguji. Sebelum agama seorang Pembina diisi, aturan butir agama tetap seperti lama (masa peralihan).
 - [`2026-09-dokumen.sql`](supabase/migrasi/2026-09-dokumen.sql): dokumen terbit dan surat pengantar ke guru agama (fase 2a). Menambah tabel `dokumen_terbit` dan `dokumen_urut` (RLS baca: pengurus dan pemilik), fungsi `sg_dokumen_surat_agama_terbit` dan `sg_dokumen_cabut`, fungsi bantu `sigarda.surat_agama_aktif`, dan memperbarui `sigarda.penguji_peran_ok`, `sg_sku_catat_internal` (Pembina tidak seagama boleh mencatat butir agama yang tercantum pada surat berlaku; riwayat menyebut guru dan nomor surat), `sg_verifikasi_token` dan `sg_verifikasi_kode` (ikut menjawab dokumen terbit) serta `sg_pengaturan_simpan` (kunci baru `surat.format_nomor`). Tidak mengubah data yang ada.
   Jalankan **setelah** `2026-09-penegakan.sql` (bila belum, berhenti dengan pesan yang menuntun). **Edge Function tidak perlu di-deploy ulang.** **Jalankan migrasi ini sebelum `git push` kode fase 2a**: tanpa tabel `dokumen_terbit`, tab Surat pengantar agama tidak dapat memuat surat (halaman lain tetap berjalan).
+- [`2026-09-data-gudep.sql`](supabase/migrasi/2026-09-data-gudep.sql): data gudep yang diatur Admin. Menambah fungsi `sg_gudep_simpan` (Admin menyimpan identitas gudep, ambalan, dan pejabat beserta NTA pada pengaturan `gudep.data`; semua isian diperiksa) dan `sg_gudep_publik` (identitas publik tanpa login: nama gudep, ambalan, sekolah, kota). Juga `sigarda.ketua_sidang` dan pembaruan `sg_sidang_simpan` (ketua sidang = Pradana pada data gudep, cadangan: pengaturan lama). Tidak ada tabel baru dan tidak ada data yang diubah.
+  Jalankan **setelah** `2026-09-dokumen.sql` (bila belum, berhenti dengan pesan yang menuntun). Aman dijalankan ulang: bila versi sebelumnya sudah dijalankan, jalankan berkas ini sekali lagi. **Edge Function tidak perlu di-deploy ulang.** Sebelum migrasi dijalankan aplikasi baru tetap berjalan dengan nilai bawaan; hanya penyimpanan di menu Data Gudep yang belum berfungsi.
 
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 
@@ -442,7 +456,7 @@ sku-bukateja/
 Skema SQL dan logika Edge Function dijalankan pada Postgres sungguhan (PGlite) dengan klien tiruan yang meniru peran Supabase, RLS, dan batas 1000 baris.
 Yang diuji: siapa boleh membaca apa, penulisan langsung ditolak untuk semua peran, semua fungsi `sg_*` (aturan SKU, absensi, portofolio, materi, anggota),
 hak reset PIN, pembatasan login, kewajiban ganti PIN, dan pemetaan data ke bentuk yang dipakai halaman.
-Jalankan semuanya dengan `npm run uji` (atau sebagian: `npm run uji -- iuran api`; `PENUH=40` menampilkan 40 baris terakhir keluaran). Berkas pengujian ada di [`uji/`](uji); pengujian migrasi memakai skema lama dari riwayat git (`git:<commit>`; mis. `migrasi-dokumen` memakai `git:428ec5a`, commit tepat sebelum fase dokumen). Pengujian membandingkan isi fungsi dengan md5 setelah akhir baris disamakan (LF), sehingga hasilnya sama di checkout Windows (CRLF). Pengujian `instrumen` dilewati kecuali `ISI_INSTRUMEN` menunjuk berkas SQL isi instrumen (rahasia, tidak ada di repositori).
+Jalankan semuanya dengan `npm run uji` (atau sebagian: `npm run uji -- iuran api`; `PENUH=40` menampilkan 40 baris terakhir keluaran). Berkas pengujian ada di [`uji/`](uji); pengujian migrasi memakai skema lama dari riwayat git (`git:<commit>`; mis. `migrasi-gudep` memakai `git:709a260`, commit tepat sebelum migrasi data gudep). Pengujian membandingkan isi fungsi dengan md5 setelah akhir baris disamakan (LF), sehingga hasilnya sama di checkout Windows (CRLF). Pengujian `instrumen` dilewati kecuali `ISI_INSTRUMEN` menunjuk berkas SQL isi instrumen (rahasia, tidak ada di repositori).
 Yang **tidak** dapat diuji tanpa proyek Supabase sungguhan: perilaku GoTrue (mis. penerimaan email `.invalid`), PostgREST, dan runtime Deno. Gunakan "Uji cepat" di atas setelah pemasangan.
 
 ### Data demo untuk pengujian di Supabase
@@ -454,7 +468,7 @@ Skrip membuat akun langsung di `auth.users`; bila gagal di proyek Anda, buat 8 a
 
 ## Menyesuaikan untuk Gudep
 
-1. **Identitas dan tanda tangan**: ubah `src/config.js` (nomor gudep, nama Pembina, Pradana).
+1. **Identitas dan tanda tangan**: isi di menu **Data Gudep** (Admin), tidak perlu mengubah kode. `GUDEP_BAWAAN` di `src/config.js` hanya nilai awal sebelum data disimpan.
 2. **Butir SKU**: `src/data/skuData.js` sudah berisi butir resmi. Jangan mengubah `id` setelah ada data progres. Setelah mengubah data butir/portofolio, jalankan `npm run skema` dan jalankan ulang bagian katalog di database.
 3. **Anggota**: tambah lewat menu Anggota (Admin). Isi agama dengan benar karena menentukan sub-butir butir 1.
 4. **Logo**: ganti isi `src/components/LogoMark.jsx`. **Warna**: `tailwind.config.js` (`pramuka` = cokelat, `emas` = aksen).

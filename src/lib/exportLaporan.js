@@ -2,7 +2,8 @@
  * Susunan lembar Excel untuk laporan absensi dan portofolio Garuda.
  * Fungsi `susun...` murni (mudah diuji); `unduh...` memicu pengunduhan di browser.
  */
-import { GUDEP, AMBANG_HADIR } from '../config';
+import { AMBANG_HADIR } from '../config';
+import { ambilGudep } from './gudepStore';
 import { ITEM_PORTOFOLIO } from '../data/portofolioData';
 import { PERAN } from './skuLogic';
 import { PERIODE, STATUS_ABSEN } from './absensiLogic';
@@ -29,7 +30,7 @@ const teksFilter = (filter) => {
 export function susunAbsensiXlsx({ tahunAjaran, periode, rekap, sesiList, filter }) {
   const judul = [
     'Rekap Absensi Latihan Rutin Jumat',
-    `${GUDEP.nama}. Tahun Ajaran ${tahunAjaran}, ${PERIODE[periode]}`,
+    `${ambilGudep().nama}. Tahun Ajaran ${tahunAjaran}, ${PERIODE[periode]}`,
     `Filter: ${teksFilter(filter)}. Pertemuan terlaksana: ${sesiList.length}. Dicetak ${fmtTanggal(hariIni())}`,
   ];
 
@@ -129,7 +130,7 @@ export function susunRaportXlsx({ tahunAjaran, semester, baris, filter, pengatur
   const jumlahFinal = baris.filter((b) => b.status === 'final').length;
   const judul = [
     'Nilai Ekstrakurikuler Pramuka Penegak',
-    `${GUDEP.nama}. Tahun Ajaran ${tahunAjaran}, ${PERIODE[semester]}`,
+    `${ambilGudep().nama}. Tahun Ajaran ${tahunAjaran}, ${PERIODE[semester]}`,
     `Filter: ${teksFilter(filter)}. Final: ${jumlahFinal} dari ${baris.length}. Dicetak ${fmtTanggal(hariIni())}`,
     ...(jumlahFinal < baris.length ? ['PERHATIAN: baris berwarna kuning belum final (hanya saran) dan belum boleh diserahkan ke sekolah.'] : []),
   ];
@@ -222,7 +223,7 @@ export const unduhRaportXlsx = (data) =>
 export function susunPortofolioXlsx({ rekap, portofolio, filter }) {
   const judul = [
     'Rekap Kesiapan Portofolio Penegak Garuda (SIGARDA)',
-    `${GUDEP.nama}. Filter: ${teksFilter(filter)}. Dicetak ${fmtTanggal(hariIni())}`,
+    `${ambilGudep().nama}. Filter: ${teksFilter(filter)}. Dicetak ${fmtTanggal(hariIni())}`,
   ];
   const label = { siap: 'Ada', proses: 'Proses', belum: 'Tidak' };
   const warna = { Ada: 'FFD1FAE5', Proses: 'FFFEF3C7', Tidak: 'FFFEE2E2' };
@@ -288,7 +289,7 @@ export const unduhPortofolioXlsx = (data) =>
 export function susunIuranXlsx({ tahunAjaran, periode, rekap, sesi, ring, kas = {}, filter, ambang = AMBANG_RUTIN }) {
   const judul = [
     'Rekap Iuran Bumbung Kepramukaan',
-    `${GUDEP.nama}. Tahun Ajaran ${tahunAjaran}, ${PERIODE[periode]}`,
+    `${ambilGudep().nama}. Tahun Ajaran ${tahunAjaran}, ${PERIODE[periode]}`,
     `Filter Penegak: ${teksFilter(filter)}. Pertemuan terlaksana: ${sesi.length}. Total gudep: Rp ${ring.total.toLocaleString('id-ID')}. Dicetak ${fmtTanggal(hariIni())}`,
   ];
   const uang = { format: '#,##0', rata: 'right' };
@@ -400,7 +401,7 @@ export function susunInstrumenXlsx({ unit, instrumen }) {
         nama: 'Instrumen',
         judul: [
           'Instrumen Penilaian SKU Penegak',
-          `${GUDEP.nama}. Diunduh ${fmtTanggal(hariIni())}. ${jumlah} butir, ${baris.length} kriteria.`,
+          `${ambilGudep().nama}. Diunduh ${fmtTanggal(hariIni())}. ${jumlah} butir, ${baris.length} kriteria.`,
           'RAHASIA: memuat panduan penguji. Jangan dibagikan kepada Penegak dan jangan diunggah ke repositori publik.',
           'Sunting lalu masukkan kembali dengan: node scripts/instrumen-ke-sql.mjs <keluaran.sql> <berkas.xlsx> --mode=perbarui-draf (kolom Butir, Isi butir, dan Status diabaikan).',
         ],

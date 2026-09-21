@@ -1880,8 +1880,8 @@ end $$;
 -- ===== Pengaturan dan Sidang Dewan Kehormatan =====
 -- Kunci pengaturan yang dikenal (nilai bertipe teks). Bawaan dipakai bila belum diatur:
 --   sidang.format_nomor   {no3}/DK/{tahun}
---   sidang.nama_ketua     (kosong: dicetak garis untuk tanda tangan)
---   sidang.sebutan_ketua  Ketua Dewan Penegak / Pemangku Adat
+--   sidang.nama_ketua     (kosong: dicetak garis untuk tanda tangan)   } hanya cadangan: ketua sidang kini Pradana pada data gudep
+--   sidang.sebutan_ketua  Ketua Dewan Penegak / Pemangku Adat        } (sigarda.ketua_sidang); dipakai bila data gudep belum diisi
 --   surat.format_nomor    {no3}/SP/{tahun}  (nomor surat pengantar agama; tanpa kode {tingkat}; hanya Pembina atau Admin yang mengubah)
 create function public.sg_pengaturan_simpan(p_kunci text, p_nilai jsonb) returns void
 language plpgsql security definer set search_path = public as
@@ -2000,8 +2000,8 @@ begin
   ) values (
     p_peserta_id, p_tingkat, p_tanggal, p_keputusan, p_magang, p_tugas_adat, v_ket, v_cat, v_nomor, v_urut,
     v_lulus, v_total, v_belum, coalesce(nullif(v_nta, ''), coalesce(v_p.nta, '')),
-    sigarda.pengaturan_teks('sidang.nama_ketua', ''),
-    sigarda.pengaturan_teks('sidang.sebutan_ketua', 'Ketua Dewan Penegak / Pemangku Adat'),
+    (select o_nama from sigarda.ketua_sidang()),
+    (select o_sebutan from sigarda.ketua_sidang()),
     auth.uid()
   ) returning id into v_id;
 
@@ -2359,6 +2359,86 @@ begin
   return v_token;
 end $$;
 
+-- ===== Data gudep: fungsi =====
+-- Identitas Gugus Depan dan pejabatnya disimpan sebagai satu objek JSON pada pengaturan 'gudep.data' (dibaca semua pengguna yang sudah masuk
+-- lewat kebijakan baca_pengaturan; diubah hanya Admin Gudep lewat sg_gudep_simpan). Belum ada baris = aplikasi memakai nilai bawaan (src/config.js).
+--   teks   : nama, singkat (nama ambalan), sekolah, alamat, kota, nomorGudep, kwarran, kwarcab, kodeSurat, telepon, email
+--   orang  : pembina (Pembina Gudep / Ka Gudep, surat intern sekolah), kamabigus (Kepala Sekolah / Kamabigus, surat keluar sekolah),
+--            pradana, pradani; masing-masing { jabatan, nama, nta, nip }
+-- Aturan isian sama dengan periksaGudep di src/lib/gudepLogic.js (dijaga oleh pengujian).
+create function public.sg_gudep_simpan(p_nilai jsonb) returns void
+language plpgsql security definer set search_path = public as
+$$
+declare
+  v_teks text[] := array['nama', 'singkat', 'sekolah', 'alamat', 'kota', 'nomorGudep', 'kwarran', 'kwarcab', 'kodeSurat', 'telepon', 'email'];
+  v_orang text[] := array['pembina', 'kamabigus', 'pradana', 'pradani'];
+  v_batas jsonb := '{"nama":120,"singkat":120,"sekolah":120,"alamat":200,"kota":60,"nomorGudep":40,"kwarran":80,"kwarcab":80,"kodeSurat":30,"telepon":40,"email":100}';
+  v_baru jsonb := '{}'::jsonb; v_o jsonb; v_h jsonb; v_k text; v_f text; v_v text;
+begin
+  perform sigarda.wajib_admin('Hanya Admin Gudep yang dapat mengubah data gudep.');
+  if p_nilai is null or jsonb_typeof(p_nilai) <> 'object' then raise exception 'Data gudep tidak sah.'; end if;
+  for v_k in select jsonb_object_keys(p_nilai) loop
+    if not (v_k = any (v_teks) or v_k = any (v_orang)) then raise exception 'Isian "%" tidak dikenal.', v_k; end if;
+  end loop;
+
+  foreach v_k in array v_teks loop
+    if p_nilai -> v_k is not null and jsonb_typeof(p_nilai -> v_k) not in ('string', 'null') then raise exception 'Isian "%" harus berupa teks.', v_k; end if;
+    v_v := sigarda.rapikan(p_nilai ->> v_k);
+    if char_length(v_v) > (v_batas ->> v_k)::int then raise exception 'Isian "%" maksimal % karakter.', v_k, v_batas ->> v_k; end if;
+    if v_k in ('nama', 'singkat', 'sekolah', 'kota') and v_v = '' then raise exception 'Isian "%" wajib diisi.', v_k; end if;
+    if v_k = 'kodeSurat' and v_v !~ '^[A-Za-z0-9._/-]*$' then raise exception 'Kode surat hanya boleh berisi huruf, angka, dan tanda . _ / -.'; end if;
+    if v_k = 'telepon' and v_v !~ '^[0-9 +()./-]*$' then raise exception 'Telepon hanya boleh berisi angka, spasi, dan tanda + ( ) . / -.'; end if;
+    if v_k = 'email' and v_v <> '' and v_v !~ '^[^@ ]+@[^@ ]+\.[^@ ]+$' then raise exception 'Alamat email tidak sah.'; end if;
+    v_baru := v_baru || jsonb_build_object(v_k, v_v);
+  end loop;
+
+  foreach v_k in array v_orang loop
+    v_o := coalesce(p_nilai -> v_k, '{}'::jsonb);
+    if jsonb_typeof(v_o) <> 'object' then raise exception 'Isian "%" tidak sah.', v_k; end if;
+    v_h := '{}'::jsonb;
+    for v_f in select jsonb_object_keys(v_o) loop
+      if v_f not in ('jabatan', 'nama', 'nta', 'nip') then raise exception 'Isian "%.%" tidak dikenal.', v_k, v_f; end if;
+    end loop;
+    foreach v_f in array array['jabatan', 'nama', 'nta', 'nip'] loop
+      if v_o -> v_f is not null and jsonb_typeof(v_o -> v_f) not in ('string', 'null') then raise exception 'Isian "%.%" harus berupa teks.', v_k, v_f; end if;
+      v_v := sigarda.rapikan(v_o ->> v_f);
+      if v_f = 'jabatan' and char_length(v_v) > 80 then raise exception 'Jabatan % maksimal 80 karakter.', v_k; end if;
+      if v_f = 'nama' and char_length(v_v) > 120 then raise exception 'Nama % maksimal 120 karakter.', v_k; end if;
+      if v_f in ('nta', 'nip') and v_v !~ '^[0-9A-Za-z./ -]{0,40}$' then raise exception '% % hanya boleh berisi huruf, angka, spasi, dan tanda / . - (maksimal 40 karakter).', upper(v_f), v_k; end if;
+      v_h := v_h || jsonb_build_object(v_f, v_v);
+    end loop;
+    if v_k = 'pembina' and (v_h ->> 'nama' = '' or v_h ->> 'jabatan' = '') then raise exception 'Nama dan jabatan Pembina Gudep wajib diisi.'; end if;
+    v_baru := v_baru || jsonb_build_object(v_k, v_h);
+  end loop;
+
+  insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada) values ('gudep.data', v_baru, auth.uid(), now())
+  on conflict (kunci) do update set nilai = excluded.nilai, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
+end $$;
+
+-- Identitas gudep yang boleh dilihat tanpa login (halaman masuk dan halaman verifikasi): hanya nama gudep, ambalan, sekolah, dan kota.
+-- Nama pejabat, NTA, alamat, dan kontak TIDAK dikeluarkan. Belum ada data = objek kosong (aplikasi memakai nilai bawaan).
+create function public.sg_gudep_publik() returns jsonb
+language sql stable security definer set search_path = public as
+$$
+  select coalesce(
+    (select jsonb_strip_nulls(jsonb_build_object('nama', p.nilai -> 'nama', 'singkat', p.nilai -> 'singkat', 'sekolah', p.nilai -> 'sekolah', 'kota', p.nilai -> 'kota'))
+     from public.pengaturan p where p.kunci = 'gudep.data'), '{}'::jsonb)
+$$;
+-- Ketua sidang untuk berita acara: Pradana pada data gudep (nama dan jabatan). Bila Admin belum menyimpan data gudep, atau nama/jabatan Pradana kosong,
+-- dipakai pengaturan lama sidang.nama_ketua dan sidang.sebutan_ketua (bawaan: kosong dan "Ketua Dewan Penegak / Pemangku Adat").
+-- Cermin ketuaSidang di src/lib/gudepLogic.js (dijaga oleh pengujian).
+create function sigarda.ketua_sidang(out o_nama text, out o_sebutan text) language plpgsql stable security definer set search_path = public as
+$$
+declare v_g jsonb;
+begin
+  select nilai into v_g from public.pengaturan where kunci = 'gudep.data';
+  o_nama := sigarda.rapikan(v_g -> 'pradana' ->> 'nama');
+  o_sebutan := sigarda.rapikan(v_g -> 'pradana' ->> 'jabatan');
+  if o_nama = '' then o_nama := sigarda.pengaturan_teks('sidang.nama_ketua', ''); end if;
+  if o_sebutan = '' then o_sebutan := sigarda.pengaturan_teks('sidang.sebutan_ketua', 'Ketua Dewan Penegak / Pemangku Adat'); end if;
+end $$;
+-- ===== akhir fungsi gudep =====
+
 -- ===== Dokumen terbit: fungsi aksi =====
 -- Menerbitkan surat pengantar ke guru agama untuk butir agama Penegak yang tidak punya Pembina seagama (Pembina atau Admin Gudep).
 -- Surat dicetak untuk tanda tangan dan stempel basah; QR memuat token (sg_verifikasi_token). Selama surat berlaku, Pembina mana pun boleh
@@ -2623,10 +2703,11 @@ grant execute on function
   public.sg_penugasan_atur(text, uuid, text[], boolean), public.sg_penugasan_salin(text, text), public.sg_rombel_perbarui(jsonb),
   public.sg_guru_agama_simpan(bigint, text, text, text), public.sg_guru_agama_hapus(bigint),
   public.sg_penguji_pilihan(text, uuid), public.sg_sku_alihkan(uuid, text, uuid, text),
-  public.sg_dokumen_surat_agama_terbit(uuid, text[], bigint, text, date, text, text, text, text, text), public.sg_dokumen_cabut(bigint, text)
+  public.sg_dokumen_surat_agama_terbit(uuid, text[], bigint, text, date, text, text, text, text, text), public.sg_dokumen_cabut(bigint, text),
+  public.sg_gudep_simpan(jsonb)
   to authenticated;
--- Verifikasi keaslian dokumen: satu-satunya fungsi yang boleh dipanggil tanpa login (hanya membaca)
-grant execute on function public.sg_verifikasi_token(text), public.sg_verifikasi_kode(text) to anon, authenticated;
+-- Fungsi yang boleh dipanggil tanpa login (hanya membaca): verifikasi keaslian dokumen dan identitas gudep yang tampil di halaman masuk
+grant execute on function public.sg_verifikasi_token(text), public.sg_verifikasi_kode(text), public.sg_gudep_publik() to anon, authenticated;
 grant execute on function
   public.sg_sku_catat_internal(uuid, uuid, text, text, date, text, text),
   public.sg_sku_catat_rubrik_internal(uuid, uuid, text, date, jsonb, text, text),

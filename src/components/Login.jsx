@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { APP, GUDEP } from '../config';
+import { APP } from '../config';
+import { useGudep } from '../lib/gudepStore';
 import { PIN_PANJANG } from '../lib/pinLogic';
 import { LOKAL } from '../lib/supabaseClient';
 import { alamatDasar } from '../lib/verifikasiLogic';
@@ -16,6 +17,7 @@ const LANGKAH = [
 ];
 
 export default function Login() {
+  const G = useGudep();
   const { login, lokal } = useApp();
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
@@ -46,7 +48,7 @@ export default function Login() {
           <h1 className="mt-5 font-display text-4xl font-bold tracking-[0.14em] md:text-5xl">{APP.nama}</h1>
           <p className="mt-1 text-lg font-semibold text-emas-light">{APP.kepanjangan}</p>
           <p className="mt-3 max-w-md text-pramuka-200">
-            {APP.tagline}, di {GUDEP.nama}.
+            {APP.tagline}, di {G.nama}.
           </p>
 
           <ul className="mt-6 hidden max-w-md space-y-3 md:block">

@@ -1,17 +1,19 @@
-import { GUDEP } from '../config';
+import { useGudep } from '../lib/gudepStore';
+import { namaAmbalan } from '../lib/gudepLogic';
 import { PERIODE } from '../lib/absensiLogic';
 import { fmtTanggal, hariIni } from '../lib/format';
 import { PREDIKAT } from '../lib/raportLogic';
 import { KopSurat } from './DokumenSku';
 
 // "Ambalan Gajah Mada/..." dipakai apa adanya; bila nama tidak diawali kata Ambalan, kata itu ditambahkan.
-const NAMA_AMBALAN = /^ambalan\b/i.test(GUDEP.singkat) ? GUDEP.singkat : `Ambalan ${GUDEP.singkat}`;
 
 /**
  * Satu lembar nilai ekstrakurikuler (A4 portrait) untuk satu Penegak. Baris yang belum final diberi tanda DRAF yang jelas
  * karena hanya saran; hanya yang berstatus final yang boleh diserahkan ke sekolah.
  */
 export function LembarRaport({ baris, tahunAjaran, semester, tanggal }) {
+  const G = useGudep();
+  const NAMA_AMBALAN = namaAmbalan(G);
   const { peserta } = baris;
   const final = baris.status === 'final';
   const p = baris.predikat && baris.sikap != null ? PREDIKAT[baris.predikat] : null;
@@ -44,13 +46,13 @@ export function LembarRaport({ baris, tahunAjaran, semester, tanggal }) {
         </p>
       </div>
 
-      <p className="mt-8 text-right text-sm">{GUDEP.kota}, {fmtTanggal(tanggal ?? hariIni())}</p>
+      <p className="mt-8 text-right text-sm">{G.kota}, {fmtTanggal(tanggal ?? hariIni())}</p>
       <div className="mt-1 text-center text-sm">
         <div className="ml-auto w-64">
-          <p>{GUDEP.pembina.jabatan}</p>
+          <p>{G.pembina.jabatan}</p>
           <div className="h-16" />
-          <p className="font-bold underline">{GUDEP.pembina.nama}</p>
-          <p className="text-xs">NTA {GUDEP.pembina.nta}</p>
+          <p className="font-bold underline">{G.pembina.nama}</p>
+          {G.pembina.nta && <p className="text-xs">NTA {G.pembina.nta}</p>}
         </div>
       </div>
     </article>

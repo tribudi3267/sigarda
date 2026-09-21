@@ -6,19 +6,28 @@ export const APP = {
   versi: '2.0',
 };
 
-// Identitas Gugus Depan. Ubah di sini, seluruh aplikasi dan dokumen cetak ikut berubah.
-export const GUDEP = {
+// Identitas Gugus Depan BAWAAN. Admin Gudep mengubahnya di menu "Data Gudep" (disimpan di basis data, pengaturan gudep.data); nilai di sini
+// hanya dipakai selama belum ada data tersimpan atau bila sebuah isian dikosongkan. Bacalah lewat useGudep() / ambilGudep() (src/lib/gudepStore.js),
+// jangan mengimpor konstanta ini langsung pada halaman.
+//   pembina   = Pembina Gudep / Ka Gudep (penanda tangan surat intern sekolah)
+//   kamabigus = Kepala Sekolah / Kamabigus (penanda tangan surat keluar sekolah)
+//   pradana, pradani = pimpinan Dewan Ambalan putra dan putri
+export const GUDEP_BAWAAN = {
   nama: 'Gugus Depan SMAN 1 Bukateja',
   singkat: 'Ambalan Gajah Mada/Christina M.T',
   sekolah: 'SMA Negeri 1 Bukateja',
   alamat: 'Bukateja, Kabupaten Purbalingga, Jawa Tengah',
   kota: 'Bukateja',
-  nomorGudep: '10.701/10.702', // isi nomor gudep resmi
+  nomorGudep: '10.701/10.702',
   kwarran: 'Kwartir Ranting Bukateja',
   kwarcab: 'Kwartir Cabang Purbalingga',
   kodeSurat: 'GD-SMAN1-BKT',
-  pembina: { jabatan: 'Pembina Gudep', nama: 'Diana Udhi Hendriyanto, S.Pd.M.Pd', nta: '11.03.10.701.02365' },
-  ketuaAmbalan: { jabatan: 'Pradana Dewan Ambalan', nama: 'Nama Pradana', nta: '.........' },
+  telepon: '',
+  email: '',
+  pembina: { jabatan: 'Pembina Gudep', nama: 'Diana Udhi Hendriyanto, S.Pd.M.Pd', nta: '11.03.10.701.02365', nip: '' },
+  kamabigus: { jabatan: 'Kepala Sekolah / Kamabigus', nama: '', nta: '', nip: '' },
+  pradana: { jabatan: 'Pradana Dewan Ambalan', nama: '', nta: '', nip: '' },
+  pradani: { jabatan: 'Pradani Dewan Ambalan', nama: '', nta: '', nip: '' },
 };
 
 // Hanya SARAN pada isian anggota baru. Daftar pada filter selalu diambil dari data yang ada.

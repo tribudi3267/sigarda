@@ -1,21 +1,26 @@
 import { useApp } from '../context/AppContext';
-import { GUDEP } from '../config';
 import { TINGKAT, hurufSub } from '../data/skuData';
 import { PERAN, butirPeserta, getEntry, hitungProgres, tanggalLulusTingkat } from '../lib/skuLogic';
 import { fmtTanggal, hariIni, kodeVerifikasi } from '../lib/format';
 import { alamatDasar, urlVerifikasi } from '../lib/verifikasiLogic';
+import { useGudep } from '../lib/gudepStore';
+import { barisKop } from '../lib/gudepLogic';
 import KodeQr from './KodeQr';
 import LogoMark from './LogoMark';
 
-export function KopSurat() {
+export function KopSurat({ gudep = null }) {
+  const dariStore = useGudep();
+  const G = gudep ?? dariStore; // `gudep` = data lain (pratinjau di halaman Data Gudep sebelum disimpan)
+  const kop = barisKop(G);
   return (
     <header className="flex items-center gap-4 border-b-4 border-double border-pramuka-800 pb-3">
       <LogoMark size={64} />
       <div className="flex-1 text-center leading-snug">
         <p className="text-xs font-semibold tracking-wide">GERAKAN PRAMUKA</p>
-        <p className="text-xs">{GUDEP.kwarcab}, {GUDEP.kwarran}</p>
-        <p className="font-display text-lg font-bold">{GUDEP.nama.toUpperCase()}</p>
-        <p className="text-xs">Gudep No. {GUDEP.nomorGudep}. {GUDEP.alamat}</p>
+        <p className="text-xs">{G.kwarcab}, {G.kwarran}</p>
+        <p className="font-display text-lg font-bold">{G.nama.toUpperCase()}</p>
+        <p className="text-xs">{kop.alamat}</p>
+        {kop.kontak && <p className="text-xs">{kop.kontak}</p>}
       </div>
       <div className="w-16" aria-hidden="true" />
     </header>
@@ -23,13 +28,14 @@ export function KopSurat() {
 }
 
 function BlokTtd({ orang, tanggal }) {
+  const G = useGudep();
   return (
     <div className="text-center text-sm">
-      {tanggal && <p>{GUDEP.kota}, {fmtTanggal(tanggal)}</p>}
+      {tanggal && <p>{G.kota}, {fmtTanggal(tanggal)}</p>}
       <p className={tanggal ? '' : 'mt-[1.35rem]'}>{orang.jabatan}</p>
       <div className="h-16" />
-      <p className="font-bold underline">{orang.nama}</p>
-      <p className="text-xs">NTA {orang.nta}</p>
+      {orang.nama ? <p className="font-bold underline">{orang.nama}</p> : <p>( ______________________________ )</p>}
+      {orang.nta && <p className="text-xs">NTA {orang.nta}</p>}
     </div>
   );
 }
@@ -38,6 +44,7 @@ const SEL = 'border border-pramuka-400 px-2 py-1 align-top';
 
 /** Kartu rekap SKU (A4 portrait). Butir 1 diuraikan per sub-butir sesuai agama peserta. */
 export function KartuSku({ peserta, tingkat }) {
+  const G = useGudep();
   const { progress, users } = useApp();
   const t = TINGKAT[tingkat];
   const h = hitungProgres(progress, peserta, tingkat);
@@ -106,7 +113,7 @@ export function KartuSku({ peserta, tingkat }) {
         <p className="max-w-xs text-[10px] leading-snug text-pramuka-600">
           Periksa keaslian butir yang lulus dengan memindai QR pada tabel atau membuka {alamatDasar()}?v= lalu mengetik kode verifikasinya.
         </p>
-        <BlokTtd orang={GUDEP.pembina} tanggal={hariIni()} />
+        <BlokTtd orang={G.pembina} tanggal={hariIni()} />
       </div>
     </article>
   );
@@ -129,18 +136,19 @@ function FragmenAgama({ no, agama, children }) {
  * `token` = token QR surat (dari sg_sertifikat_tingkat); tanpa token surat tetap tercetak tanpa QR.
  */
 export function SuratTandaLulus({ peserta, tingkat, token = null }) {
+  const G = useGudep();
   const { progress } = useApp();
   const t = TINGKAT[tingkat];
   const tglLulus = tanggalLulusTingkat(progress, peserta, tingkat);
   const tahun = (tglLulus ?? hariIni()).slice(0, 4);
   const hash = kodeVerifikasi([peserta.id, tingkat, tglLulus ?? '']).slice(4);
-  const nomor = `${GUDEP.kodeSurat}/STL-${t.kode}/${tahun}/${hash}`;
+  const nomor = `${G.kodeSurat}/STL-${t.kode}/${tahun}/${hash}`;
 
   return (
     <article className="print-area mx-auto min-w-[760px] max-w-[1050px] border-[10px] border-pramuka-800 bg-white p-2 text-pramuka-900">
       <div className="border-2 border-emas px-10 py-8 text-center">
         <div className="flex justify-center"><LogoMark size={72} /></div>
-        <p className="mt-2 text-sm font-semibold">{GUDEP.nama}, {GUDEP.kwarran}</p>
+        <p className="mt-2 text-sm font-semibold">{G.nama}, {G.kwarran}</p>
         <h2 className="mt-3 font-display text-4xl font-bold text-pramuka-800">Surat Tanda Lulus</h2>
         <p className="mt-1 font-display text-lg font-semibold">Syarat Kecakapan Umum {t.judul.replace('SKU ', '')}</p>
         <p className="mt-1 text-xs text-pramuka-600">Nomor {nomor}</p>
@@ -156,7 +164,7 @@ export function SuratTandaLulus({ peserta, tingkat, token = null }) {
         </p>
 
         <div className={`mt-8 grid items-end gap-8 ${token ? 'grid-cols-[1fr_auto_1fr]' : 'grid-cols-2'}`}>
-          <BlokTtd orang={GUDEP.ketuaAmbalan} tanggal={tglLulus} />
+          <BlokTtd orang={G.pradana} tanggal={tglLulus} />
           {token && (
             <div className="flex flex-col items-center text-[10px] leading-snug text-pramuka-600">
               <KodeQr teks={urlVerifikasi(token)} ukuran={96} label={`QR verifikasi Surat Tanda Lulus ${tingkat}`} className="border border-pramuka-200" />
@@ -164,7 +172,7 @@ export function SuratTandaLulus({ peserta, tingkat, token = null }) {
               <p>{alamatDasar().replace(/^https?:\/\//, '').replace(/\/$/, '')}</p>
             </div>
           )}
-          <BlokTtd orang={GUDEP.pembina} />
+          <BlokTtd orang={G.pembina} />
         </div>
       </div>
     </article>

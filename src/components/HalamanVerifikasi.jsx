@@ -3,7 +3,8 @@ import { ambilKlien, GALAT_KONFIGURASI } from '../lib/supabaseClient';
 import { buatApi } from '../lib/api';
 import { alamatDasar, JUDUL_DOKUMEN, labelUnit, POLA_KODE, POLA_TOKEN, teksUnit } from '../lib/verifikasiLogic';
 import { fmtTanggal } from '../lib/format';
-import { APP, GUDEP } from '../config';
+import { APP } from '../config';
+import { tambahGudep, useGudep } from '../lib/gudepStore';
 import { FooterRingkas } from './Footer';
 import LogoMark from './LogoMark';
 import { Icon } from './ui';
@@ -77,6 +78,7 @@ function Dicabut({ d }) {
 }
 
 function HasilDokumen({ d }) {
+  const G = useGudep();
   if (d.dicabut) return <Dicabut d={d} />;
   const butir = Array.isArray(d.butir) ? d.butir : [];
   return (
@@ -91,7 +93,7 @@ function HasilDokumen({ d }) {
       {butir.length > 0 && <Baris label="Butir">{butir.map((id) => `${labelUnit(id)} (${id.startsWith('LAK') ? 'Laksana' : 'Bantara'})`).join(', ')}</Baris>}
       {d.kode && <Baris label="Kode verifikasi"><span className="font-mono">{d.kode}</span></Baris>}
       <p className="py-2.5 text-xs leading-relaxed text-pramuka-600">
-        QR ini membuktikan surat diterbitkan oleh aplikasi. Surat dinyatakan sah bila bertanda tangan dan berstempel {GUDEP.nama}.
+        QR ini membuktikan surat diterbitkan oleh aplikasi. Surat dinyatakan sah bila bertanda tangan dan berstempel {G.nama}.
       </p>
     </Sah>
   );
@@ -150,6 +152,7 @@ function HasilKode({ d }) {
 }
 
 export default function HalamanVerifikasi({ awal = '' }) {
+  const G = useGudep();
   const [api, setApi] = useState(null);
   const [siap, setSiap] = useState('memuat'); // memuat | siap | konfigurasi | galat
   const [galatSambung, setGalatSambung] = useState('');
@@ -174,7 +177,9 @@ export default function HalamanVerifikasi({ awal = '' }) {
       try {
         const { klien } = await ambilKlien();
         if (batal) return;
-        setApi(buatApi(klien));
+        const a = buatApi(klien);
+        setApi(a);
+        a.muatGudepPublik().then((r) => { if (r.ok && !batal) tambahGudep(r.data); }); // nama gudep tanpa login
         setSiap('siap');
       } catch (e) {
         if (batal) return;
@@ -232,7 +237,7 @@ export default function HalamanVerifikasi({ awal = '' }) {
       <main className="mx-auto w-full max-w-xl flex-1 px-4 py-6">
         <h1 className="text-xl font-bold text-pramuka-900">Periksa keaslian dokumen</h1>
         <p className="mt-1 text-sm leading-relaxed text-pramuka-700">
-          Kartu SKU dan Surat Tanda Lulus dari {GUDEP.nama} memuat kode QR dan kode verifikasi. Pindai QR untuk melihat isinya,
+          Kartu SKU dan Surat Tanda Lulus dari {G.nama} memuat kode QR dan kode verifikasi. Pindai QR untuk melihat isinya,
           atau ketik kode verifikasi (VRF-...) di bawah.
         </p>
 
