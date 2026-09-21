@@ -34,6 +34,11 @@ export async function isiDataContoh(pg) {
     await pg.query('update public.profiles set dibuat = coalesce($2::date, dibuat), calon_garuda = $3::date where id = $1', [akun.id, u.dibuat ?? null, u.calonGaruda ?? null]);
   }
   const p = (id) => uuid[id] ?? null;
+  // Jenis kelamin data contoh (peragaan, bergantian menurut urutan). Tiga Penegak terakhir sengaja dibiarkan kosong agar "Lengkapi jenis kelamin" terlihat.
+  if ((await pg.query("select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'jenis_kelamin'")).rows.length) {
+    await pg.query("update public.profiles p set jenis_kelamin = case when x.n % 2 = 0 then 'L' else 'P' end from (select id, row_number() over (order by username) as n from public.profiles) x where x.id = p.id");
+    await pg.query("update public.profiles set jenis_kelamin = null where id in (select id from public.profiles where role = 'peserta' order by username desc limit 3)");
+  }
   const sekarang = new Date().toISOString();
 
   // Agama Pembina contoh dan penugasan contoh (tahun ajaran berjalan). XII-02 sengaja tanpa penguji agar peringatannya terlihat.

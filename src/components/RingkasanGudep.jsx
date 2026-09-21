@@ -7,6 +7,7 @@ import {
 } from '../lib/absensiLogic';
 import { rekapPortofolio, ringkasPortofolio } from '../lib/portofolioLogic';
 import { hariIni } from '../lib/format';
+import { hitungJenisKelamin } from '../lib/jenisKelaminLogic';
 import useAbsensiPeriode from '../hooks/useAbsensiPeriode';
 import { Icon, MuatAbsensi, ProgressBar } from './ui';
 import KartuIuran from './KartuIuran';
@@ -35,6 +36,7 @@ export default function RingkasanGudep({ onNav }) {
   const garuda = useMemo(() => rekapPortofolio(portofolio, daftarPeserta), [portofolio, daftarPeserta]);
   const pf = ringkasPortofolio(garuda);
 
+  const jk = hitungJenisKelamin(daftarPeserta);
   const perPeran = URUTAN_PERAN.map((p) => ({ peran: p, jumlah: daftarPeserta.filter((u) => u.peran === p).length }));
 
   return (
@@ -53,6 +55,10 @@ export default function RingkasanGudep({ onNav }) {
             </div>
           ))}
         </div>
+        <p className="mt-2 text-sm text-pramuka-600">
+          Laki-laki <span className="font-semibold text-pramuka-800">{jk.L}</span>, perempuan <span className="font-semibold text-pramuka-800">{jk.P}</span>
+          {jk.kosong > 0 && <>, <span className="font-semibold text-amber-700">{jk.kosong} belum diisi jenis kelaminnya</span></>}
+        </p>
       </section>
 
       <section aria-label="Rekap absensi">

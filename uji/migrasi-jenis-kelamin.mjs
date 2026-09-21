@@ -1,4 +1,4 @@
-// Migrasi notifikasi dan Web Push: kesetaraan dengan skema baru, data utuh, idempoten, perilaku pemicu pada data lama, dan gagal jelas bila prasyarat belum ada.
+// Migrasi jenis kelamin anggota: kesetaraan dengan skema baru, data utuh, idempoten, perilaku pada data lama, dan gagal jelas bila prasyarat belum ada.
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -11,8 +11,8 @@ const ok = (c, m) => { if (c) { l++; console.log('ok   :', m); } else { g++; con
 const stub = readFileSync(`${P}/supabase/lokal/stub.sql`, 'utf8');
 // Akhir baris disamakan (LF): checkout Windows dapat mengubah berkas menjadi CRLF, sedangkan skema lama dari git berakhir LF.
 const bersih = (s) => s.replace(/^﻿/, '').replace(/\r\n/g, '\n');
-const M = ['sidang-dk', 'sidang-format-nomor', 'raport', 'instrumen', 'verifikasi-sesi', 'nta-anggota', 'butir-agama-pembina', 'indeks-kode-verifikasi', 'iuran', 'penugasan', 'penegakan', 'dokumen', 'data-gudep', 'jabatan-dewan', 'notifikasi'].map((n) => bersih(readFileSync(`${P}/supabase/migrasi/2026-09-${n}.sql`, 'utf8')));
-const MP = M[14]; // hanya migrasi notifikasi yang diuji di sini
+const M = ['sidang-dk', 'sidang-format-nomor', 'raport', 'instrumen', 'verifikasi-sesi', 'nta-anggota', 'butir-agama-pembina', 'indeks-kode-verifikasi', 'iuran', 'penugasan', 'penegakan', 'dokumen', 'data-gudep', 'jabatan-dewan', 'notifikasi', 'jenis-kelamin'].map((n) => bersih(readFileSync(`${P}/supabase/migrasi/2026-09-${n}.sql`, 'utf8')));
+const MP = M[15]; // hanya migrasi jenis kelamin yang diuji di sini
 
 // Skema "sebelum migrasi" diambil dari riwayat git: 'git:<commit>' = supabase/skema.sql pada commit itu (commit TEPAT sebelum migrasi notifikasi).
 const skemaDari = (ref) => (ref.startsWith('git:') ? execFileSync('git', ['show', `${ref.slice(4)}:supabase/skema.sql`], { cwd: P, encoding: 'utf8', maxBuffer: 1 << 26 }) : readFileSync(ref, 'utf8'));
@@ -46,22 +46,22 @@ const bandingkan = (nama, pa, pb) => {
   }
 };
 
-// Skema "sesudah notifikasi" = skema.sql pada commit 060fe49 (skema terbaru sudah memuat migrasi jenis kelamin).
-const A = await baru('git:060fe49');
+// Skema "sesudah jenis kelamin" = skema.sql terbaru (dibuat dari inti.sql).
+const A = await baru(`${P}/supabase/skema.sql`);
 const pa = await potret(A);
-ok(pa.fungsi.some((x) => x.proname === 'sg_notifikasi_tandai') && pa.fungsi.some((x) => x.proname === 'notif_pengingat') && pa.pemicu.some((x) => x.tgname === 'notif_sku_progress'), 'skema baru memuat sg_notifikasi_tandai, notif_pengingat, dan pemicu notif_sku_progress');
+ok(pa.fungsi.some((x) => x.proname === 'sg_anggota_jk_atur') && pa.kolom.some((x) => x.table_name === 'profiles' && x.column_name === 'jenis_kelamin'), 'skema baru memuat sg_anggota_jk_atur dan kolom profiles.jenis_kelamin');
 
-const SEBELUM = 'git:6676a4a'; // commit TEPAT sebelum migrasi notifikasi (Fase 3 sudah terbit)
+const SEBELUM = 'git:060fe49'; // commit TEPAT sebelum migrasi jenis kelamin (notifikasi dan PWA sudah terbit)
 
-console.log('--- Jalur 1: database Anda sekarang (sampai jabatan Dewan), berisi data ---');
+console.log('--- Jalur 1: database Anda sekarang (sampai notifikasi), berisi data ---');
 const B1 = await baru(SEBELUM);
 await isiDataContoh(B1);
 await B1.query('update public.profiles set wajib_ganti_pin = false');
 const sebelum = await cacah(B1);
-ok((await B1.query(`select to_regclass('public.notifikasi') is null as kosong`)).rows[0].kosong, 'prasyarat: skema lama belum punya tabel notifikasi');
+ok((await B1.query(`select count(*)::int n from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'jenis_kelamin'`)).rows[0].n === 0, 'prasyarat: skema lama belum punya kolom jenis_kelamin');
 await B1.exec(MP);
 ok(JSON.stringify(await cacah(B1)) === JSON.stringify(sebelum), 'jumlah data tidak berubah oleh migrasi: ' + JSON.stringify(sebelum));
-ok((await B1.query('select count(*)::int n from public.notifikasi')).rows[0].n === 0, 'data lama tidak memicu notifikasi apa pun (pemicu hanya untuk peristiwa baru)');
+ok((await B1.query('select count(*)::int n from public.profiles where jenis_kelamin is not null')).rows[0].n === 0, 'anggota yang sudah ada tetap kosong (dilengkapi Admin kemudian)');
 await B1.exec(MP); await B1.exec(MP);
 ok(JSON.stringify(await cacah(B1)) === JSON.stringify(sebelum), 'menjalankan migrasi tiga kali: data tetap sama');
 bandingkan('jalur 1', pa, await potret(B1));
@@ -70,19 +70,14 @@ console.log('\n--- Sesudah migrasi: perilaku pada data lama ---');
 {
   const id = async (sql, a = []) => (await B1.query(sql, a)).rows[0].id;
   const pembina = await id(`select id from public.profiles where role = 'penguji' and jabatan = 'Pembina'`);
-  const ahmad = await id(`select id from public.profiles where username = '10231'`);
+  const admin = await id(`select id from public.profiles where role = 'admin'`);
   const sebagai = async (uid, sql, args = []) => { try { return { ok: true, rows: (await sqlSebagai(B1, uid, sql, args)).rows }; } catch (e) { return { ok: false, pesan: e.message }; } };
-  await B1.query(`delete from public.sku_progress where peserta_id = $1 and sku_id = 'BAN-05'`, [ahmad]);
-  let r = await sebagai(ahmad, `select public.sg_sku_ajukan('BAN-05', current_date, $1::uuid, '')`, [pembina]);
-  ok(r.ok, 'Penegak mengajukan uji pada database hasil migrasi: ' + (r.pesan ?? ''));
-  r = await sebagai(pembina, `select judul, isi from public.notifikasi where penerima_id = $1`, [pembina]);
-  ok(r.ok && r.rows.length === 1 && r.rows[0].judul === 'Pengajuan uji baru', 'pemicu bekerja: penguji tujuan mendapat notifikasi');
-  r = await sebagai(pembina, `select public.sg_notifikasi_tandai(null) n`);
-  ok(r.ok && r.rows[0].n === 1, 'tandai dibaca bekerja');
-  r = await sebagai(ahmad, `select public.sg_push_kunci() k`);
-  ok(r.ok && r.rows[0].k === null, 'kunci push kosong sebelum diatur pemilik');
-  r = await sebagai(ahmad, `select public.sg_push_ambil_internal('{1}'::bigint[])`);
-  ok(!r.ok && /permission denied/i.test(r.pesan), 'fungsi khusus Edge Function tidak dapat dipanggil pengguna aplikasi');
+  let r = await sebagai(pembina, `select public.sg_anggota_jk_atur('[{"username":"10231","jk":"L"}]'::jsonb)`);
+  ok(!r.ok && /Hanya Admin Gudep/.test(r.pesan), 'Pembina tidak dapat mengatur jenis kelamin');
+  r = await sebagai(admin, `select public.sg_anggota_jk_atur('[{"username":"10231","jk":"l"},{"username":"pembina","jk":"P"}]'::jsonb) n`);
+  ok(r.ok && r.rows[0].n === 2, 'Admin mengatur dua anggota pada database hasil migrasi');
+  r = await sebagai(admin, `select public.sg_anggota_jk_atur('[{"username":"10231","jk":"P"},{"username":"pembina","jk":"Z"}]'::jsonb)`);
+  ok(!r.ok && (await B1.query(`select jenis_kelamin from public.profiles where username = '10231'`)).rows[0].jenis_kelamin === 'L', 'baris tidak sah membatalkan seluruh permintaan');
 }
 
 console.log('\n--- Jalur 2: database sebelum Sidang, semua migrasi berurutan ---');
@@ -93,12 +88,12 @@ for (const m of M) await B2.exec(m);
 ok(JSON.stringify(await cacah(B2)) === JSON.stringify(s2), 'data tidak berubah oleh semua migrasi');
 bandingkan('jalur 2', pa, await potret(B2));
 
-console.log('\n--- Jalur 3: tanpa migrasi dokumen: gagal jelas ---');
-const B3 = await baru('git:428ec5a'); // sebelum dokumen terbit (fase 2a)
+console.log('\n--- Jalur 3: tanpa migrasi penugasan: gagal jelas ---');
+const B3 = await baru('git:be46788'); // sebelum penugasan (tanpa sigarda.wajib_admin)
 let galat = null;
 try { await B3.exec(MP); } catch (e) { galat = e.message; await B3.exec('rollback'); }
 ok(/Jalankan lebih dulu skema dan migrasi/.test(galat ?? ''), 'pesan yang menuntun: ' + (galat ?? 'TIDAK GAGAL').slice(0, 100));
-ok((await B3.query(`select to_regclass('public.notifikasi') is null as kosong`)).rows[0].kosong, 'kegagalan membatalkan seluruh migrasi (tidak ada tabel setengah jadi)');
+ok((await B3.query(`select count(*)::int n from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'jenis_kelamin'`)).rows[0].n === 0, 'kegagalan membatalkan seluruh migrasi (kolom tidak tertambah)');
 
-console.log(`\nRINGKASAN MIGRASI NOTIFIKASI: ${l} lulus, ${g} GAGAL`);
+console.log(`\nRINGKASAN MIGRASI JENIS KELAMIN: ${l} lulus, ${g} GAGAL`);
 process.exit(g ? 1 : 0);

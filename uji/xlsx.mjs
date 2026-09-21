@@ -37,7 +37,8 @@ const rendahBaris = [...Array(daftar.length)].map((_, i) => ws.getRow(6 + i)).fi
 cek('sel persen rendah diwarnai merah muda', rendahBaris.getCell(idxPersen).fill?.fgColor?.argb === 'FFFEE2E2');
 const pj = wb.getWorksheet('Per Jumat');
 console.log('Per Jumat kolom:', pj.getRow(5).values.slice(1, 9).join(' | '), '...');
-cek('Per Jumat: kolom tanggal = jumlah sesi', pj.getRow(5).values.length - 1 === 4 + sesi.length + 2);
+cek('Per Jumat: kolom tanggal = jumlah sesi', pj.getRow(5).values.length - 1 === 5 + sesi.length + 2);
+cek('Rekap dan Per Jumat memuat kolom Jenis Kelamin sesudah Nama', ws.getRow(5).getCell(3).value === 'Jenis Kelamin' && pj.getRow(5).getCell(3).value === 'Jenis Kelamin', String(ws.getRow(5).getCell(3).value));
 
 // ---- Portofolio
 const rp = rekapPortofolio(db.portofolio, daftar);

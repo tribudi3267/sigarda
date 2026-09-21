@@ -115,7 +115,7 @@ export default function PortofolioPengurus({ fokusId, onBuka, onKembali, onBukaS
         </p>
       )}
 
-      <div className="mb-3"><FilterBar data={dataFilter} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas']} rombelSaya={rombelSaya} /></div>
+      <div className="mb-3"><FilterBar data={dataFilter} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'jk']} rombelSaya={rombelSaya} /></div>
 
       {rekap.length === 0 ? (
         <Kosong

@@ -6,14 +6,14 @@ import { PENGATURAN_RAPORT_BAWAAN } from '../src/lib/raportLogic.js';
 let g = 0, l = 0;
 const ok = (c, m) => { if (c) { l++; console.log('ok   :', m); } else { g++; console.log('GAGAL:', m); } };
 
-const peserta = (nama, nis, kelas) => ({ id: nis, nama, nis, kelas, sangga: 'Elang' });
+const peserta = (nama, nis, kelas, jenisKelamin) => ({ id: nis, nama, nis, kelas, sangga: 'Elang', jenisKelamin });
 const baris = (p, o = {}) => ({
   peserta: p, tingkat: 'Bantara', hadir: 9, dicatat: 10, kehadiran: 90, lulus: 10, target: 12, capaian: 83, sikap: 4, karakter: [], skk: 2,
   skor: 86, predikatHitung: 'B', predikatAkhir: null, predikat: 'B', catatanPredikat: '', deskripsi: 'Deskripsi uji.', status: 'final', berubah: false, ...o,
 });
 const data = [
-  baris(peserta('Budi Santoso', '1001', 'X IPA 1')),
-  baris(peserta('Ani Lestari', '1002', 'X IPA 1'), { status: 'draf', deskripsi: 'Saran otomatis.' }),
+  baris(peserta('Budi Santoso', '1001', 'X IPA 1', 'L')),
+  baris(peserta('Ani Lestari', '1002', 'X IPA 1', 'P'), { status: 'draf', deskripsi: 'Saran otomatis.' }),
   baris(peserta('Cici', '1003', 'XI/IPS: 2'), { status: 'belum', sikap: null, predikat: 'A', deskripsi: '' }),
   baris(peserta('Dodi', '1004', 'XI/IPS: 2'), { predikatHitung: 'B', predikatAkhir: 'A', predikat: 'A', catatanPredikat: 'Aktif memimpin', skor: 88 }),
   baris(peserta('Eko', '1005', ''), { status: 'draf' }),
@@ -43,12 +43,14 @@ const kepala = ws.getRow(ws.getRow(5).values.length ? 6 : 5);
 let barisKepala = 0; ws.eachRow((r, n) => { if (r.getCell(1).value === 'No') barisKepala = n; });
 ok(barisKepala > 0, 'baris kepala tabel ditemukan pada baris ' + barisKepala);
 const r1 = ws.getRow(barisKepala + 1), r2 = ws.getRow(barisKepala + 2);
-ok(r1.getCell(3).value === 'Ani Lestari' && r1.getCell(8).value === 'DRAF (belum final)', 'baris draf: status tertulis');
+ok(r1.getCell(3).value === 'Ani Lestari' && r1.getCell(9).value === 'DRAF (belum final)', 'baris draf: status tertulis');
 const warna = (c) => c.fill?.fgColor?.argb;
 ok(warna(r1.getCell(3)) === 'FFFEF3C7', 'baris draf berwarna kuning');
-ok(r2.getCell(3).value === 'Budi Santoso' && r2.getCell(8).value === 'Final' && warna(r2.getCell(8)) === 'FFD1FAE5', 'baris final: status Final berwarna hijau, sel lain tanpa warna: ' + warna(r2.getCell(3)));
-ok(r2.getCell(1).value === 2 && r2.getCell(2).value === '1001' && r2.getCell(5).value === 'B' && r2.getCell(6).value === 'Baik', 'kolom NIS, predikat huruf dan keterangan benar');
-ok(String(r2.getCell(7).value) === 'Deskripsi uji.', 'deskripsi capaian terisi');
+ok(r2.getCell(3).value === 'Budi Santoso' && r2.getCell(9).value === 'Final' && warna(r2.getCell(9)) === 'FFD1FAE5', 'baris final: status Final berwarna hijau, sel lain tanpa warna: ' + warna(r2.getCell(3)));
+ok(r2.getCell(1).value === 2 && r2.getCell(2).value === '1001' && r2.getCell(6).value === 'B' && r2.getCell(7).value === 'Baik', 'kolom NIS, predikat huruf dan keterangan benar');
+ok(r1.getCell(4).value === 'Perempuan' && r2.getCell(4).value === 'Laki-laki' && ws.getRow(barisKepala).getCell(4).value === 'Jenis Kelamin', 'kolom Jenis Kelamin sesudah Nama: Perempuan, Laki-laki, dan judul kolom');
+ok(lembar.flatMap((x) => x.baris).find((b) => b.nama === 'Eko').jk === '', 'jenis kelamin yang belum diisi: sel kosong');
+ok(String(r2.getCell(8).value) === 'Deskripsi uji.', 'deskripsi capaian terisi');
 const ket = wb.getWorksheet('Keterangan');
 let teks = ''; ket.eachRow((r) => { teks += r.getCell(2).value + ' '; });
 ok(/A Sangat Baik: 90 ke atas\. B Baik: 75-89\. C Cukup: 60-74\. D Kurang: di bawah 60/.test(teks), 'keterangan memuat pita nilai dari pengaturan');

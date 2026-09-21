@@ -155,7 +155,7 @@ console.log('\n--- Klien: pejabatDewan, penandaTanganDewan, rencanaJabatanDewan 
 console.log('\n--- Klien: impor Excel Dewan (jabatan dan NTA) ---');
 {
   const users = (await pengguna()).map((u) => u);
-  const kp = { nis: '', kelas: '', sangga: '', agama: '', pin: '', username: '', nta: '', jabatanDewan: '' };
+  const kp = { jk: 'L', nis: '', kelas: '', sangga: '', agama: '', pin: '', username: '', nta: '', jabatanDewan: '' };
   const hasil = periksaBaris([
     { no: 2, nama: 'Baru Satu', ...kp, jabatanDewan: 'Sekretaris', nta: '11.03.9' },
     { no: 3, nama: 'Baru Dua', ...kp, jabatanDewan: 'wakil pradana' },

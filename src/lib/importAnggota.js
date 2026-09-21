@@ -14,6 +14,7 @@ import { AGAMA } from '../data/skuData';
 import { formatPinSah, pinLemah } from './pinLogic';
 import { JABATAN_DEWAN, JABATAN_TUNGGAL, normalisasiJabatanDewan } from './dewanLogic';
 import { normalisasiRombel, PESAN_ROMBEL, SEMUA_ROMBEL } from './rombelLogic';
+import { JENIS_KELAMIN, PESAN_JK, normalisasiJenisKelamin } from './jenisKelaminLogic';
 
 export const POLA_USERNAME = /^[a-z0-9][a-z0-9._-]{2,31}$/;
 /** Nomor Tanda Anggota Pramuka (opsional). Sama dengan aturan di server (sg_anggota_nta_atur). */
@@ -31,6 +32,7 @@ export const kelompokDari = (id) => KELOMPOK_PENGGUNA.find((k) => k.id === id);
 
 const KOLOM_PENEGAK = [
   { header: 'Nama Lengkap', key: 'nama', lebar: 32 },
+  { header: 'Jenis Kelamin', key: 'jk', lebar: 16 },
   { header: 'NIS', key: 'nis', lebar: 14 },
   { header: 'Rombel', key: 'kelas', lebar: 10 },
   { header: 'Sangga', key: 'sangga', lebar: 20 },
@@ -41,6 +43,7 @@ const KOLOM_PENEGAK = [
 // Dewan Ambalan: jabatan (Pradana dan seterusnya) dan NTA opsional; Pradana dan Pradani dipakai pada tanda tangan dokumen.
 const KOLOM_DEWAN = [
   { header: 'Nama Lengkap', key: 'nama', lebar: 40 },
+  { header: 'Jenis Kelamin', key: 'jk', lebar: 16 },
   { header: 'Nama Pengguna (opsional)', key: 'username', lebar: 26 },
   { header: 'Jabatan Dewan (opsional)', key: 'jabatanDewan', lebar: 24 },
   { header: 'NTA (opsional)', key: 'nta', lebar: 22 },
@@ -48,12 +51,14 @@ const KOLOM_DEWAN = [
 ];
 const KOLOM_PENGURUS = [
   { header: 'Nama Lengkap', key: 'nama', lebar: 40 },
+  { header: 'Jenis Kelamin', key: 'jk', lebar: 16 },
   { header: 'Nama Pengguna (opsional)', key: 'username', lebar: 26 },
   { header: 'PIN Awal (opsional)', key: 'pin', lebar: 22 },
 ];
 // Pembina memiliki agama (butir agama hanya boleh diuji Pembina yang seagama); Dewan Ambalan tidak.
 const KOLOM_PEMBINA = [
   { header: 'Nama Lengkap', key: 'nama', lebar: 40 },
+  { header: 'Jenis Kelamin', key: 'jk', lebar: 16 },
   { header: 'Nama Pengguna (opsional)', key: 'username', lebar: 26 },
   { header: 'Agama (opsional)', key: 'agama', lebar: 18 },
   { header: 'PIN Awal (opsional)', key: 'pin', lebar: 22 },
@@ -83,6 +88,7 @@ function petaHeader(teks) {
   const k = hurufSaja(teks);
   if (k.startsWith('namapengguna') || k === 'username') return 'username';
   if (k === 'nama' || k === 'namalengkap' || k === 'namasiswa') return 'nama';
+  if (k === 'jeniskelamin' || k === 'jk' || k === 'kelamin' || k === 'lp') return 'jk';
   if (k === 'nis' || k === 'nisn') return 'nis';
   if (k === 'kelas' || k === 'rombel') return 'kelas';
   if (k === 'sangga') return 'sangga';
@@ -109,7 +115,7 @@ export function teksSel(v) {
 /* ---------- Membaca file ---------- */
 
 /**
- * Mengembalikan baris mentah: [{ no, nama, nis, kelas, sangga, agama, pin }] (no = nomor baris di Excel).
+ * Mengembalikan baris mentah: [{ no, nama, jk, nis, kelas, sangga, agama, pin }] (no = nomor baris di Excel; jk = jenis kelamin sebagaimana tertulis).
  * Untuk Dewan Ambalan dan Pembina, nis/kelas/sangga selalu kosong; agama hanya terbaca untuk Pembina; jabatan dan NTA hanya untuk Dewan Ambalan.
  */
 export async function bacaExcelAnggota(buffer, kelompok = 'peserta') {
@@ -155,7 +161,7 @@ export async function bacaExcelAnggota(buffer, kelompok = 'peserta') {
     const row = ws.getRow(r);
     const ambil = (k) => (kolom[k] ? teksSel(row.getCell(kolom[k]).value) : '');
     const item = {
-      no: r, nama: ambil('nama'), nis: ambil('nis'), kelas: ambil('kelas'), sangga: ambil('sangga'), agama: penegak || kelompok === 'pembina' ? ambil('agama') : '',
+      no: r, nama: ambil('nama'), jk: ambil('jk'), nis: ambil('nis'), kelas: ambil('kelas'), sangga: ambil('sangga'), agama: penegak || kelompok === 'pembina' ? ambil('agama') : '',
       username: ambil('username'), pin: ambil('pin'), nta: penegak || kelompok === 'dewan' ? ambil('nta') : '',
       jabatanDewan: kelompok === 'dewan' ? ambil('jabatanDewan') : '',
     };
@@ -186,6 +192,9 @@ export function periksaBaris(baris, users, kelompok = 'peserta') {
     const agama = normalisasiAgama(b.agama);
     const nis = String(b.nis ?? '').trim().toLowerCase();
     if (!b.nama) galat.push('Nama kosong');
+    const jk = normalisasiJenisKelamin(b.jk);
+    if (!b.jk) galat.push('Jenis kelamin kosong');
+    else if (!jk) galat.push(`Jenis kelamin "${b.jk}" tidak dikenal. ${PESAN_JK}`);
     if (!nis) galat.push('NIS kosong (NIS dipakai untuk masuk)');
     else if (!POLA_USERNAME.test(nis)) galat.push('NIS harus 3 sampai 32 karakter huruf atau angka');
     else if (dipakai.has(nis)) galat.push('NIS sudah terdaftar');
@@ -199,7 +208,7 @@ export function periksaBaris(baris, users, kelompok = 'peserta') {
     if (b.pin && !pinAwalSah(b.pin)) galat.push(PESAN_PIN);
 
     if (!galat.length) dipakai.add(nis); // duplikat di dalam file yang sama ikut terdeteksi
-    return { no: b.no, data: { ...b, nis: b.nis ? String(b.nis).trim() : '', kelas: kelas || b.kelas, agama, agamaAsli: b.agama }, galat, siap: galat.length === 0 };
+    return { no: b.no, data: { ...b, jk, jkAsli: b.jk ?? '', nis: b.nis ? String(b.nis).trim() : '', kelas: kelas || b.kelas, agama, agamaAsli: b.agama }, galat, siap: galat.length === 0 };
   });
 }
 
@@ -214,6 +223,9 @@ function periksaPengurus(baris, users, kelompok) {
     const username = String(b.username ?? '').trim().toLowerCase();
     const nama = (b.nama ?? '').trim().toLowerCase();
     if (!b.nama) galat.push('Nama kosong');
+    const jk = normalisasiJenisKelamin(b.jk);
+    if (!b.jk) galat.push('Jenis kelamin kosong');
+    else if (!jk) galat.push(`Jenis kelamin "${b.jk}" tidak dikenal. ${PESAN_JK}`);
     if (username) {
       if (!POLA_USERNAME.test(username)) galat.push('Nama pengguna harus 3 sampai 32 karakter: huruf kecil, angka, titik, garis bawah, atau strip');
       else if (dipakai.has(username)) galat.push('Nama pengguna sudah dipakai');
@@ -238,7 +250,7 @@ function periksaPengurus(baris, users, kelompok) {
       else namaAda.add(nama);
       if (JABATAN_TUNGGAL.includes(jabatanDewan)) tunggalDiFile.add(jabatanDewan);
     }
-    return { no: b.no, data: { ...b, agama, agamaAsli: kelompok === 'pembina' ? b.agama ?? '' : '', jabatanDewan, jabatanAsli: b.jabatanDewan ?? '' }, galat, siap: galat.length === 0 };
+    return { no: b.no, data: { ...b, jk, jkAsli: b.jk ?? '', agama, agamaAsli: kelompok === 'pembina' ? b.agama ?? '' : '', jabatanDewan, jabatanAsli: b.jabatanDewan ?? '' }, galat, siap: galat.length === 0 };
   });
 }
 
@@ -248,23 +260,24 @@ const PETUNJUK_PENEGAK = (label) => [
   [`Petunjuk pengisian template import ${label} SIGARDA`, ''],
   ['', ''],
   ['1. Isi data pada lembar "Anggota"', 'Satu baris satu penegak, mulai baris 2 (di bawah judul kolom). Jangan mengubah atau menghapus judul kolom.'],
-  ['2. Kolom wajib', 'Nama Lengkap, NIS, Rombel, Sangga, Agama. NIS WAJIB dan tidak boleh sama dengan anggota lain: NIS menjadi nama pengguna untuk masuk ke aplikasi.'],
-  ['3. Agama', `Pilih dari daftar: ${AGAMA.join(', ')}. Agama menentukan sub-butir pada butir 1 SKU.`],
-  ['4. Rombel dan Sangga', `Rombel wajib salah satu dari ${SEMUA_ROMBEL.length} rombel baku: X-01 sampai X-10, XI-01 sampai XI-10, XII-01 sampai XII-10 (dua angka; pilih dari daftar). Sangga bebas diketik (mis. Sangga Elang); penulisannya disamakan dengan data yang sudah ada.`],
-  ['5. NTA (opsional)', 'Nomor Tanda Anggota Pramuka, mis. 11.03.10.701.00123. Boleh dikosongkan dan diisi kemudian (di lembar sidang atau ubah anggota). Maksimal 40 karakter.'],
-  ['6. PIN Awal (opsional)', 'Isi tepat 6 angka (tidak boleh sama semua atau berurutan). Jika dikosongkan, aplikasi membuat PIN acak. Setiap anggota WAJIB mengganti PIN saat login pertama.'],
-  ['7. Batas', `Maksimal ${MAKS_BARIS} baris per impor. Baris dengan NIS yang sudah terdaftar dilewati.`],
-  ['8. Setelah impor', 'Daftar NIS dan PIN awal tampil satu kali dan dapat diunduh. Bagikan ke masing-masing anggota secara langsung.'],
+  ['2. Kolom wajib', 'Nama Lengkap, Jenis Kelamin, NIS, Rombel, Sangga, Agama. NIS WAJIB dan tidak boleh sama dengan anggota lain: NIS menjadi nama pengguna untuk masuk ke aplikasi.'],
+  ['3. Jenis Kelamin', 'Pilih Laki-laki atau Perempuan dari daftar (L atau P juga dikenali). Wajib.'],
+  ['4. Agama', `Pilih dari daftar: ${AGAMA.join(', ')}. Agama menentukan sub-butir pada butir 1 SKU.`],
+  ['5. Rombel dan Sangga', `Rombel wajib salah satu dari ${SEMUA_ROMBEL.length} rombel baku: X-01 sampai X-10, XI-01 sampai XI-10, XII-01 sampai XII-10 (dua angka; pilih dari daftar). Sangga bebas diketik (mis. Sangga Elang); penulisannya disamakan dengan data yang sudah ada.`],
+  ['6. NTA (opsional)', 'Nomor Tanda Anggota Pramuka, mis. 11.03.10.701.00123. Boleh dikosongkan dan diisi kemudian (di lembar sidang atau ubah anggota). Maksimal 40 karakter.'],
+  ['7. PIN Awal (opsional)', 'Isi tepat 6 angka (tidak boleh sama semua atau berurutan). Jika dikosongkan, aplikasi membuat PIN acak. Setiap anggota WAJIB mengganti PIN saat login pertama.'],
+  ['8. Batas', `Maksimal ${MAKS_BARIS} baris per impor. Baris dengan NIS yang sudah terdaftar dilewati.`],
+  ['9. Setelah impor', 'Daftar NIS dan PIN awal tampil satu kali dan dapat diunduh. Bagikan ke masing-masing anggota secara langsung.'],
   ['', ''],
   ['Contoh isian', ''],
-  ['Nama Lengkap | NIS | Rombel | Sangga | Agama | NTA', 'Andi Pratama | 10301 | X-03 | Sangga Elang | Islam | 11.03.10.701.00123'],
-  ['', 'Made Sari | 10302 | XI-07 | Sangga Merak | Hindu'],
+  ['Nama Lengkap | Jenis Kelamin | NIS | Rombel | Sangga | Agama | NTA', 'Andi Pratama | Laki-laki | 10301 | X-03 | Sangga Elang | Islam | 11.03.10.701.00123'],
+  ['', 'Made Sari | Perempuan | 10302 | XI-07 | Sangga Merak | Hindu'],
 ];
 
 const PETUNJUK_PENGURUS = (label, kelompok) => {
   const pembina = kelompok === 'pembina';
   const dewan = kelompok === 'dewan';
-  const ekstra = [];
+  const ekstra = [['Jenis Kelamin', 'Pilih Laki-laki atau Perempuan dari daftar (L atau P juga dikenali). Wajib.']];
   if (pembina) ekstra.push(['Agama (opsional)', `Pilih dari daftar: ${AGAMA.join(', ')}. Butir agama pada SKU hanya boleh diuji Pembina yang seagama dengan Penegak, jadi sebaiknya diisi. Boleh dikosongkan dan diisi kemudian lewat Ubah anggota.`]);
   if (dewan) {
     ekstra.push(['Jabatan Dewan (opsional)', `Pilih dari daftar: ${JABATAN_DEWAN.join(', ')}. Pradana dan Pradani masing-masing hanya satu orang: Pradana menjadi ketua sidang dan bersama Pradani menandatangani Surat Tanda Lulus. Boleh dikosongkan dan diisi kemudian lewat Ubah anggota.`]);
@@ -275,7 +288,7 @@ const PETUNJUK_PENGURUS = (label, kelompok) => {
     [`Petunjuk pengisian template import ${label} SIGARDA`, ''],
     ['', ''],
     ['1. Isi data pada lembar "Anggota"', `Satu baris satu orang, mulai baris 2 (di bawah judul kolom). Semua yang diimpor didaftarkan sebagai ${label}. Jangan mengubah atau menghapus judul kolom.`],
-    ['2. Kolom wajib', 'Nama Lengkap. Gelar boleh ditulis (mis. Budi Santoso, S.Pd.).'],
+    ['2. Kolom wajib', 'Nama Lengkap dan Jenis Kelamin. Gelar boleh ditulis pada nama (mis. Budi Santoso, S.Pd.).'],
     ['3. Nama Pengguna (opsional)', 'Dipakai untuk masuk. 3 sampai 32 karakter: huruf kecil, angka, titik, garis bawah, atau strip. Jika dikosongkan dibuat otomatis dari nama (mis. budi.santoso).'],
     ...ekstra.map(([judul, teks], k) => [`${4 + k}. ${judul}`, teks]),
     [`${n}. PIN Awal (opsional)`, 'Isi tepat 6 angka (tidak boleh sama semua atau berurutan). Jika dikosongkan, aplikasi membuat PIN acak. Setiap orang WAJIB mengganti PIN saat login pertama.'],
@@ -284,10 +297,10 @@ const PETUNJUK_PENGURUS = (label, kelompok) => {
     ['', ''],
     ['Contoh isian', ''],
     pembina
-      ? ['Nama Lengkap | Nama Pengguna | Agama | PIN Awal', 'Budi Santoso, S.Pd. | budi.santoso | Islam | (kosong, PIN dibuat acak)']
+      ? ['Nama Lengkap | Jenis Kelamin | Nama Pengguna | Agama | PIN Awal', 'Budi Santoso, S.Pd. | Laki-laki | budi.santoso | Islam | (kosong, PIN dibuat acak)']
       : dewan
-        ? ['Nama Lengkap | Nama Pengguna | Jabatan Dewan | NTA | PIN Awal', 'Andi Pratama | andi.pratama | Pradana | 11.03.10.701.00123 | (kosong, PIN dibuat acak)']
-        : ['Nama Lengkap | Nama Pengguna | PIN Awal', 'Budi Santoso, S.Pd. | budi.santoso | (kosong, PIN dibuat acak)'],
+        ? ['Nama Lengkap | Jenis Kelamin | Nama Pengguna | Jabatan Dewan | NTA | PIN Awal', 'Andi Pratama | Laki-laki | andi.pratama | Pradana | 11.03.10.701.00123 | (kosong, PIN dibuat acak)']
+        : ['Nama Lengkap | Jenis Kelamin | Nama Pengguna | PIN Awal', 'Budi Santoso, S.Pd. | Laki-laki | budi.santoso | (kosong, PIN dibuat acak)'],
   ];
 };
 
@@ -313,6 +326,10 @@ export async function buatTemplateAnggota(kelompok = 'peserta') {
   // Kolom NIS dan PIN berformat teks agar angka 0 di depan tidak hilang
   for (let r = 2; r <= MAKS_BARIS + 1; r += 1) {
     ws.getCell(r, nomorKolom('pin')).numFmt = '@';
+    ws.getCell(r, nomorKolom('jk')).dataValidation = {
+      type: 'list', allowBlank: true, formulae: [`"${JENIS_KELAMIN.map((j) => j.label).join(',')}"`],
+      showErrorMessage: true, errorTitle: 'Jenis kelamin', error: PESAN_JK,
+    };
     if (penegak || kelompok === 'dewan') ws.getCell(r, nomorKolom('nta')).numFmt = '@';
     if (!penegak) ws.getCell(r, nomorKolom('username')).numFmt = '@';
     if (kelompok === 'pembina') {

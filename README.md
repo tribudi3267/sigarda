@@ -50,7 +50,7 @@ Pengguna lain: **Dewan Ambalan** dan **Pembina** (keduanya penguji), serta **Adm
 | Sesi ujian | Melihat jadwal ujian bersama yang mencantumkannya (di Beranda) | Buat jadwal, pilih butir dan peserta, pantau papan sesi, dan menilai langsung dari papan (Dewan Ambalan dan Pembina) | Buat dan pantau (tidak menilai). Hapus sesi: Pembina dan Admin |
 | Instrumen | Melihat daftar kriteria penilaian per butir (pada butir yang instrumennya ditetapkan) | Menilai dengan instrumen (skor 1-5 per kriteria) di lembar penilaian | Hanya **Pembina** dan Admin: kelola instrumen, tetapkan, pengaturan |
 | Penugasan | | Hanya **Pembina**: melihat penugasan penguji per rombel (tanpa mengubah) | Diatur di Anggota > tab Penugasan |
-| Anggota | | | Tambah, ubah, hapus anggota; import Excel dan unduh template (Penegak, Dewan Ambalan, Pembina); perbarui rombel Penegak; tab **Penugasan** (penguji per rombel, guru agama) |
+| Anggota | | | Tambah, ubah, hapus anggota (termasuk jenis kelamin, wajib untuk anggota baru; tombol **Lengkapi jenis kelamin** untuk anggota lama); import Excel dan unduh template (Penegak, Dewan Ambalan, Pembina); perbarui rombel Penegak; tab **Penugasan** (penguji per rombel, guru agama) |
 | Data Gudep | | | Identitas gugus depan dan ambalan, alamat, kwartir, serta Pembina/Ka Gudep, Kamabigus/Kepala Sekolah beserta NTA (rujukan kop surat dan semua dokumen); Pradana dan Pradani diambil dari jabatan anggota Dewan Ambalan |
 | Reset PIN (menu akun) | | Sesuai kewenangan (lihat di bawah) | Semua kecuali Admin |
 | Pengaturan akun (menu akun) | Ganti PIN sendiri | Ganti PIN sendiri | Ganti PIN sendiri |
@@ -83,14 +83,19 @@ Buka **Anggota**, pilih tab kelompoknya, lalu **Unduh template Excel**. Setiap k
 
 | Kelompok | Kolom template |
 |---|---|
-| Penegak | Nama Lengkap, **NIS (wajib, menjadi nama pengguna)**, **Rombel** (X-01 sampai XII-10, daftar pilihan), Sangga, Agama, NTA (opsional), PIN Awal (opsional) |
-| Dewan Ambalan | Nama Lengkap, Nama Pengguna (opsional), PIN Awal (opsional) |
-| Pembina | Nama Lengkap, Nama Pengguna (opsional), Agama (opsional, disarankan diisi), PIN Awal (opsional) |
+| Penegak | Nama Lengkap, **Jenis Kelamin (wajib)**, **NIS (wajib, menjadi nama pengguna)**, **Rombel** (X-01 sampai XII-10, daftar pilihan), Sangga, Agama, NTA (opsional), PIN Awal (opsional) |
+| Dewan Ambalan | Nama Lengkap, **Jenis Kelamin (wajib)**, Nama Pengguna (opsional), Jabatan Dewan (opsional), NTA (opsional), PIN Awal (opsional) |
+| Pembina | Nama Lengkap, **Jenis Kelamin (wajib)**, Nama Pengguna (opsional), Agama (opsional, disarankan diisi), PIN Awal (opsional) |
 
 Setelah diisi, klik **Import Excel**. Aplikasi menampilkan pratinjau per baris (siap atau dilewati beserta alasannya). Baris yang
 lolos dikirim ke server per 25 akun; server memeriksa ulang dan bisa menolak baris tertentu. Rombel dibakukan (mis. `xi 3` menjadi `XI-03`; selain rombel baku ditolak) dan penulisan sangga disamakan
 dengan data yang ada. Berkas template Penegak lama yang berjudul kolom "Kelas" tetap terbaca. Setelah impor, daftar **nama pengguna dan PIN awal** tampil satu kali dan dapat diunduh sebagai Excel.
 Maksimal 500 baris per impor.
+
+**Jenis kelamin** berlaku untuk semua peran (Penegak, Dewan Ambalan, Pembina, Admin Gudep). Pada template dan formulir berupa pilihan **Laki-laki** atau **Perempuan** (penulisan lain di Excel seperti L, P, Pria, Wanita dibakukan; disimpan sebagai `L` atau `P`).
+**Wajib untuk anggota baru** (formulir Tambah anggota dan setiap baris import); baris tanpa jenis kelamin ditolak di pratinjau, termasuk pada berkas template lama yang belum berkolom Jenis Kelamin (unduh template terbaru).
+Anggota yang sudah ada boleh kosong: lengkapi lewat **Ubah anggota**, atau sekaligus lewat tombol **Lengkapi jenis kelamin** (muncul di menu Anggota selama masih ada yang kosong): pilih per orang di daftar, atau unduh berkas Excel berisi anggota yang belum terisi, isi kolomnya, lalu unggah.
+Akun dibuat lebih dulu, lalu jenis kelamin disimpan lewat fungsi khusus Admin `sg_anggota_jk_atur` (migrasi `2026-09-jenis-kelamin.sql`); Edge Function tidak berubah. Jenis kelamin tampil pada daftar anggota, halaman Akun, dan detail Penegak.
 
 **NTA** (Nomor Tanda Anggota, mis. `11.03.10.701.00123`) opsional untuk Penegak: dapat diisi pada kolom template, pada formulir tambah atau ubah anggota, dan pada lembar sidang. Akun dibuat lebih dulu, lalu NTA disimpan lewat fungsi khusus Admin `sg_anggota_nta_atur` (migrasi `2026-09-nta-anggota.sql`); bila fungsi itu belum ada, akun tetap dibuat dan aplikasi memberi tahu bahwa NTA belum tersimpan. Berkas template lama tanpa kolom NTA tetap dapat diimpor.
 
@@ -296,7 +301,10 @@ Kartu SKU mencetak **satu QR per butir yang lulus** dan Surat Tanda Lulus mencet
 - **Batasnya**: Supabase tidak membatasi laju panggilan fungsi publik ini secara bawaan. Token acak 128 bit tidak dapat ditebak, tetapi seseorang dapat mengulang pertanyaan kode `VRF-` (hanya sah/tidak, tanpa nama). Alamat pada QR mengikuti alamat aplikasi yang sedang dibuka saat mencetak: cetak dari alamat terbit (bukan `localhost`).
 
 ### Filter dinamis
-Semua filter (sangga, kelas, peran, agama, tahun ajaran) dibangun dari data yang ada.
+Semua filter (sangga, kelas, peran, agama, jenis kelamin, tahun ajaran) dibangun dari data yang ada.
+**Filter jenis kelamin** (Laki-laki, Perempuan, dan **Belum diisi** selama masih ada anggota yang kosong) tersedia pada semua daftar Penegak yang memakai filter: Anggota, Dashboard Admin, Peserta, Absensi (rekap dan catat), Portofolio, Raport, Sidang, Reset PIN, dan Rekap Iuran. Keterangan filter pada berkas Excel ikut menyebutnya.
+Dashboard Pembina, Dewan, dan Admin menampilkan jumlah Penegak laki-laki, perempuan, dan yang belum diisi di bawah komposisi anggota.
+**Kolom Jenis Kelamin** (Laki-laki, Perempuan, atau kosong bila belum diisi; tepat sesudah Nama) ada pada berkas Excel: rekap absensi (lembar Rekap dan Per Jumat), nilai raport (semua lembar kelas), rekap portofolio (Rekap Kesiapan), rekap iuran (Per Penegak), dan CSV rekap SKU di Dashboard Admin.
 
 ## Menjalankan
 
@@ -456,6 +464,8 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
   Jalankan **setelah** `2026-09-data-gudep.sql` (bila belum, berhenti dengan pesan yang menyebut apa yang belum ada). Berkas ini juga menerbitkan ulang `sigarda.ketua_sidang` dan `sg_sidang_simpan`, jadi tetap berjalan walau yang dijalankan dulu adalah versi awal `2026-09-data-gudep.sql`. Aman dijalankan ulang. **Edge Function tidak perlu di-deploy ulang.** **Jalankan migrasi ini sebelum `git push` kode ini**: tanpa kolom baru, daftar anggota gagal dimuat. Sesudahnya, **isi Jabatan Dewan Ambalan** (menu Anggota > Dewan Ambalan > ubah): nama Pradana/Pradani yang sebelumnya diketik di Data Gudep tidak dipakai lagi.
 - [`2026-09-notifikasi.sql`](supabase/migrasi/2026-09-notifikasi.sql): notifikasi dan Web Push (PWA). Menambah tabel `notifikasi` (dibaca pemiliknya), `push_langganan` dan `push_konfigurasi` (tanpa kebijakan baca), pemicu pembuat notifikasi pada `sku_progress`, `sesi_ujian_peserta`, dan `dokumen_terbit`, `sigarda.notif_pengingat` (dijadwalkan pg_cron), pemicu pengirim push lewat pg_net, `sigarda.push_atur`, serta fungsi `sg_notifikasi_tandai`, `sg_push_kunci`, `sg_push_simpan`, `sg_push_hapus`, `sg_push_ringkasan`, `sg_push_ambil_internal`, `sg_push_hasil_internal`. Tidak mengubah fungsi atau data yang ada.
   Jalankan **setelah** `2026-09-jabatan-dewan.sql` (bila belum, berhenti dengan pesan yang menuntun). Edge Function `sigarda` **tidak berubah**; Web Push memerlukan Edge Function **baru** `notif-push` (lihat bagian *Notifikasi dan aplikasi terpasang*). Aman diulang (mis. sesudah mengaktifkan pg_net atau pg_cron).
+- [`2026-09-jenis-kelamin.sql`](supabase/migrasi/2026-09-jenis-kelamin.sql): jenis kelamin anggota. Menambah kolom `profiles.jenis_kelamin` ('L' atau 'P'; boleh kosong untuk anggota yang sudah ada) dan fungsi `sg_anggota_jk_atur` (Admin mengatur banyak anggota sekaligus, semua atau tidak sama sekali). Tidak mengubah data yang ada.
+  Jalankan **setelah** `2026-09-notifikasi.sql` (bila belum, berhenti dengan pesan yang menuntun). Edge Function `sigarda` **tidak berubah** dan tidak perlu di-deploy ulang. **Jalankan migrasi ini sebelum `git push` kodenya**: tanpa fungsi `sg_anggota_jk_atur`, tambah anggota baru menyimpan akunnya tetapi jenis kelaminnya belum tersimpan (pesan peringatan).
 
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 

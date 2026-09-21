@@ -59,6 +59,7 @@ create table public.profiles (
   calon_garuda date,
   nta text,                                                        -- Nomor Tanda Anggota Pramuka (opsional; diisi saat sidang)
   jabatan_dewan text check (jabatan_dewan in ('Pradana','Pradani','Wakil Pradana','Wakil Pradani','Sekretaris','Bendahara')),  -- hanya Dewan Ambalan
+  jenis_kelamin text check (jenis_kelamin in ('L','P')),          -- L = laki-laki, P = perempuan; semua peran; kosong pada anggota lama sampai dilengkapi Admin
   wajib_ganti_pin boolean not null default true,
   pin_direset_oleh uuid references public.profiles(id) on delete set null,
   pin_direset_pada timestamptz,
@@ -2013,6 +2014,31 @@ begin
   return v_n;
 end $$;
 
+-- ===== Jenis kelamin: fungsi =====
+-- Jenis kelamin anggota (semua peran), oleh Admin Gudep. p_data = [{"username": "10231", "jk": "L"}, ...]; jk 'L' (laki-laki) atau 'P' (perempuan); jk kosong
+-- menghapus. Dipakai formulir tambah dan ubah anggota, import Excel (diisi sesudah akun dibuat; Edge Function tidak membawanya), dan "Lengkapi jenis kelamin"
+-- untuk anggota lama. Semua atau tidak sama sekali. Mengembalikan jumlah anggota yang ditemukan dan diperbarui.
+create function public.sg_anggota_jk_atur(p_data jsonb) returns int
+language plpgsql security definer set search_path = public as
+$$
+declare v_e jsonb; v_user text; v_jk text; v_n int := 0; v_k int;
+begin
+  perform sigarda.wajib_admin('Hanya Admin Gudep yang dapat mengubah jenis kelamin anggota.');
+  if p_data is null or jsonb_typeof(p_data) <> 'array' then raise exception 'Data jenis kelamin tidak valid.'; end if;
+  if jsonb_array_length(p_data) > 500 then raise exception 'Maksimal 500 baris jenis kelamin per permintaan.'; end if;
+  for v_e in select * from jsonb_array_elements(p_data) loop
+    v_user := lower(btrim(coalesce(v_e ->> 'username', '')));
+    v_jk := upper(btrim(coalesce(v_e ->> 'jk', '')));
+    if v_user = '' then raise exception 'Nama pengguna anggota wajib diisi.'; end if;
+    if v_jk not in ('', 'L', 'P') then raise exception 'Jenis kelamin "%" tidak dikenal (pilih L atau P).', v_e ->> 'jk'; end if;
+    update public.profiles set jenis_kelamin = nullif(v_jk, '') where username = v_user;
+    get diagnostics v_k = row_count;
+    v_n := v_n + v_k;
+  end loop;
+  return v_n;
+end $$;
+-- ===== akhir fungsi jenis kelamin =====
+
 -- ===== Jabatan Dewan Ambalan: fungsi =====
 -- Jabatan Dewan Ambalan (Pradana, Pradani, Wakil Pradana, Wakil Pradani, Sekretaris, Bendahara), oleh Admin Gudep. p_data = [{"username": "andi", "jabatan": "Pradana"}, ...];
 -- jabatan kosong menghapus jabatan. Hanya untuk anggota Dewan Ambalan. Pradana dan Pradani hanya satu pemegang: pemegang lama harus dikosongkan lebih dulu
@@ -3053,7 +3079,7 @@ grant execute on function
   public.sg_absen_buat_sesi(date), public.sg_absen_set(date, uuid, text),
   public.sg_absen_set_banyak(date, uuid[], text, boolean), public.sg_absen_hapus_sesi(date),
   public.sg_anggota_ubah(uuid, text, text, text, text, boolean),
-  public.sg_anggota_nta_atur(jsonb), public.sg_anggota_agama_atur(jsonb), public.sg_anggota_jabatan_dewan_atur(jsonb),
+  public.sg_anggota_nta_atur(jsonb), public.sg_anggota_agama_atur(jsonb), public.sg_anggota_jabatan_dewan_atur(jsonb), public.sg_anggota_jk_atur(jsonb),
   public.sg_materi_simpan(uuid, text, text, text, text, text, text[], jsonb),
   public.sg_materi_hapus(uuid), public.sg_materi_geser(uuid, int),
   public.sg_pengaturan_simpan(text, jsonb),

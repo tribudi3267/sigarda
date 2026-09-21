@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { labelJenisKelamin } from '../lib/jenisKelaminLogic';
 import { useApp } from '../context/AppContext';
 import { bolehMenilaiPoin, hitungProgres, laksanaTerbuka } from '../lib/skuLogic';
 import { perluSuratAgama, suratAgamaAktif } from '../lib/dokumenLogic';
@@ -60,7 +61,7 @@ export default function PesertaDetail({ pesertaId, onKembali, onCetak, onBukaPor
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold leading-tight">{peserta.nama}</h1>
           <p className="text-sm text-pramuka-600">
-            NIS {peserta.nis || '-'}, kelas {peserta.kelas}, {peserta.sangga}, {peserta.agama}
+            NIS {peserta.nis || '-'}, kelas {peserta.kelas}, {peserta.sangga}, {peserta.agama}{peserta.jenisKelamin ? `, ${labelJenisKelamin(peserta.jenisKelamin)}` : ''}
           </p>
           <p className="mt-1"><BadgePeran peran={peserta.peran} /></p>
         </div>

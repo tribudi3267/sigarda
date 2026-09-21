@@ -9,15 +9,20 @@ import { normalisasiNama } from '../lib/cariNama';
 import { PIN_PANJANG, buatPinAcak } from '../lib/pinLogic';
 import { KELOMPOK_IMPOR, unduhTemplateAnggota } from '../lib/importAnggota';
 import { KELAS_ROMBEL, daftarRombelKelas, pesertaRombelLama, rombelSah } from '../lib/rombelLogic';
+import { JENIS_KELAMIN, anggotaTanpaJk, labelJenisKelamin } from '../lib/jenisKelaminLogic';
 import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
 import ImportAnggotaModal from '../components/ImportAnggotaModal';
 import PenugasanRombel from '../components/PenugasanRombel';
 import PerbaruiRombelModal from '../components/PerbaruiRombelModal';
+import LengkapiJenisKelaminModal from '../components/LengkapiJenisKelaminModal';
 import { LOKAL } from '../lib/supabaseClient';
 import { Avatar, BadgePeran, Field, Icon, Kosong, Modal } from '../components/ui';
 
-const BARU = { role: 'peserta', nama: '', nis: '', username: '', kelas: '', sangga: '', agama: AGAMA[0], jabatan: '', jabatanDewan: '', pin: '', nta: '' };
+const BARU = { role: 'peserta', nama: '', jenisKelamin: '', nis: '', username: '', kelas: '', sangga: '', agama: AGAMA[0], jabatan: '', jabatanDewan: '', pin: '', nta: '' };
 const TAB_PENUGASAN = 'penugasan';
+
+/** Teks jenis kelamin pada daftar; yang belum diisi diberi warna agar mudah terlihat. */
+const ketJk = (kode) => (kode ? labelJenisKelamin(kode) : <span className="font-semibold text-amber-700">jenis kelamin belum diisi</span>);
 
 /** Menampilkan nama pengguna dan PIN awal akun baru satu kali, agar admin dapat menyampaikannya. */
 function AkunBaru({ akun, onTutup }) {
@@ -116,6 +121,16 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
       </Field>
       <Field label="Nama lengkap" htmlFor="f-nama">
         <input id="f-nama" className="input" value={f.nama} onChange={set('nama')} />
+      </Field>
+      <Field
+        label="Jenis kelamin"
+        htmlFor="f-jk"
+        bantuan={baru ? 'Wajib.' : f.jenisKelamin ? undefined : 'Belum diisi. Anggota lama boleh dilengkapi kemudian, atau sekaligus lewat tombol "Lengkapi jenis kelamin".'}
+      >
+        <select id="f-jk" className="input" value={f.jenisKelamin ?? ''} onChange={set('jenisKelamin')}>
+          <option value="">{baru ? 'Pilih...' : 'Belum diisi'}</option>
+          {JENIS_KELAMIN.map((j) => <option key={j.kode} value={j.kode}>{j.label}</option>)}
+        </select>
       </Field>
 
       {f.role === 'peserta' && (
@@ -253,12 +268,14 @@ export default function AdminAnggota() {
   const [form, setForm] = useState(null);
   const [impor, setImpor] = useState(false);
   const [rombelModal, setRombelModal] = useState(false);
+  const [jkModal, setJkModal] = useState(false);
   const [cari, setCari] = useState('');
   const [akunBaru, setAkunBaru] = useState(null);
 
   const penugasan = kelompok === TAB_PENUGASAN;
   const aktif = KELOMPOK_PENGGUNA.find((k) => k.id === kelompok);
   const rombelLama = useMemo(() => pesertaRombelLama(users).length, [users]);
+  const tanpaJk = useMemo(() => anggotaTanpaJk(users).length, [users]);
   const daftar = useMemo(() => {
     const kata = normalisasiNama(cari);
     const dasar =
@@ -320,6 +337,13 @@ export default function AdminAnggota() {
         </button>
       </div>
 
+      {!penugasan && tanpaJk > 0 && (
+        <div role="status" className="mb-3 rounded-md bg-amber-50 px-3 py-2.5 text-sm text-amber-950">
+          <p><span className="font-semibold">{tanpaJk} anggota</span> belum diisi jenis kelaminnya (semua peran).</p>
+          <button className="btn btn-gold btn-sm mt-2" onClick={() => setJkModal(true)}>Lengkapi jenis kelamin</button>
+        </div>
+      )}
+
       {kelompok === 'peserta' && rombelLama > 0 && (
         <div role="status" className="mb-3 rounded-md bg-amber-50 px-3 py-2.5 text-sm text-amber-950">
           <p><span className="font-semibold">{rombelLama} Penegak</span> masih memakai kelas lama (belum berupa rombel X-01 sampai XII-10).</p>
@@ -328,7 +352,7 @@ export default function AdminAnggota() {
       )}
 
       {kelompok === 'peserta' && (
-        <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'peran', 'agama']} /></div>
+        <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'peran', 'agama', 'jk']} /></div>
       )}
 
       {penugasan && <PenugasanRombel bolehUbah onPerbaruiRombel={() => setRombelModal(true)} />}
@@ -359,11 +383,11 @@ export default function AdminAnggota() {
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-pramuka-500">
                   {u.role === 'peserta' && (
                     <>
-                      NIS {u.nis || '-'}, rombel {u.kelas}, {u.sangga}, {u.agama}{u.nta ? `, NTA ${u.nta}` : ''} <BadgePeran peran={u.peran} singkat />
+                      NIS {u.nis || '-'}, {ketJk(u.jenisKelamin)}, rombel {u.kelas}, {u.sangga}, {u.agama}{u.nta ? `, NTA ${u.nta}` : ''} <BadgePeran peran={u.peran} singkat />
                     </>
                   )}
-                  {u.role === 'penguji' && <>{u.jabatan}{u.jabatanDewan ? ` (${u.jabatanDewan})` : ''}{u.jabatan === 'Pembina' ? `, agama ${u.agama ?? 'belum diisi'}` : ''}{u.jabatan === 'Dewan Ambalan' && u.nta ? `, NTA ${u.nta}` : ''}, pengguna <span className="font-mono">{u.username}</span></>}
-                  {u.role === 'admin' && <>Admin Gudep, pengguna <span className="font-mono">{u.username}</span></>}
+                  {u.role === 'penguji' && <>{u.jabatan}{u.jabatanDewan ? ` (${u.jabatanDewan})` : ''}, {ketJk(u.jenisKelamin)}{u.jabatan === 'Pembina' ? `, agama ${u.agama ?? 'belum diisi'}` : ''}{u.jabatan === 'Dewan Ambalan' && u.nta ? `, NTA ${u.nta}` : ''}, pengguna <span className="font-mono">{u.username}</span></>}
+                  {u.role === 'admin' && <>Admin Gudep, {ketJk(u.jenisKelamin)}, pengguna <span className="font-mono">{u.username}</span></>}
                 </p>
               </div>
               <button className="rounded-md p-2 text-pramuka-600 hover:bg-pramuka-100" aria-label={`Ubah ${u.nama}`} onClick={() => setForm(u)}>
@@ -395,6 +419,7 @@ export default function AdminAnggota() {
       {form && <FormAnggota awal={form} onTutup={() => setForm(null)} onAkunBaru={setAkunBaru} />}
       {akunBaru && <AkunBaru akun={akunBaru} onTutup={() => setAkunBaru(null)} />}
       {rombelModal && <PerbaruiRombelModal onTutup={() => setRombelModal(false)} />}
+      {jkModal && <LengkapiJenisKelaminModal onTutup={() => setJkModal(false)} />}
       {impor && <ImportAnggotaModal key={kelompok} kelompok={kelompok} onTutup={() => setImpor(false)} />}
     </div>
   );

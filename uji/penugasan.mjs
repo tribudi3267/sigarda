@@ -237,12 +237,12 @@ console.log('\n--- Server: perbarui rombel massal ---');
 console.log('\n--- Import Excel: rombel baku dan agama Pembina ---');
 {
   const users2 = (await K.admin.a.muatProfil()).data;
-  const kp = { nis: '', kelas: '', sangga: '', agama: '', pin: '', username: '' };
+  const kp = { jk: 'L', nis: '', kelas: '', sangga: '', agama: '', pin: '', username: '' };
   let p = periksaBaris([
-    { no: 2, nama: 'Baru A', nis: '70001', kelas: 'xi 3', sangga: 'E', agama: 'Islam', pin: '', username: '' },
-    { no: 3, nama: 'Baru B', nis: '70002', kelas: 'X', sangga: 'E', agama: 'Islam', pin: '', username: '' },
-    { no: 4, nama: 'Baru C', nis: '70003', kelas: 'XII-11', sangga: 'E', agama: 'Islam', pin: '', username: '' },
-    { no: 5, nama: 'Baru D', nis: '70004', kelas: '', sangga: 'E', agama: 'Islam', pin: '', username: '' },
+    { no: 2, nama: 'Baru A', jk: 'P', nis: '70001', kelas: 'xi 3', sangga: 'E', agama: 'Islam', pin: '', username: '' },
+    { no: 3, nama: 'Baru B', jk: 'P', nis: '70002', kelas: 'X', sangga: 'E', agama: 'Islam', pin: '', username: '' },
+    { no: 4, nama: 'Baru C', jk: 'P', nis: '70003', kelas: 'XII-11', sangga: 'E', agama: 'Islam', pin: '', username: '' },
+    { no: 5, nama: 'Baru D', jk: 'P', nis: '70004', kelas: '', sangga: 'E', agama: 'Islam', pin: '', username: '' },
   ], users2);
   ok(p[0].siap && p[0].data.kelas === 'XI-03', 'Penegak: "xi 3" dibakukan menjadi XI-03');
   ok(!p[1].siap && /Rombel "X" tidak sah/.test(p[1].galat.join()) && !p[2].siap && !p[3].siap && /Rombel kosong/.test(p[3].galat.join()), 'Penegak: kelas lama, rombel di luar daftar, dan kosong ditolak');
@@ -255,13 +255,13 @@ console.log('\n--- Import Excel: rombel baku dan agama Pembina ---');
   ok(!p[1].siap && /Agama "Zoroaster" tidak dikenal/.test(p[1].galat.join()) && p[2].siap && p[2].data.agama === '', 'Pembina: agama tidak dikenal ditolak; kosong diperbolehkan');
   p = periksaBaris([{ no: 2, nama: 'Pak Dedi', ...kp, agama: 'Islam' }], users2, 'dewan');
   ok(p[0].siap && p[0].data.agama === '', 'Dewan Ambalan: agama diabaikan');
-  ok(kolomTemplate('pembina').map((c) => c.key).join() === 'nama,username,agama,pin' && kolomTemplate('dewan').map((c) => c.key).join() === 'nama,username,jabatanDewan,nta,pin' && kolomTemplate('peserta').map((c) => c.header)[2] === 'Rombel', 'kolom template: Pembina berAgama, Dewan berjabatan dan NTA (tanpa agama), Penegak memakai "Rombel"');
+  ok(kolomTemplate('pembina').map((c) => c.key).join() === 'nama,jk,username,agama,pin' && kolomTemplate('dewan').map((c) => c.key).join() === 'nama,jk,username,jabatanDewan,nta,pin' && kolomTemplate('peserta').map((c) => c.header)[3] === 'Rombel', 'kolom template: Pembina berAgama, Dewan berjabatan dan NTA (tanpa agama), Penegak memakai "Rombel"');
 
   // template Pembina: unduh, isi, baca
   const wbP = new ExcelJS.Workbook(); await wbP.xlsx.load(await buatTemplateAnggota('pembina'));
   const wsP = wbP.getWorksheet('Anggota');
-  ok(wsP.getCell(2, 3).dataValidation?.type === 'list' && String(wsP.getCell(2, 3).dataValidation.formulae[0]).includes('Khonghucu'), 'template Pembina: kolom Agama berdaftar pilihan');
-  wsP.getCell(2, 1).value = 'Bu Ani'; wsP.getCell(2, 3).value = 'Kristen';
+  ok(wsP.getCell(2, 4).dataValidation?.type === 'list' && String(wsP.getCell(2, 4).dataValidation.formulae[0]).includes('Khonghucu'), 'template Pembina: kolom Agama berdaftar pilihan');
+  wsP.getCell(2, 1).value = 'Bu Ani'; wsP.getCell(2, 4).value = 'Kristen';
   wsP.getCell(3, 1).value = 'Bu Budi';
   const bp = await bacaExcelAnggota(await wbP.xlsx.writeBuffer(), 'pembina');
   ok(bp.length === 2 && bp[0].agama === 'Kristen' && bp[1].agama === '', 'bacaExcelAnggota Pembina membaca kolom Agama');
@@ -273,8 +273,8 @@ console.log('\n--- Import Excel: rombel baku dan agama Pembina ---');
   // template Penegak: kolom Rombel berdaftar pilihan, dan template lama ("Kelas") tetap terbaca
   const wbS = new ExcelJS.Workbook(); await wbS.xlsx.load(await buatTemplateAnggota('peserta'));
   const wsS = wbS.getWorksheet('Anggota');
-  ok(wsS.getCell(2, 3).dataValidation?.type === 'list' && String(wsS.getCell(2, 3).dataValidation.formulae[0]).includes('XII-10'), 'template Penegak: kolom Rombel berdaftar 30 rombel');
-  ['Budi', '70010', 'XI-07', 'Sangga Elang', 'Islam'].forEach((v, i) => { wsS.getCell(2, i + 1).value = v; });
+  ok(wsS.getCell(2, 4).dataValidation?.type === 'list' && String(wsS.getCell(2, 4).dataValidation.formulae[0]).includes('XII-10'), 'template Penegak: kolom Rombel berdaftar 30 rombel');
+  ['Budi', 'Laki-laki', '70010', 'XI-07', 'Sangga Elang', 'Islam'].forEach((v, i) => { wsS.getCell(2, i + 1).value = v; });
   const bs = await bacaExcelAnggota(await wbS.xlsx.writeBuffer(), 'peserta');
   ok(bs.length === 1 && bs[0].kelas === 'XI-07' && bs[0].nis === '70010', 'bacaExcelAnggota Penegak membaca kolom Rombel');
   const wbLama = new ExcelJS.Workbook(); const wl = wbLama.addWorksheet('Anggota');

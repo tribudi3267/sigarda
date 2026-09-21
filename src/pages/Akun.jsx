@@ -1,4 +1,5 @@
 import { useApp } from '../context/AppContext';
+import { labelJenisKelamin } from '../lib/jenisKelaminLogic';
 import { siapaBisaReset } from '../lib/pinLogic';
 import { fmtWaktu } from '../lib/format';
 import FormGantiPin from '../components/FormGantiPin';
@@ -12,6 +13,7 @@ export default function Akun() {
 
   const info = [
     ['Nama pengguna (untuk masuk)', user.username],
+    ['Jenis kelamin', labelJenisKelamin(user.jenisKelamin) || 'Belum diisi (hubungi Admin Gudep)'],
     user.role === 'peserta' && ['NIS', user.nis || '-'],
     user.role === 'peserta' && ['Kelas', user.kelas],
     user.role === 'peserta' && ['Sangga', user.sangga],

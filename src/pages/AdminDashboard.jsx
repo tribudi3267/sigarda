@@ -5,16 +5,17 @@ import { fmtTanggal, hariIni } from '../lib/format';
 import { useGudep } from '../lib/gudepStore';
 import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
 import RingkasanGudep from '../components/RingkasanGudep';
+import { labelJenisKelamin } from '../lib/jenisKelaminLogic';
 import { BadgePeran, Icon, Kosong, ProgressBar } from '../components/ui';
 
 function unduhCsv(rekap) {
   const kepala = [
-    'Nama', 'NIS', 'Kelas', 'Sangga', 'Agama', 'Peran',
+    'Nama', 'Jenis Kelamin', 'NIS', 'Kelas', 'Sangga', 'Agama', 'Peran',
     'Bantara lulus', 'Bantara total', 'Bantara persen', 'Tanggal lulus Bantara',
     'Laksana lulus', 'Laksana total', 'Laksana persen', 'Tanggal lulus Laksana',
   ];
   const baris = rekap.map((r) => [
-    r.user.nama, r.user.nis ?? '', r.user.kelas ?? '', r.user.sangga ?? '', r.user.agama ?? '', PERAN[r.peran].label,
+    r.user.nama, labelJenisKelamin(r.user.jenisKelamin), r.user.nis ?? '', r.user.kelas ?? '', r.user.sangga ?? '', r.user.agama ?? '', PERAN[r.peran].label,
     r.bantara.lulus, r.bantara.total, r.bantara.persen, r.tglBantara ?? '',
     r.laksana.lulus, r.laksana.total, r.laksana.persen, r.tglLaksana ?? '',
   ]);
@@ -117,7 +118,7 @@ export default function AdminDashboard({ onBuka, onNav }) {
 
       <section>
         <h2 className="mb-2 text-lg font-bold">Rekap per anggota</h2>
-        <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'peran', 'agama']} /></div>
+        <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'peran', 'agama', 'jk']} /></div>
 
         {tersaring.length === 0 ? (
           <Kosong judul="Tidak ada data" teks="Ubah kata kunci, sangga, kelas, peran, atau agama pada filter." />

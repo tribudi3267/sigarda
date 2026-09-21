@@ -2,6 +2,7 @@
 import { useApp } from '../context/AppContext';
 import { bacaExcelAnggota, kelompokDari, periksaBaris, unduhTemplateAnggota, MAKS_BARIS } from '../lib/importAnggota';
 import { unduhXlsx } from '../lib/exportXlsx';
+import { labelJenisKelamin } from '../lib/jenisKelaminLogic';
 import { fmtTanggal, hariIni } from '../lib/format';
 import { Icon, Modal } from './ui';
 
@@ -108,12 +109,12 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
           <ol className="list-decimal space-y-1 pl-5 text-sm text-pramuka-700">
             <li>Unduh template Excel {label}, lalu isi datanya (satu baris satu orang).</li>
             <li>{penegak
-              ? 'Kolom wajib: Nama Lengkap, NIS, Rombel (X-01 sampai XII-10), Sangga, Agama. NIS menjadi nama pengguna untuk masuk. NTA dan PIN Awal boleh dikosongkan.'
+              ? 'Kolom wajib: Nama Lengkap, Jenis Kelamin, NIS, Rombel (X-01 sampai XII-10), Sangga, Agama. NIS menjadi nama pengguna untuk masuk. NTA dan PIN Awal boleh dikosongkan.'
               : kelompok === 'pembina'
-                ? 'Kolom wajib: Nama Lengkap. Agama (sebaiknya diisi, untuk butir agama), Nama Pengguna, dan PIN Awal boleh dikosongkan.'
+                ? 'Kolom wajib: Nama Lengkap dan Jenis Kelamin. Agama (sebaiknya diisi, untuk butir agama), Nama Pengguna, dan PIN Awal boleh dikosongkan.'
                 : kelompok === 'dewan'
-                  ? 'Kolom wajib: Nama Lengkap. Jabatan Dewan (Pradana, Pradani, dan seterusnya), NTA, Nama Pengguna, dan PIN Awal boleh dikosongkan.'
-                  : 'Kolom wajib: Nama Lengkap. Nama Pengguna dan PIN Awal boleh dikosongkan (dibuat otomatis).'}</li>
+                  ? 'Kolom wajib: Nama Lengkap dan Jenis Kelamin. Jabatan Dewan (Pradana, Pradani, dan seterusnya), NTA, Nama Pengguna, dan PIN Awal boleh dikosongkan.'
+                  : 'Kolom wajib: Nama Lengkap dan Jenis Kelamin. Nama Pengguna dan PIN Awal boleh dikosongkan (dibuat otomatis).'}</li>
             <li>Unggah file di bawah, periksa pratinjaunya, lalu impor. Maksimal {MAKS_BARIS} baris.</li>
           </ol>
 
@@ -150,6 +151,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
                 <tr>
                   <th className="px-3 py-2 font-semibold">Baris</th>
                   <th className="px-3 py-2 font-semibold">Nama</th>
+                  <th className="px-3 py-2 font-semibold">Jenis kelamin</th>
                   {kelompok === 'pembina' && <th className="px-3 py-2 font-semibold">Agama</th>}
                   {kelompok === 'dewan' && <th className="px-3 py-2 font-semibold">Jabatan</th>}
                   {penegak && (
@@ -167,6 +169,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
                   <tr key={r.no} className={r.siap ? '' : 'bg-red-50/70'}>
                     <td className="px-3 py-2 text-pramuka-500">{r.no}</td>
                     <td className="px-3 py-2 font-semibold">{r.data.nama || '-'}</td>
+                    <td className="px-3 py-2">{labelJenisKelamin(r.data.jk) || r.data.jkAsli || '-'}</td>
                     {kelompok === 'pembina' && <td className="px-3 py-2">{r.data.agama || r.data.agamaAsli || '-'}</td>}
                     {kelompok === 'dewan' && <td className="px-3 py-2">{r.data.jabatanDewan || r.data.jabatanAsli || '-'}</td>}
                     {penegak && (

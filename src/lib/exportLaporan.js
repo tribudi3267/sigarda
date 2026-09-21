@@ -10,11 +10,15 @@ import { PERIODE, STATUS_ABSEN } from './absensiLogic';
 import { getItem } from './portofolioLogic';
 import { PREDIKAT } from './raportLogic';
 import { fmtTanggal, fmtTglPendek, hariIni } from './format';
+import { labelJenisKelamin } from './jenisKelaminLogic';
 import { AMBANG_RUTIN } from './iuranLogic';
 import { unduhXlsx } from './exportXlsx';
 
 const WARNA_ABSEN = { H: 'FFD1FAE5', I: 'FFDBEAFE', S: 'FFFEF3C7', A: 'FFFEE2E2' };
 const MERAH_MUDA = 'FFFEE2E2';
+
+/** Kolom "Jenis Kelamin" (Laki-laki, Perempuan, atau kosong bila belum diisi) tepat sesudah Nama pada rekap per Penegak. */
+const KOLOM_JK = { header: 'Jenis Kelamin', key: 'jk', lebar: 14, rata: 'center' };
 
 const teksFilter = (filter) => {
   const bagian = [];
@@ -23,6 +27,7 @@ const teksFilter = (filter) => {
   if (filter.sangga) bagian.push(filter.sangga);
   if (filter.kelas) bagian.push(`kelas ${filter.kelas}`);
   if (filter.peran) bagian.push(PERAN[filter.peran].singkat);
+  if (filter.jk) bagian.push(filter.jk === '-' ? 'jenis kelamin belum diisi' : labelJenisKelamin(filter.jk));
   return bagian.length ? bagian.join(', ') : 'semua anggota';
 };
 
@@ -41,6 +46,7 @@ export function susunAbsensiXlsx({ tahunAjaran, periode, rekap, sesiList, filter
     kolom: [
       { header: 'No', key: 'no', lebar: 6, rata: 'center' },
       { header: 'Nama', key: 'nama', lebar: 30 },
+      KOLOM_JK,
       { header: 'NIS', key: 'nis', lebar: 12 },
       { header: 'Kelas', key: 'kelas', lebar: 9, rata: 'center' },
       { header: 'Sangga', key: 'sangga', lebar: 18 },
@@ -56,6 +62,7 @@ export function susunAbsensiXlsx({ tahunAjaran, periode, rekap, sesiList, filter
     baris: rekap.map((r, i) => ({
       no: i + 1,
       nama: r.user.nama,
+      jk: labelJenisKelamin(r.user.jenisKelamin),
       nis: r.user.nis ?? '',
       kelas: r.user.kelas ?? '',
       sangga: r.user.sangga ?? '',
@@ -73,6 +80,7 @@ export function susunAbsensiXlsx({ tahunAjaran, periode, rekap, sesiList, filter
     kolom: [
       { header: 'No', key: 'no', lebar: 6, rata: 'center' },
       { header: 'Nama', key: 'nama', lebar: 30 },
+      KOLOM_JK,
       { header: 'Kelas', key: 'kelas', lebar: 9, rata: 'center' },
       { header: 'Sangga', key: 'sangga', lebar: 18 },
       ...sesiList.map((s) => ({ header: fmtTglPendek(s.tanggal), key: s.tanggal, lebar: 7, rata: 'center' })),
@@ -82,6 +90,7 @@ export function susunAbsensiXlsx({ tahunAjaran, periode, rekap, sesiList, filter
     baris: rekap.map((r, i) => ({
       no: i + 1,
       nama: r.user.nama,
+      jk: labelJenisKelamin(r.user.jenisKelamin),
       kelas: r.user.kelas ?? '',
       sangga: r.user.sangga ?? '',
       ...Object.fromEntries(sesiList.map((s) => [s.tanggal, r.perSesi[s.tanggal] === 'B' ? '?' : r.perSesi[s.tanggal] ?? '-'])),
@@ -139,6 +148,7 @@ export function susunRaportXlsx({ tahunAjaran, semester, baris, filter, pengatur
     { header: 'No', key: 'no', lebar: 6, rata: 'center' },
     { header: 'NIS', key: 'nis', lebar: 12 },
     { header: 'Nama', key: 'nama', lebar: 30 },
+    KOLOM_JK,
     { header: 'Kelas', key: 'kelas', lebar: 9, rata: 'center' },
     { header: 'Predikat', key: 'huruf', lebar: 10, rata: 'center' },
     { header: 'Keterangan Predikat', key: 'label', lebar: 16 },
@@ -164,6 +174,7 @@ export function susunRaportXlsx({ tahunAjaran, semester, baris, filter, pengatur
       no: i + 1,
       nis: b.peserta.nis ?? '',
       nama: b.peserta.nama,
+      jk: labelJenisKelamin(b.peserta.jenisKelamin),
       kelas: b.peserta.kelas ?? '',
       huruf: p?.huruf ?? '',
       label: p?.label ?? '',
@@ -236,6 +247,7 @@ export function susunPortofolioXlsx({ rekap, portofolio, filter }) {
       kolom: [
         { header: 'No', key: 'no', lebar: 6, rata: 'center' },
         { header: 'Nama', key: 'nama', lebar: 30 },
+        KOLOM_JK,
         { header: 'NIS', key: 'nis', lebar: 12 },
         { header: 'Kelas', key: 'kelas', lebar: 9, rata: 'center' },
         { header: 'Sangga', key: 'sangga', lebar: 18 },
@@ -246,7 +258,7 @@ export function susunPortofolioXlsx({ rekap, portofolio, filter }) {
         { header: 'Total Dokumen', key: 'total', lebar: 12, rata: 'center' },
         { header: 'Kesiapan (%)', key: 'persen', lebar: 12, rata: 'center', format: '0"%"' },
       ],
-      baris: rekap.map((r, i) => ({ no: i + 1, nama: r.user.nama, nis: r.user.nis ?? '', kelas: r.user.kelas ?? '', sangga: r.user.sangga ?? '', ...r })),
+      baris: rekap.map((r, i) => ({ no: i + 1, nama: r.user.nama, jk: labelJenisKelamin(r.user.jenisKelamin), nis: r.user.nis ?? '', kelas: r.user.kelas ?? '', sangga: r.user.sangga ?? '', ...r })),
     },
     {
       nama: 'Cek List',
@@ -300,6 +312,7 @@ export function susunIuranXlsx({ tahunAjaran, periode, rekap, sesi, ring, kas = 
     kolom: [
       { header: 'No', key: 'no', lebar: 6, rata: 'center' },
       { header: 'Nama', key: 'nama', lebar: 30 },
+      KOLOM_JK,
       { header: 'NIS', key: 'nis', lebar: 12 },
       { header: 'Kelas', key: 'kelas', lebar: 9, rata: 'center' },
       { header: 'Sangga', key: 'sangga', lebar: 18 },
@@ -312,7 +325,7 @@ export function susunIuranXlsx({ tahunAjaran, periode, rekap, sesi, ring, kas = 
       { header: 'Keterangan', key: 'ket', lebar: 24 },
     ],
     baris: rekap.map((r, i) => ({
-      no: i + 1, nama: r.peserta.nama, nis: r.peserta.nis ?? '', kelas: r.peserta.kelas ?? '', sangga: r.peserta.sangga ?? '',
+      no: i + 1, nama: r.peserta.nama, jk: labelJenisKelamin(r.peserta.jenisKelamin), nis: r.peserta.nis ?? '', kelas: r.peserta.kelas ?? '', sangga: r.peserta.sangga ?? '',
       kali: r.kali, rutin: r.rutin, susulan: r.susulan, persen: r.persen ?? '', total: r.total, totalSusulan: r.totalSusulan,
       ket: r.persen === null ? 'Belum ada pertemuan' : r.persen < ambang ? `Di bawah ${ambang}%` : `Memenuhi ${ambang}%`,
     })),

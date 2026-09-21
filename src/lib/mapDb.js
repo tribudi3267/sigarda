@@ -29,6 +29,7 @@ export function petaProfil(r) {
     agama: atau(r.agama),
     jabatan: atau(r.jabatan),
     jabatanDewan: atau(r.jabatan_dewan),
+    jenisKelamin: atau(r.jenis_kelamin),
     calonGaruda: r.calon_garuda ? tgl(r.calon_garuda) : undefined,
     nta: atau(r.nta),
     wajibGantiPin: r.wajib_ganti_pin !== false,

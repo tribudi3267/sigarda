@@ -9,6 +9,7 @@ import { bolehResetPin, validasiPinBaru } from '../lib/pinLogic';
 import { periksaBaris, POLA_NTA } from '../lib/importAnggota';
 import { normalisasiRombel, PESAN_ROMBEL } from '../lib/rombelLogic';
 import { rencanaJabatanDewan } from '../lib/dewanLogic';
+import { PESAN_JK, normalisasiJenisKelamin } from '../lib/jenisKelaminLogic';
 import { bolehKelolaMateri, validasiMateri } from '../lib/materiLogic';
 import { hariIni } from '../lib/format';
 import { resetGudep, setGudep, tambahGudep } from '../lib/gudepStore';
@@ -710,6 +711,10 @@ export function AppProvider({ children }) {
       if (!baku && !(kelas && kelas.toLowerCase() === String(kelasLama ?? '').toLowerCase())) return { ok: false, pesan: PESAN_ROMBEL };
       data = { ...data, kelas: baku || kelas };
     }
+    // Jenis kelamin (semua peran): wajib untuk anggota baru; anggota lama boleh kosong sampai dilengkapi
+    const jk = normalisasiJenisKelamin(data.jenisKelamin);
+    if (!data.id && !jk) return { ok: false, pesan: `Jenis kelamin wajib dipilih. ${PESAN_JK}` };
+    if (data.jenisKelamin && !jk) return { ok: false, pesan: `Jenis kelamin tidak valid. ${PESAN_JK}` };
     // NTA (Penegak dan Dewan Ambalan) diperiksa sebelum apa pun disimpan, agar data lain tidak tersimpan sebagian
     const anggotaDewan = data.role === 'penguji' && data.jabatan === 'Dewan Ambalan';
     const punyaNta = data.role === 'peserta' || anggotaDewan;
@@ -728,6 +733,9 @@ export function AppProvider({ children }) {
       // NTA diisi sesudah akun ada (fungsi terpisah, khusus Admin). Bila gagal, akun tetap dibuat dan Admin diberi tahu.
       const nta = punyaNta ? String(data.nta ?? '').trim() : '';
       let peringatan = '';
+      // Jenis kelamin juga diisi sesudah akun ada (Edge Function tidak membawanya)
+      const j0 = await api().aturJenisKelamin([{ username: baris.username, jk }]);
+      if (!j0.ok) peringatan = `Jenis kelamin belum tersimpan: ${j0.pesan}`;
       if (nta) {
         const n = await api().aturNta([{ username: baris.username, nta }]);
         if (!n.ok) peringatan = `NTA belum tersimpan: ${n.pesan}`;
@@ -758,6 +766,15 @@ export function AppProvider({ children }) {
       if (r.sesiBerakhir) await sesiBerakhir();
       return { ok: false, pesan: r.pesan };
     }
+    // Jenis kelamin hanya dikirim bila berubah (server yang belum dimigrasi tetap dapat mengubah data lain)
+    if (jk && jk !== (lama?.jenisKelamin ?? '')) { // mengosongkan jenis kelamin yang sudah terisi tidak ditawarkan
+      const j = await api().aturJenisKelamin([{ username: usernameBaru || lama.username, jk }]);
+      if (!j.ok) {
+        await segarkan.users();
+        if (j.sesiBerakhir) await sesiBerakhir();
+        return { ok: false, pesan: `Data anggota tersimpan, tetapi jenis kelamin belum: ${j.pesan}` };
+      }
+    }
     // NTA hanya dikirim bila berubah (server lama tanpa migrasi NTA tetap dapat mengubah data lain)
     const ntaBaru = String(data.nta ?? '').trim();
     const lamaPunyaNta = lama?.role === 'peserta' || (lama?.role === 'penguji' && lama.jabatan === 'Dewan Ambalan');
@@ -783,6 +800,19 @@ export function AppProvider({ children }) {
     return { ok: true };
   };
 
+  /** Mengisi jenis kelamin banyak anggota sekaligus (Admin): daftar = [{ username, jk }]. Mengembalikan { ok, data: jumlah } atau { ok: false, pesan }. */
+  const lengkapiJenisKelamin = async (daftar) => {
+    if (user?.role !== 'admin') return { ok: false, pesan: 'Hanya Admin Gudep yang dapat mengelola anggota.' };
+    const r = await api().aturJenisKelamin(daftar);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    await segarkan.users();
+    notify(`Jenis kelamin ${r.data} anggota tersimpan.`);
+    return r;
+  };
+
   /**
    * Impor banyak anggota dari Excel. `baris` = hasil bacaExcelAnggota, `kelompok` = 'peserta' | 'dewan' | 'pembina'.
    * Baris yang tidak lolos pemeriksaan dilewati. Dikirim per rombongan. Mengembalikan daftar akun baru beserta
@@ -805,14 +835,22 @@ export function AppProvider({ children }) {
       for (const h of r.hasil) (h.ok ? daftar : ditolakServer).push(h);
       kemajuan?.(Math.min(i + UKURAN_ROMBONGAN, kirim.length), kirim.length);
     }
-    // NTA (opsional, hanya Penegak) diisi sesudah akun dibuat. Bila gagal, akun tetap ada dan Admin diberi tahu.
+    // Jenis kelamin (wajib, semua kelompok), NTA, agama Pembina, dan jabatan Dewan diisi sesudah akun dibuat. Bila gagal, akun tetap ada dan Admin diberi tahu.
     let peringatan = '';
+    if (daftar.length) {
+      const jkPerBaris = new Map(siap.map(({ no, data }) => [no, data.jk]));
+      const daftarJk = daftar.map((h) => ({ username: h.username, jk: jkPerBaris.get(h.no) ?? '' })).filter((x) => x.jk);
+      if (daftarJk.length) {
+        const j = await api().aturJenisKelamin(daftarJk);
+        if (!j.ok) peringatan = `Jenis kelamin ${daftarJk.length} anggota belum tersimpan: ${j.pesan}`;
+      }
+    }
     if (kelompok === 'pembina' && daftar.length) {
       const agamaPerBaris = new Map(siap.map(({ no, data }) => [no, data.agama]));
       const daftarAgama = daftar.map((h) => ({ username: h.username, agama: agamaPerBaris.get(h.no) ?? '' })).filter((x) => x.agama);
       if (daftarAgama.length) {
         const g = await api().aturAgamaPembina(daftarAgama);
-        if (!g.ok) peringatan = `Agama ${daftarAgama.length} Pembina belum tersimpan: ${g.pesan}`;
+        if (!g.ok) peringatan = `${peringatan ? `${peringatan} ` : ''}Agama ${daftarAgama.length} Pembina belum tersimpan: ${g.pesan}`;
       }
     }
     if (kelompok === 'dewan' && daftar.length) {
@@ -821,7 +859,7 @@ export function AppProvider({ children }) {
       const daftarJabatan = daftar.map((h) => ({ username: h.username, jabatan: jabatanPerBaris.get(h.no) ?? '' })).filter((x) => x.jabatan);
       if (daftarJabatan.length) {
         const j = await api().aturJabatanDewan(daftarJabatan);
-        if (!j.ok) peringatan = `Jabatan ${daftarJabatan.length} anggota Dewan belum tersimpan: ${j.pesan}`;
+        if (!j.ok) peringatan = `${peringatan ? `${peringatan} ` : ''}Jabatan ${daftarJabatan.length} anggota Dewan belum tersimpan: ${j.pesan}`;
       }
     }
     if ((kelompok === 'peserta' || kelompok === 'dewan') && daftar.length) {
@@ -829,7 +867,7 @@ export function AppProvider({ children }) {
       const daftarNta = daftar.map((h) => ({ username: h.username, nta: ntaPerBaris.get(h.no) ?? '' })).filter((x) => x.nta);
       if (daftarNta.length) {
         const n = await api().aturNta(daftarNta);
-        if (!n.ok) peringatan = `NTA ${daftarNta.length} anggota belum tersimpan: ${n.pesan}`;
+        if (!n.ok) peringatan = `${peringatan ? `${peringatan} ` : ''}NTA ${daftarNta.length} anggota belum tersimpan: ${n.pesan}`;
       }
     }
     if (daftar.length) await segarkan.users();
@@ -999,7 +1037,7 @@ export function AppProvider({ children }) {
     daftarCalonGaruda, ubahPortofolio, catatPortofolioPenguji,
     buatSesiAbsen, setStatusAbsen, tandaiBanyakAbsen, hapusSesiAbsen, semesterSiap, pastikanAbsensi,
     gantiPin, resetPin,
-    simpanAnggota, imporAnggota, hapusAnggota, perbaruiRombel,
+    simpanAnggota, imporAnggota, hapusAnggota, perbaruiRombel, lengkapiJenisKelamin,
     simpanGudep,
     dokumen: db.dokumen, muatDokumen, terbitkanSuratAgama, cabutDokumen, bolehSurat,
     penugasan: db.penugasan, guruAgama: db.guruAgama, muatPenugasan, muatLogPenugasan, aturPenugasan, salinPenugasan, simpanGuruAgama, hapusGuruAgama,

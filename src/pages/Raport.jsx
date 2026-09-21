@@ -402,7 +402,7 @@ function TabNilai({ per, semester, pengaturan }) {
         ))}
       </section>
 
-      <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['kelas', 'sangga']} rombelSaya={rombelSaya} /></div>
+      <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['kelas', 'sangga', 'jk']} rombelSaya={rombelSaya} /></div>
 
       <div className="no-print mb-3 flex flex-wrap items-center gap-2">
         <button className="btn btn-gold btn-sm" onClick={unduh} disabled={mengunduh || tampil.length === 0}>

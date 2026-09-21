@@ -12,7 +12,7 @@ const users = [
   { id: 'd', role: 'penguji', jabatan: 'Dewan Ambalan', username: 'rizky.dewan', nama: 'Rizky Dewan' },
   { id: 's', role: 'peserta', username: '10231', nis: '10231', nama: 'Ahmad Fauzi', kelas: 'X-01' },
 ];
-const k = { nis: '', kelas: 'X-01', sangga: 'E', agama: 'Islam', pin: '', username: '' };
+const k = { jk: 'Laki-laki', nis: '', kelas: 'X-01', sangga: 'E', agama: 'Islam', pin: '', username: '' };
 
 // Penegak
 let p = periksaBaris([
@@ -31,7 +31,7 @@ ok(p.map((x) => x.siap).join() === 'true,false,false,false,false,false,false,tru
 ok(/NIS kosong/.test(p[1].galat[0]) && /sudah terdaftar/.test(p[2].galat[0]) && /sudah terdaftar/.test(p[3].galat[0]), 'pesan galat NIS jelas');
 
 // Dewan / Pembina
-const kp = { nis: '', kelas: '', sangga: '', agama: '', pin: '', username: '' };
+const kp = { jk: 'Perempuan', nis: '', kelas: '', sangga: '', agama: '', pin: '', username: '' };
 p = periksaBaris([
   { no: 2, nama: 'Sinta', ...kp },
   { no: 3, nama: 'rizky dewan', ...kp },
@@ -46,22 +46,22 @@ p = periksaBaris([{ no: 2, nama: 'Rizky Dewan', ...kp }], users, 'pembina');
 ok(p[0].siap, 'nama sama pada jabatan berbeda (Pembina) boleh');
 
 // template
-ok(kolomTemplate('peserta').map((c) => c.key).join() === 'nama,nis,kelas,sangga,agama,nta,pin' && kolomTemplate('dewan').map((c) => c.key).join() === 'nama,username,jabatanDewan,nta,pin' && kolomTemplate('pembina').map((c) => c.key).join() === 'nama,username,agama,pin', 'kolom template');
+ok(kolomTemplate('peserta').map((c) => c.key).join() === 'nama,jk,nis,kelas,sangga,agama,nta,pin' && kolomTemplate('dewan').map((c) => c.key).join() === 'nama,jk,username,jabatanDewan,nta,pin' && kolomTemplate('pembina').map((c) => c.key).join() === 'nama,jk,username,agama,pin', 'kolom template');
 {
   const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await buatTemplateAnggota('dewan'));
   const ws = wb.getWorksheet('Anggota');
-  ws.getCell(2, 1).value = 'Sinta Ambalan'; ws.getCell(2, 2).value = 'sinta.a'; ws.getCell(2, 5).value = '0482911'; ws.getCell(2, 3).value = 'wakil pradana'; ws.getCell(2, 4).value = '11.03.10.701.00777';
-  ws.getCell(3, 1).value = 'Tono'; ws.getCell(3, 5).value = '482913';
+  ws.getCell(2, 1).value = 'Sinta Ambalan'; ws.getCell(2, 3).value = 'sinta.a'; ws.getCell(2, 6).value = '0482911'; ws.getCell(2, 4).value = 'wakil pradana'; ws.getCell(2, 5).value = '11.03.10.701.00777'; ws.getCell(2, 2).value = 'Perempuan';
+  ws.getCell(3, 1).value = 'Tono'; ws.getCell(3, 6).value = '482913'; ws.getCell(3, 2).value = 'L';
   const b = await bacaExcelAnggota(await wb.xlsx.writeBuffer(), 'dewan');
   ok(b.length === 2 && b[0].username === 'sinta.a' && b[0].pin === '0482911' && b[1].username === '' && b[1].pin === '482913' && b[0].jabatanDewan === 'wakil pradana' && b[0].nta === '11.03.10.701.00777' && b[1].jabatanDewan === '', 'baca file Dewan dengan kolom Nama Pengguna: ' + JSON.stringify(b.map((x) => [x.nama, x.username, x.pin])));
-  ok(ws.getCell(2, 2).numFmt === '@' && ws.getCell(2, 4).numFmt === '@' && ws.getCell(2, 5).numFmt === '@', 'kolom nama pengguna, NTA, dan PIN berformat teks');
+  ok(ws.getCell(2, 3).numFmt === '@' && ws.getCell(2, 5).numFmt === '@' && ws.getCell(2, 6).numFmt === '@', 'kolom nama pengguna, NTA, dan PIN berformat teks');
   let petunjuk = ''; wb.getWorksheet('Petunjuk').eachRow((r) => r.eachCell((c) => { petunjuk += c.value + ' '; }));
   ok(/Nama Pengguna/.test(petunjuk) && /6 angka/.test(petunjuk), 'petunjuk menyebut Nama Pengguna dan PIN 6 angka');
 }
 {
   const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await buatTemplateAnggota('peserta'));
   const ws = wb.getWorksheet('Anggota');
-  [ 'Andi', '10301', 'X', 'Sangga Elang', 'Islam', '' ].forEach((v, i) => { ws.getCell(2, i + 1).value = v || null; });
+  [ 'Andi', 'Laki-laki', '10301', 'X', 'Sangga Elang', 'Islam', '' ].forEach((v, i) => { ws.getCell(2, i + 1).value = v || null; });
   const b = await bacaExcelAnggota(await wb.xlsx.writeBuffer(), 'peserta');
   ok(b.length === 1 && b[0].nis === '10301' && b[0].username === '', 'baca file Penegak');
   let petunjuk = ''; wb.getWorksheet('Petunjuk').eachRow((r) => r.eachCell((c) => { petunjuk += c.value + ' '; }));

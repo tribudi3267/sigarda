@@ -116,7 +116,7 @@ r = await set(A.k, T2, kevin, 1500); ok(/Dewan Ambalan atau asisten/.test(r.err 
 // batas 5
 const sisa = calonLaksana.length; const jumlahAsisten = async () => (await q(`select count(*)::int n from public.asisten_iuran`))[0].n;
 await q(`delete from public.asisten_iuran`);
-await q(`insert into public.asisten_iuran (peserta_id) select id from public.profiles where role = 'peserta' and id not in (select peserta_id from public.asisten_iuran) limit 5`);
+await q(`insert into public.asisten_iuran (peserta_id) select id from public.profiles where role = 'peserta' and id <> $1 and id not in (select peserta_id from public.asisten_iuran) order by username limit 5`, [cl.id]); // bukan cl: urutan fisik baris tidak boleh menentukan hasil uji
 ok((await jumlahAsisten()) === 5, 'data uji: 5 asisten terpasang');
 r = await rpc(K.dewan.k, 'sg_asisten_iuran_atur', { p_peserta_id: cl.id, p_aktif: true }); ok(/maksimal 5/i.test(r.err ?? ''), 'asisten keenam ditolak: ' + r.err);
 await q(`delete from public.asisten_iuran`);

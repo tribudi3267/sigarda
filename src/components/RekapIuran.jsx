@@ -187,7 +187,7 @@ export default function RekapIuran() {
                   <Icon nama="unduh" className="h-4 w-4" /> Unduh Excel
                 </button>
               </div>
-              <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas']} /></div>
+              <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'jk']} /></div>
               {tersaring.length === 0 ? (
                 <Kosong judul="Tidak ada Penegak" teks="Ubah kata kunci, sangga, atau kelas pada filter." />
               ) : (

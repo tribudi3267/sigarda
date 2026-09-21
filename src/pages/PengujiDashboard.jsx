@@ -150,7 +150,7 @@ function DaftarPeserta({ onBuka }) {
     <div className="animasi-naik">
       <h1 className="mb-1 text-2xl font-bold">Peserta</h1>
       <p className="mb-4 text-sm text-pramuka-600">{daftar.length} peserta ditemukan</p>
-      <div className="mb-4"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'peran', 'agama']} rombelSaya={rombelSaya} /></div>
+      <div className="mb-4"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'peran', 'agama', 'jk']} rombelSaya={rombelSaya} /></div>
 
       {daftar.length === 0 ? (
         <Kosong judul="Tidak ada peserta" teks="Ubah kata kunci, sangga, kelas, peran, atau agama pada filter, atau matikan &quot;Hanya rombel saya&quot;." />

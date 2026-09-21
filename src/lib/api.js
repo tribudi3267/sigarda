@@ -307,6 +307,8 @@ export function buatApi(klien) {
     aturNta: (daftar) => rpc('sg_anggota_nta_atur', { p_data: daftar }),
     /** Agama Pembina (Admin). `daftar` = [{ username, agama }]; agama kosong menghapus. Hanya berlaku untuk Pembina. Mengembalikan jumlah yang diperbarui. */
     aturAgamaPembina: (daftar) => rpc('sg_anggota_agama_atur', { p_data: daftar }),
+    /** Jenis kelamin anggota, semua peran (Admin). `daftar` = [{ username, jk }]; jk 'L' | 'P', kosong menghapus. Semua atau tidak sama sekali. Mengembalikan jumlah yang diperbarui. */
+    aturJenisKelamin: (daftar) => rpc('sg_anggota_jk_atur', { p_data: daftar }),
     /** Jabatan Dewan Ambalan (Admin). `daftar` = [{ username, jabatan }]; jabatan kosong menghapus. Semua atau tidak sama sekali. Mengembalikan jumlah yang diperbarui. */
     aturJabatanDewan: (daftar) => rpc('sg_anggota_jabatan_dewan_atur', { p_data: daftar }),
     /** Rombel banyak Penegak sekaligus (Admin). `daftar` = [{ username (NIS), rombel }]. Semua atau tidak sama sekali. Mengembalikan jumlah baris. */

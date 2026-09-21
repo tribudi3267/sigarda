@@ -2,9 +2,10 @@ import { useEffect, useMemo } from 'react';
 import { PERAN, URUTAN_PERAN } from '../lib/skuLogic';
 import { urutAlami, urutTeks } from '../lib/format';
 import { ringkasDaftarRombel } from '../lib/rombelLogic';
+import { JENIS_KELAMIN, JK_BELUM_DIISI, labelJenisKelamin } from '../lib/jenisKelaminLogic';
 import { Icon } from './ui';
 
-export const FILTER_AWAL = { q: '', sangga: '', kelas: '', peran: '', agama: '', saya: false };
+export const FILTER_AWAL = { q: '', sangga: '', kelas: '', peran: '', agama: '', jk: '', saya: false };
 
 /**
  * `f.rombel` (larik; diisi filterEfektif dari "rombel saya") membatasi ke rombel itu; kosong = tanpa batas.
@@ -18,11 +19,12 @@ export const terapkanFilter = (daftar, f) =>
       (!f.kelas || u.kelas === f.kelas) &&
       (!f.peran || u.peran === f.peran) &&
       (!f.agama || u.agama === f.agama) &&
+      (!f.jk || (f.jk === JK_BELUM_DIISI ? !u.jenisKelamin : u.jenisKelamin === f.jk)) &&
       (!f.q || `${u.nama} ${u.nis ?? ''}`.toLowerCase().includes(f.q.trim().toLowerCase()))
   );
 
 const unik = (daftar, kunci, urut) => [...new Set(daftar.map((u) => u[kunci]).filter(Boolean))].sort(urut);
-const TAMPIL_STANDAR = ['sangga', 'kelas', 'peran'];
+const TAMPIL_STANDAR = ['sangga', 'kelas', 'peran', 'jk'];
 
 /**
  * Filter data anggota. Semua pilihan (sangga, kelas, peran, agama) dibangun dari `data`,
@@ -39,6 +41,8 @@ export default function FilterBar({ data, filter, setFilter, tampil = TAMPIL_STA
       kelas: unik(data, 'kelas', urutAlami),
       peran: URUTAN_PERAN.filter((p) => data.some((u) => u.peran === p)),
       agama: unik(data, 'agama', urutTeks),
+      // Jenis kelamin: hanya yang ada pada data, ditambah "belum diisi" selama masih ada yang kosong
+      jk: [...JENIS_KELAMIN.map((j) => j.kode).filter((k) => data.some((u) => u.jenisKelamin === k)), ...(data.some((u) => !u.jenisKelamin) ? [JK_BELUM_DIISI] : [])],
     }),
     [data]
   );
@@ -99,6 +103,12 @@ export default function FilterBar({ data, filter, setFilter, tampil = TAMPIL_STA
         <select className="input w-full sm:w-44" value={filter.peran} onChange={ubah('peran')} aria-label="Filter peran">
           <option value="">Semua peran</option>
           {opsi.peran.map((p) => <option key={p} value={p}>{PERAN[p].singkat}</option>)}
+        </select>
+      )}
+      {tampil.includes('jk') && (
+        <select className="input w-full sm:w-44" value={filter.jk ?? ''} onChange={ubah('jk')} aria-label="Filter jenis kelamin">
+          <option value="">Semua jenis kelamin</option>
+          {opsi.jk.map((k) => <option key={k} value={k}>{k === JK_BELUM_DIISI ? 'Belum diisi' : labelJenisKelamin(k)}</option>)}
         </select>
       )}
       {tampil.includes('agama') && (

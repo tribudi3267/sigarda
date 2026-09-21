@@ -115,7 +115,7 @@ export default function ResetPin() {
       )}
 
       {aktif?.id === 'peserta' && (
-        <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'peran']} /></div>
+        <div className="mb-3"><FilterBar data={daftarPeserta} filter={filter} setFilter={setFilter} tampil={['sangga', 'kelas', 'peran', 'jk']} /></div>
       )}
 
       {aktif && aktif.id !== 'peserta' && (
