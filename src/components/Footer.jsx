@@ -10,12 +10,17 @@ const JALUR = [
   { no: 3, judul: 'Portofolio Garuda', ket: `${ITEM_PORTOFOLIO.length} dokumen disusun dalam jurnal kesiapan`, garuda: true },
 ];
 
-/** Footer aplikasi (setelah masuk). Ditampilkan di laptop dan ponsel; tidak ikut tercetak. */
-export default function Footer() {
+// Tiga kolom butuh sekitar 540px isi; bila menu samping terbuka lebar (md:pl-60) lebar itu baru tercapai di lg,
+// jadi di md kolom ketiga turun ke baris kedua. Kalau tidak, kolom melewati footer dan halaman melebar.
+const KOLOM_3 = 'md:grid-cols-[1.3fr_1.2fr_1fr]';
+const KOLOM_MD_2 = 'md:grid-cols-2 lg:grid-cols-[1.3fr_1.2fr_1fr]';
+
+/** Footer aplikasi (setelah masuk). Ditampilkan di laptop dan ponsel; tidak ikut tercetak. `ciut` = menu samping sedang ciut. */
+export default function Footer({ ciut = false }) {
   return (
     <footer className="no-print mt-auto border-t-4 border-emas bg-pramuka-900 pb-20 text-pramuka-200 md:pb-0">
       <div className="mx-auto max-w-6xl px-4 py-9">
-        <div className="grid gap-9 md:grid-cols-[1.3fr_1.2fr_1fr]">
+        <div className={`grid gap-9 ${ciut ? KOLOM_3 : KOLOM_MD_2}`}>
           <div>
             <LogoSigarda size={48} className="text-pramuka-50" />
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-pramuka-300">
@@ -45,7 +50,7 @@ export default function Footer() {
             </ol>
           </div>
 
-          <div>
+          <div className={ciut ? '' : 'md:col-span-2 lg:col-span-1'}>
             <h2 className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-emas-light">Gugus Depan</h2>
             <address className="space-y-1 text-sm not-italic leading-relaxed text-pramuka-300">
               <p className="font-semibold text-pramuka-50">{GUDEP.nama}</p>
