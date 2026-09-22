@@ -527,7 +527,15 @@ Tiga alat, hanya membaca, untuk mengetahui seberapa cepat SIGARDA terasa di HP s
 
 **Wilayah proyek Supabase memengaruhi semua angka ini** (Dashboard > Project Settings > General): jarak Bukateja ke Tokyo lebih jauh daripada ke Singapura, jadi setiap permintaan berurutan (`ambilSemua` per 1000 baris) membayar bolak-balik yang lebih mahal. Perbarui `RTT_SERVER_MS` di `scripts/profil/jaringan.mjs` bila wilayah proyek berubah.
 
-Uji beban serentak (banyak "pengguna" memuat bersamaan) dan data uji khusus untuk itu ada di tahap berikutnya (L2-B): dijalankan HANYA setelah cadangan data terbaru diambil, dengan akun bertanda "Uji" yang mudah dibersihkan (`hapus_data_uji_beban.sql`), TIDAK memakai skrip `hapus_semua_akun_kecuali_admin.sql` (itu juga menghapus akun asli non-admin).
+**Uji beban dengan data berskala sekolah (tahap L2-B).** Untuk mengukur database Supabase SUNGGUHAN pada skala pemakaian nyata (bukan model):
+
+1. **Ambil cadangan data terbaru dulu** (klik dua kali `Cadangkan-SIGARDA.bat`).
+2. Jalankan [`supabase/demo/data_uji_beban.sql`](supabase/demo/data_uji_beban.sql) di SQL Editor (MENULIS, bukan hanya membaca): menambah ~850 Penegak fiktif (bawaan 700 aktif + 150 alumni, dapat diubah) beserta progres SKU dan riwayatnya. Semua bertanda jelas: NIS `88xxxx` dan nama berawalan "Uji ". Sengaja **tidak** menyentuh kehadiran/iuran (menghindari angka fiktif tercampur ke rekap keuangan sungguhan yang sedang dipakai). Hasil paling akhir menampilkan **PIN 30 akun uji** untuk login sungguhan — salin sekarang, tidak ditampilkan lagi, jangan diunggah ke GitHub.
+3. Simpan daftar NIS+PIN itu di `scripts/uji-beban/akun.json` (tidak ikut git; bentuk `[{"nis":"...","pin":"..."}]`).
+4. **[`scripts/uji-beban/beban.mjs`](scripts/uji-beban/beban.mjs)** mengirim banyak permintaan bersamaan ke Supabase sungguhan: `node scripts/uji-beban/beban.mjs login --n=20` (login serentak, naikkan bertahap) atau `node scripts/uji-beban/beban.mjs baca --n=300 --sesi=30` (banyak "pengguna" membaca bersamaan lewat sesi yang dipakai bergantian, mendekati beban 300–500 pengguna tanpa memboroskan batas login). Melaporkan jumlah berhasil/gagal dan latensi p50/p95/p99. **Jalankan di luar jam sekolah** (memakai kuota egress dan Auth yang sama dengan pengguna sungguhan).
+5. **Sesudah selesai**, HAPUS data uji dengan [`supabase/demo/hapus_data_uji_beban.sql`](supabase/demo/hapus_data_uji_beban.sql) — **wajib** sebelum uji coba pengguna sungguhan. **Jangan** memakai `hapus_semua_akun_kecuali_admin.sql` untuk ini (skrip itu juga menghapus akun asli non-admin, mis. Pembina).
+
+Diuji: `uji/data-uji-beban.mjs` memvalidasi rumus pembuatan data dan sisipan progres/riwayat di atas PGlite (bagian auth.users/pgcrypto tidak dapat diuji secara lokal — PGlite tidak memilikinya — jadi ikuti langkah 1 dan coba dulu dengan skala kecil bila ragu, mis. ubah `700`/`150` pada berkas SQL menjadi angka kecil untuk percobaan pertama).
 
 ## Struktur folder
 
