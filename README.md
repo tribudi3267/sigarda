@@ -516,6 +516,19 @@ Edge Function tidak dapat diperiksa dari SQL: barisnya bertanda PERIKSA MANUAL (
 
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 
+### Uji kinerja dan beban (tahap L2)
+Tiga alat, hanya membaca, untuk mengetahui seberapa cepat SIGARDA terasa di HP siswa dan seberapa dekat pemakaian mendekati batas paket gratis Supabase, SEBELUM uji coba pengguna sungguhan:
+
+1. **`npm run profil`** — model (bukan pengukuran): membuat data sekolah penuh di Postgres lokal (PGlite), menjalankan alur masuk (`AppContext.muatSemua`) yang SUNGGUH lewat `src/lib/api.js`, mencatat permintaan dan byte per peran, lalu memperkirakan lama "beranda siap" pada beberapa jaringan (Wi-Fi, 4G, Fast 3G, Slow 3G) dan HP lambat (CPU 6x). Berguna untuk membandingkan peran dan menguji ide perbaikan dengan cepat, tanpa menyentuh Supabase. Pilihan: `--cpu=`, `--server=` (md per permintaan), `--dist=dist` (pakai build yang sudah ada), `--json=<berkas>`. Sumber: [`scripts/profil/model.mjs`](scripts/profil/model.mjs), [`scripts/profil/jaringan.mjs`](scripts/profil/jaringan.mjs) (dijaga `uji/profil-muat.mjs`).
+2. **[`supabase/demo/ukur_muatan.sql`](supabase/demo/ukur_muatan.sql)** — dijalankan di SQL Editor Supabase (hanya membaca, aman diulang): ukuran sungguhan tiap tabel, ukuran database (dibanding batas 500 MB), byte JSON per baris untuk tabel besar (progres, riwayat, kehadiran, profil), dan rencana kueri (`EXPLAIN ANALYZE`) untuk memuat progres/riwayat satu Penegak dan seluruh Penegak. Menjawab: apakah indeks terpakai (bukan "Seq Scan" untuk kueri satu orang), dan berapa dekat database ke batas 500 MB.
+3. **[`scripts/profil/ukur-devtools.js`](scripts/profil/ukur-devtools.js)** — tempel di konsol DevTools (F12 > Console) pada halaman SIGARDA sungguhan (produksi, atau HP lewat `chrome://inspect`): merekam permintaan NYATA ke Supabase (jumlah, lama, byte lewat kabel SUDAH terkompresi vs byte asli), sehingga laju kompresi gzip Supabase yang SEBENARNYA terlihat (bukan model). Panggil `ukurMulai('nama')` sebelum aksi (mis. masuk, kembali ke tab), diamkan sebentar, ringkasan tercetak otomatis; `ukurRingkasan()` dan `ukurCsv()` melihat semua percobaan. Baca komentar di berkas untuk langkah lengkap.
+
+**Anggaran yang disetujui:** Penegak beranda siap ≤ 5 detik (Fast 3G) / ≤ 10 detik (Slow 3G); Pembina/Dewan/Admin ≤ 8 / ≤ 15 detik; transfer awal Penegak (aplikasi + data) ≤ 500 kB gzip; JS awal ≤ 150 kB gzip. `npm run profil` menandai ✓/✗ terhadap anggaran ini.
+
+**Wilayah proyek Supabase memengaruhi semua angka ini** (Dashboard > Project Settings > General): jarak Bukateja ke Tokyo lebih jauh daripada ke Singapura, jadi setiap permintaan berurutan (`ambilSemua` per 1000 baris) membayar bolak-balik yang lebih mahal. Perbarui `RTT_SERVER_MS` di `scripts/profil/jaringan.mjs` bila wilayah proyek berubah.
+
+Uji beban serentak (banyak "pengguna" memuat bersamaan) dan data uji khusus untuk itu ada di tahap berikutnya (L2-B): dijalankan HANYA setelah cadangan data terbaru diambil, dengan akun bertanda "Uji" yang mudah dibersihkan (`hapus_data_uji_beban.sql`), TIDAK memakai skrip `hapus_semua_akun_kecuali_admin.sql` (itu juga menghapus akun asli non-admin).
+
 ## Struktur folder
 
 ```

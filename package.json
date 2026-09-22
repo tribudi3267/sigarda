@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "skema": "node scripts/buat-skema.mjs",
     "periksa": "node scripts/buat-periksa.mjs",
+    "profil": "node scripts/profil-muat.mjs",
     "uji": "node uji/jalankan.mjs"
   },
   "dependencies": {
