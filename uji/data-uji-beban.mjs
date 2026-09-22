@@ -58,6 +58,16 @@ ok(yatim === 0, 'setiap sku_id pada progres uji memang ada di katalog sku_unit')
 ok(await n("select count(*)::int n from public.sku_progress where peserta_id in (select id from public.profiles where nis ~ '^88[0-9]{4}$') and status = 'lulus' and verifikasi_token is null") === 0, 'setiap butir lulus punya verifikasi_token');
 ok(await n("select count(*)::int n from public.profiles where nis ~ '^88[0-9]{4}$' and (nis is null or kelas is null or sangga is null or agama is null)") === 0, 'tidak ada baris Penegak dengan kolom wajib kosong');
 
+// Pemicu sigarda.notif_sku_progress mengirim notifikasi (dan push sungguhan bila punya perangkat) ke PENGUJI SUNGGUHAN
+// saat status 'diajukan' bertujuan langsung (bukan antrian rombel). Data uji TIDAK BOLEH pernah memicu ini terhadap
+// akun asli (mis. Pembina contoh yang ikut di-seed lokal) — lihat catatan di data_uji_beban.sql bagian "sedang berjalan".
+ok(await n(`select count(*)::int n from public.notifikasi no
+  join public.profiles p on p.id = no.penerima_id
+  where no.jenis = 'ajukan' and not (p.nis ~ '^88[0-9]{4}$' and p.nama like 'Uji %')`) === 0,
+  'TIDAK ADA notifikasi "ajukan" (pengajuan baru) yang nyasar ke akun ASLI (mis. Pembina contoh)');
+ok(await n("select count(*)::int n from public.sku_progress where peserta_id in (select id from public.profiles where nis ~ '^88[0-9]{4}$') and status = 'diajukan' and penguji_id is not null") === 0,
+  'setiap baris uji berstatus "diajukan" selalu penguji NULL (antrian rombel, tidak pernah langsung ke akun asli)');
+
 console.log('\n--- Berjalan ulang (dijalankan dua kali, seperti menempel ulang berkas di sesi baru): tidak menduplikasi ---');
 await pg.exec('drop table if exists param, uji_konfig, uji_penegak, uji_login, uji_baru;'); // seperti baris terakhir berkas sungguhan
 let galat2 = null;
@@ -73,6 +83,7 @@ const hapus = readFileSync(`${P}/supabase/demo/hapus_data_uji_beban.sql`, 'utf8'
 ok(/88\[0-9\]\{4\}/.test(hapus) || /'\^88/.test(hapus), 'menyasar pola NIS 88xxxx');
 ok(/Uji %/.test(hapus), 'menyasar nama berawalan "Uji "');
 ok(/login_gagal/.test(hapus), 'ikut membersihkan login_gagal');
+ok(/jenis = 'ajukan' and isi like 'Uji %'/.test(hapus), 'ikut membersihkan notifikasi "ajukan" yang nyasar ke akun asli');
 
 console.log(`\nRINGKASAN: ${lulus} lulus, ${gagal} GAGAL.`);
 if (gagal) process.exit(1);

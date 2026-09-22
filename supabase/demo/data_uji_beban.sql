@@ -15,6 +15,11 @@
 -- sungguhan (dilihat Dewan Ambalan dan Bendahara) selama data uji ini ada. Progres SKU dan riwayat (dua tabel
 -- TERBESAR menurut ukur_muatan.sql) sudah cukup mewakili beban baca/tulis dan ukuran database.
 --
+-- SENGAJA TIDAK PERNAH membuat progres berstatus 'diajukan': pemicu sigarda.notif_sku_progress mengirim notifikasi
+-- (dan PUSH SUNGGUHAN ke HP bila penerimanya punya perangkat terdaftar) kepada PENGUJI ASLI setiap ada 'diajukan'
+-- baru, baik ditujukan langsung maupun ke antrian rombel (yang justru menotifikasi SEMUA penguji sah rombel itu).
+-- Hanya status 'lulus' dan 'proses' dipakai di sini, keduanya hanya menotifikasi akun uji itu sendiri.
+--
 -- HANYA 30 akun (kelas XII, aktif) diberi PIN SUNGGUHAN untuk uji login serentak (lihat hasil kueri PALING AKHIR
 -- setelah skrip ini selesai): PIN ACAK, ditampilkan HANYA SEKALI, TIDAK disimpan di mana pun oleh skrip ini.
 -- SALIN SEKARANG ke luar repository (mis. berkas teks lokal di komputer Anda) dan JANGAN diunggah ke GitHub.
@@ -142,12 +147,15 @@ union all
 select peserta_id, sku_id, tanggal_uji::timestamptz, 'Lulus (Baik)', penguji_id
 from public.sku_progress where status = 'lulus' and peserta_id in (select id from uji_baru);
 
--- pengajuan yang sedang berjalan (sebagian antrian rombel — penguji NULL, sebagian ditujukan ke Pembina)
+-- Pengajuan yang sedang berjalan: SELALU status 'proses' (TIDAK PERNAH 'diajukan'). Alasan: sigarda.notif_sku_progress
+-- mengirim notifikasi (dan push sungguhan bila punya perangkat) kepada PENGUJI SUNGGUHAN saat status baru 'diajukan' —
+-- baik ditujukan langsung MAUPUN NULL (antrian rombel; saat NULL, notifikasi dikirim ke SEMUA penguji sah rombel itu,
+-- lewat sigarda.penguji_sah, yang HAMPIR SELALU akun asli). Tidak ada cara aman membuat baris 'diajukan' untuk data uji.
+-- 'proses' aman: notifikasinya ('Pengujian dimulai') hanya ditujukan ke Penegak (peserta_id) itu sendiri, yaitu akun uji.
 insert into public.sku_progress (peserta_id, sku_id, status, jadwal, penguji_id, diubah)
-select b.id, 'BAN-' || lpad((b.kb + 1)::text, 2, '0'),
-       case when abs(hashtext(b.id::text)) % 3 = 0 then 'proses' else 'diajukan' end,
+select b.id, 'BAN-' || lpad((b.kb + 1)::text, 2, '0'), 'proses',
        sigarda.hari_ini() + (abs(hashtext(b.id::text)) % 5),
-       case when abs(hashtext(b.id::text)) % 2 = 0 then null else k.pembina end, now()
+       case when abs(hashtext(b.id::text)) % 2 = 0 then k.pembina else null end, now()
 from uji_baru b cross join uji_konfig k
 where b.status = 'aktif' and b.kb between 1 and 22 and abs(hashtext(b.id::text)) % 14 = 0
 on conflict do nothing;

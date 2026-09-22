@@ -25,11 +25,13 @@ await isiSekolahPenuh(pg, { penegak: 30, alumni: 5 });
 let hasil = null, galat = null;
 try { hasil = await pg.exec(berkas); } catch (e) { galat = e; }
 ok(!galat, 'seluruh pernyataan berjalan tanpa galat' + (galat ? `: ${galat.message}` : ''));
-ok(Array.isArray(hasil) && hasil.length >= 10, `menghasilkan beberapa kumpulan baris (${hasil?.length ?? 0} pernyataan)`);
+ok(Array.isArray(hasil) && hasil.length === 5, `4 blok EXPLAIN + 1 ringkasan gabungan (${hasil?.length ?? 0} pernyataan)`);
+ok((hasil?.[4]?.rows ?? []).length > 5, 'pernyataan TERAKHIR (yang tampil otomatis di SQL Editor) berisi ringkasan gabungan, bukan EXPLAIN');
 const bagian = hasil?.flatMap((h) => h.rows ?? []).filter((r) => r.bagian) ?? [];
 ok(bagian.some((r) => r.bagian === 'Ukuran tabel'), 'bagian "Ukuran tabel" muncul');
 ok(bagian.some((r) => r.bagian === 'Ukuran database'), 'bagian "Ukuran database" muncul');
 ok(bagian.filter((r) => /^Byte JSON/.test(r.bagian)).length >= 4, 'bagian "Byte JSON" muncul untuk beberapa tabel');
+ok(bagian.some((r) => r.bagian === 'Jumlah anggota'), 'bagian "Jumlah anggota" ikut dalam ringkasan gabungan');
 await pg.close();
 
 console.log(`\nRINGKASAN: ${lulus} lulus, ${gagal} GAGAL.`);
