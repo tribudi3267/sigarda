@@ -5,7 +5,7 @@
 import { fmtTanggal } from './format';
 
 export const LABEL_JENIS = {
-  ajukan: 'Pengajuan', alih: 'Dialihkan', mulai: 'Pengujian', hasil: 'Hasil', pengingat: 'Pengingat', lama: 'Menunggu lama', sesi: 'Sesi ujian', surat: 'Surat', tes: 'Uji', eskalasi: 'Eskalasi', agenda: 'Agenda',
+  ajukan: 'Pengajuan', alih: 'Dialihkan', mulai: 'Pengujian', hasil: 'Hasil', pengingat: 'Pengingat', lama: 'Menunggu lama', sesi: 'Sesi ujian', surat: 'Surat', tes: 'Uji', eskalasi: 'Eskalasi', agenda: 'Agenda', musyawarah: 'Musyawarah Ambalan', kegiatan: 'Usulan Kegiatan',
 };
 
 /**
@@ -33,6 +33,7 @@ export const KAPAN_NOTIFIKASI = {
     'Pengingat pukul 07.00 WIB sehari sebelum jadwal pengujian atau sesi ujian Anda.',
     'Pengingat pukul 07.00 WIB bila SKU, absensi, atau iuran Anda sudah beberapa hari tidak bergerak (nadanya makin sering bila terus tidak bergerak).',
     'Pengingat H-30/H-7/H-1 untuk kegiatan agenda yang menandai Anda sebagai Penegak terkait (mis. calon sidang atau pelantikan).',
+    'Bila Anda Pradana/Pradani: keputusan Pembina (disetujui/ditolak) atas usulan kegiatan (Musyawarah Ambalan, pelantikan, dll) yang Anda ajukan.',
   ],
   penguji: [
     'Penegak mengajukan pengujian kepada Anda, atau ke antrian rombel yang Anda tangani.',
@@ -41,6 +42,8 @@ export const KAPAN_NOTIFIKASI = {
     'Pengingat pukul 07.00 WIB sehari sebelum jadwal pengujian yang menjadi tugas Anda.',
     'Seorang Penegak sudah 8 hari lebih tidak bergerak (SKU, absensi, atau iuran) — juga muncul di menu Tindak Lanjut.',
     'Pengingat H-30/H-7/H-1 untuk setiap kegiatan agenda (Musyawarah Ambalan, Naik Kelas, Sidang, Pelantikan, dll).',
+    'Bila Anda Pembina: usulan kegiatan baru diajukan (Musyawarah Ambalan atau 10 kegiatan lain), atau Pradana/Pradani mengingatkan usulan yang belum ditinjau.',
+    'Pengingat berkala ke semua pengurus dan Dewan Ambalan bila kegiatan tahunan (Musyawarah Ambalan atau 10 kegiatan lain) belum terjadwal menjelang bulan sasarannya.',
   ],
 };
 
