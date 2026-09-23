@@ -411,6 +411,12 @@ export function buatApi(klien) {
     /** Pembina dan Admin: ringkasan masalah kualitas data (lihat src/lib/pemeriksaanLogic.js untuk bentuk hasil). */
     muatPemeriksaanData: () => rpc('sg_pemeriksaan_data'),
 
+    /* ------------------------------ Cadangan data (tahap L4) ------------------------------ */
+    /** Admin: status cadangan terakhir { pada, oleh } atau {} bila belum pernah, tanpa mengambil seluruh data. */
+    statusCadangan: () => rpc('sg_cadangan_status'),
+    /** Admin: ekspor lengkap untuk cadangan manual (tanpa akun login/hash PIN). Mencatat waktunya di server. */
+    unduhCadangan: () => rpc('sg_cadangan_admin'),
+
     /* ------------------------------- Materi ------------------------------- */
     simpanMateri: (m) =>
       rpc('sg_materi_simpan', {

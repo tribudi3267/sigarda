@@ -1,10 +1,62 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { GUDEP_BAWAAN } from '../config';
 import { useGudep } from '../lib/gudepStore';
 import { KETERANGAN_ORANG, KOLOM_ORANG, WAJIB_TEKS, periksaGudep, samaGudep, untukForm } from '../lib/gudepLogic';
+import { namaBerkasCadangan, perluCadangan } from '../lib/cadanganLogic';
+import { waktuRelatif } from '../lib/notifikasiLogic';
 import { KopSurat } from '../components/DokumenSku';
 import { Field } from '../components/ui';
+
+/** Panel "Cadangan data" (Admin Gudep): status cadangan terakhir dan tombol unduh (tahap L4). */
+function CadanganData() {
+  const { api } = useApp();
+  const [status, setStatus] = useState(null);
+  const [sibuk, setSibuk] = useState(false);
+  const [galat, setGalat] = useState('');
+
+  const muat = useCallback(async () => {
+    const r = await api().statusCadangan();
+    if (r.ok) setStatus(r.data);
+  }, [api]);
+  useEffect(() => { muat(); }, [muat]);
+
+  const unduh = async () => {
+    setSibuk(true);
+    setGalat('');
+    const r = await api().unduhCadangan();
+    setSibuk(false);
+    if (!r.ok) { setGalat(r.pesan); return; }
+    const berkas = new Blob([JSON.stringify(r.data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(berkas);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = namaBerkasCadangan();
+    a.click();
+    URL.revokeObjectURL(url);
+    await muat();
+  };
+
+  const perlu = status && perluCadangan(status);
+  return (
+    <section className="panel space-y-2 p-4" aria-labelledby="gudep-cadangan">
+      <h2 id="gudep-cadangan" className="text-base font-bold text-pramuka-900">Cadangan data</h2>
+      <p className="text-xs text-pramuka-600">
+        Mengunduh satu berkas JSON berisi data aplikasi (tanpa akun login dan PIN) ke komputer ini, sebagai cadangan ringan di luar Supabase.
+        Simpan berkas ini di tempat aman (mis. Google Drive pribadi); bila diperlukan lagi, kembalikan lewat SQL Editor Supabase. Untuk
+        cadangan penuh (termasuk akun login), pakai <code>Cadangkan-SIGARDA.bat</code>.
+      </p>
+      <p className="text-sm">
+        {status === null ? 'Memuat status...' : status.pada
+          ? <>Cadangan terakhir: <b>{waktuRelatif(status.pada)}</b>{status.oleh ? ` oleh ${status.oleh}` : ''}.</>
+          : <span className="font-medium text-amber-700">Belum pernah diunduh dari menu ini.</span>}
+        {perlu && status?.pada && <span className="ml-1 font-medium text-amber-700">Sudah waktunya cadangan baru.</span>}
+      </p>
+      {galat && <p role="alert" className="text-sm font-medium text-red-700">{galat}</p>}
+      <button type="button" className="btn btn-outline" disabled={sibuk} onClick={unduh}>{sibuk ? 'Menyiapkan...' : 'Unduh cadangan'}</button>
+    </section>
+  );
+}
 
 /** Satu isian teks pada formulir; `jalur` = 'nama' atau 'pembina.nta' (dipakai untuk pesan galat). */
 function Isian({ id, label, jalur, nilai, ubah, galat, bantuan, maks, jenis = 'text', wajib = false, placeholder }) {
@@ -81,7 +133,8 @@ export default function DataGudep() {
   };
 
   return (
-    <form onSubmit={simpan} className="animasi-naik space-y-5" noValidate>
+    <div className="animasi-naik space-y-5">
+      <form onSubmit={simpan} className="space-y-5" noValidate>
       <div>
         <h1 className="text-2xl font-bold">Data Gudep</h1>
         <p className="text-sm text-pramuka-600">
@@ -150,6 +203,9 @@ export default function DataGudep() {
         </button>
         {dicoba && adaGalat && <p role="alert" className="text-sm font-medium text-red-700">Ada isian yang perlu diperbaiki (tanda merah).</p>}
       </div>
-    </form>
+      </form>
+
+      <CadanganData />
+    </div>
   );
 }

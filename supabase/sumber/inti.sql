@@ -1079,8 +1079,11 @@ end $$;
 create trigger notif_dokumen after insert on public.dokumen_terbit
   for each row execute function sigarda.notif_dokumen();
 
--- Pengingat harian (dijalankan pg_cron pukul 07.00 WIB): pengujian dan sesi ujian besok, pengajuan yang menunggu lebih dari 3 hari, dan
--- pembersihan notifikasi berumur lebih dari 90 hari. Kunci membuat tiap pengingat terkirim sekali walau dijalankan berulang.
+-- ===== Cadangan (tahap L4): pengingat ===== (penanda ketat di sekitar notif_pengingat saja, tanpa trigger di sekitarnya yang
+-- tidak aman diulang, supaya migrasi cadangan dapat memperbarui fungsi ini sendirian)
+-- Pengingat harian (dijalankan pg_cron pukul 07.00 WIB): pengujian dan sesi ujian besok, pengajuan yang menunggu lebih dari 3 hari,
+-- cadangan data yang sudah sebulan tidak diunduh (tahap L4), dan pembersihan notifikasi berumur lebih dari 90 hari. Kunci membuat
+-- tiap pengingat terkirim sekali walau dijalankan berulang.
 create function sigarda.notif_pengingat() returns void language plpgsql security definer set search_path = public as
 $$
 declare v_besok date := sigarda.hari_ini() + 1; r record; v_x uuid; v_label text;
@@ -1105,8 +1108,18 @@ begin
            where s.status = 'terjadwal' and s.tanggal = v_besok loop
     perform sigarda.notif_buat(r.peserta_id, 'pengingat', 'Ujian bersama besok', r.nama, '{"tab":"beranda"}', 'sesi-h1:' || r.id || ':' || r.tanggal);
   end loop;
+  if not exists (
+    select 1 from public.pengaturan where kunci = 'cadangan.terakhir' and (nilai ->> 'pada')::timestamptz > now() - interval '30 days'
+  ) then
+    for v_x in select id from public.profiles where role = 'admin' and status = 'aktif' loop
+      perform sigarda.notif_buat(v_x, 'pengingat', 'Waktunya cadangan data',
+        'Sudah lebih dari sebulan sejak cadangan terakhir (atau belum pernah). Unduh dari menu Data Gudep.', '{"tab":"gudep"}',
+        'cadangan:' || to_char(now(), 'YYYY-MM'));
+    end loop;
+  end if;
   delete from public.notifikasi where dibuat < now() - interval '90 days';
 end $$;
+-- ===== akhir pengingat cadangan =====
 
 -- Mengantre Web Push: satu permintaan HTTP per pernyataan INSERT (pg_net) ke Edge Function notif-push, hanya untuk penerima yang punya perangkat.
 -- Tanpa konfigurasi (sigarda.push_atur) atau tanpa pg_net tidak ada yang dikirim; Kotak Notifikasi di aplikasi tetap berjalan. Galat push tidak
@@ -3585,6 +3598,76 @@ begin
 end $$;
 -- ===== akhir fungsi pemeriksaan data =====
 
+-- ===== Cadangan (tahap L4): fungsi =====
+-- Ekspor manual dari menu Data Gudep (Admin Gudep): satu berkas JSON berisi isi tabel data aplikasi, untuk disimpan sendiri sebagai
+-- cadangan ringan tanpa layanan berbayar. TIDAK menyentuh auth.users/auth.identities atau hash PIN sama sekali: bila database perlu
+-- dipulihkan, akun dibuat ulang lewat undang anggota (PIN baru), baru berkas ini dipulihkan manual bila perlu. Tabel yang berisi
+-- rahasia atau bersifat sementara (login_gagal, push_konfigurasi, push_langganan, notifikasi) TIDAK disertakan. Untuk cadangan penuh
+-- level basis data (termasuk akun login), tetap pakai Cadangkan-SIGARDA.bat. Memanggil fungsi ini mencatat waktunya (pengaturan
+-- 'cadangan.terakhir') supaya pengingat bulanan (sigarda.notif_pengingat) berhenti selama cadangan masih baru.
+create function public.sg_cadangan_admin() returns jsonb language plpgsql security definer set search_path = public as
+$$
+declare v_hasil jsonb;
+begin
+  perform sigarda.wajib_admin('Hanya Admin Gudep yang dapat mengunduh cadangan.');
+  select jsonb_build_object(
+    'dibuat_pada', now(),
+    'tabel', jsonb_build_object(
+      'profiles', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.profiles t),
+      'sku_butir', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sku_butir t),
+      'sku_unit', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sku_unit t),
+      'pf_item', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.pf_item t),
+      'sku_progress', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sku_progress t),
+      'sku_riwayat', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sku_riwayat t),
+      'absensi_sesi', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.absensi_sesi t),
+      'absensi_hadir', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.absensi_hadir t),
+      'iuran', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.iuran t),
+      'iuran_log', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.iuran_log t),
+      'iuran_kas', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.iuran_kas t),
+      'asisten_iuran', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.asisten_iuran t),
+      'penugasan_rombel', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penugasan_rombel t),
+      'penugasan_log', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penugasan_log t),
+      'penugasan_peserta', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penugasan_peserta t),
+      'kepengurusan_log', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.kepengurusan_log t),
+      'guru_agama', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.guru_agama t),
+      'dokumen_terbit', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_terbit t),
+      'dokumen_urut', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_urut t),
+      'naik_kelas_batch', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.naik_kelas_batch t),
+      'naik_kelas_log', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.naik_kelas_log t),
+      'portofolio', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.portofolio t),
+      'portofolio_jurnal', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.portofolio_jurnal t),
+      'materi', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.materi t),
+      'pengaturan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.pengaturan t),
+      'sidang_urut', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sidang_urut t),
+      'sidang_dk', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sidang_dk t),
+      'raport', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.raport t),
+      'instrumen', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.instrumen t),
+      'instrumen_kriteria', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.instrumen_kriteria t),
+      'instrumen_penguji', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.instrumen_penguji t),
+      'instrumen_panduan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.instrumen_panduan t),
+      'sku_penilaian', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sku_penilaian t),
+      'sertifikat_tingkat', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sertifikat_tingkat t),
+      'sesi_ujian', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian t),
+      'sesi_ujian_butir', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian_butir t),
+      'sesi_ujian_peserta', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian_peserta t)
+    )
+  ) into v_hasil;
+  insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada)
+    values ('cadangan.terakhir', jsonb_build_object('pada', now(), 'oleh', (select nama from public.profiles where id = auth.uid())), auth.uid(), now())
+    on conflict (kunci) do update set nilai = excluded.nilai, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
+  return v_hasil;
+end $$;
+
+-- Kapan dan siapa yang terakhir mengunduh cadangan, untuk ditampilkan di menu Data Gudep tanpa mengambil seluruh data;
+-- { pada, oleh } atau objek kosong bila belum pernah diunduh.
+create function public.sg_cadangan_status() returns jsonb language plpgsql stable security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_admin('Hanya Admin Gudep yang dapat melihat status cadangan.');
+  return coalesce((select nilai from public.pengaturan where kunci = 'cadangan.terakhir'), '{}'::jsonb);
+end $$;
+-- ===== akhir fungsi cadangan =====
+
 -- Untuk Edge Function notif-push (service_role): bahan kirim untuk beberapa notifikasi yang belum berstatus, dan pencatatan hasilnya.
 create function public.sg_push_ambil_internal(p_ids bigint[]) returns jsonb language sql stable security definer set search_path = public as
 $$
@@ -3768,7 +3851,7 @@ grant execute on function
   public.sg_naik_kelas(text, jsonb, boolean), public.sg_naik_kelas_batalkan(bigint), public.sg_anggota_status_atur(uuid, text, text, text),
   public.sg_notifikasi_tandai(bigint[]), public.sg_push_kunci(), public.sg_push_simpan(text, text, text, text), public.sg_push_hapus(text), public.sg_push_ringkasan(), public.sg_notifikasi_tes(),
   public.sg_penugasan_peserta_atur(text, uuid, uuid[], text), public.sg_kepengurusan_terapkan(jsonb, boolean, boolean), public.sg_dewan_lama_arsipkan(uuid[], boolean),
-  public.sg_pemeriksaan_data()
+  public.sg_pemeriksaan_data(), public.sg_cadangan_admin(), public.sg_cadangan_status()
   to authenticated;
 -- Fungsi yang boleh dipanggil tanpa login (hanya membaca): verifikasi keaslian dokumen dan identitas gudep yang tampil di halaman masuk
 grant execute on function public.sg_verifikasi_token(text), public.sg_verifikasi_kode(text), public.sg_gudep_publik() to anon, authenticated;
