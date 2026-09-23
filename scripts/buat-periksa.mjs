@@ -4,7 +4,7 @@
  * (pg_net, pg_cron, konfigurasi push). Daftar yang diharapkan DIAMBIL dari skema terbaru (skema.sql yang dijalankan di PGlite), jadi selalu sinkron;
  * uji/periksa-pemasangan.mjs menjaga berkas hasilnya tidak usang.
  *
- * Jalankan: npm run periksa   (ulangi setiap kali supabase/sumber/inti.sql berubah, sesudah npm run skema)
+ * Jalankan: npm run periksa   (ulangi setiap kali supabase/sumber/*.sql berubah, sesudah npm run skema)
  *
  * Yang tidak dapat diperiksa dari SQL: Edge Function (sigarda dan notif-push). Skrip mengingatkannya sebagai "PERIKSA MANUAL".
  * Isi fungsi dibandingkan lewat md5 setelah karakter CR dibuang (tempelan dari Windows dapat membawa CRLF).

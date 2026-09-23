@@ -1,13 +1,14 @@
 /**
- * Membuat supabase/skema.sql = supabase/sumber/inti.sql + katalog butir SKU dan dokumen portofolio.
+ * Membuat supabase/skema.sql = supabase/sumber/*.sql (dirakit scripts/sumber.mjs) + katalog butir SKU dan dokumen portofolio.
  * Katalog diambil langsung dari src/data (skuData.js, portofolioData.js) agar tidak ada salah ketik dan
  * selalu sama dengan yang dipakai aplikasi.
  *
  * Jalankan: npm run skema
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { bacaInti } from './sumber.mjs';
 import { INDEKS_POIN, TINGKAT } from '../src/data/skuData.js';
 import { ITEM_PORTOFOLIO } from '../src/data/portofolioData.js';
 
@@ -40,6 +41,6 @@ baris.push('');
 baris.push("notify pgrst, 'reload schema';");
 baris.push('');
 
-const inti = readFileSync(resolve(akar, 'supabase/sumber/inti.sql'), 'utf8');
+const inti = bacaInti(akar);
 writeFileSync(resolve(akar, 'supabase/skema.sql'), inti.trimEnd() + '\n' + baris.join('\n'), 'utf8');
 console.log(`skema.sql dibuat: ${butir.length} butir, ${unit.length} unit, ${ITEM_PORTOFOLIO.length} dokumen portofolio.`);

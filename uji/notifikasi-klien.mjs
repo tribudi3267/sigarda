@@ -8,6 +8,7 @@ import { aktifkanPush, berhentiPushPerangkat, daftarkanSW, keadaanPush, nonaktif
 import { adaVersiBaru, ambilVersiTerbit } from '../src/lib/versi.js';
 import { LencanaMenu } from '../src/components/ui.jsx';
 import { susunNotifikasi } from '../src/lib/mapDb.js';
+import { bacaInti } from '../scripts/sumber.mjs';
 
 let lulus = 0; let gagal = 0;
 const ok = (c, m) => { if (c) { lulus++; console.log('ok   :', m); } else { gagal++; console.log('GAGAL:', m); } };
@@ -32,7 +33,7 @@ console.log('--- Logika notifikasi ---');
   ok(waktuRelatif('2026-09-21T11:59:40Z', skr) === 'baru saja' && waktuRelatif('2026-09-21T11:55:00Z', skr) === '5 menit lalu' && waktuRelatif('2026-09-21T09:00:00Z', skr) === '3 jam lalu' && waktuRelatif('2026-09-19T12:00:00Z', skr) === '2 hari lalu', 'waktuRelatif: detik, menit, jam, hari');
   ok(/2026/.test(waktuRelatif('2026-09-01T12:00:00Z', skr)) && waktuRelatif('bukan-tanggal', skr) === '', 'waktuRelatif: lebih dari seminggu memakai tanggal; masukan salah = kosong');
   ok(['ajukan', 'alih', 'mulai', 'hasil', 'pengingat', 'lama', 'sesi', 'surat'].every((j) => LABEL_JENIS[j]), 'setiap jenis notifikasi dari server punya label');
-  const sqlJenis = /jenis in \(([^)]*)\)/.exec(sumber('supabase/sumber/inti.sql').split('create table public.notifikasi')[1])[1].split(',').map((x) => x.trim().replace(/'/g, ''));
+  const sqlJenis = /jenis in \(([^)]*)\)/.exec(bacaInti().split('create table public.notifikasi')[1])[1].split(',').map((x) => x.trim().replace(/'/g, ''));
   ok(sqlJenis.length === Object.keys(LABEL_JENIS).length && sqlJenis.every((j) => LABEL_JENIS[j]), 'daftar jenis pada tabel notifikasi = daftar label klien: ' + sqlJenis.join());
   const lencana = renderToStaticMarkup(h(LencanaMenu, { jumlah: 120, posisi: 'absolute -right-0.5 -top-1' }));
   ok(lencana.includes('99+') && lencana.includes('120 belum dibaca') && lencana.includes('absolute') && renderToStaticMarkup(h(LencanaMenu, { jumlah: 0 })) === '', 'LencanaMenu: 99+, teks untuk pembaca layar, tersembunyi bila 0');
