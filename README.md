@@ -560,6 +560,24 @@ Berkas `.github/workflows/deploy.yml` membangun dan menerbitkan otomatis setiap 
 3. `git push`. Pantau tab **Actions**. Bila variabel belum diisi, proses berhenti dengan pesan yang jelas (situs lama tetap tampil).
 4. Alamat situs: `https://NAMAAKUN.github.io/NAMAREPO/`.
 
+### Keep-alive Supabase (agar proyek Free tier tidak dijeda)
+Proyek Supabase Free tier dijeda otomatis setelah 7 hari tanpa aktivitas. Ada dua lapis, sengaja bertumpuk:
+
+**1. Dari dalam database (cara utama; migrasi `2026-09-keepalive.sql`).** `pg_cron` menjalankan `sigarda.keepalive_ping()` tiap hari pukul 01.30 UTC (08.30 WIB); fungsi itu meminta `pg_net` mengirim SATU permintaan HTTP ke API proyek sendiri (fungsi publik `sg_gudep_publik`), sehingga tercatat sebagai lalu lintas API sungguhan. Tidak bergantung pada GitHub, tidak ada yang perlu dinyalakan ulang. Pemasangan, SEKALI, di SQL Editor Supabase (nilai alamat dan kunci anon/publishable dari Project Settings > API; JANGAN kunci service_role):
+```sql
+select sigarda.keepalive_atur('https://<ref>.supabase.co', '<kunci anon atau publishable>');
+```
+Perintah itu menyimpan pengaturan, membuat dua jadwal (ping dan pencatatan hasil), dan langsung mengirim ping pertama. Beberapa detik kemudian periksa:
+```sql
+select sigarda.keepalive_periksa();
+```
+Hasil sehat: `"sehat": true`, `"status": 200`, dan `"pekerjaan_cron_aktif": 2`. `status` 401/403 = kunci salah; 404 = alamat proyek salah. Bila `pg_cron` atau `pg_net` belum aktif, perintah pertama menyebutnya: aktifkan di **Dashboard > Integrations**, lalu jalankan lagi. Untuk mematikan (mis. pindah ke paket berbayar): `select sigarda.keepalive_matikan();`. Sebagai pemeriksaan tambahan, lihat **Reports > API** di Dashboard: permintaan harian ke `sg_gudep_publik` seharusnya muncul.
+
+**2. Dari GitHub Actions (cadangan).** `.github/workflows/keep-alive.yml` menjalankan `scripts/keep-alive.mjs` tiap hari pukul 02.17 UTC dengan dua variabel yang sama dengan deploy (`VITE_SUPABASE_URL` dan `VITE_SUPABASE_ANON_KEY`, tab **Variables**). Kelebihannya: bila gagal, GitHub mengirim email. Uji pertama: tab **Actions > Keep-alive Supabase > Run workflow**. Batasnya: pada repositori publik GitHub menonaktifkan jadwal setelah 60 hari tanpa aktivitas repositori (nyalakan lagi di tab Actions); lapis 1 tidak terpengaruh.
+
+**Batas yang perlu diketahui:** keduanya mencegah penjedaan otomatis tetapi bukan jaminan dari Supabase (kebijakan Free tier dapat berubah). Lapis 1 hanya berjalan selama proyek aktif: proyek yang sudah terjeda tidak bangun sendiri, pulihkan lewat Dashboard (**Restore project**) lalu pasang ulang bila perlu. Cadangan data tetap dianjurkan (menu Data Gudep > Cadangan data, atau `Cadangkan-SIGARDA.bat`).
+- Jalankan tangan lapis 2: `VITE_SUPABASE_URL=... VITE_SUPABASE_ANON_KEY=... node scripts/keep-alive.mjs`. Dijaga pengujian `keep-alive`, `keepalive-db`, dan `migrasi-keepalive`.
+
 **Domain khusus** (mis. `sigarda.smabukateja.sch.id`): di **Settings > Pages > Custom domain** isi domainnya dan centang **Enforce HTTPS**; di DNS domain buat rekaman
 `CNAME` untuk subdomain itu yang menunjuk ke `NAMAAKUN.github.io`. Situs lalu dilayani dari akar domain, sehingga `VITE_BASE` di `deploy.yml` harus `/`
 (bukan `/NAMAREPO/`). Bila keliru, halaman tampil **putih kosong** karena berkas JS/CSS dicari di `/NAMAREPO/assets/...` yang tidak ada di domain khusus.
@@ -651,6 +669,10 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
 - [`2026-09-berkas-garuda.sql`](supabase/migrasi/2026-09-berkas-garuda.sql): Berkas Calon Garuda (tahap L7). Tabel baru `public.garuda_berkas_token` (RLS tanpa kebijakan, hanya lewat fungsi), fungsi `sg_garuda_berkas_baca(peserta_id)`, `sg_garuda_token_buat(peserta_id)`, `sg_garuda_token_cabut(peserta_id)` (Pembina dan Admin), `sg_garuda_token_baca(token)` (dapat dipanggil tanpa login), dan `sigarda.garuda_berkas_json(peserta_id)`. Jalankan **setelah** `2026-09-usulan-kegiatan.sql` (bila belum, berhenti dengan pesan yang menuntun). Edge Function **tidak berubah**. Tidak menghapus data; aman diulang. Jalankan sebelum `git push` (tombol "Cetak / bagikan berkas" di menu Portofolio memanggil fungsi ini).
 
 - [`2026-09-periksa-dewan.sql`](supabase/migrasi/2026-09-periksa-dewan.sql): Dewan Ambalan ikut memeriksa data. Hanya menulis ulang isi `sg_pemeriksaan_data()` dan `sg_push_ringkasan()` (tanda tangan sama): kini boleh dipanggil semua pengurus (Pembina, Dewan Ambalan, Admin), bukan hanya Pembina dan Admin. Jalankan **setelah** `2026-09-berkas-garuda.sql` (bila belum, berhenti dengan pesan yang menuntun). Edge Function **tidak berubah**. Tidak ada tabel/kolom baru; tidak menghapus data; aman diulang. Jalankan sebelum `git push` (menu Periksa Data untuk Dewan memanggil kedua fungsi ini).
+
+- [`2026-09-indeks-fk.sql`](supabase/migrasi/2026-09-indeks-fk.sql): indeks kunci asing pada tabel besar (saran Supabase Advisor). Hanya menambah 10 indeks (`sku_progress.penguji_id`, `sku_riwayat.oleh`, `sku_penilaian.penguji_id`, `absensi_hadir.oleh`, `iuran.oleh`, `iuran_log.oleh` dan `.peserta_id`, `naik_kelas_log.oleh`, `portofolio.catatan_penguji_oleh`, `portofolio_jurnal.oleh`) agar menghapus akun tidak memindai seluruh tabel. Jalankan **setelah** `2026-09-periksa-dewan.sql` (bila belum, berhenti dengan pesan yang menuntun). Tanpa perubahan data, tabel, atau fungsi; Edge Function **tidak berubah**; aman diulang. Tidak perlu urutan khusus terhadap `git push` (kode aplikasi tidak berubah).
+
+- [`2026-09-keepalive.sql`](supabase/migrasi/2026-09-keepalive.sql): keep-alive Supabase dari dalam database. Tabel baru `public.keepalive_konfigurasi` (RLS tanpa kebijakan) dan fungsi `sigarda.keepalive_atur/_ping/_catat/_periksa/_matikan`. Jalankan **setelah** `2026-09-indeks-fk.sql` (bila belum, berhenti dengan pesan yang menuntun). Butuh ekstensi `pg_cron` dan `pg_net` (Dashboard > Integrations). Sesudah migrasi, jalankan SATU perintah di SQL Editor (lihat bagian Keep-alive Supabase). Tidak mengubah data; Edge Function **tidak berubah**; aman diulang (konfigurasi yang sudah diisi tidak terhapus). Kode aplikasi tidak berubah.
 
 **Memeriksa pemasangan.** Sesudah menjalankan migrasi dan men-deploy Edge Function, jalankan [`supabase/demo/periksa_pemasangan.sql`](supabase/demo/periksa_pemasangan.sql) di SQL Editor (hanya membaca; aman diulang). Hasilnya ringkasan per kategori (tabel, kolom, batasan, indeks, kebijakan akses, pemicu, fungsi) lalu daftar yang bermasalah:
 `KURANG` (belum ada, migrasi belum dijalankan), `BEDA` (ada tetapi isi fungsi bukan versi terbaru, jalankan ulang migrasi yang menimpanya), `HAK BEDA` atau `RLS BEDA`; ditambah pemeriksaan lingkungan notifikasi (pg_net, pg_cron, jadwal pengingat, konfigurasi push). Semua OK = database mutakhir.

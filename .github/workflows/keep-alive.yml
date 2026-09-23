@@ -1,0 +1,34 @@
+name: Keep-alive Supabase
+# Satu permintaan kecil ke database tiap hari agar proyek Supabase Free tier tidak dijeda (paused) karena 7 hari tanpa aktivitas.
+# Memakai variabel yang SAMA dengan deploy (Settings > Secrets and variables > Actions > tab Variables): VITE_SUPABASE_URL dan
+# VITE_SUPABASE_ANON_KEY (kunci anon/publishable, memang publik). JANGAN isi kunci service_role. Penjelasan: README, bagian "Keep-alive Supabase".
+on:
+  schedule:
+    # Tiap hari 02:17 UTC (09:17 WIB). Menit 17 (bukan 00) menghindari antrean padat GitHub; harian memberi kelonggaran bila satu-dua jadwal terlewat.
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Periksa variabel Supabase
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "::error::Variabel VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY belum diisi. Isi di Settings > Secrets and variables > Actions > Variables."
+            exit 1
+          fi
+      - name: Kirim permintaan keep-alive
+        run: node scripts/keep-alive.mjs
