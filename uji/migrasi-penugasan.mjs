@@ -1,6 +1,6 @@
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { skemaLama } from '../scripts/skema-lama.mjs';
 import { siapkanPg } from '../src/lokal/klienFake.js';
 import { isiDataContoh } from '../src/lokal/seedLokal.js';
 import { sqlSebagai } from '../src/lokal/klienFake.js';
@@ -17,7 +17,7 @@ const MP = M[9]; // hanya migrasi penugasan yang diuji di sini
 
 // Skema "sebelum migrasi" diambil dari riwayat git: 'git:<commit>' = supabase/skema.sql pada commit itu (mis. git:e2236da = sebelum iuran).
 // Untuk migrasi berikutnya, pakai commit TEPAT SEBELUM perubahan skema itu.
-const skemaDari = (ref) => (ref.startsWith('git:') ? execFileSync('git', ['show', `${ref.slice(4)}:supabase/skema.sql`], { cwd: P, encoding: 'utf8', maxBuffer: 1 << 26 }) : readFileSync(ref, 'utf8'));
+const skemaDari = (ref) => (ref.startsWith('git:') ? skemaLama(ref.slice(4), P) : readFileSync(ref, 'utf8'));
 const baru = async (skemaFile) => { const db = new PGlite(); await siapkanPg(db, { sqlStub: stub, sqlSkema: bersih(skemaDari(skemaFile)) }); return db; };
 const cacah = async (db) => (await db.query(`select (select count(*) from public.profiles)::int p, (select count(*) from public.sku_progress)::int s, (select count(*) from public.absensi_hadir)::int a, (select count(*) from auth.users)::int u`)).rows[0];
 const TABEL = `('pengaturan','sidang_dk','sidang_urut','profiles','raport','instrumen','instrumen_kriteria','instrumen_penguji','instrumen_panduan','sku_penilaian','sku_progress','sku_riwayat','sertifikat_tingkat','sesi_ujian','sesi_ujian_butir','sesi_ujian_peserta','iuran','iuran_log','iuran_kas','asisten_iuran','penugasan_rombel','penugasan_log','guru_agama')`;

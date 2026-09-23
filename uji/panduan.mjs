@@ -1,4 +1,5 @@
 // Tahap L10: panduan pengguna -- struktur isi (panduanData.js) dan panduanLogic.js (murni).
+import { readFileSync } from 'node:fs';
 import { BAGIAN_UMUM, PANDUAN, PERAN_PANDUAN } from '../src/data/panduanData.js';
 import { panduanAwal } from '../src/lib/panduanLogic.js';
 
@@ -36,6 +37,16 @@ console.log('\n--- panduanAwal (murni) ---');
   ok(panduanAwal({ role: 'penguji', jabatan: 'Dewan Ambalan' }) === 'dewan', 'akun Dewan lama: panduan dewan');
   ok(panduanAwal({ role: 'penguji', jabatan: 'Dewan Ambalan', jabatanDewan: 'Pradana' }) === 'dewan', 'Penegak berjabatan (tampilan Dewan): panduan dewan');
   ok(panduanAwal({ role: 'admin' }) === 'admin', 'Admin Gudep: panduan admin');
+}
+
+console.log('\n--- Panduan mencakup setiap menu di App.jsx (panduan dijaga manual: uji ini menangkap yang ketinggalan) ---');
+{
+  const app = readFileSync(`${process.cwd()}/src/App.jsx`, 'utf8');
+  const menu = [...new Set([...app.matchAll(/label: '([^']+)'/g)].map((m) => m[1]))];
+  const teksPanduan = JSON.stringify([BAGIAN_UMUM, PANDUAN]).toLowerCase();
+  ok(menu.length >= 20, `${menu.length} nama menu terbaca dari buatNav`);
+  const tanpaPanduan = menu.filter((m) => !teksPanduan.includes(m.toLowerCase()));
+  ok(tanpaPanduan.length === 0, tanpaPanduan.length ? `menu BELUM ada di panduan (tambahkan bagiannya di src/data/panduanData.js): ${tanpaPanduan.join(', ')}` : 'setiap nama menu disebut di panduan');
 }
 
 console.log(`\nRINGKASAN PANDUAN: ${lulus} lulus, ${gagal} GAGAL.`);
