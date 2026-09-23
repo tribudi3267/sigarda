@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunAgenda, susunBatchNaikKelas, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -150,6 +150,23 @@ export function buatApi(klien) {
       }),
 
     muatMateri: () => muat(async () => susunMateri(await ambilSemua('materi', { urut: ['urutan'] }))),
+
+    /* ------------------------- Berkas Calon Garuda (tahap L7) ------------------------- */
+    /** Pembina dan Admin: seluruh isi berkas satu Calon Garuda (kartu SKU Bantara+Laksana, portofolio, jurnal, token berbagi aktif). */
+    muatBerkasGaruda: async (pesertaId) => {
+      const r = await rpc('sg_garuda_berkas_baca', { p_peserta_id: pesertaId });
+      return r.ok ? { ok: true, data: susunBerkasGaruda(r.data) } : r;
+    },
+    /** Membuat (atau mengganti) tautan berbagi baca-saja; mengembalikan token barunya. */
+    buatTautanBerkasGaruda: (pesertaId) => rpc('sg_garuda_token_buat', { p_peserta_id: pesertaId }),
+    /** Mencabut tautan berbagi yang sedang aktif. */
+    cabutTautanBerkasGaruda: (pesertaId) => rpc('sg_garuda_token_cabut', { p_peserta_id: pesertaId }),
+    /** DAPAT DIPANGGIL TANPA LOGIN: membaca berkas lewat tautan berbagi. `data: null` = token tidak dikenal/sudah dicabut (bukan galat). */
+    bacaTautanBerkasGaruda: async (token) => {
+      const r = await rpc('sg_garuda_token_baca', { p_token: token });
+      if (!r.ok) return r;
+      return { ok: true, data: r.data?.ditemukan ? susunBerkasGaruda(r.data) : null };
+    },
 
     /** Catatan sidang (hanya pengurus yang menerima baris) dan pengaturan aplikasi. Dimuat saat halaman Sidang dibuka. */
     muatSidang: () => muat(async () => (await ambilSemua('sidang_dk', { urut: ['id'] })).map(petaSidang)),

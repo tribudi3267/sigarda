@@ -243,6 +243,28 @@ Daftar 26 lampiran dari file "03.01. Tabel Cek List Lampiran Berkas Dokumen Port
 berstatus Belum siap, Sedang disiapkan, atau Siap (Ada), dengan catatan, tautan berkas (harus diawali http/https), dan jurnal perubahan.
 Rekap tampil di dashboard Dewan Ambalan, Pembina, dan Admin, dan dapat diunduh sebagai Excel.
 
+#### Berkas Calon Garuda (tahap L7)
+Dari halaman Portofolio, tombol **"Cetak / bagikan berkas"** pada detail seorang Calon Garuda (Pembina dan Admin) membuka satu
+dokumen gabungan siap cetak: sampul dan identitas, **Kartu Kemajuan SKU Bantara dan Laksana** (lengkap dengan QR dan kode
+verifikasi tiap butir, memakai komponen yang sama dengan menu Cetak), **cek list 26 dokumen portofolio** (status, tautan Drive,
+catatan), jurnal ringkas, dan blok tanda tangan Pembina. **PDF**: klik "Cetak atau simpan PDF", lalu pilih "Simpan sebagai PDF"
+pada dialog cetak browser (pola sama dengan seluruh dokumen cetak lain di aplikasi, tanpa library PDF).
+
+**Tautan berbagi baca-saja** (untuk penilai kwartir ranting/cabang yang tidak punya akun SIGARDA): tombol "Buat tautan berbagi"
+menghasilkan alamat `?berkas=<token>` yang dapat dibuka **tanpa login**, menampilkan berkas yang sama persis (dapat dicetak sendiri
+oleh penilainya). Satu tautan **aktif** per Calon Garuda; membuat tautan baru otomatis mengganti (mencabut) yang lama, dan
+**tanpa kedaluwarsa** — berlaku sampai dicabut manual lewat tombol "Cabut tautan". Token 128 bit acak, tidak dapat ditebak, tetapi
+**berbeda dari QR verifikasi keaslian** (`?v=<token>`, yang hanya menjawab ringkasan): tautan ini memberi akses **baca isi lengkap**
+berkas kepada siapa pun yang memegangnya, jadi hanya Pembina dan Admin yang dapat membuat/mencabutnya (lebih ketat daripada
+menilai portofolio sehari-hari yang juga melibatkan Dewan Ambalan), dan tabelnya **tidak** ikut dicadangkan lewat "Unduh cadangan".
+
+Kode: `src/lib/garudaLogic.js` (`urlBerkasGaruda`, `parameterBerkasGaruda`), `src/components/BerkasGaruda.jsx`
+(`BerkasGarudaDokumen`, `TampilanBerkasGaruda`), `src/components/HalamanBerkasGaruda.jsx` (halaman publik, mandiri seperti
+`HalamanVerifikasi.jsx`). Server: `sg_garuda_berkas_baca(peserta_id)`, `sg_garuda_token_buat(peserta_id)`,
+`sg_garuda_token_cabut(peserta_id)` (Pembina dan Admin), `sg_garuda_token_baca(token)` (tanpa login). Tabel
+`public.garuda_berkas_token` (RLS aktif TANPA kebijakan, sama seperti `sertifikat_tingkat`: hanya lewat fungsi). Dijaga pengujian
+`garuda`, `migrasi-garuda`.
+
 ### Sidang Dewan Kehormatan Ambalan
 Menu **Sidang** (Dewan Ambalan, Pembina, Admin) untuk keputusan Lulus atau Tidak Lulus SKU sebelum pelantikan. SKU pada dasarnya lulus/tidak lulus; predikat (Cukup, Baik, Sangat Baik) bukan ketentuan Kwarnas.
 - **Antrian**: peserta yang seluruh butir tingkatnya lulus dan belum dinyatakan Layak. Peserta lain (capaian belum 100%) dapat dicari untuk keputusan Ditunda / Remedi.
@@ -580,6 +602,8 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
 - [`2026-09-agenda.sql`](supabase/migrasi/2026-09-agenda.sql): Agenda tahunan (tahap L6). Tabel baru `public.agenda`, nilai `'agenda'` pada `notifikasi.jenis`, fungsi `sg_agenda_simpan(...)` dan `sg_agenda_hapus(id)` (Pembina dan Admin), dan memperbarui `sigarda.notif_pengingat()` (pengingat H-30/H-7/H-1). Jalankan **setelah** `2026-09-eskalasi.sql` (bila belum, berhenti dengan pesan yang menuntun). Edge Function **tidak berubah**. Tidak menghapus data; aman diulang. Jalankan sebelum `git push` (menu Agenda memanggil fungsi ini).
 
 - [`2026-09-usulan-kegiatan.sql`](supabase/migrasi/2026-09-usulan-kegiatan.sql): Usulan kegiatan (tahap L6b) — Musyawarah Ambalan dan 10 kegiatan lain. Memperluas `public.agenda.jenis` dengan 8 nilai baru; tabel baru `public.kegiatan_usulan`, nilai `'musyawarah'` dan `'kegiatan'` pada `notifikasi.jenis`, fungsi `sg_kegiatan_usul(jenis, ...)`, `sg_kegiatan_tinjau(...)`, `sg_kegiatan_ping(id)`, `sigarda.kegiatan_judul_bawaan(jenis)`, `sigarda.kegiatan_bulan_tanggal(tahunAjaran, bulan)`, `sigarda.pembina_saja()`, `sigarda.pradana_atau_pradani()`, `sigarda.musyawarah_pengingat()`, `sigarda.kegiatan_pengingat()`, dan memperbarui `sg_agenda_simpan`, `sg_cadangan_admin()` (kini ikut mengekspor `agenda` dan `kegiatan_usulan`), serta `sigarda.notif_pengingat()`. Jalankan **setelah** `2026-09-agenda.sql` (bila belum, berhenti dengan pesan yang menuntun). Edge Function **tidak berubah**. Tidak menghapus data; aman diulang. Jalankan sebelum `git push` (menu Agenda memanggil fungsi ini).
+
+- [`2026-09-berkas-garuda.sql`](supabase/migrasi/2026-09-berkas-garuda.sql): Berkas Calon Garuda (tahap L7). Tabel baru `public.garuda_berkas_token` (RLS tanpa kebijakan, hanya lewat fungsi), fungsi `sg_garuda_berkas_baca(peserta_id)`, `sg_garuda_token_buat(peserta_id)`, `sg_garuda_token_cabut(peserta_id)` (Pembina dan Admin), `sg_garuda_token_baca(token)` (dapat dipanggil tanpa login), dan `sigarda.garuda_berkas_json(peserta_id)`. Jalankan **setelah** `2026-09-usulan-kegiatan.sql` (bila belum, berhenti dengan pesan yang menuntun). Edge Function **tidak berubah**. Tidak menghapus data; aman diulang. Jalankan sebelum `git push` (tombol "Cetak / bagikan berkas" di menu Portofolio memanggil fungsi ini).
 
 **Memeriksa pemasangan.** Sesudah menjalankan migrasi dan men-deploy Edge Function, jalankan [`supabase/demo/periksa_pemasangan.sql`](supabase/demo/periksa_pemasangan.sql) di SQL Editor (hanya membaca; aman diulang). Hasilnya ringkasan per kategori (tabel, kolom, batasan, indeks, kebijakan akses, pemicu, fungsi) lalu daftar yang bermasalah:
 `KURANG` (belum ada, migrasi belum dijalankan), `BEDA` (ada tetapi isi fungsi bukan versi terbaru, jalankan ulang migrasi yang menimpanya), `HAK BEDA` atau `RLS BEDA`; ditambah pemeriksaan lingkungan notifikasi (pg_net, pg_cron, jadwal pengingat, konfigurasi push). Semua OK = database mutakhir.

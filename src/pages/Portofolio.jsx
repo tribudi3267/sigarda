@@ -8,11 +8,13 @@ import FilterBar, { terapkanFilter } from '../components/FilterBar';
 import { useFilterRombel } from '../hooks/useRombelSaya';
 import PortofolioChecklist from '../components/PortofolioChecklist';
 import RekapKesiapan, { JurnalTerbaru } from '../components/RekapKesiapan';
+import { TampilanBerkasGaruda } from '../components/BerkasGaruda';
 import { Avatar, Icon, Kosong, ProgressBar } from '../components/ui';
 
 function Detail({ pesertaId, onKembali, onBukaSku }) {
   const { daftarPesertaSemua: daftarPeserta } = useApp();
   const peserta = daftarPeserta.find((u) => u.id === pesertaId);
+  const [tampilBerkas, setTampilBerkas] = useState(false);
   if (!peserta || peserta.peran !== 'calon-garuda') {
     return (
       <div className="animasi-naik">
@@ -23,6 +25,8 @@ function Detail({ pesertaId, onKembali, onBukaSku }) {
       </div>
     );
   }
+
+  if (tampilBerkas) return <TampilanBerkasGaruda peserta={peserta} onKembali={() => setTampilBerkas(false)} />;
 
   return (
     <div className="animasi-naik">
@@ -39,6 +43,9 @@ function Detail({ pesertaId, onKembali, onBukaSku }) {
           </p>
         </div>
         <button className="btn btn-outline btn-sm" onClick={() => onBukaSku(peserta.id)}>Lihat SKU</button>
+        <button className="btn btn-gold btn-sm" onClick={() => setTampilBerkas(true)}>
+          <Icon nama="cetak" className="h-4 w-4" /> Cetak / bagikan berkas
+        </button>
       </section>
 
       <div className="mb-5 grid gap-5 lg:grid-cols-[1.1fr_1fr]">

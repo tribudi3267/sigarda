@@ -266,6 +266,27 @@ export const susunUsulanKegiatan = (baris = []) =>
     catatanTinjauan: r.catatan_tinjauan ?? '', dipingPada: r.diping_pada ?? null, agendaId: r.agenda_id ?? null,
   })).sort((a, b) => b.id - a.id);
 
+/**
+ * Hasil sg_garuda_berkas_baca / sg_garuda_token_baca (tahap L7) -> { peserta, progress, portofolio, users, token }.
+ * `progress` dan `portofolio` memakai bentuk bersarang yang SAMA dengan halaman biasa (susunProgress/susunPortofolio di atas),
+ * jadi komponen cetak (KartuSku, dst.) dapat dipakai ulang apa adanya baik untuk Pembina/Admin yang sudah masuk maupun
+ * pengunjung tautan berbagi tanpa login (lihat src/components/BerkasGaruda.jsx).
+ */
+export function susunBerkasGaruda(raw) {
+  const p = raw.peserta ?? {};
+  return {
+    peserta: {
+      id: p.id, nama: p.nama, nis: p.nis ?? '', kelas: p.kelas ?? '', sangga: p.sangga ?? '', agama: p.agama ?? '',
+      nta: p.nta ?? '', jenisKelamin: p.jenis_kelamin ?? null, calonGaruda: p.calon_garuda ? tgl(p.calon_garuda) : null,
+      peran: 'calon-garuda',
+    },
+    progress: susunProgress(raw.sku_progress, raw.sku_riwayat),
+    portofolio: susunPortofolio(raw.portofolio, raw.portofolio_jurnal),
+    users: (raw.users ?? []).map((u) => ({ id: u.id, nama: u.nama, jabatan: u.jabatan ?? null })),
+    token: raw.token ?? null,
+  };
+}
+
 /** Baris agenda -> [{ id, tahunAjaran, jenis, judul, tanggal, keterangan, pesertaTerkait, lewatiBatas, dibuatOleh, dibuatPada }] (tanggal lebih dekat dulu) */
 export const susunAgenda = (baris = []) =>
   baris.map((r) => ({
