@@ -30,6 +30,7 @@ import Notifikasi from './pages/Notifikasi';
 import PemeriksaanData from './pages/PemeriksaanData';
 import TindakLanjut from './pages/TindakLanjut';
 import Agenda from './pages/Agenda';
+import Laporan from './pages/Laporan';
 import BannerVersi from './components/BannerVersi';
 import HalamanVerifikasi from './components/HalamanVerifikasi';
 import HalamanBerkasGaruda from './components/HalamanBerkasGaruda';
@@ -44,7 +45,7 @@ import LogoMark from './components/LogoMark';
  * Menu per peran, dikelompokkan menurut fungsinya (tampil sebagai kelompok di menu samping, dan berurutan di menu bawah ponsel).
  *  Utama            : Dashboard (Penegak: Beranda atau Garuda), Notifikasi (semua peran; lencana = belum dibaca)
  *  Pengujian SKU    : Penegak: Poin SKU, Cetak. Dewan/Pembina: Antrian, Peserta, Sesi, Instrumen, Penugasan, Kepengurusan, Pemeriksaan Data (Pembina), Sidang, Cetak. Admin: Sesi, Instrumen, Sidang, Cetak
- *  Kegiatan Ambalan : Absensi, Iuran, Agenda (tahap L6, semua peran), Portofolio, Tindak Lanjut (tahap L5, pengurus), Raport (Pembina dan Admin)
+ *  Kegiatan Ambalan : Absensi, Iuran, Agenda (tahap L6, semua peran), Portofolio, Tindak Lanjut (tahap L5, pengurus), Raport dan Laporan (tahap L8, Pembina dan Admin)
  *  Materi           : Materi, Kelola Materi (Pembina dan Admin)
  *  Pengelolaan      : Anggota, Kepengurusan, Naik Kelas, Data Gudep, Pemeriksaan Data (Admin). Kepengurusan Dewan Ambalan juga untuk Pembina (di Pengujian SKU).
  * Pemeriksaan Data (tahap L3, Pembina dan Admin): ringkasan masalah kualitas data umum (lihat src/lib/pemeriksaanLogic.js).
@@ -55,6 +56,7 @@ function buatNav(user, peran, belumDibaca = 0) {
   const materi = { id: 'materi', label: 'Materi', ikon: 'buku' };
   const kelola = { id: 'kelolamateri', label: 'Kelola Materi', ikon: 'pustaka' };
   const raport = { id: 'raport', label: 'Raport', ikon: 'raport' };
+  const laporan = { id: 'laporan', label: 'Laporan', ikon: 'grafik' };
   const instrumen = { id: 'instrumen', label: 'Instrumen', ikon: 'instrumen' };
   const absensi = { id: 'absensi', label: 'Absensi', ikon: 'absensi' };
   const iuran = { id: 'iuran', label: 'Iuran', ikon: 'iuran' };
@@ -82,14 +84,14 @@ function buatNav(user, peran, belumDibaca = 0) {
     return [
       { judul: 'Utama', item: [{ id: 'dashboard', label: 'Dashboard', ikon: 'dashboard' }, notifikasi] },
       { judul: 'Pengujian SKU', item: [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }, { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, sesi, ...(kelolaBoleh ? [instrumen, penugasan, kepengurusan, pemeriksaan] : []), sidang, cetak] },
-      { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, ...(kelolaBoleh ? [raport] : [])] },
+      { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, ...(kelolaBoleh ? [raport, laporan] : [])] },
       { judul: 'Materi', item: [materi, ...(kelolaBoleh ? [kelola] : [])] },
     ];
   }
   return [
     { judul: 'Utama', item: [{ id: 'rekap', label: 'Dashboard', ikon: 'dashboard' }, notifikasi] },
     { judul: 'Pengujian SKU', item: [sesi, instrumen, sidang, cetak] },
-    { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, raport] },
+    { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, raport, laporan] },
     { judul: 'Materi', item: [materi, kelola] },
     { judul: 'Pengelolaan', item: [{ id: 'anggota', label: 'Anggota', ikon: 'anggota' }, kepengurusan, { id: 'naikkelas', label: 'Naik Kelas', ikon: 'naikkelas' }, { id: 'gudep', label: 'Data Gudep', ikon: 'perisai' }, pemeriksaan] },
   ];
@@ -250,6 +252,8 @@ function Shell() {
     isi = <SesiUjian />;
   } else if (tabAktif === 'raport' && bolehKelolaMateri(user)) {
     isi = <Raport />;
+  } else if (tabAktif === 'laporan' && bolehKelolaMateri(user)) {
+    isi = <Laporan />;
   } else if (tabAktif === 'instrumen' && bolehKelolaMateri(user)) {
     isi = <KelolaInstrumen />;
   } else if (tabAktif === 'gudep' && user.role === 'admin') {

@@ -296,6 +296,35 @@ Menu **Raport** (hanya Pembina dan Admin; Dewan Ambalan dan Penegak tidak meliha
 - Server menghitung ulang kehadiran, capaian, skor, dan predikat dari data absensi dan progres SKU saat menyimpan (`sg_raport_simpan`), jadi angka tidak bisa dipalsukan dari layar. Rumus di `src/lib/raportLogic.js` dan di SQL sama persis (pembulatan setengah ke atas dengan bilangan bulat) dan dijaga oleh pengujian.
 - Penulisan hanya lewat fungsi server `sg_raport_simpan`, `sg_raport_hapus`, `sg_raport_pengaturan_simpan`; tabel `raport` hanya terbaca Pembina dan Admin.
 
+### Laporan berjenjang tahunan (tahap L8)
+Menu **Laporan** (hanya Pembina dan Admin) menyusun satu **laporan tahunan gugus depan** untuk diserahkan ke Kwartir Ranting,
+dengan tembusan Kwartir Cabang -- satu berkas gabungan (Excel banyak lembar + PDF siap cetak), bukan beberapa berkas terpisah.
+SIGARDA hanya **menghasilkan** berkasnya; **tidak ada** pengiriman otomatis ke sistem kwartir mana pun.
+
+**Periode dapat dipilih** (bukan salah satu tetap): **Tahun Ajaran** (Juli-Juni, konsisten dengan seluruh data SIGARDA lain)
+atau **Tahun Kalender** (Januari-Desember, kebiasaan registrasi ulang Kwarcab). Memilih Tahun Kalender otomatis menggabungkan
+data dari dua tahun ajaran yang berbeda (mis. tahun 2026 = separuh akhir tahun ajaran 2025/2026 + separuh awal 2026/2027).
+
+Isi laporan (tombol **"Susun laporan"** menghitung semuanya sekaligus, lalu tombol **Unduh Excel** dan **Cetak PDF** memakai
+hasil yang sama):
+- **Sampul**: identitas gudep (nama, nomor, kwarran, kwarcab, Pembina, Ka. Mabigus) dan periode laporan.
+- **Rekap Keanggotaan**: jumlah Penegak **aktif** per tingkat (X/XI/XII) x jenis kelamin x peran (Calon Bantara/Laksana/Garuda).
+  Ini SNAPSHOT pada tanggal laporan dibuat (seperti sensus "data potensi" Kwarcab), **bukan** rata-rata sepanjang periode.
+- **Kepengurusan Dewan Ambalan**: daftar pengurus yang menjabat saat laporan dibuat (nama, NTA, jabatan).
+- **Rekap Kegiatan**: kegiatan Agenda yang tanggalnya jatuh pada periode laporan.
+- **Rekap Pencapaian SKU**: jumlah Penegak yang menyelesaikan seluruh SKU Bantara/Laksana atau mendaftar Calon Garuda **pada
+  periode itu** -- dihitung dari SEMUA Penegak (bukan hanya yang aktif sekarang), karena seorang Penegak bisa lulus lalu
+  menjadi alumni pada tahun ajaran yang sama dan pencapaiannya tetap harus tercatat.
+- **Rekap Kehadiran**: rata-rata kehadiran latihan Jumat pada periode itu (rumus sama dengan halaman Absensi).
+- **Rekap Keuangan Iuran**: total iuran terkumpul pada periode itu (rumus sama dengan halaman Iuran).
+
+Kode: `src/lib/laporanLogic.js` (murni: `rentangLaporan`, `rekapKeanggotaan`, `rekapPencapaianSku`, `rekapKegiatan`,
+`sesiRentang`), `src/lib/exportLaporanTahunan.js` (lembar Excel, memakai `unduhXlsx` dari `exportXlsx.js` yang sudah ada),
+`src/components/CetakLaporanTahunan.jsx` (cetak PDF lewat `window.print()`, pola sama dengan dokumen cetak lain), halaman
+`src/pages/Laporan.jsx`. **Tanpa fungsi atau tabel server baru**: seluruhnya disusun dari data yang sudah dimuat di klien
+(anggota, progres SKU, Agenda) atau lewat fungsi server yang sudah ada dan sudah menerima rentang tanggal bebas
+(`sg_iuran_agregat` lewat `muatIuranAgregat`, kehadiran lewat `muatHadirRentang`). Dijaga pengujian `laporan`.
+
 ### Instrumen penilaian SKU
 Tiap unit SKU (butir; butir agama per sub-butir, total 90 unit) dapat punya **instrumen**: cara uji, instruksi penguji, dan 1-15 kriteria (jenis Lisan/Praktik/Bukti kegiatan/Pengamatan, bobot 1-5, tanda **Wajib**, panduan penguji).
 - **Penilaian**: penguji memberi nilai 1-5 pada tiap kriteria di lembar penilaian. **Skor** (0-100) = 20 x jumlah(nilai x bobot) / jumlah(bobot), dibulatkan setengah ke atas. **Saran LULUS** bila skor mencapai ambang (bawaan 75) dan, bila "kriteria wajib menjadi syarat lulus" menyala (bawaan: menyala), setiap kriteria wajib bernilai minimal 3. Predikat: 90 ke atas Sangat baik, 75 ke atas Baik, selebihnya Cukup. Semua angka dapat diatur di tab Pengaturan.
