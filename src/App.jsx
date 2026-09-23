@@ -32,9 +32,11 @@ import TindakLanjut from './pages/TindakLanjut';
 import Agenda from './pages/Agenda';
 import BannerVersi from './components/BannerVersi';
 import HalamanVerifikasi from './components/HalamanVerifikasi';
+import HalamanBerkasGaruda from './components/HalamanBerkasGaruda';
 import FormWhatsapp from './components/FormWhatsapp';
 import { Modal } from './components/ui';
 import { parameterVerifikasi } from './lib/verifikasiLogic';
+import { parameterBerkasGaruda } from './lib/garudaLogic';
 import { bolehKelolaMateri } from './lib/materiLogic';
 import LogoMark from './components/LogoMark';
 
@@ -330,6 +332,9 @@ export default function App() {
   // Alamat dari QR dokumen (/?v=...) membuka halaman verifikasi publik: tanpa login dan tanpa memuat data aplikasi.
   const verifikasi = parameterVerifikasi(window.location.search);
   if (verifikasi !== null) return <HalamanVerifikasi awal={verifikasi} />;
+  // Tautan berbagi Berkas Calon Garuda (/?berkas=...): tanpa login, baca-saja (tahap L7).
+  const berkas = parameterBerkasGaruda(window.location.search);
+  if (berkas !== null) return <HalamanBerkasGaruda token={berkas} />;
   return (
     <AppProvider>
       <Shell />
