@@ -166,7 +166,7 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
               <Field
                 label="Jabatan Dewan Ambalan (opsional)"
                 htmlFor="f-jabatan-dewan"
-                bantuan="Dewan Ambalan adalah jabatan pada akun Penegak ini (bukan akun terpisah): pemegang jabatan dapat berganti tampilan Penegak/Dewan dan menguji sesuai penugasan. Pradana menjadi ketua sidang; Pradana dan Pradani menandatangani Surat Tanda Lulus. Pradana dan Pradani masing-masing hanya satu orang. Jabatan dicabut otomatis saat Penegak nonaktif atau alumni. Untuk mengganti seluruh kepengurusan sekaligus, pakai menu Kepengurusan."
+                bantuan="Dewan Ambalan adalah jabatan pada akun Penegak ini (bukan akun terpisah): pemegang jabatan dapat berganti tampilan Penegak/Dewan dan menguji sesuai penugasan. Pradana menjadi ketua sidang; Pradana dan Pradani menandatangani Surat Tanda Lulus. Pradana dan Pradani masing-masing hanya satu orang. Jabatan dicabut otomatis saat Penegak nonaktif atau alumni. Untuk mengganti seluruh kepengurusan sekaligus, pakai menu Pengurus."
               >
                 <input id="f-jabatan-dewan" className="input" list="saran-jabatan-dewan" maxLength={60} autoComplete="off" placeholder="Kosongkan bila bukan pengurus Dewan" value={f.jabatanDewan ?? ''} onChange={set('jabatanDewan')} />
                 <datalist id="saran-jabatan-dewan">{JABATAN_DEWAN.map((j) => <option key={j} value={j} />)}</datalist>
@@ -231,7 +231,7 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
       {f.role === 'penguji' && f.jabatan === 'Dewan Ambalan' && (
         <>
           <p className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-950">
-            Ini akun Dewan Ambalan LAMA. Dewan Ambalan kini berupa jabatan pada akun Penegak: tetapkan kepengurusan di menu Kepengurusan, lalu arsipkan akun lama di sana.
+            Ini akun Dewan Ambalan LAMA. Dewan Ambalan kini berupa jabatan pada akun Penegak: tetapkan kepengurusan di menu Pengurus, lalu arsipkan akun lama di sana.
           </p>
           <Field label="NTA (opsional)" htmlFor="f-nta-dewan" bantuan="Nomor Tanda Anggota Pramuka, mis. 11.03.10.701.00123. Tercetak pada tanda tangan Pradana dan Pradani.">
             <input id="f-nta-dewan" className="input" autoComplete="off" maxLength={40} value={f.nta ?? ''} onChange={set('nta')} />
@@ -357,7 +357,7 @@ export default function AdminAnggota() {
 
       {dewanLama && (
         <div role="status" className="mb-3 rounded-md bg-amber-50 px-3 py-2.5 text-sm text-amber-950">
-          Dewan Ambalan kini berupa <span className="font-semibold">jabatan pada akun Penegak</span>. Akun di bawah ini adalah akun Dewan lama; arsipkan setelah kepengurusan baru ditetapkan di menu Kepengurusan.
+          Dewan Ambalan kini berupa <span className="font-semibold">jabatan pada akun Penegak</span>. Akun di bawah ini adalah akun Dewan lama; arsipkan setelah kepengurusan baru ditetapkan di menu Pengurus.
         </div>
       )}
 

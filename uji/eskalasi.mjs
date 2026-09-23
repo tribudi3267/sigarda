@@ -5,7 +5,7 @@ import { siapkanPg, buatKlienFake, sqlSebagai } from '../src/lokal/klienFake.js'
 import { isiDataContoh } from '../src/lokal/seedLokal.js';
 import { PIN_DEMO } from '../src/lokal/pinDemo.js';
 import { buatApi } from '../src/lib/api.js';
-import { labelJenisEskalasi, teksWaSiap, waLink, whatsappSah } from '../src/lib/eskalasiLogic.js';
+import { labelJenisEskalasi, bolehDihubungi, nomorWaAnggota, teksWaAjakMasuk, teksWaAktifkanNotifikasi, teksWaSiap, waLink, whatsappSah } from '../src/lib/eskalasiLogic.js';
 
 const P = process.cwd().replace(/\\/g, '/');
 let gagal = 0, lulus = 0;
@@ -21,6 +21,17 @@ console.log('--- eskalasiLogic.js (murni) ---');
   ok(waLink('', 'halo').startsWith('https://wa.me/?'), 'tanpa nomor: wa.me tanpa nomor (pengguna pilih kontak sendiri)');
   const teks = teksWaSiap({ nama: 'Budi', jenis: 'sku', hari: 10 });
   ok(teks.includes('Budi') && teks.length > 10, 'teksWaSiap menyebut nama: ' + teks);
+  const ingat = teksWaAktifkanNotifikasi('Sari');
+  ok(ingat.includes('Sari') && /Notifikasi/.test(ingat) && /Aktifkan notifikasi/.test(ingat) && !/lulus|ulang/i.test(ingat), 'teksWaAktifkanNotifikasi menyebut nama dan langkah, tanpa hasil lulus/ulang');
+  const ajak = teksWaAjakMasuk('Dewi', 'https://contoh.id/');
+  ok(ajak.includes('Dewi') && ajak.includes('https://contoh.id/') && /belum pernah dipakai masuk/.test(ajak) && !/PIN\s*[:=]?\s*\d/.test(ajak) && !/lulus|ulang/i.test(ajak), 'teksWaAjakMasuk menyebut nama dan alamat, tanpa PIN atau hasil lulus/ulang');
+  const pembinaU = { id: 'p', role: 'penguji', jabatan: 'Pembina' }, dewanU = { id: 'd', role: 'penguji', jabatan: 'Dewan Ambalan' }, adminU = { id: 'a', role: 'admin' };
+  const semua = [{ id: 'x', peran: 'Penegak' }, { id: 'y', peran: 'Dewan Ambalan' }, { id: 'z', peran: 'Pembina' }, { id: 'w', peran: 'Admin Gudep' }];
+  ok(JSON.stringify(semua.map((t) => bolehDihubungi(pembinaU, t))) === '[true,true,true,false]' && JSON.stringify(semua.map((t) => bolehDihubungi(adminU, t))) === '[true,true,true,false]', 'bolehDihubungi: Pembina dan Admin menghubungi Penegak, Dewan, dan Pembina, bukan Admin');
+  ok(JSON.stringify(semua.map((t) => bolehDihubungi(dewanU, t))) === '[true,true,false,false]', 'bolehDihubungi: Dewan Ambalan menghubungi Penegak dan sesama Dewan, bukan Pembina/Admin');
+  ok(!bolehDihubungi({ role: 'peserta' }, semua[0]) && !bolehDihubungi(null, semua[0]) && !bolehDihubungi(pembinaU, { id: 'p', peran: 'Pembina' }), 'bolehDihubungi: Penegak biasa tidak, tanpa pengguna tidak, diri sendiri tidak');
+  const us = [{ id: 'a', whatsapp: ' 08123456789 ' }, { id: 'b' }, { id: 'c', whatsapp: 'abc' }];
+  ok(nomorWaAnggota(us, 'a') === '08123456789' && nomorWaAnggota(us, 'b') === '' && nomorWaAnggota(us, 'c') === '' && nomorWaAnggota(us, 'x') === '' && nomorWaAnggota(null, 'a') === '', 'nomorWaAnggota: hanya nomor sah, selain itu kosong');
 }
 
 console.log('\n--- Server (PGlite + data contoh) ---');

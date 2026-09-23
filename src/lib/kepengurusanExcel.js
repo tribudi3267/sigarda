@@ -88,7 +88,7 @@ export async function buatBerkasKepengurusan(baris = []) {
     'Jabatan diisi bebas (mis. Pradana, Pradani, Wakil Pradana, Sekretaris, Bendahara, Ketua Bidang Kegiatan); daftar pilihan hanya saran. Pradana dan Pradani masing-masing hanya satu orang.',
     'Dewan Ambalan adalah jabatan pada akun Penegak (bukan akun terpisah). Hanya Penegak yang aktif dapat menjabat. Penegak yang belum menyelesaikan Bantara tetap dapat dilantik (hanya diberi peringatan).',
     'Secara bawaan kepengurusan lama DIGANTI seluruhnya: pemegang jabatan yang tidak ada di berkas ini kehilangan jabatannya dan kembali menjadi Penegak biasa (penugasan pengujinya ikut dihapus).',
-    'Setelah selesai, unggah berkas ini di halaman Kepengurusan, periksa pratinjau, lalu terapkan.',
+    'Setelah selesai, unggah berkas ini di halaman Pengurus, periksa pratinjau, lalu terapkan.',
   ].forEach((t) => petunjuk.addRow([t]));
   petunjuk.getRow(1).font = { bold: true, size: 14, color: { argb: 'FF45291A' } };
   petunjuk.eachRow((r) => { r.alignment = { vertical: 'top', wrapText: true }; });

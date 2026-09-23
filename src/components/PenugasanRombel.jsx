@@ -236,7 +236,7 @@ export default function PenugasanRombel({ bolehUbah = false, onPerbaruiRombel })
           </div>
 
           {pengujiUrut.length === 0 ? (
-            <Kosong judul="Belum ada Pembina atau pengurus Dewan Ambalan" teks="Tambahkan Pembina lewat menu Anggota dan tetapkan pengurus Dewan lewat menu Kepengurusan." />
+            <Kosong judul="Belum ada Pembina atau pengurus Dewan Ambalan" teks="Tambahkan Pembina lewat menu Anggota dan tetapkan pengurus Dewan lewat menu Pengurus." />
           ) : (
             <div className="panel overflow-x-auto">
               <table className="w-full min-w-max border-collapse text-center text-sm">

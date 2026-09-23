@@ -15,8 +15,8 @@ export const KATEGORI_PEMERIKSAAN = [
   { kunci: 'tanpaJk', judul: 'Belum diisi jenis kelamin', keterangan: 'Wajib untuk anggota baru; anggota lama boleh dilengkapi lewat tombol "Lengkapi jenis kelamin" di menu Anggota.', tab: { admin: 'anggota' } },
   { kunci: 'rombelTanpaPenguji', judul: 'Rombel belum ada penugasan penguji', keterangan: 'Rombel berisi Penegak aktif tetapi belum ada penguji ditugaskan tahun ajaran ini. Atur lewat menu Penugasan.', tab: { pembina: 'penugasan' } },
   { kunci: 'pembinaTanpaAgama', judul: 'Pembina belum diisi agama', keterangan: 'Agama Pembina menentukan siapa yang boleh menilai butir agama. Lengkapi lewat menu Anggota.', tab: { admin: 'anggota' } },
-  { kunci: 'belumPernahMasuk', judul: 'Akun belum pernah masuk', keterangan: 'Akun sudah dibuat tetapi belum pernah dipakai masuk. Ingatkan pemiliknya, atau reset PIN lewat menu Anggota bila lupa.', tab: { admin: 'anggota' } },
-  { kunci: 'tanpaPerangkat', judul: 'Belum aktifkan notifikasi di HP', keterangan: 'Belum ada perangkat berlangganan notifikasi. Tidak dapat diperbaiki oleh Admin/Pembina: minta pemiliknya membuka menu Notifikasi di HP-nya sendiri dan mengizinkan notifikasi.', tab: {} },
+  { kunci: 'belumPernahMasuk', judul: 'Akun belum pernah masuk', keterangan: 'Akun sudah dibuat tetapi belum pernah dipakai masuk. Ingatkan pemiliknya lewat tombol WhatsApp pada daftar, atau reset PIN lewat menu Anggota bila lupa.', tab: { admin: 'anggota' } },
+  { kunci: 'tanpaPerangkat', judul: 'Belum aktifkan notifikasi di HP', keterangan: 'Belum ada perangkat berlangganan notifikasi. Tidak dapat diperbaiki oleh Admin/Pembina: ingatkan pemiliknya lewat tombol WhatsApp pada daftar, agar membuka menu Notifikasi di HP-nya sendiri dan mengizinkan notifikasi.', tab: {} },
 ];
 
 /** Jumlah baris pada satu kategori (0 bila kosong atau kategori tidak dikenal). */

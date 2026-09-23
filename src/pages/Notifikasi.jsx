@@ -49,7 +49,7 @@ export function DaftarNotifikasi({ daftar, idMenu, onBuka }) {
 export default function Notifikasi({ idMenu, onNav }) {
   const { user, notifikasi, belumDibaca, segarkanNotifikasi, tandaiNotifikasi } = useApp();
   useEffect(() => { segarkanNotifikasi(); }, [segarkanNotifikasi]);
-  const pengurus = user.role === 'admin' || (user.role === 'penguji' && user.jabatan === 'Pembina');
+  const pengurus = user.role === 'admin' || user.role === 'penguji'; // Pembina, Dewan Ambalan, Admin (ringkasan perangkat notifikasi anggota)
 
   const buka = (n) => {
     if (!n.dibaca) tandaiNotifikasi([n.id]);

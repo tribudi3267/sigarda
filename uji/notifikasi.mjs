@@ -205,7 +205,8 @@ ok(r.ok && r.data.terkonfigurasi === true && r.data.aktif === 1 && r.data.total 
 ok(r.data.tanpa.find((x) => x.id === rina).peran === 'Penegak' && r.data.tanpa.find((x) => x.id === dewan).peran === 'Dewan Ambalan', 'peran tercantum (Penegak, Dewan Ambalan)');
 r = await K.admin.a.ringkasanPush();
 ok(r.ok, 'Admin dapat melihat ringkasan');
-ok(cocok(await K.dewan.a.ringkasanPush(), /Hanya Pembina dan Admin/) && cocok(await K.ahmad.a.ringkasanPush(), /Hanya Pembina dan Admin/), 'Dewan Ambalan dan Penegak tidak dapat melihat ringkasan');
+ok((await K.dewan.a.ringkasanPush()).ok, 'Dewan Ambalan ikut dapat melihat ringkasan (migrasi periksa-dewan)');
+ok(cocok(await K.ahmad.a.ringkasanPush(), /Hanya pengurus/), 'Penegak biasa tidak dapat melihat ringkasan');
 await q('delete from public.push_langganan');
 
 console.log('\n--- Antrean push lewat pg_net (dipalsukan) ---');
