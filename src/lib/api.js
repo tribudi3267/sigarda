@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunBatchNaikKelas, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunAgenda, susunBatchNaikKelas, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -422,6 +422,17 @@ export function buatApi(klien) {
     simpanWhatsapp: (nomor) => rpc('sg_profil_whatsapp_atur', { p_whatsapp: nomor ?? '' }),
     /** Pembina, Dewan Ambalan, dan Admin: daftar Penegak tingkat mendesak (lihat src/lib/eskalasiLogic.js). */
     muatEskalasi: () => rpc('sg_eskalasi_daftar'),
+
+    /* ------------------------------- Agenda tahunan (tahap L6) ------------------------------- */
+    /** Semua yang sudah masuk (RLS): daftar kegiatan agenda, tanggal lebih dekat dulu. */
+    muatAgenda: () => muat(async () => susunAgenda(await ambilSemua('agenda', { urut: ['tanggal'] }))),
+    /** Menambah (tanpa id) atau mengubah (dengan id) satu kegiatan agenda (Pembina dan Admin). */
+    simpanAgenda: (a) =>
+      rpc('sg_agenda_simpan', {
+        p_id: a.id ?? null, p_tahun_ajaran: a.tahunAjaran, p_jenis: a.jenis, p_judul: a.judul, p_tanggal: a.tanggal,
+        p_keterangan: a.keterangan ?? '', p_peserta_terkait: a.pesertaTerkait ?? [], p_lewati_batas: a.lewatiBatas ?? false,
+      }),
+    hapusAgenda: (id) => rpc('sg_agenda_hapus', { p_id: id }),
 
     /* ------------------------------- Materi ------------------------------- */
     simpanMateri: (m) =>

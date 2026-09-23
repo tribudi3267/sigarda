@@ -297,7 +297,7 @@ create table public.dokumen_urut (          -- penghitung nomor dokumen per jeni
 create table public.notifikasi (
   id bigint generated always as identity primary key,
   penerima_id uuid not null references public.profiles(id) on delete cascade,
-  jenis text not null check (jenis in ('ajukan','alih','mulai','hasil','pengingat','lama','sesi','surat','tes','eskalasi')),   -- 'tes' = notifikasi uji dari tombol di halaman Notifikasi; 'eskalasi' = tangga pengingat tahap L5
+  jenis text not null check (jenis in ('ajukan','alih','mulai','hasil','pengingat','lama','sesi','surat','tes','eskalasi','agenda')),   -- 'tes' = notifikasi uji dari tombol di halaman Notifikasi; 'eskalasi' = tangga pengingat tahap L5; 'agenda' = pengingat H-30/H-7/H-1 tahap L6
   judul text not null check (char_length(judul) between 1 and 120),
   isi text not null default '' check (char_length(isi) <= 300),
   tautan jsonb not null default '{}'::jsonb,                        -- { tab: 'antrian' | 'sku' | 'beranda' | 'cetak' }
@@ -364,6 +364,28 @@ create table public.naik_kelas_log (
 create index naik_kelas_log_batch_idx on public.naik_kelas_log (batch_id);
 create index naik_kelas_log_peserta_idx on public.naik_kelas_log (peserta_id, id);
 -- ===== akhir tabel naik kelas =====
+
+-- ===== Agenda tahunan (tahap L6): tabel =====
+-- Kegiatan tahunan Ambalan: 6 jenis baku (musyawarah, naik_kelas, sidang, tiga pelantikan) atau 'lainnya' (judul bebas).
+-- peserta_terkait (opsional): Penegak yang ikut diberi tahu pengingat H-30/H-7/H-1 selain semua pengurus (mis. calon sidang/pelantikan).
+-- lewati_batas: HANYA berlaku untuk jenis 'musyawarah' dan HANYA dapat diset true oleh Pembina (bukan Admin), atas usulan Dewan Ambalan di
+-- luar aplikasi -- melewati batas "harus sebelum 1 Juli tahun kedua" (pergantian kepengurusan sebelum tahun ajaran baru).
+create table public.agenda (
+  id bigint generated always as identity primary key,
+  tahun_ajaran text not null check (tahun_ajaran ~ '^[0-9]{4}/[0-9]{4}$'),
+  jenis text not null check (jenis in ('musyawarah','naik_kelas','sidang','pelantikan_bantara','pelantikan_laksana','pelantikan_garuda','lainnya')),
+  judul text not null check (char_length(btrim(judul)) between 1 and 120),
+  tanggal date not null,
+  keterangan text not null default '' check (char_length(keterangan) <= 500),
+  peserta_terkait uuid[] not null default '{}',
+  lewati_batas boolean not null default false,
+  dibuat_oleh uuid references public.profiles(id) on delete set null,
+  dibuat_pada timestamptz not null default now(),
+  diubah_pada timestamptz not null default now()
+);
+create index if not exists agenda_tahun_ajaran_idx on public.agenda (tahun_ajaran);
+create index if not exists agenda_tanggal_idx on public.agenda (tanggal);
+-- ===== akhir tabel agenda =====
 
 create table public.portofolio (
   peserta_id uuid not null references public.profiles(id) on delete cascade,
@@ -1085,10 +1107,11 @@ create trigger notif_dokumen after insert on public.dokumen_terbit
 -- ===== Eskalasi (tahap L5): pengingat ===== (penanda kedua yang membungkus fungsi SAMA; dipakai migrasi L5. Tiap tahap baru yang
 -- mengubah notif_pengingat cukup menambah penanda serupa di sini, JANGAN mengubah/menghapus penanda tahap sebelumnya -- skrip
 -- migrasi lama yang sudah terbit tetap harus bisa dibangun ulang dari inti.sql bila diperlukan)
+-- ===== Agenda tahunan (tahap L6): pengingat ===== (penanda ketiga yang membungkus fungsi SAMA; dipakai migrasi L6)
 -- Pengingat harian (dijalankan pg_cron pukul 07.00 WIB): pengujian dan sesi ujian besok, pengajuan yang menunggu lebih dari 3 hari,
--- cadangan data yang sudah sebulan tidak diunduh (tahap L4), tangga eskalasi tidak bergerak (tahap L5, juga di luar jam senyap karena
--- selalu berjalan 07.00 WIB), dan pembersihan notifikasi berumur lebih dari 90 hari. Kunci membuat tiap pengingat terkirim sekali
--- walau dijalankan berulang.
+-- cadangan data yang sudah sebulan tidak diunduh (tahap L4), tangga eskalasi tidak bergerak (tahap L5), agenda tahunan H-30/H-7/H-1
+-- (tahap L6, juga di luar jam senyap karena selalu berjalan 07.00 WIB), dan pembersihan notifikasi berumur lebih dari 90 hari.
+-- Kunci membuat tiap pengingat terkirim sekali walau dijalankan berulang.
 create function sigarda.notif_pengingat() returns void language plpgsql security definer set search_path = public as
 $$
 declare v_besok date := sigarda.hari_ini() + 1; r record; v_x uuid; v_label text;
@@ -1123,10 +1146,12 @@ begin
     end loop;
   end if;
   perform sigarda.eskalasi_proses();
+  perform sigarda.agenda_proses();
   delete from public.notifikasi where dibuat < now() - interval '90 days';
 end $$;
 -- ===== akhir pengingat cadangan =====
 -- ===== akhir pengingat eskalasi =====
+-- ===== akhir pengingat agenda =====
 
 -- Mengantre Web Push: satu permintaan HTTP per pernyataan INSERT (pg_net) ke Edge Function notif-push, hanya untuk penerima yang punya perangkat.
 -- Tanpa konfigurasi (sigarda.push_atur) atau tanpa pg_net tidak ada yang dikirim; Kotak Notifikasi di aplikasi tetap berjalan. Galat push tidak
@@ -1216,6 +1241,7 @@ alter table public.penugasan_peserta enable row level security;   -- baca: pengu
 alter table public.kepengurusan_log enable row level security;    -- baca: pengurus; tulis: hanya fungsi kepengurusan
 alter table public.naik_kelas_batch enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_naik_kelas*
 alter table public.naik_kelas_log enable row level security;
+alter table public.agenda enable row level security;   -- baca: semua yang aktif; tulis: hanya fungsi sg_agenda_*
 alter table public.dokumen_terbit enable row level security;   -- baca: pengurus dan pemilik; tulis: hanya fungsi sg_dokumen_*
 alter table public.dokumen_urut enable row level security;
 alter table public.notifikasi enable row level security;   -- baca: pemilik; tulis: hanya pemicu dan fungsi sg_*
@@ -1238,6 +1264,7 @@ create policy baca_katalog_butir on public.sku_butir for select to authenticated
 create policy baca_katalog_unit on public.sku_unit for select to authenticated using ((select sigarda.aktif()));
 create policy baca_katalog_pf on public.pf_item for select to authenticated using ((select sigarda.aktif()));
 create policy baca_materi on public.materi for select to authenticated using ((select sigarda.aktif()));
+create policy baca_agenda on public.agenda for select to authenticated using ((select sigarda.aktif()));
 create policy baca_sesi on public.absensi_sesi for select to authenticated using ((select sigarda.aktif()));
 
 create policy baca_progres on public.sku_progress for select to authenticated
@@ -3827,6 +3854,94 @@ begin
 end $$;
 -- ===== akhir fungsi eskalasi =====
 
+-- ===== Agenda tahunan (tahap L6): fungsi =====
+-- Batas keras: Musyawarah Ambalan (pergantian kepengurusan) harus SEBELUM 1 Juli tahun kedua tahun ajaran (sebelum tahun ajaran
+-- baru dan Naik Kelas dimulai). Dapat dilewati HANYA oleh Pembina (bukan Admin) lewat p_lewati_batas, atas usulan Dewan Ambalan
+-- di luar aplikasi; cermin batasMusyawarah di src/lib/agendaLogic.js.
+create function sigarda.agenda_batas_musyawarah(p_tahun_ajaran text) returns date language sql immutable as
+$$ select (split_part(p_tahun_ajaran, '/', 2) || '-07-01')::date $$;
+
+-- Menyimpan (tambah bila p_id null, ubah bila terisi) satu kegiatan agenda. Pembina dan Admin. peserta_terkait dibatasi ke
+-- Penegak aktif (maks 500 baris, cukup untuk pelantikan satu angkatan penuh).
+create function public.sg_agenda_simpan(
+  p_id bigint, p_tahun_ajaran text, p_jenis text, p_judul text, p_tanggal date, p_keterangan text default '',
+  p_peserta_terkait uuid[] default '{}', p_lewati_batas boolean default false
+) returns bigint language plpgsql security definer set search_path = public as
+$$
+declare
+  v_judul text := sigarda.rapikan(p_judul); v_ket text := btrim(coalesce(p_keterangan, ''));
+  v_ids uuid[]; v_id uuid; v_lewati boolean := false; v_hasil_id bigint;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mengatur agenda.'; end if;
+  if not sigarda.tahun_ajaran_sah(p_tahun_ajaran) then raise exception 'Tahun ajaran tidak sah. Contoh: 2026/2027.'; end if;
+  if p_jenis not in ('musyawarah','naik_kelas','sidang','pelantikan_bantara','pelantikan_laksana','pelantikan_garuda','lainnya') then
+    raise exception 'Jenis kegiatan tidak dikenal.';
+  end if;
+  if v_judul = '' then raise exception 'Judul wajib diisi.'; end if;
+  if char_length(v_judul) > 120 then raise exception 'Judul maksimal 120 karakter.'; end if;
+  if p_tanggal is null then raise exception 'Tanggal wajib diisi.'; end if;
+  if char_length(v_ket) > 500 then raise exception 'Keterangan maksimal 500 karakter.'; end if;
+
+  -- lewati_batas hanya berlaku bila pemanggil benar Pembina (bukan Admin, bukan Dewan/Penegak).
+  if p_lewati_batas is true and coalesce((select role = 'penguji' and jabatan = 'Pembina' from public.profiles where id = auth.uid()), false) then
+    v_lewati := true;
+  end if;
+  if p_jenis = 'musyawarah' and not v_lewati and p_tanggal >= sigarda.agenda_batas_musyawarah(p_tahun_ajaran) then
+    raise exception 'Musyawarah Ambalan harus dijadwalkan sebelum 1 Juli % (sebelum tahun ajaran baru dan Naik Kelas). Hanya Pembina yang dapat melewati batas ini, atas usulan Dewan Ambalan.', split_part(p_tahun_ajaran, '/', 2);
+  end if;
+
+  v_ids := coalesce((select array_agg(distinct x) from unnest(p_peserta_terkait) x), '{}');
+  if cardinality(v_ids) > 500 then raise exception 'Maksimal 500 Penegak terkait.'; end if;
+  foreach v_id in array v_ids loop
+    if not exists (select 1 from public.profiles where id = v_id and role = 'peserta' and status = 'aktif') then
+      raise exception 'Salah satu Penegak terkait tidak ditemukan atau tidak aktif.';
+    end if;
+  end loop;
+
+  if p_id is null then
+    insert into public.agenda (tahun_ajaran, jenis, judul, tanggal, keterangan, peserta_terkait, lewati_batas, dibuat_oleh)
+      values (p_tahun_ajaran, p_jenis, v_judul, p_tanggal, v_ket, v_ids, v_lewati, auth.uid())
+      returning id into v_hasil_id;
+  else
+    update public.agenda set tahun_ajaran = p_tahun_ajaran, jenis = p_jenis, judul = v_judul, tanggal = p_tanggal,
+      keterangan = v_ket, peserta_terkait = v_ids, lewati_batas = v_lewati, diubah_pada = now()
+      where id = p_id;
+    if not found then raise exception 'Kegiatan agenda tidak ditemukan.'; end if;
+    v_hasil_id := p_id;
+  end if;
+  return v_hasil_id;
+end $$;
+
+create function public.sg_agenda_hapus(p_id bigint) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus agenda.'; end if;
+  delete from public.agenda where id = p_id;
+end $$;
+
+-- Pengingat H-30, H-7, H-1: semua pengurus aktif, DITAMBAH Penegak pada peserta_terkait (bila ada dan masih aktif). Isi notifikasi
+-- memakai judul dan keterangan agenda apa adanya (berlaku untuk jenis baku maupun 'lainnya', tanpa teks berbeda per jenis).
+create function sigarda.agenda_proses() returns void language plpgsql security definer set search_path = public as
+$$
+declare v_hari date := sigarda.hari_ini(); r record; v_x uuid; v_judul text; v_isi text;
+begin
+  for r in select id, judul, tanggal, keterangan, peserta_terkait from public.agenda where tanggal - v_hari in (30, 7, 1) loop
+    v_judul := 'H-' || (r.tanggal - v_hari)::text || ': ' || r.judul;
+    v_isi := case when r.keterangan <> '' then r.keterangan else 'Dijadwalkan ' || to_char(r.tanggal, 'DD-MM-YYYY') || '.' end;
+    for v_x in select id from public.profiles where status = 'aktif' and (role in ('penguji','admin') or (role = 'peserta' and jabatan_dewan is not null)) loop
+      perform sigarda.notif_buat(v_x, 'agenda', v_judul, v_isi, '{"tab":"agenda"}', 'agenda:' || r.id || ':' || v_hari);
+    end loop;
+    foreach v_x in array coalesce(r.peserta_terkait, '{}') loop
+      if exists (select 1 from public.profiles where id = v_x and status = 'aktif') then
+        perform sigarda.notif_buat(v_x, 'agenda', v_judul, v_isi, '{"tab":"agenda"}', 'agenda:' || r.id || ':' || v_hari);
+      end if;
+    end loop;
+  end loop;
+end $$;
+-- ===== akhir fungsi agenda =====
+
 -- Untuk Edge Function notif-push (service_role): bahan kirim untuk beberapa notifikasi yang belum berstatus, dan pencatatan hasilnya.
 create function public.sg_push_ambil_internal(p_ids bigint[]) returns jsonb language sql stable security definer set search_path = public as
 $$
@@ -3974,7 +4089,7 @@ grant select on public.profiles, public.sku_butir, public.sku_unit, public.pf_it
   public.sesi_ujian, public.sesi_ujian_butir, public.sesi_ujian_peserta,
   public.iuran, public.iuran_log, public.iuran_kas, public.asisten_iuran,
   public.penugasan_rombel, public.penugasan_log, public.guru_agama, public.dokumen_terbit, public.dokumen_urut, public.notifikasi,
-  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log to authenticated;
+  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda to authenticated;
 
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function
@@ -4011,7 +4126,8 @@ grant execute on function
   public.sg_notifikasi_tandai(bigint[]), public.sg_push_kunci(), public.sg_push_simpan(text, text, text, text), public.sg_push_hapus(text), public.sg_push_ringkasan(), public.sg_notifikasi_tes(),
   public.sg_penugasan_peserta_atur(text, uuid, uuid[], text), public.sg_kepengurusan_terapkan(jsonb, boolean, boolean), public.sg_dewan_lama_arsipkan(uuid[], boolean),
   public.sg_pemeriksaan_data(), public.sg_cadangan_admin(), public.sg_cadangan_status(),
-  public.sg_profil_whatsapp_atur(text), public.sg_eskalasi_daftar()
+  public.sg_profil_whatsapp_atur(text), public.sg_eskalasi_daftar(),
+  public.sg_agenda_simpan(bigint, text, text, text, date, text, uuid[], boolean), public.sg_agenda_hapus(bigint)
   to authenticated;
 -- Fungsi yang boleh dipanggil tanpa login (hanya membaca): verifikasi keaslian dokumen dan identitas gudep yang tampil di halaman masuk
 grant execute on function public.sg_verifikasi_token(text), public.sg_verifikasi_kode(text), public.sg_gudep_publik() to anon, authenticated;

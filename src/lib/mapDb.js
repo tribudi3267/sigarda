@@ -256,6 +256,13 @@ export const susunAsisten = (baris = []) =>
 export const susunLembarIuran = (baris = []) =>
   baris.map((r) => ({ id: r.id, nama: r.nama, kelas: r.kelas ?? '', sangga: r.sangga ?? '', status: r.status ?? null, jumlah: r.jumlah ?? null, jenis: r.jenis ?? null }));
 
+/** Baris agenda -> [{ id, tahunAjaran, jenis, judul, tanggal, keterangan, pesertaTerkait, lewatiBatas, dibuatOleh, dibuatPada }] (tanggal lebih dekat dulu) */
+export const susunAgenda = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), tahunAjaran: r.tahun_ajaran, jenis: r.jenis, judul: r.judul, tanggal: tgl(r.tanggal), keterangan: r.keterangan ?? '',
+    pesertaTerkait: r.peserta_terkait ?? [], lewatiBatas: !!r.lewati_batas, dibuatOleh: r.dibuat_oleh ?? null, dibuatPada: r.dibuat_pada,
+  })).sort((a, b) => a.tanggal.localeCompare(b.tanggal));
+
 /** Baris raport satu semester -> { [pesertaId]: baris } */
 export const susunRaport = (baris = []) => Object.fromEntries(baris.map((r) => [r.peserta_id, petaRaport(r)]));
 
