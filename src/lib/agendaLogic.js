@@ -3,14 +3,23 @@
  * Bentuk satu kegiatan: { id, tahunAjaran, jenis, judul, tanggal, keterangan, pesertaTerkait, lewatiBatas }
  */
 
-/** Jenis baku (dengan judul bawaan yang bisa diubah pengguna) + 'lainnya' (judul bebas). */
+/** Jenis baku (dengan judul bawaan yang bisa diubah pengguna) + 'lainnya' (judul bebas). Judul bawaan sama dengan
+ * sigarda.kegiatan_judul_bawaan (SQL) untuk jenis yang juga didukung alur usulan (lihat JENIS_USULAN di kegiatanLogic.js). */
 export const JENIS_AGENDA = [
   { id: 'musyawarah', label: 'Musyawarah Ambalan', judulBawaan: 'Musyawarah Ambalan' },
   { id: 'naik_kelas', label: 'Naik Kelas', judulBawaan: 'Naik Kelas' },
   { id: 'sidang', label: 'Sidang Dewan Kehormatan', judulBawaan: 'Sidang Dewan Kehormatan' },
-  { id: 'pelantikan_bantara', label: 'Pelantikan Bantara', judulBawaan: 'Pelantikan Bantara' },
+  { id: 'pelantikan_bantara', label: 'Pembayatan dan Pelantikan Bantara', judulBawaan: 'Pembayatan dan Pelantikan Bantara' },
   { id: 'pelantikan_laksana', label: 'Pelantikan Laksana', judulBawaan: 'Pelantikan Laksana' },
   { id: 'pelantikan_garuda', label: 'Pelantikan Garuda', judulBawaan: 'Pelantikan Garuda' },
+  { id: 'pengembaraan', label: 'Pengembaraan', judulBawaan: 'Pengembaraan' },
+  { id: 'perkemahan', label: 'Perkemahan', judulBawaan: 'Perkemahan' },
+  { id: 'gelora_saka_expo', label: 'Gelora Saka Expo', judulBawaan: 'Gelora Saka Expo' },
+  { id: 'gladi_tangguh_1', label: 'Gladi Tangguh 1', judulBawaan: 'Gladi Tangguh 1' },
+  { id: 'gladi_tangguh_2', label: 'Gladi Tangguh 2', judulBawaan: 'Gladi Tangguh 2' },
+  { id: 'penempuhan_sku_laksana', label: 'Penempuhan SKU Laksana', judulBawaan: 'Penempuhan SKU Laksana' },
+  { id: 'ptgd', label: 'PTGD (Penerimaan Tamu Gugus Depan)', judulBawaan: 'PTGD (Penerimaan Tamu Gugus Depan)' },
+  { id: 'pembekalan_dewan', label: 'Pembekalan Dewan Ambalan Angkatan Berikutnya', judulBawaan: 'Pembekalan Dewan Ambalan Angkatan Berikutnya' },
   { id: 'lainnya', label: 'Lainnya', judulBawaan: '' },
 ];
 const PETA_JENIS = Object.fromEntries(JENIS_AGENDA.map((j) => [j.id, j]));

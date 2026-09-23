@@ -37,7 +37,9 @@ const bandingkan = (nama, pa, pb) => {
   }
 };
 
-const A = await baru(`${P}/supabase/skema.sql`);
+// Skema "sesudah agenda" = commit TEPAT sesudah migrasi ini (sebelum migrasi musyawarah), BUKAN skema.sql terbaru
+// (yang sudah memuat fungsi migrasi berikutnya juga; lihat CLAUDE.md, bagian uji migrasi).
+const A = await baru('git:6a4d494');
 const pa = await potret(A);
 ok(pa.fungsi.length === 5, `skema baru memuat semua fungsi agenda (2 publik + 3 sigarda): ${pa.fungsi.length}`);
 ok(pa.hakFungsi.filter((x) => x.grantee === 'authenticated').length === 2, 'kedua fungsi publik baru dapat dipanggil authenticated');

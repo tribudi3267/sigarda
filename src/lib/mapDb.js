@@ -256,6 +256,16 @@ export const susunAsisten = (baris = []) =>
 export const susunLembarIuran = (baris = []) =>
   baris.map((r) => ({ id: r.id, nama: r.nama, kelas: r.kelas ?? '', sangga: r.sangga ?? '', status: r.status ?? null, jumlah: r.jumlah ?? null, jenis: r.jenis ?? null }));
 
+/** Baris kegiatan_usulan -> [{ id, jenis, tahunAjaran, tanggalUsul, dokumenUrl, catatan, status, diajukanOleh, diajukanOlehNama, diajukanPada,
+ *  ditinjauOleh, ditinjauOlehNama, ditinjauPada, catatanTinjauan, dipingPada, agendaId }] (terbaru lebih dulu) */
+export const susunUsulanKegiatan = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), jenis: r.jenis, tahunAjaran: r.tahun_ajaran, tanggalUsul: tgl(r.tanggal_usul), dokumenUrl: r.dokumen_url, catatan: r.catatan ?? '',
+    status: r.status, diajukanOleh: r.diajukan_oleh ?? null, diajukanOlehNama: r.diajukan_oleh_nama ?? '', diajukanPada: r.diajukan_pada,
+    ditinjauOleh: r.ditinjau_oleh ?? null, ditinjauOlehNama: r.ditinjau_oleh_nama ?? '', ditinjauPada: r.ditinjau_pada ?? null,
+    catatanTinjauan: r.catatan_tinjauan ?? '', dipingPada: r.diping_pada ?? null, agendaId: r.agenda_id ?? null,
+  })).sort((a, b) => b.id - a.id);
+
 /** Baris agenda -> [{ id, tahunAjaran, jenis, judul, tanggal, keterangan, pesertaTerkait, lewatiBatas, dibuatOleh, dibuatPada }] (tanggal lebih dekat dulu) */
 export const susunAgenda = (baris = []) =>
   baris.map((r) => ({

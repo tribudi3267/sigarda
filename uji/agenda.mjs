@@ -13,7 +13,7 @@ const ok = (c, m) => { if (c) { lulus++; console.log('ok   :', m); } else { gaga
 
 console.log('--- agendaLogic.js (murni) ---');
 {
-  ok(JENIS_AGENDA.length === 7 && JENIS_AGENDA.some((j) => j.id === 'lainnya'), '7 jenis (6 baku + lainnya)');
+  ok(JENIS_AGENDA.length === 15 && JENIS_AGENDA.some((j) => j.id === 'lainnya'), '15 jenis (6 baku awal + 8 baku tahap L6b + lainnya)');
   ok(labelJenisAgenda('musyawarah') === 'Musyawarah Ambalan' && labelJenisAgenda('pelantikan_garuda') === 'Pelantikan Garuda', 'label jenis');
   ok(judulBawaanJenis('sidang') === 'Sidang Dewan Kehormatan' && judulBawaanJenis('lainnya') === '', 'judul bawaan (lainnya kosong, diisi bebas)');
   ok(batasMusyawarah('2026/2027') === '2027-07-01' && batasMusyawarah('') === null, 'batas Musyawarah = 1 Juli tahun kedua: ' + batasMusyawarah('2026/2027'));

@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunAgenda, susunBatchNaikKelas, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunAgenda, susunBatchNaikKelas, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 
@@ -433,6 +433,17 @@ export function buatApi(klien) {
         p_keterangan: a.keterangan ?? '', p_peserta_terkait: a.pesertaTerkait ?? [], p_lewati_batas: a.lewatiBatas ?? false,
       }),
     hapusAgenda: (id) => rpc('sg_agenda_hapus', { p_id: id }),
+
+    /* ------------------------------- Usulan kegiatan: Musyawarah Ambalan + 10 kegiatan lain (tahap L6b) ------------------------------- */
+    /** Pengurus (RLS): daftar usulan (semua jenis), terbaru lebih dulu. */
+    muatUsulanKegiatan: () => muat(async () => susunUsulanKegiatan(await ambilSemua('kegiatan_usulan', { urut: ['id'] }))),
+    /** Pradana/Pradani mengajukan usulan baru untuk satu jenis kegiatan. */
+    usulkanKegiatan: (u) =>
+      rpc('sg_kegiatan_usul', { p_jenis: u.jenis, p_tahun_ajaran: u.tahunAjaran, p_tanggal_usul: u.tanggalUsul, p_dokumen_url: u.dokumenUrl, p_catatan: u.catatan ?? '' }),
+    /** Pembina meninjau: keputusan 'disetujui' atau 'ditolak' (catatan wajib bila ditolak). */
+    tinjauKegiatan: (id, keputusan, catatan = '') => rpc('sg_kegiatan_tinjau', { p_id: id, p_keputusan: keputusan, p_catatan: catatan }),
+    /** Pradana/Pradani mengingatkan lagi semua Pembina (dibatasi sekali per 24 jam). */
+    ingatkanKegiatan: (id) => rpc('sg_kegiatan_ping', { p_id: id }),
 
     /* ------------------------------- Materi ------------------------------- */
     simpanMateri: (m) =>

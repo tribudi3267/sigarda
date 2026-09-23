@@ -362,13 +362,38 @@ Menu **Tindak Lanjut** (Pembina, Dewan Ambalan, Admin): daftar Penegak tingkat m
 Kode: `src/lib/eskalasiLogic.js` (`waLink`, `teksWaSiap`, `whatsappSah`, label), `src/pages/TindakLanjut.jsx`. Server: `sigarda.eskalasi_mulai_sku/absensi/iuran`, `eskalasi_tingkat`, `eskalasi_proses()`, `sg_eskalasi_daftar()` (Pembina/Dewan/Admin). Dijaga pengujian `eskalasi`, `migrasi-eskalasi`.
 
 ### Agenda tahunan (tahap L6)
-Menu **Agenda** (semua peran melihat; hanya Pembina dan Admin menambah/mengubah/menghapus): kegiatan tahunan Ambalan per tahun ajaran, 6 jenis baku (Musyawarah Ambalan, Naik Kelas, Sidang Dewan Kehormatan, Pelantikan Bantara/Laksana/Garuda, masing-masing dengan judul bawaan yang dapat diubah) atau **'lainnya'** (judul bebas). Setiap kegiatan boleh menandai **Penegak terkait** (opsional, mis. calon yang akan disidang/dilantik) yang ikut diberi tahu selain semua pengurus.
+Menu **Agenda** (semua peran melihat; hanya Pembina dan Admin menambah/mengubah/menghapus): kegiatan tahunan Ambalan per tahun ajaran, 14 jenis baku (Musyawarah Ambalan, Naik Kelas, Sidang Dewan Kehormatan, Pembayatan dan Pelantikan Bantara, Pelantikan Laksana, Pelantikan Garuda, Pengembaraan, Perkemahan, Gelora Saka Expo, Gladi Tangguh 1 dan 2, Penempuhan SKU Laksana, PTGD, Pembekalan Dewan Ambalan Angkatan Berikutnya — masing-masing dengan judul bawaan yang dapat diubah) atau **'lainnya'** (judul bebas). Setiap kegiatan boleh menandai **Penegak terkait** (opsional, mis. calon yang akan disidang/dilantik) yang ikut diberi tahu selain semua pengurus.
 
-**Batas keras Musyawarah Ambalan:** harus dijadwalkan **sebelum 1 Juli** tahun kedua tahun ajaran (sebelum Naik Kelas dan tahun ajaran baru, supaya kepengurusan sudah berganti). Ditegakkan di server; **hanya Pembina** (bukan Admin) dapat melewati batas ini lewat centang "Lewati batas", atas usulan Dewan Ambalan di luar aplikasi.
+**Batas keras Musyawarah Ambalan:** harus dijadwalkan **sebelum 1 Juli** tahun kedua tahun ajaran (sebelum Naik Kelas dan tahun ajaran baru, supaya kepengurusan sudah berganti). Ditegakkan di server; **hanya Pembina** (bukan Admin) dapat melewati batas ini lewat centang "Lewati batas", atau (jalur resmi) lewat persetujuan usulan Musyawarah Ambalan di bawah. Jenis lain tidak mengenal batas ini.
 
 Pengingat otomatis **H-30, H-7, H-1** ke semua pengurus (Pembina, Dewan Ambalan, Admin) dan Penegak pada peserta terkait (bila ada), dijalankan dari `sigarda.notif_pengingat()` (pengingat harian 07.00 WIB, otomatis di luar jam senyap). Isi notifikasi memakai judul dan keterangan kegiatan apa adanya.
 
 Kode: `src/lib/agendaLogic.js` (`JENIS_AGENDA`, `batasMusyawarah`, `periksaAgenda`, `hariMenuju`), `src/pages/Agenda.jsx`. Server: `sg_agenda_simpan(...)`, `sg_agenda_hapus(id)` (Pembina dan Admin), `sigarda.agenda_proses()`, `sigarda.agenda_batas_musyawarah(tahunAjaran)`. Tabel `public.agenda` (baca: semua yang sudah masuk; tulis: hanya lewat fungsi). Dijaga pengujian `agenda`, `migrasi-agenda`.
+
+#### Usulan kegiatan (tahap L6b)
+Alur resmi di dalam aplikasi untuk "usulan Dewan Ambalan", ditampilkan di menu **Agenda** sebagai panel **Usulan kegiatan**, satu baris per jenis: **hanya Pradana atau Pradani** (Penegak aktif berjabatan itu, atau akun Dewan lama yang masih menjabat) dapat mengajukan usulan untuk salah satu dari **11 jenis kegiatan** — tanggal pelaksanaan, **tautan dokumen proposal** (Google Drive), dan catatan opsional. Usulan masuk ke **semua akun Pembina** (notifikasi + tampil di menu Agenda). **Hanya Pembina** (bukan Admin) dapat meninjau: **setuju** (catatan opsional) atau **tolak** (catatan alasan **wajib**). Maksimal satu usulan "menunggu" per (tahun ajaran, jenis) — harus ditinjau dulu sebelum diajukan lagi untuk jenis yang sama; selagi menunggu, Pradana/Pradani dapat menekan **"Ingatkan Pembina"** untuk mengirim ulang notifikasi ke semua Pembina (dibatasi sekali per 24 jam).
+
+Persetujuan **otomatis membuat/memperbarui entri di menu Agenda** (jenis dan judul bawaan sama dengan usulannya) dengan tanggal usulan itu; "lewati batas 1 Juli" hanya berlaku dan otomatis aktif untuk jenis **Musyawarah Ambalan** bila tanggal usulan memang di atas/pada batas — jenis lain tidak mengenal batas ini (`lewati_batas` selalu `false`).
+
+11 jenis dan jadwal pengingat otomatis (ke semua pengurus dan Dewan Ambalan, berhenti begitu tahun ajaran berjalan punya entri Agenda jenis itu, berlanjut sampai ada yang disetujui bila belum):
+
+| Jenis | Pengingat mulai | Lalu tiap |
+| --- | --- | --- |
+| Musyawarah Ambalan | H-60 sebelum batas 1 Juli | 14 hari |
+| Pembayatan dan Pelantikan Bantara | H-30 sebelum Desember atau Februari (yang lebih awal) | 14 hari |
+| Pelantikan Laksana | H-30 sebelum April atau Juni (yang lebih awal) | 14 hari |
+| Pengembaraan | H-30 sebelum Desember atau Februari (yang lebih awal) | 14 hari |
+| Perkemahan | H-30 sebelum Desember atau Februari (yang lebih awal) | 14 hari |
+| Gelora Saka Expo | H-30 sebelum September | 14 hari |
+| Gladi Tangguh 1 | H-30 sebelum Desember atau Februari (yang lebih awal) | 14 hari |
+| Gladi Tangguh 2 | H-30 sebelum April atau Juni (yang lebih awal) | 14 hari |
+| Penempuhan SKU Laksana | H-30 sebelum Desember atau Februari (yang lebih awal) | 14 hari |
+| PTGD (Penerimaan Tamu Gugus Depan) | H-60 sebelum Juli | 14 hari |
+| Pembekalan Dewan Ambalan Angkatan Berikutnya | H-30 sebelum Agustus | 14 hari |
+
+Musyawarah Ambalan punya pengingatnya sendiri (`sigarda.musyawarah_pengingat()`, tidak berubah sejak rancangan awal); 10 jenis lain memakai satu fungsi bersama (`sigarda.kegiatan_pengingat()`) dengan tabel konfigurasi bulan sasaran per jenis.
+
+Kode: `src/lib/kegiatanLogic.js` (`JENIS_USULAN`, `labelJenisUsulan`, `periksaUsulan`, `periksaTinjauan`, `bolehIngatkan`, `usulanMenunggu`, `usulanTerakhir`), komponen `UsulanKegiatan` di `src/pages/Agenda.jsx`. Server: `sg_kegiatan_usul(jenis, ...)`, `sg_kegiatan_tinjau(id, keputusan, catatan)`, `sg_kegiatan_ping(id)`, `sigarda.kegiatan_judul_bawaan(jenis)`, `sigarda.kegiatan_bulan_tanggal(tahunAjaran, bulan)`, `sigarda.musyawarah_pengingat()`, `sigarda.kegiatan_pengingat()`, `sigarda.pembina_saja()`, `sigarda.pradana_atau_pradani()`. Tabel `public.kegiatan_usulan` (baca: pengurus saja; tulis: hanya lewat fungsi). Dijaga pengujian `kegiatan`, `migrasi-kegiatan`.
 
 ### Filter dinamis
 Semua filter (status, sangga, kelas, peran, agama, jenis kelamin, tahun ajaran) dibangun dari data yang ada. Filter **Status** (Aktif bawaan, Nonaktif, Alumni, Semua status) ada pada Anggota, Peserta, Reset PIN, Raport, dan rekap Absensi; daftar lain hanya memuat Penegak aktif.
@@ -553,6 +578,8 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
 - [`2026-09-eskalasi.sql`](supabase/migrasi/2026-09-eskalasi.sql): Eskalasi tidak bergerak (tahap L5). Menambah kolom `profiles.whatsapp` (opsional), nilai `'eskalasi'` pada `notifikasi.jenis`, fungsi `sg_profil_whatsapp_atur(text)` dan `sg_eskalasi_daftar()` (menu Tindak Lanjut), dan memperbarui `sigarda.notif_pengingat()` (tangga pengingat SKU/absensi/iuran tidak bergerak). Jalankan **setelah** `2026-09-cadangan.sql` (bila belum, berhenti dengan pesan yang menuntun). Edge Function **tidak berubah**. Tidak menghapus data; aman diulang. Jalankan sebelum `git push` (menu Akun saya dan Tindak Lanjut memanggil fungsi ini).
 
 - [`2026-09-agenda.sql`](supabase/migrasi/2026-09-agenda.sql): Agenda tahunan (tahap L6). Tabel baru `public.agenda`, nilai `'agenda'` pada `notifikasi.jenis`, fungsi `sg_agenda_simpan(...)` dan `sg_agenda_hapus(id)` (Pembina dan Admin), dan memperbarui `sigarda.notif_pengingat()` (pengingat H-30/H-7/H-1). Jalankan **setelah** `2026-09-eskalasi.sql` (bila belum, berhenti dengan pesan yang menuntun). Edge Function **tidak berubah**. Tidak menghapus data; aman diulang. Jalankan sebelum `git push` (menu Agenda memanggil fungsi ini).
+
+- [`2026-09-usulan-kegiatan.sql`](supabase/migrasi/2026-09-usulan-kegiatan.sql): Usulan kegiatan (tahap L6b) — Musyawarah Ambalan dan 10 kegiatan lain. Memperluas `public.agenda.jenis` dengan 8 nilai baru; tabel baru `public.kegiatan_usulan`, nilai `'musyawarah'` dan `'kegiatan'` pada `notifikasi.jenis`, fungsi `sg_kegiatan_usul(jenis, ...)`, `sg_kegiatan_tinjau(...)`, `sg_kegiatan_ping(id)`, `sigarda.kegiatan_judul_bawaan(jenis)`, `sigarda.kegiatan_bulan_tanggal(tahunAjaran, bulan)`, `sigarda.pembina_saja()`, `sigarda.pradana_atau_pradani()`, `sigarda.musyawarah_pengingat()`, `sigarda.kegiatan_pengingat()`, dan memperbarui `sg_agenda_simpan`, `sg_cadangan_admin()` (kini ikut mengekspor `agenda` dan `kegiatan_usulan`), serta `sigarda.notif_pengingat()`. Jalankan **setelah** `2026-09-agenda.sql` (bila belum, berhenti dengan pesan yang menuntun). Edge Function **tidak berubah**. Tidak menghapus data; aman diulang. Jalankan sebelum `git push` (menu Agenda memanggil fungsi ini).
 
 **Memeriksa pemasangan.** Sesudah menjalankan migrasi dan men-deploy Edge Function, jalankan [`supabase/demo/periksa_pemasangan.sql`](supabase/demo/periksa_pemasangan.sql) di SQL Editor (hanya membaca; aman diulang). Hasilnya ringkasan per kategori (tabel, kolom, batasan, indeks, kebijakan akses, pemicu, fungsi) lalu daftar yang bermasalah:
 `KURANG` (belum ada, migrasi belum dijalankan), `BEDA` (ada tetapi isi fungsi bukan versi terbaru, jalankan ulang migrasi yang menimpanya), `HAK BEDA` atau `RLS BEDA`; ditambah pemeriksaan lingkungan notifikasi (pg_net, pg_cron, jadwal pengingat, konfigurasi push). Semua OK = database mutakhir.
