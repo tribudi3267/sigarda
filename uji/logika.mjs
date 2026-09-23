@@ -6,6 +6,7 @@ import * as pf from '../src/lib/portofolioLogic.js';
 import { buatSeed } from '../src/data/seed.js';
 import { buatBufferXlsx } from '../src/lib/exportXlsx.js';
 import fs from 'fs';
+import os from 'os';
 
 let gagal = 0;
 const cek = (nama, kondisi, info = '') => {
@@ -102,7 +103,7 @@ const buf = await buatBufferXlsx([{
   nama: 'Rekap', judul: ['Judul', 'Sub'], kolom: [{ header: 'Nama', key: 'n', lebar: 20 }, { header: '%', key: 'p', format: '0"%"', rata: 'center' }],
   baris: [{ n: 'A', p: 90 }, { n: 'B', p: 40 }], warna: (b, k) => (k === 'p' && b.p < 75 ? 'FFFEE2E2' : undefined),
 }]);
-fs.writeFileSync(process.argv[2] ?? (process.env.TEMP + '/uji-logika.xlsx'), Buffer.from(buf));
+fs.writeFileSync(process.argv[2] ?? (os.tmpdir() + '/uji-logika.xlsx'), Buffer.from(buf)); // tmpdir(): jalan di Windows (TEMP) dan Linux/CI (/tmp)
 cek('xlsx dibuat', buf.byteLength > 1000, `${buf.byteLength} byte`);
 
 console.log(gagal ? `\n${gagal} PENGUJIAN GAGAL` : '\nSEMUA PENGUJIAN LULUS');
