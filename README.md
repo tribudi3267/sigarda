@@ -479,7 +479,7 @@ npm run dev:lokal    # mode lokal: TANPA Supabase, data di browser ini saja, aku
                      # data sekolah penuh (700 Penegak + 150 alumni, untuk uji kinerja): ?data=penuh&masuk=pembina  (pertama kali ~1 menit; ?ulang=1 membuat ulang)
 npm run dev          # memakai Supabase (butuh .env.local, lihat bagian berikutnya)
 npm run build        # hasil produksi di folder dist/
-npm run skema        # membuat ulang supabase/skema.sql dari supabase/sumber/inti.sql + data butir SKU
+npm run skema        # membuat ulang supabase/skema.sql dari supabase/sumber/*.sql + data butir SKU
 ```
 
 **Mode lokal** menjalankan Postgres sungguhan (PGlite) di dalam browser dengan skema SQL, aturan akses, dan Edge Function
@@ -711,12 +711,12 @@ sku-bukateja/
 ├── .github/workflows/deploy.yml        terbit otomatis ke GitHub Pages
 ├── scripts/buat-skema.mjs              membuat supabase/skema.sql (menyisipkan katalog butir dari src/data)
 ├── scripts/instrumen-ke-sql.mjs        Excel instrumen penilaian -> SQL pemuat isi (isinya sendiri TIDAK di repositori)
-├── scripts/migrasi/                    penyusun berkas migrasi dari blok bermarka di inti.sql (bantu.mjs + contoh 2026-09-iuran.mjs)
+├── scripts/migrasi/                    penyusun berkas migrasi dari blok bermarka di supabase/sumber (bantu.mjs + contoh 2026-09-iuran.mjs)
 ├── uji/                                pengujian otomatis (npm run uji), Postgres sungguhan lewat PGlite
 ├── CLAUDE.md                           panduan singkat untuk asisten pemrograman (aturan kerja, arsitektur, konvensi)
 ├── supabase/
 │   ├── skema.sql                       (dibuat otomatis) tabel, RLS, fungsi sg_*, katalog. Dijalankan di SQL Editor
-│   ├── sumber/inti.sql                 sumber skema tanpa katalog (EDIT DI SINI, lalu npm run skema)
+│   ├── sumber/*.sql                    sumber skema tanpa katalog, 33 berkas bernomor per modul (EDIT DI SINI, lalu npm run skema; peta di sumber/README.md)
 │   ├── migrasi/                        perubahan skema untuk database yang SUDAH berisi data (jalankan berurutan, aman diulang)
 │   ├── demo/                           data demo Penegak untuk pengujian (data_demo_penegak.sql) dan pembersihnya (hapus_data_demo.sql)
 │   ├── admin_pertama.sql               profil admin pertama

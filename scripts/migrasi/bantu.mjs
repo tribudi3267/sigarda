@@ -5,12 +5,13 @@
  * Migrasi harus AMAN untuk database berisi data: `create table if not exists`, `create or replace function`, `drop policy if exists` sebelum
  * `create policy`, `add column if not exists`, dan tanpa menghapus data. Kesetaraan migrasi dengan skema baru diuji (lihat uji/migrasi-iuran.mjs).
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { bacaInti } from '../sumber.mjs';
 
 export const akar = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const inti = readFileSync(path.join(akar, 'supabase/sumber/inti.sql'), 'utf8').replace(/\r\n/g, '\n');
+const inti = bacaInti(akar).replace(/\r\n/g, '\n');
 
 /** Mengambil potongan inti.sql dari penanda awal sampai penanda akhir (penanda akhir ikut bila sertakanAkhir). */
 export const ambil = (awal, akhir, sertakanAkhir = false) => {
