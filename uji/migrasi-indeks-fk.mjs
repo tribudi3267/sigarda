@@ -15,7 +15,7 @@ const MP = bersih(readFileSync(`${P}/supabase/migrasi/2026-09-indeks-fk.sql`, 'u
 const skemaDari = (ref) => (ref.startsWith('git:') ? execFileSync('git', ['show', `${ref.slice(4)}:supabase/skema.sql`], { cwd: P, encoding: 'utf8', maxBuffer: 1 << 26 }) : readFileSync(ref, 'utf8'));
 const baru = async (skemaFile) => { const db = new PGlite(); await siapkanPg(db, { sqlStub: stub, sqlSkema: bersih(skemaDari(skemaFile)) }); return db; };
 const cacah = async (db) => (await db.query(`select (select count(*) from public.profiles)::int p, (select count(*) from public.sku_progress)::int s, (select count(*) from public.sku_riwayat)::int r, (select count(*) from auth.users)::int u`)).rows[0];
-const indeks = async (db) => (await db.query(`select tablename t, indexname n, indexdef d from pg_indexes where schemaname = 'public' order by 1, 2`)).rows;
+const indeks = async (db) => (await db.query(`select tablename t, indexname n, indexdef d from pg_indexes where schemaname = 'public' and tablename <> 'keepalive_konfigurasi' order by 1, 2`)).rows; // tabel keepalive datang dari migrasi sesudahnya
 
 const DIHARAPKAN = [
   ['sku_progress', 'sku_progress_penguji_idx', 'penguji_id'], ['sku_riwayat', 'sku_riwayat_oleh_idx', 'oleh'], ['sku_penilaian', 'sku_penilaian_penguji_idx', 'penguji_id'],

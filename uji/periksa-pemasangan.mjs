@@ -90,7 +90,7 @@ console.log('\n--- Sebelum L0: notifikasi uji dan pemeriksaan data belum ada; mi
 {
   const S = await baru('9eb504d'); // tepat sebelum tahap L0 (skema sesudah fase 6b)
   const m = masalah(await jalankan(S));
-  ok(m.length === 120 && m.some((x) => /sg_notifikasi_tes/.test(x.objek) && x.status === 'KURANG') && m.some((x) => /notifikasi_jenis_check/.test(x.objek) && x.status === 'BEDA')
+  ok(m.length === 139 && m.some((x) => /sg_notifikasi_tes/.test(x.objek) && x.status === 'KURANG') && m.some((x) => /notifikasi_jenis_check/.test(x.objek) && x.status === 'BEDA')
       && m.some((x) => /sg_pemeriksaan_data/.test(x.objek) && x.status === 'KURANG') && m.some((x) => /sg_push_ringkasan/.test(x.objek) && /^BEDA/.test(x.status)) && m.some((x) => /sg_cadangan_admin/.test(x.objek) && x.status === 'KURANG')
       && m.some((x) => /sg_cadangan_status/.test(x.objek) && x.status === 'KURANG') && m.some((x) => /notif_pengingat/.test(x.objek) && /^BEDA/.test(x.status))
       && m.some((x) => x.objek === 'profiles.whatsapp' && x.status === 'KURANG') && m.some((x) => /sg_profil_whatsapp_atur/.test(x.objek) && x.status === 'KURANG')
@@ -102,10 +102,10 @@ console.log('\n--- Sebelum L0: notifikasi uji dan pemeriksaan data belum ada; mi
       && m.some((x) => /musyawarah_pengingat/.test(x.objek) && x.status === 'KURANG') && m.some((x) => /kegiatan_pengingat/.test(x.objek) && x.status === 'KURANG')
       && m.some((x) => x.objek === 'garuda_berkas_token' && x.status === 'KURANG') && m.some((x) => /sg_garuda_berkas_baca/.test(x.objek) && x.status === 'KURANG')
       && m.some((x) => /sg_garuda_token_buat/.test(x.objek) && x.status === 'KURANG') && m.some((x) => /sg_garuda_token_baca/.test(x.objek) && x.status === 'KURANG'),
-    `${m.length} temuan (tabel agenda, kegiatan_usulan, dan garuda_berkas_token baru membawa banyak kolom/batasan/indeks/kebijakan sekaligus): notifikasi uji, pemeriksaan data, cadangan (L4), eskalasi (L5), agenda (L6), usulan kegiatan (L6b), berkas Calon Garuda (L7), sg_push_ringkasan versi lama (periksa-dewan), dan 10 indeks kunci asing belum ada/berbeda: ` + JSON.stringify(m.map((x) => x.objek)));
-  const migrasiL0L6b = ['2026-09-tes-notifikasi', '2026-09-pemeriksaan-data', '2026-09-cadangan', '2026-09-eskalasi', '2026-09-agenda', '2026-09-usulan-kegiatan', '2026-09-berkas-garuda', '2026-09-periksa-dewan', '2026-09-indeks-fk'];
+    `${m.length} temuan (tabel agenda, kegiatan_usulan, dan garuda_berkas_token baru membawa banyak kolom/batasan/indeks/kebijakan sekaligus): notifikasi uji, pemeriksaan data, cadangan (L4), eskalasi (L5), agenda (L6), usulan kegiatan (L6b), berkas Calon Garuda (L7), sg_push_ringkasan versi lama (periksa-dewan), , 10 indeks kunci asing, dan keep-alive dari dalam database belum ada/berbeda: ` + JSON.stringify(m.map((x) => x.objek)));
+  const migrasiL0L6b = ['2026-09-tes-notifikasi', '2026-09-pemeriksaan-data', '2026-09-cadangan', '2026-09-eskalasi', '2026-09-agenda', '2026-09-usulan-kegiatan', '2026-09-berkas-garuda', '2026-09-periksa-dewan', '2026-09-indeks-fk', '2026-09-keepalive'];
   for (const nama of migrasiL0L6b) await S.exec(bersih(readFileSync(`${P}/supabase/migrasi/${nama}.sql`, 'utf8')));
-  ok(masalah(await jalankan(S)).length === 0, 'sesudah migrasi tes-notifikasi, pemeriksaan-data, cadangan, eskalasi, agenda, usulan-kegiatan, berkas-garuda, periksa-dewan, dan indeks-fk: tidak ada masalah');
+  ok(masalah(await jalankan(S)).length === 0, 'sesudah migrasi tes-notifikasi, pemeriksaan-data, cadangan, eskalasi, agenda, usulan-kegiatan, berkas-garuda, periksa-dewan, indeks-fk, dan keepalive: tidak ada masalah');
   for (const nama of migrasiL0L6b) await S.exec(bersih(readFileSync(`${P}/supabase/migrasi/${nama}.sql`, 'utf8')));
   ok(masalah(await jalankan(S)).length === 0, 'migrasi dijalankan dua kali: tetap tidak ada masalah');
   let g = ''; const T = await baru('2a8ebc3'); try { await T.exec(bersih(readFileSync(`${P}/supabase/migrasi/2026-09-tes-notifikasi.sql`, 'utf8'))); } catch (e) { g = e.message; }
