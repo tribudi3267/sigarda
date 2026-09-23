@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { nomorWaAnggota, teksWaAktifkanNotifikasi } from '../lib/eskalasiLogic';
+import TombolWhatsapp from './TombolWhatsapp';
 
-/** Pembina dan Admin: berapa anggota yang sudah punya perangkat notifikasi, dan siapa yang belum (agar bisa diingatkan mengaktifkannya). */
+/**
+ * Pembina dan Admin: berapa anggota yang sudah punya perangkat notifikasi, dan siapa yang belum (agar bisa diingatkan mengaktifkannya).
+ * Tiap anggota yang belum punya tombol WhatsApp berpesan siap-kirim; nomor diambil dari profil (`users`), tanpa nomor pengguna memilih kontak sendiri.
+ */
 export default function RingkasanPerangkat() {
-  const { api } = useApp();
+  const { api, users } = useApp();
   const [d, setD] = useState(null);
   const [galat, setGalat] = useState('');
   const [buka, setBuka] = useState(false);
@@ -31,16 +36,22 @@ export default function RingkasanPerangkat() {
       {d.tanpa.length > 0 && (
         <>
           <button className="mt-2 text-sm font-semibold text-pramuka-700 underline underline-offset-2 hover:text-pramuka-900" aria-expanded={buka} onClick={() => setBuka(!buka)}>
-            {buka ? 'Sembunyikan daftar' : `Lihat ${d.tanpa.length} anggota yang belum punya perangkat`}
+            {buka ? `Sembunyikan daftar ${d.tanpa.length} anggota yang belum mengaktifkan notifikasi` : `Lihat ${d.tanpa.length} anggota yang belum mengaktifkan notifikasi`}
           </button>
           {buka && (
             <ul className="mt-2 max-h-64 divide-y divide-pramuka-100 overflow-y-auto rounded-lg border border-pramuka-100 text-sm">
-              {d.tanpa.map((a) => (
-                <li key={a.id} className="flex items-baseline justify-between gap-2 px-3 py-1.5">
-                  <span className="min-w-0 truncate font-medium">{a.nama}</span>
-                  <span className="shrink-0 text-xs text-pramuka-500">{[a.peran, a.kelas].filter(Boolean).join(', ')}</span>
-                </li>
-              ))}
+              {d.tanpa.map((a) => {
+                const nomor = nomorWaAnggota(users, a.id);
+                return (
+                  <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{a.nama}</p>
+                      <p className="text-xs text-pramuka-500">{[a.peran, a.kelas].filter(Boolean).join(', ')}</p>
+                    </div>
+                    <TombolWhatsapp nomor={nomor} nama={a.nama} teks={teksWaAktifkanNotifikasi(a.nama)} />
+                  </li>
+                );
+              })}
             </ul>
           )}
         </>

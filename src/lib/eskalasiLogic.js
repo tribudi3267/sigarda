@@ -36,4 +36,23 @@ export function teksWaSiap({ nama, jenis, hari }) {
   return `Halo ${nama}, ini dari Pembina/Dewan Ambalan. Sudah ${hari} hari ${soal}. Ada kendala? Kabari kami ya, biar bisa dibantu.`;
 }
 
+/** Pesan siap-kirim untuk mengingatkan satu anggota yang belum mengaktifkan notifikasi di HP-nya (tanpa menyebut hasil lulus/ulang). */
+export function teksWaAktifkanNotifikasi(nama) {
+  return `Halo ${nama}, ini dari pengurus SIGARDA. Notifikasi SIGARDA di HP-mu belum aktif, jadi kabar penting (jadwal, pengajuan, pengingat) belum sampai. `
+    + 'Mohon buka SIGARDA di HP, masuk ke menu Notifikasi, lalu ketuk "Aktifkan notifikasi" dan pilih Izinkan. Terima kasih.';
+}
+
+/** Pesan siap-kirim untuk mengajak anggota yang akunnya sudah dibuat tetapi belum pernah masuk. TIDAK memuat PIN (PIN awal disampaikan Pembina/Admin secara langsung). */
+export function teksWaAjakMasuk(nama, alamat = '') {
+  return `Halo ${nama}, ini dari pengurus SIGARDA. Akun SIGARDA-mu sudah dibuat tetapi belum pernah dipakai masuk${alamat ? `. Silakan buka ${alamat}` : '. Silakan buka SIGARDA'}`
+    + ' lalu masuk dengan username dan PIN awal dari Pembina/Admin; kamu akan diminta membuat PIN baru saat masuk pertama. '
+    + 'Kalau lupa PIN awal atau ada kendala, kabari kami ya, nanti dibantu. Terima kasih.';
+}
+
+/** Nomor WhatsApp tersimpan milik anggota `id` pada daftar `users` (bentuk tampilan); '' bila belum diisi atau formatnya tidak sah. */
+export function nomorWaAnggota(users, id) {
+  const nomor = (users ?? []).find((u) => u.id === id)?.whatsapp;
+  return whatsappSah(nomor) ? String(nomor).trim() : '';
+}
+
 export { JENIS as JENIS_ESKALASI };

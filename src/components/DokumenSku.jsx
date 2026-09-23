@@ -9,14 +9,20 @@ import { pejabatDewan, penandaTanganDewan } from '../lib/dewanLogic';
 import BlokTtd from './BlokTtd';
 import KodeQr from './KodeQr';
 import LogoMark from './LogoMark';
+import logoTunasKelapa from '../assets/logo/tunas-kelapa.png';
+import logoPanduDunia from '../assets/logo/pandu-dunia-wosm.png';
 
+/** Kop surat seragam semua dokumen cetak: Tunas Kelapa (kiri atas), identitas gudep di tengah, Logo Pandu Dunia/WOSM (kanan atas). */
 export function KopSurat({ gudep = null }) {
   const dariStore = useGudep();
   const G = gudep ?? dariStore; // `gudep` = data lain (pratinjau di halaman Data Gudep sebelum disimpan)
   const kop = barisKop(G);
   return (
-    <header className="flex items-center gap-4 border-b-4 border-double border-pramuka-800 pb-3">
-      <LogoMark size={64} />
+    <header className="flex items-start gap-4 border-b-4 border-double border-pramuka-800 pb-3">
+      {/* Pojok kiri atas: Tunas Kelapa (Gerakan Pramuka); pojok kanan atas: Logo Pandu Dunia (WOSM). Kotak sama lebar agar teks tepat di tengah. */}
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center">
+        <img src={logoTunasKelapa} alt="Lambang Tunas Kelapa Gerakan Pramuka" className="h-16 w-auto max-w-full object-contain" />
+      </div>
       <div className="flex-1 text-center leading-snug">
         <p className="text-xs font-semibold tracking-wide">GERAKAN PRAMUKA</p>
         <p className="text-xs">{G.kwarcab}, {G.kwarran}</p>
@@ -24,7 +30,9 @@ export function KopSurat({ gudep = null }) {
         <p className="text-xs">{kop.alamat}</p>
         {kop.kontak && <p className="text-xs">{kop.kontak}</p>}
       </div>
-      <div className="w-16" aria-hidden="true" />
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center">
+        <img src={logoPanduDunia} alt="Logo Pandu Dunia (WOSM)" className="h-16 w-16 object-contain" />
+      </div>
     </header>
   );
 }

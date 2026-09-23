@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { KATEGORI_PEMERIKSAAN, gabungHasilPemeriksaan, jumlahKategori, tabPerbaikan, totalMasalah } from '../lib/pemeriksaanLogic';
+import { nomorWaAnggota, teksWaAjakMasuk } from '../lib/eskalasiLogic';
+import { alamatDasar } from '../lib/verifikasiLogic';
 import RingkasanPerangkat from '../components/RingkasanPerangkat';
+import TombolWhatsapp from '../components/TombolWhatsapp';
 import { Icon } from '../components/ui';
 
 /** Satu kategori: judul, keterangan, jumlah, tombol "Perbaiki" (bila peran ini bisa), dan daftar yang dapat dibuka/tutup. */
@@ -43,22 +46,34 @@ function Kategori({ kategori, daftar, tab, onNav, render }) {
   );
 }
 
-const Baris = ({ kiri, kanan }) => (
-  <li className="flex items-baseline justify-between gap-2 px-3 py-1.5">
-    <span className="min-w-0 truncate font-medium">{kiri}</span>
-    {kanan && <span className="shrink-0 text-xs text-pramuka-500">{kanan}</span>}
+const Baris = ({ kiri, kanan, aksi }) => (
+  <li className={aksi ? 'flex flex-wrap items-center justify-between gap-2 px-3 py-1.5' : 'flex items-baseline justify-between gap-2 px-3 py-1.5'}>
+    {aksi ? (
+      <div className="min-w-0">
+        <p className="truncate font-medium">{kiri}</p>
+        {kanan && <p className="text-xs text-pramuka-500">{kanan}</p>}
+      </div>
+    ) : (
+      <>
+        <span className="min-w-0 truncate font-medium">{kiri}</span>
+        {kanan && <span className="shrink-0 text-xs text-pramuka-500">{kanan}</span>}
+      </>
+    )}
+    {aksi}
   </li>
 );
 
-/** Perender per kategori (bentuk baris server berbeda-beda; lihat sg_pemeriksaan_data di supabase/sumber/inti.sql). */
-const RENDER = {
+/** Perender per kategori (bentuk baris server berbeda-beda; lihat sg_pemeriksaan_data di supabase/sumber/inti.sql). `users` = untuk mencari nomor WhatsApp. */
+const RENDER = (users) => ({
   kelasLama: (x) => <Baris key={x.id} kiri={x.nama} kanan={`NIS ${x.nis || '-'}, kelas "${x.kelas || '-'}"`} />,
   tanpaNta: (x) => <Baris key={x.id} kiri={x.nama} kanan={`NIS ${x.nis || '-'}, ${x.kelas || '-'}`} />,
   tanpaJk: (x) => <Baris key={x.id} kiri={x.nama} kanan={[x.peran, x.kelas].filter(Boolean).join(', ')} />,
   rombelTanpaPenguji: (x) => <Baris key={x.rombel} kiri={x.rombel} kanan={`${x.jumlah} Penegak aktif`} />,
   pembinaTanpaAgama: (x) => <Baris key={x.id} kiri={x.nama} />,
-  belumPernahMasuk: (x) => <Baris key={x.id} kiri={x.nama} kanan={x.peran} />,
-};
+  belumPernahMasuk: (x) => (
+    <Baris key={x.id} kiri={x.nama} kanan={x.peran} aksi={<TombolWhatsapp nomor={nomorWaAnggota(users, x.id)} nama={x.nama} teks={teksWaAjakMasuk(x.nama, alamatDasar())} />} />
+  ),
+});
 
 /**
  * Pemeriksaan Data (tahap L3, Pembina dan Admin): ringkasan masalah kualitas data yang umum, dengan tombol "Perbaiki" ke
@@ -66,7 +81,8 @@ const RENDER = {
  * `onNav(tab)` berpindah menu (sama seperti tujuan tautan Notifikasi).
  */
 export default function PemeriksaanData({ onNav }) {
-  const { api, user } = useApp();
+  const { api, user, users } = useApp();
+  const render = RENDER(users);
   const [hasil, setHasil] = useState(null);
   const [galat, setGalat] = useState('');
   const [memuat, setMemuat] = useState(true);
@@ -93,7 +109,7 @@ export default function PemeriksaanData({ onNav }) {
       {hasil && (
         <div className="grid gap-3 md:grid-cols-2">
           {KATEGORI_PEMERIKSAAN.filter((k) => k.kunci !== 'tanpaPerangkat').map((k) => (
-            <Kategori key={k.kunci} kategori={k} daftar={hasil[k.kunci] ?? []} tab={tabPerbaikan(k, user)} onNav={onNav} render={RENDER[k.kunci]} />
+            <Kategori key={k.kunci} kategori={k} daftar={hasil[k.kunci] ?? []} tab={tabPerbaikan(k, user)} onNav={onNav} render={render[k.kunci]} />
           ))}
           <div className="md:col-span-2">
             <RingkasanPerangkat />

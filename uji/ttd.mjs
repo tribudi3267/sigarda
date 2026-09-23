@@ -47,6 +47,8 @@ console.log('--- Dokumen memakai blok yang sama ---');
   const dokumen = { nomor: '001/SP/2026', tanggal: '2026-09-21', guru: { nama: 'Bu Guru', keterangan: '' }, agama: 'Kristen', penerbit: 'SMA Negeri 1 Bukateja', pesertaNama: 'Maria', nis: '2', kelas: 'XII-02', sangga: 'Elang', butir: [id], catatan: '', token: 'abc', kode: 'VRF-AAAA-BBBB', dibuatOlehNama: 'Budi', dibuatOlehJabatan: 'Pembina', penandaTanganJabatan: 'Pembina Gudep', penandaTanganNama: 'Budi Santoso', dicabutPada: null };
   const surat = render(h(SuratPengantarAgama, { dokumen }));
   ok(hitung(surat, />stempel</g) === 1 && surat.includes('Budi Santoso') && surat.includes('Pembina Gudep'), 'Surat pengantar: blok penanda tangan dari data surat, dengan tempat stempel');
+  const kiriKanan = (s) => s.indexOf('Lambang Tunas Kelapa') > -1 && s.indexOf('Logo Pandu Dunia') > s.indexOf('Lambang Tunas Kelapa') && s.indexOf('GERAKAN PRAMUKA') > s.indexOf('Lambang Tunas Kelapa') && s.indexOf('GERAKAN PRAMUKA') < s.indexOf('Logo Pandu Dunia');
+  ok(kiriKanan(surat) && kiriKanan(baQr), 'Kop surat: Tunas Kelapa di kiri, identitas gudep di tengah, Logo Pandu Dunia (WOSM) di kanan (surat pengantar dan berita acara)');
 }
 
 console.log('--- Sumber: tidak ada lagi blok tanda tangan buatan sendiri ---');

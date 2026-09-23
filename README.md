@@ -146,7 +146,7 @@ Kartu SKU, Surat Tanda Lulus, Berita Acara Sidang, Nilai Raport, dan Surat Penga
 **Berita Acara Sidang** juga memuat **QR dan kode verifikasi** (dibuat saat berita acara pertama kali dicetak; cetak ulang memakai yang sama). QR membuktikan berita acara benar tercatat di aplikasi (nomor, tanggal, pencatat, ketua sidang, Pembina, Penegak, tingkat, keputusan); dokumen sah bila bertanda tangan dan berstempel. Catatan sidang yang dihapus tidak lagi dijawab oleh QR-nya.
 
 Untuk pergantian pengurus atau pejabat pada tahun berikutnya, Admin cukup memperbarui isian ini: dokumen yang dibuat sesudahnya memakai data terbaru, sedangkan berita acara sidang dan surat pengantar yang sudah terbit tetap memuat nama saat dibuat.
-Pratinjau kop surat tampil langsung sebelum disimpan. Data tersimpan di basis data (pengaturan `gudep.data`) dan menjadi rujukan kop surat, tanda tangan, kota dan tanggal surat, halaman masuk, footer, menu, ekspor Excel, dan seluruh dokumen cetak.
+Pratinjau kop surat tampil langsung sebelum disimpan. Kop seragam di semua dokumen cetak (`KopSurat` di `src/components/DokumenSku.jsx`): lambang Tunas Kelapa Gerakan Pramuka di pojok kiri atas, identitas gudep di tengah, Logo Pandu Dunia (WOSM) di pojok kanan atas; gambarnya di `src/assets/logo/` (bersumber dari Wikimedia Commons: *Lambang Tunas Kelapa Gerakan Pramuka.png* dan *World Scout Emblem.png*, yang kedua diperkecil ke 320 px). Data tersimpan di basis data (pengaturan `gudep.data`) dan menjadi rujukan kop surat, tanda tangan, kota dan tanggal surat, halaman masuk, footer, menu, ekspor Excel, dan seluruh dokumen cetak.
 Selama belum pernah disimpan, aplikasi memakai nilai bawaan di `GUDEP_BAWAAN` pada `src/config.js`; setelah disimpan, isian yang dikosongkan tetap kosong. Halaman masuk dan verifikasi (tanpa login) hanya menerima nama gudep, ambalan, sekolah,
 dan kota (`sg_gudep_publik`); nama pejabat, NTA, alamat, dan kontak baru terbaca setelah masuk. Perubahan hanya oleh Admin (`sg_gudep_simpan`, semua isian diperiksa di server).
 
@@ -186,7 +186,7 @@ terkirim, gagal, atau penyebab yang perlu diperbaiki (push belum dikonfigurasi, 
    Secrets (Edge Functions > Secrets): `NOTIF_RAHASIA` (karangan sendiri, minimal 16 karakter), `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (mis. `mailto:pembina@sekolah.sch.id`).
 4. Beri tahu basis data alamat fungsi dan kuncinya (SQL Editor, sekali; jalankan lagi bila salah satunya berganti):
    `select sigarda.push_atur('https://KODE.supabase.co/functions/v1/notif-push', '<NOTIF_RAHASIA yang sama>', '<kunci publik VAPID>');`
-5. Buka aplikasi di HP, menu **Notifikasi**, ketuk **Aktifkan notifikasi**. Admin dan Pembina melihat berapa anggota yang sudah punya perangkat (dan daftar yang belum) di halaman yang sama.
+5. Buka aplikasi di HP, menu **Notifikasi**, ketuk **Aktifkan notifikasi**. Admin dan Pembina melihat berapa anggota yang sudah punya perangkat di halaman yang sama; **Lihat n anggota yang belum mengaktifkan notifikasi** membuka daftarnya, dan tiap nama punya tombol **Buka WhatsApp** (langsung ke nomor anggota itu, bila sudah diisi di menu Akun saya) berpesan siap-kirim yang mengajak mengaktifkan notifikasi. Daftar yang sama tampil di menu Pemeriksaan Data.
 
 Aturan dan batas: (1) **Keluar menghentikan notifikasi di perangkat itu** (langganan dihapus di server dan di peramban), agar HP bersama tidak terus menerima notifikasi akun sebelumnya; yang hanya menutup tab atau sesinya kedaluwarsa tetap menerima. Masuk lagi di perangkat yang sama mengaktifkannya kembali
 tanpa izin ulang. (2) **iPhone dan iPad**: push hanya bekerja bila aplikasi dipasang lewat *Bagikan > Tambah ke Layar Utama* dan dibuka dari sana (iOS 16.4 ke atas); halaman Notifikasi menampilkan petunjuknya. (3) Sebagian HP Android menunda notifikasi karena penghemat baterai. (4) Tidak ada saluran yang menjamin notifikasi dibaca; yang terjamin: tersimpan di Kotak Notifikasi.
@@ -401,7 +401,7 @@ Dewan Ambalan **bukan akun terpisah**: ia adalah **jabatan** (`profiles.jabatan_
 
 ### Pemeriksaan Data (tahap L3)
 Menu **Pemeriksaan Data** (Pembina dan Admin Gudep): satu halaman berisi ringkasan masalah kualitas data yang umum ditemui, dengan tombol **Perbaiki** ke menu yang tepat bila peran yang sedang masuk bisa memperbaikinya sendiri:
-- **Kelas belum format rombel baku**, **Belum ada NTA**, **Belum diisi jenis kelamin**, **Pembina belum diisi agama**, **Akun belum pernah masuk**: hanya Admin Gudep yang dapat memperbaikinya (tombol Perbaiki membuka menu Anggota); Pembina tetap melihat daftarnya agar tahu apa yang perlu diminta ke Admin.
+- **Kelas belum format rombel baku**, **Belum ada NTA**, **Belum diisi jenis kelamin**, **Pembina belum diisi agama**, **Akun belum pernah masuk**: hanya Admin Gudep yang dapat memperbaikinya (tombol Perbaiki membuka menu Anggota); Pembina tetap melihat daftarnya agar tahu apa yang perlu diminta ke Admin. Pada **Akun belum pernah masuk**, tiap nama punya tombol **Buka WhatsApp** berpesan siap-kirim yang mengajak masuk (tanpa PIN; PIN awal disampaikan Pembina/Admin langsung); nomor diambil dari menu Akun saya anggota itu, tanpa nomor Anda memilih kontak sendiri.
 - **Rombel belum ada penugasan penguji**: Pembina dan Admin dapat mengatur (tombol Perbaiki membuka menu Penugasan untuk Pembina).
 - **Perangkat notifikasi anggota**: memakai komponen yang sama dengan halaman Notifikasi (`RingkasanPerangkat`); tidak dapat diperbaiki dari sini (pemiliknya sendiri yang mengaktifkan di HP-nya).
 Kode: `src/lib/pemeriksaanLogic.js` (kategori dan tautan perbaiki menurut peran), `src/pages/PemeriksaanData.jsx`. Server: `sg_pemeriksaan_data()` (Pembina dan Admin). Dijaga pengujian `pemeriksaan-data`, `migrasi-pemeriksaan-data`.
@@ -738,7 +738,7 @@ Skrip demo membuat akun langsung di `auth.users`; bila gagal di proyek Anda, bua
 1. **Identitas dan tanda tangan**: isi di menu **Data Gudep** (Admin), tidak perlu mengubah kode; Pradana dan Pradani lewat jabatan anggota Dewan Ambalan di menu **Anggota**. `GUDEP_BAWAAN` di `src/config.js` hanya nilai awal sebelum data disimpan.
 2. **Butir SKU**: `src/data/skuData.js` sudah berisi butir resmi. Jangan mengubah `id` setelah ada data progres. Setelah mengubah data butir/portofolio, jalankan `npm run skema` dan jalankan ulang bagian katalog di database.
 3. **Anggota**: tambah lewat menu Anggota (Admin). Isi agama dengan benar karena menentukan sub-butir butir 1.
-4. **Logo**: ganti isi `src/components/LogoMark.jsx`. **Warna**: `tailwind.config.js` (`pramuka` = cokelat, `emas` = aksen).
+4. **Logo**: lambang SIGARDA di `src/components/LogoMark.jsx` (header, menu, halaman masuk); logo kop surat di `src/assets/logo/` (lihat bagian Data Gudep). **Warna**: `tailwind.config.js` (`pramuka` = cokelat, `emas` = aksen).
 
 ## Mencetak dan PDF
 

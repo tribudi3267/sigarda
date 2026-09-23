@@ -33,7 +33,7 @@ for (const nama of daftar) {
       entryPoints: [path.join(akar, 'uji', `${nama}.mjs`)], outfile: keluar, bundle: true, platform: 'node', format: 'esm',
       external: ['@electric-sql/pglite', 'exceljs', 'node:*', 'virtual:backend-lokal'], define: { 'import.meta.env': '{}' }, // komponen halaman mengimpor AppContext (supabaseClient)
       alias: { 'npm:@supabase/supabase-js@2': supabaseJs, 'npm:web-push@3.6.7': path.join(akar, 'uji', 'palsu', 'web-push.mjs') },
-      loader: { '.ts': 'ts' }, jsx: 'automatic', logLevel: 'silent',
+      loader: { '.ts': 'ts', '.png': 'dataurl' /* gambar (logo kop) dibundel sebagai data URL */ }, jsx: 'automatic', logLevel: 'silent',
       banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
     });
   } catch (e) { console.log(`### ${nama}: GAGAL BUNDEL ${String(e.message).split('\n')[0]}`); gagal += 1; continue; }
