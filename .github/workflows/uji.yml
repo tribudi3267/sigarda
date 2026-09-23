@@ -34,9 +34,6 @@ jobs:
         shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
-        with:
-          # Uji migrasi membaca skema dari commit lama lewat "git show <hash>:supabase/skema.sql": butuh seluruh riwayat.
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -44,3 +41,10 @@ jobs:
       - run: npm ci
       - name: Jalankan pengujian (bagian ${{ matrix.shard }} dari 4)
         run: npm run uji -- --shard=${{ matrix.shard }}/4
+      - name: Pastikan pengujian tidak mengubah berkas terlacak
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::Pengujian mengubah atau membuat berkas di repositori (lihat daftar di bawah). Uji harus menulis ke folder sementara (os.tmpdir() atau .uji), bukan ke repositori."
+            git status --short
+            exit 1
+          fi

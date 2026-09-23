@@ -1,7 +1,7 @@
 // Migrasi Periksa Data untuk Dewan Ambalan: kesetaraan dengan skema baru, data utuh, idempoten, peran ditegakkan, dan gagal jelas bila prasyarat belum ada.
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { skemaLama } from '../scripts/skema-lama.mjs';
 import { siapkanPg, sqlSebagai } from '../src/lokal/klienFake.js';
 import { isiDataContoh, isiStatusContoh } from '../src/lokal/seedLokal.js';
 
@@ -12,7 +12,7 @@ const stub = readFileSync(`${P}/supabase/lokal/stub.sql`, 'utf8');
 const bersih = (s) => s.replace(/^﻿/, '').replace(/\r\n/g, '\n');
 const MP = bersih(readFileSync(`${P}/supabase/migrasi/2026-09-periksa-dewan.sql`, 'utf8'));
 
-const skemaDari = (ref) => (ref.startsWith('git:') ? execFileSync('git', ['show', `${ref.slice(4)}:supabase/skema.sql`], { cwd: P, encoding: 'utf8', maxBuffer: 1 << 26 }) : readFileSync(ref, 'utf8'));
+const skemaDari = (ref) => (ref.startsWith('git:') ? skemaLama(ref.slice(4), P) : readFileSync(ref, 'utf8'));
 const baru = async (skemaFile) => { const db = new PGlite(); await siapkanPg(db, { sqlStub: stub, sqlSkema: bersih(skemaDari(skemaFile)) }); return db; };
 const cacah = async (db) => (await db.query(`select (select count(*) from public.profiles)::int p, (select count(*) from public.sku_progress)::int s, (select count(*) from public.notifikasi)::int no, (select count(*) from auth.users)::int u`)).rows[0];
 const potret = async (db) => {

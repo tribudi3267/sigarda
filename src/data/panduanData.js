@@ -13,6 +13,7 @@ const UMUM = {
     'Di HP, tambahkan SIGARDA ke Layar Utama (menu berbagi/tambah pada peramban) supaya terasa seperti aplikasi biasa dan notifikasi bekerja lebih baik, terutama di iPhone.',
     'Keluar dari akun menghentikan notifikasi HANYA di perangkat itu; perangkat lain yang masih masuk tetap menerima notifikasi.',
     'Menu Akun saya (nama di pojok) untuk mengganti PIN dan mengisi nomor WhatsApp (dipakai pengurus untuk menghubungi bila diperlukan; boleh dilewati, tetapi akan diminta lagi setiap masuk sampai diisi).',
+    'Menu Bantuan (ikon tanda tanya) memuat panduan ini untuk semua peran; tombol cetak di halaman itu menghasilkan salinan yang dapat dibagikan.',
     'Dokumen cetak (kartu SKU, surat, laporan) dibuat lewat tombol "Cetak" di aplikasi, lalu pilih "Simpan sebagai PDF" pada kotak dialog cetak peramban.',
   ],
 };
@@ -59,6 +60,7 @@ const PENEGAK = {
         'Surat Tanda Lulus: hanya dapat dicetak setelah seluruh butir satu tingkat lulus.',
       ],
     },
+    { id: 'penegak-materi', judul: 'Materi', isi: ['Bahan belajar SKU dan kepramukaan, per topik dan per butir SKU. Kolom "Cari materi" mencari menurut judul atau bagian; daftar isi membantu melompat ke bagian tertentu. Sebagian materi berupa tautan Google Drive yang dapat dipratinjau langsung.'] },
     {
       id: 'penegak-dewan',
       judul: 'Bila berjabatan Dewan Ambalan',
@@ -90,6 +92,7 @@ const DEWAN = {
     { id: 'dewan-portofolio', judul: 'Portofolio', isi: ['Meninjau dan memberi catatan pada dokumen portofolio Calon Garuda (bukan mengisi milik Penegak, hanya menilai).'] },
     { id: 'dewan-sidang', judul: 'Sidang', isi: ['Bila ditugaskan: mencatat keputusan Layak/Tidak Lulus pada Sidang Dewan Kehormatan sebelum pelantikan, dan mencetak Berita Acara.'] },
     { id: 'dewan-periksa', judul: 'Periksa Data', isi: ['Ikut membantu memeriksa data yang belum lengkap (NTA, jenis kelamin, rombel format lama, dan lainnya). Untuk akun yang belum pernah masuk dan anggota yang belum mengaktifkan notifikasi, tombol Buka WhatsApp mengirim pesan pengingat siap kirim ke Penegak dan sesama Dewan Ambalan.'] },
+    { id: 'dewan-sesi', judul: 'Sesi ujian', isi: ['Jadwal ujian bersama (tanggal, tempat), butir yang diuji, dan daftar pesertanya. Papan sesi menampilkan keadaan tiap peserta dari hasil uji yang sudah dicatat. Dewan Ambalan, Pembina, dan Admin dapat membuat dan mengubah sesi.'] },
     { id: 'dewan-tindaklanjut', judul: 'Tindak Lanjut', isi: ['Daftar Penegak yang lama tidak bergerak (SKU, absensi, atau iuran); tombol untuk membuka WhatsApp dengan pesan pengingat siap kirim.'] },
     {
       id: 'dewan-pradana',
@@ -112,6 +115,7 @@ const PEMBINA = {
     { id: 'pembina-penugasan', judul: 'Penugasan', isi: ['Menentukan Pembina/Dewan Ambalan mana yang menguji rombel mana pada satu tahun ajaran, dan penugasan khusus untuk satu Penegak tertentu.'] },
     { id: 'pembina-kepengurusan', judul: 'Pengurus', isi: ['Menetapkan jabatan Dewan Ambalan (Pradana, Pradani, dan lainnya) untuk Penegak aktif, satu per satu atau lewat berkas Excel.'] },
     { id: 'pembina-pemeriksaan', judul: 'Periksa Data (perbaikan)', isi: ['Selain melihat daftarnya seperti Dewan Ambalan, Pembina dan Admin mendapat tombol Perbaiki (tautan langsung ke menu yang tepat) untuk data yang belum lengkap. Tombol WhatsApp juga dapat dipakai untuk Pembina lain.'] },
+    { id: 'pembina-kelolamateri', judul: 'Kelola Materi', isi: ['Menambah, mengubah, menghapus, dan menggeser urutan materi. Materi dapat dihubungkan ke butir SKU tertentu dan memakai tautan Google Drive; butir SKU yang belum punya materi ditandai agar mudah dilengkapi.'] },
     { id: 'pembina-raport', judul: 'Raport', isi: ['Menilai raport ekstrakurikuler Pramuka tiap semester (skor dari kehadiran, capaian SKU, dan sikap), lalu mencetak atau mengunduh Excel per kelas.'] },
     { id: 'pembina-laporan', judul: 'Laporan', isi: ['Menyusun laporan tahunan gugus depan (Excel dan PDF) untuk diserahkan ke Kwartir Ranting, dengan tembusan Kwartir Cabang.'] },
     { id: 'pembina-agenda', judul: 'Agenda', isi: ['Menambah dan mengubah jadwal kegiatan Ambalan, serta meninjau (menyetujui atau menolak) usulan kegiatan dari Pradana/Pradani.'] },

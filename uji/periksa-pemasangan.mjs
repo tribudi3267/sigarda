@@ -2,7 +2,7 @@
 // menyatakan OK pada skema terbaru, mendeteksi KURANG/BEDA pada skema lama, sembuh sesudah migrasi dijalankan, dan tidak tertipu CRLF.
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { skemaLama } from '../scripts/skema-lama.mjs';
 import { siapkanPg, buatKlienFake, sqlSebagai } from '../src/lokal/klienFake.js';
 import { isiDataContoh } from '../src/lokal/seedLokal.js';
 import { PIN_DEMO } from '../src/lokal/pinDemo.js';
@@ -15,7 +15,7 @@ let gagal = 0, lulus = 0;
 const ok = (c, m) => { if (c) { lulus++; console.log('ok   :', m); } else { gagal++; console.log('GAGAL:', m); } };
 const bersih = (s) => s.replace(/^﻿/, '').replace(/\r\n/g, '\n');
 const stub = readFileSync(`${P}/supabase/lokal/stub.sql`, 'utf8');
-const skemaDari = (ref) => (ref === 'kini' ? readFileSync(`${P}/supabase/skema.sql`, 'utf8') : execFileSync('git', ['show', `${ref}:supabase/skema.sql`], { cwd: P, encoding: 'utf8', maxBuffer: 1 << 26 }));
+const skemaDari = (ref) => (ref === 'kini' ? readFileSync(`${P}/supabase/skema.sql`, 'utf8') : skemaLama(ref, P));
 const baru = async (ref) => { const db = new PGlite(); await siapkanPg(db, { sqlStub: stub, sqlSkema: bersih(skemaDari(ref)) }); return db; };
 const berkas = bersih(readFileSync(`${P}/supabase/demo/periksa_pemasangan.sql`, 'utf8'));
 const jalankan = async (db, sql = berkas) => (await db.query(sql)).rows;

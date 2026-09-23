@@ -34,11 +34,12 @@ console.log('\n--- Pemasangan ---');
   const bagian = (y.match(/shard:\s*\[([^\]]+)\]/) ?? [])[1]?.split(',').map((x) => Number(x.trim())) ?? [];
   const dari = Number((y.match(/--shard=\$\{\{ matrix\.shard \}\}\/(\d+)/) ?? [])[1]);
   ok(bagian.length >= 2 && bagian.length === dari && bagian.every((n, i) => n === i + 1), `matriks CI [${bagian}] cocok dengan pembagi /${dari}`);
-  ok(/fetch-depth:\s*0/.test(y), 'CI mengambil seluruh riwayat git (uji migrasi membaca skema dari commit lama)');
+  ok(!/fetch-depth/.test(y), 'CI cukup clone dangkal: uji migrasi memakai snapshot skema di supabase/riwayat, bukan riwayat git');
   ok(/pull_request:/.test(y) && /push:\s*\n\s+branches:\s*\[main\]/.test(y), 'berjalan pada pull request dan push ke main');
   ok(/permissions:\n\s+contents: read\n/.test(y), 'izin minimal (hanya baca)');
   ok(/npm run build/.test(y) && /npm ci/.test(y), 'CI membangun aplikasi dan memasang dependensi dari lockfile');
   ok(readdirSync(`${P}/uji`).length > 20, 'folder uji terbaca');
+  ok(/git status --porcelain/.test(y), 'CI menggagalkan proses bila uji mengubah atau membuat berkas di repositori');
 }
 
 console.log(`\nRINGKASAN SHARD: ${lulus} lulus, ${gagal} GAGAL`);

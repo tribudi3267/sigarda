@@ -1,0 +1,9 @@
+# Akhir baris LF di semua checkout (Windows, Linux, CI) agar berkas dan uji konsisten; berkas biner tidak disentuh.
+* text=auto eol=lf
+*.png binary
+*.gz binary
+*.xlsx binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
