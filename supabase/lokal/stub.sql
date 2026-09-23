@@ -14,7 +14,8 @@ create table auth.users (
   id uuid primary key default gen_random_uuid(),
   email text unique not null,
   encrypted_password text not null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  last_sign_in_at timestamptz   -- null = belum pernah masuk (dipakai sg_pemeriksaan_data); diisi masukDenganPassword di klienFake.js
 );
 create function auth.uid() returns uuid language sql stable as
 $$ select nullif(nullif(current_setting('request.jwt.claims', true), '')::json ->> 'sub', '')::uuid $$;

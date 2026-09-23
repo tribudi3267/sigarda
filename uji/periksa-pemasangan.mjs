@@ -86,14 +86,17 @@ console.log('\n--- Skema lama: pemeriksa menunjukkan yang belum dimigrasi ---');
   ok(r.some((x) => x.urut === 0 && /^PERIKSA/.test(x.status)), 'ringkasan menyatakan PERIKSA');
 }
 
-console.log('\n--- Sebelum L0: hanya notifikasi uji yang belum ada; migrasi menyembuhkan ---');
+console.log('\n--- Sebelum L0: notifikasi uji dan pemeriksaan data belum ada; migrasi menyembuhkan ---');
 {
   const S = await baru('9eb504d'); // tepat sebelum tahap L0 (skema sesudah fase 6b)
   const m = masalah(await jalankan(S));
-  ok(m.length === 2 && m.some((x) => /sg_notifikasi_tes/.test(x.objek) && x.status === 'KURANG') && m.some((x) => /notifikasi_jenis_check/.test(x.objek) && x.status === 'BEDA'), 'hanya dua temuan: sg_notifikasi_tes KURANG dan notifikasi_jenis_check BEDA: ' + JSON.stringify(m.map((x) => x.objek)));
+  ok(m.length === 3 && m.some((x) => /sg_notifikasi_tes/.test(x.objek) && x.status === 'KURANG') && m.some((x) => /notifikasi_jenis_check/.test(x.objek) && x.status === 'BEDA') && m.some((x) => /sg_pemeriksaan_data/.test(x.objek) && x.status === 'KURANG'),
+    'tiga temuan: sg_notifikasi_tes KURANG, notifikasi_jenis_check BEDA, sg_pemeriksaan_data KURANG: ' + JSON.stringify(m.map((x) => x.objek)));
   await S.exec(bersih(readFileSync(`${P}/supabase/migrasi/2026-09-tes-notifikasi.sql`, 'utf8')));
-  ok(masalah(await jalankan(S)).length === 0, 'sesudah migrasi 2026-09-tes-notifikasi.sql: tidak ada masalah');
+  await S.exec(bersih(readFileSync(`${P}/supabase/migrasi/2026-09-pemeriksaan-data.sql`, 'utf8')));
+  ok(masalah(await jalankan(S)).length === 0, 'sesudah migrasi tes-notifikasi dan pemeriksaan-data: tidak ada masalah');
   await S.exec(bersih(readFileSync(`${P}/supabase/migrasi/2026-09-tes-notifikasi.sql`, 'utf8')));
+  await S.exec(bersih(readFileSync(`${P}/supabase/migrasi/2026-09-pemeriksaan-data.sql`, 'utf8')));
   ok(masalah(await jalankan(S)).length === 0, 'migrasi dijalankan dua kali: tetap tidak ada masalah');
   let g = ''; const T = await baru('2a8ebc3'); try { await T.exec(bersih(readFileSync(`${P}/supabase/migrasi/2026-09-tes-notifikasi.sql`, 'utf8'))); } catch (e) { g = e.message; }
   ok(/Jalankan lebih dulu skema dan migrasi/.test(g), 'tanpa migrasi sebelumnya: gagal dengan pesan yang menuntun');

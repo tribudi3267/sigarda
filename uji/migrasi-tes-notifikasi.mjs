@@ -46,8 +46,9 @@ const bandingkan = (nama, pa, pb) => {
   }
 };
 
-// Skema "sesudah naik kelas" = skema.sql terbaru (dibuat dari inti.sql).
-const A = await baru(`${P}/supabase/skema.sql`); // skema.sql terbaru = sesudah migrasi notifikasi uji
+// Skema "sesudah notifikasi uji" = commit TEPAT sesudah migrasi ini (sebelum migrasi pemeriksaan-data), BUKAN skema.sql
+// terbaru (yang sudah memuat fungsi migrasi berikutnya juga; lihat CLAUDE.md, bagian uji migrasi).
+const A = await baru('git:bfbd14f');
 const pa = await potret(A);
 ok(pa.fungsi.some((x) => x.proname === 'sg_notifikasi_tes') && pa.batasan.some((x) => x.conname === 'notifikasi_jenis_check' && /tes/.test(x.def)), 'skema baru memuat sg_notifikasi_tes dan jenis notifikasi tes');
 

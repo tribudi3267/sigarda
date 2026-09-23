@@ -164,6 +164,7 @@ export function buatDepsEdge(pg) {
     async masukDenganPassword(email, pin) {
       const u = await cari(email);
       if (!u || u.encrypted_password !== (await hashPin(pin))) return null;
+      await pg.query('update auth.users set last_sign_in_at = now() where id = $1', [u.id]); // seperti Supabase Auth sungguhan (dipakai sg_pemeriksaan_data)
       return { access_token: `lokal.${u.id}.${Date.now()}`, refresh_token: `lokal-r.${u.id}` };
     },
     admin: {

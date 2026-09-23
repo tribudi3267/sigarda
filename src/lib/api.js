@@ -407,6 +407,10 @@ export function buatApi(klien) {
     /** Pembina dan Admin: { total, aktif, tanpa: [{ id, nama, peran, kelas }], terkonfigurasi }. */
     ringkasanPush: () => rpc('sg_push_ringkasan'),
 
+    /* ------------------------------ Pemeriksaan data (tahap L3) ------------------------------ */
+    /** Pembina dan Admin: ringkasan masalah kualitas data (lihat src/lib/pemeriksaanLogic.js untuk bentuk hasil). */
+    muatPemeriksaanData: () => rpc('sg_pemeriksaan_data'),
+
     /* ------------------------------- Materi ------------------------------- */
     simpanMateri: (m) =>
       rpc('sg_materi_simpan', {

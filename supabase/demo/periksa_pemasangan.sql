@@ -788,6 +788,7 @@ h_fungsi(skema, nama, args, isi, au, an, sv) as (values
     ('public', 'sg_naik_kelas_batalkan', 'p_batch bigint', 'dfb062d886126d7262dd450afd780a7e', true, false, true),
     ('public', 'sg_notifikasi_tandai', 'p_ids bigint[]', 'aebf3598eee6126fb4287e021c928d45', true, false, true),
     ('public', 'sg_notifikasi_tes', '', '9cf97c96da7bb16825c10586d54befb5', true, false, true),
+    ('public', 'sg_pemeriksaan_data', '', '715062a68d3f352c70b43ac179597659', true, false, true),
     ('public', 'sg_pengaturan_simpan', 'p_kunci text, p_nilai jsonb', '86557f0c05a5fc4383ee782d2dc98730', true, false, true),
     ('public', 'sg_penguji_pilihan', 'p_sku_id text, p_peserta_id uuid', '29f88a695abd9c37b6c072d92ea79c15', true, false, true),
     ('public', 'sg_penugasan_atur', 'p_tahun_ajaran text, p_penguji_id uuid, p_rombel text[], p_ada boolean', '6194df3da1fd50f58f45e8b8d3c884a5', true, false, true),
