@@ -30,6 +30,7 @@ export function petaProfil(r) {
     jabatan: atau(r.jabatan),
     jabatanDewan: atau(r.jabatan_dewan),
     jenisKelamin: atau(r.jenis_kelamin),
+    whatsapp: atau(r.whatsapp),
     status: r.status ?? 'aktif',
     statusPada: tgl(r.status_pada) ?? undefined,
     lulusTa: atau(r.lulus_ta),

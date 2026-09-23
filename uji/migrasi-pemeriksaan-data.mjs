@@ -34,8 +34,9 @@ const bandingkan = (nama, pa, pb) => {
   }
 };
 
-// Skema "sesudah migrasi" = skema.sql terbaru (dibuat dari inti.sql).
-const A = await baru(`${P}/supabase/skema.sql`);
+// Skema "sesudah migrasi" = commit TEPAT sesudah migrasi ini (sebelum migrasi cadangan), BUKAN skema.sql terbaru
+// (yang sudah memuat fungsi migrasi berikutnya juga; lihat CLAUDE.md, bagian uji migrasi).
+const A = await baru('git:e147d7c');
 const pa = await potret(A);
 ok(pa.fungsi.length === 1 && pa.hakFungsi.some((x) => x.grantee === 'authenticated'), 'skema baru memuat sg_pemeriksaan_data, dapat dipanggil authenticated');
 

@@ -3,6 +3,7 @@ import { labelJenisKelamin } from '../lib/jenisKelaminLogic';
 import { siapaBisaReset } from '../lib/pinLogic';
 import { fmtWaktu } from '../lib/format';
 import FormGantiPin from '../components/FormGantiPin';
+import FormWhatsapp from '../components/FormWhatsapp';
 import { Avatar, BadgePeran, Icon } from '../components/ui';
 
 /** Akun saya: profil singkat dan penggantian PIN oleh pemilik akun. */
@@ -67,6 +68,16 @@ export default function Akun() {
             Masukkan PIN lama, lalu PIN baru. Gunakan PIN yang tidak dipakai di tempat lain dan jangan dibagikan.
           </p>
           <FormGantiPin />
+        </section>
+
+        <section className="panel p-5 lg:col-span-2">
+          <h2 className="text-lg font-bold">Nomor WhatsApp</h2>
+          <p className="mb-4 mt-1 text-sm text-pramuka-600">
+            {user.whatsapp
+              ? `Nomor tersimpan: ${user.whatsapp}. Ubah bila nomornya berganti.`
+              : 'Belum diisi. Isi supaya Pembina atau Dewan Ambalan dapat menghubungi Anda bila diperlukan.'}
+          </p>
+          <FormWhatsapp />
         </section>
       </div>
     </div>

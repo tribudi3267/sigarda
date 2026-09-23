@@ -417,6 +417,12 @@ export function buatApi(klien) {
     /** Admin: ekspor lengkap untuk cadangan manual (tanpa akun login/hash PIN). Mencatat waktunya di server. */
     unduhCadangan: () => rpc('sg_cadangan_admin'),
 
+    /* ------------------------------ Eskalasi (tahap L5) ------------------------------ */
+    /** Menyimpan nomor WhatsApp milik sendiri (semua peran); teks kosong mengosongkannya. */
+    simpanWhatsapp: (nomor) => rpc('sg_profil_whatsapp_atur', { p_whatsapp: nomor ?? '' }),
+    /** Pembina, Dewan Ambalan, dan Admin: daftar Penegak tingkat mendesak (lihat src/lib/eskalasiLogic.js). */
+    muatEskalasi: () => rpc('sg_eskalasi_daftar'),
+
     /* ------------------------------- Materi ------------------------------- */
     simpanMateri: (m) =>
       rpc('sg_materi_simpan', {

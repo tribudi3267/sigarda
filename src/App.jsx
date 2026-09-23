@@ -28,8 +28,11 @@ import SesiUjian from './pages/SesiUjian';
 import Iuran from './pages/Iuran';
 import Notifikasi from './pages/Notifikasi';
 import PemeriksaanData from './pages/PemeriksaanData';
+import TindakLanjut from './pages/TindakLanjut';
 import BannerVersi from './components/BannerVersi';
 import HalamanVerifikasi from './components/HalamanVerifikasi';
+import FormWhatsapp from './components/FormWhatsapp';
+import { Modal } from './components/ui';
 import { parameterVerifikasi } from './lib/verifikasiLogic';
 import { bolehKelolaMateri } from './lib/materiLogic';
 import LogoMark from './components/LogoMark';
@@ -38,7 +41,7 @@ import LogoMark from './components/LogoMark';
  * Menu per peran, dikelompokkan menurut fungsinya (tampil sebagai kelompok di menu samping, dan berurutan di menu bawah ponsel).
  *  Utama            : Dashboard (Penegak: Beranda atau Garuda), Notifikasi (semua peran; lencana = belum dibaca)
  *  Pengujian SKU    : Penegak: Poin SKU, Cetak. Dewan/Pembina: Antrian, Peserta, Sesi, Instrumen, Penugasan, Kepengurusan, Pemeriksaan Data (Pembina), Sidang, Cetak. Admin: Sesi, Instrumen, Sidang, Cetak
- *  Kegiatan Ambalan : Absensi, Iuran (semua peran), Portofolio (pengurus), Raport (Pembina dan Admin)
+ *  Kegiatan Ambalan : Absensi, Iuran (semua peran), Portofolio, Tindak Lanjut (tahap L5, pengurus), Raport (Pembina dan Admin)
  *  Materi           : Materi, Kelola Materi (Pembina dan Admin)
  *  Pengelolaan      : Anggota, Kepengurusan, Naik Kelas, Data Gudep, Pemeriksaan Data (Admin). Kepengurusan Dewan Ambalan juga untuk Pembina (di Pengujian SKU).
  * Pemeriksaan Data (tahap L3, Pembina dan Admin): ringkasan masalah kualitas data umum (lihat src/lib/pemeriksaanLogic.js).
@@ -59,6 +62,7 @@ function buatNav(user, peran, belumDibaca = 0) {
   const penugasan = { id: 'penugasan', label: 'Penugasan', ikon: 'penugasan' };
   const kepengurusan = { id: 'kepengurusan', label: 'Kepengurusan', ikon: 'perisai' };
   const pemeriksaan = { id: 'pemeriksaan', label: 'Pemeriksaan Data', ikon: 'cari' };
+  const tindakLanjut = { id: 'tindaklanjut', label: 'Tindak Lanjut', ikon: 'lonceng' };
   const kelolaBoleh = bolehKelolaMateri(user);
   const notifikasi = { id: 'notifikasi', label: 'Notifikasi', ikon: 'lonceng', lencana: belumDibaca };
 
@@ -74,14 +78,14 @@ function buatNav(user, peran, belumDibaca = 0) {
     return [
       { judul: 'Utama', item: [{ id: 'dashboard', label: 'Dashboard', ikon: 'dashboard' }, notifikasi] },
       { judul: 'Pengujian SKU', item: [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }, { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, sesi, ...(kelolaBoleh ? [instrumen, penugasan, kepengurusan, pemeriksaan] : []), sidang, cetak] },
-      { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, ...(kelolaBoleh ? [raport] : [])] },
+      { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, ...(kelolaBoleh ? [raport] : [])] },
       { judul: 'Materi', item: [materi, ...(kelolaBoleh ? [kelola] : [])] },
     ];
   }
   return [
     { judul: 'Utama', item: [{ id: 'rekap', label: 'Dashboard', ikon: 'dashboard' }, notifikasi] },
     { judul: 'Pengujian SKU', item: [sesi, instrumen, sidang, cetak] },
-    { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, raport] },
+    { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, raport] },
     { judul: 'Materi', item: [materi, kelola] },
     { judul: 'Pengelolaan', item: [{ id: 'anggota', label: 'Anggota', ikon: 'anggota' }, kepengurusan, { id: 'naikkelas', label: 'Naik Kelas', ikon: 'naikkelas' }, { id: 'gudep', label: 'Data Gudep', ikon: 'perisai' }, pemeriksaan] },
   ];
@@ -148,12 +152,14 @@ function Shell() {
   const [tingkat, setTingkat] = useState('Bantara');
   const [materiButir, setMateriButir] = useState(null); // butir SKU yang dituju tombol "Materi"
   const [kelolaId, setKelolaId] = useState(null); // materi yang langsung dibuka di Kelola Materi ('baru' = tambah)
+  const [waTutup, setWaTutup] = useState(false); // ajakan isi nomor WhatsApp ditutup/dilewati untuk sesi masuk ini (tahap L5)
 
   useEffect(() => {
     setTab(null);
     setFokusId(null);
     setMateriButir(null);
     setKelolaId(null);
+    setWaTutup(false); // setiap masuk baru (termasuk akun yang sama masuk lagi) ajakan tampil lagi bila nomor belum diisi
   }, [user?.id, user?.role]);
 
   // Klik notifikasi push membuka aplikasi di Kotak Notifikasi: lewat alamat ?buka=notifikasi (aplikasi tertutup) atau pesan service worker (sudah terbuka).
@@ -252,6 +258,8 @@ function Shell() {
     isi = <Kepengurusan />;
   } else if (tabAktif === 'pemeriksaan' && bolehKelolaMateri(user)) {
     isi = <PemeriksaanData onNav={pindah} />;
+  } else if (tabAktif === 'tindaklanjut' && user.role !== 'peserta') {
+    isi = <TindakLanjut onNav={(id) => pindah(user.role === 'penguji' ? 'peserta' : 'rekap', id)} />;
   } else if (tabAktif === 'materi') {
     isi = <Materi key={materiButir ?? 'semua'} butirAwal={materiButir} onKelola={bukaKelola} />;
   } else if (tabAktif === 'kelolamateri') {
@@ -298,9 +306,19 @@ function Shell() {
   }
 
   return (
-    <Layout nav={nav} grup={grup} tab={tabAktif} setTab={pilihTab}>
-      {isi}
-    </Layout>
+    <>
+      <Layout nav={nav} grup={grup} tab={tabAktif} setTab={pilihTab}>
+        {isi}
+      </Layout>
+      {/* Ajakan isi nomor WhatsApp (tahap L5): satu kali per masuk, dapat dilewati, tampil lagi pada masuk berikutnya bila masih kosong. */}
+      <Modal buka={!user.whatsapp && !waTutup} tutup={() => setWaTutup(true)} judul="Isi nomor WhatsApp">
+        <p className="mb-4 text-sm text-pramuka-600">
+          Supaya Pembina atau Dewan Ambalan dapat menghubungi Anda bila diperlukan (mis. SKU sudah lama tidak bergerak). Boleh dilewati; akan
+          ditanyakan lagi lain kali sampai diisi.
+        </p>
+        <FormWhatsapp onSelesai={() => setWaTutup(true)} onLewati={() => setWaTutup(true)} />
+      </Modal>
+    </>
   );
 }
 

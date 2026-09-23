@@ -347,6 +347,20 @@ Setiap kali cadangan diunduh, waktunya dicatat (pengaturan `cadangan.terakhir`).
 
 Kode: `src/lib/cadanganLogic.js` (nama berkas unduhan, `perluCadangan`), panel `CadanganData` di `src/pages/DataGudep.jsx`. Server: `sg_cadangan_admin()`, `sg_cadangan_status()` (keduanya Admin-only). Dijaga pengujian `cadangan`, `migrasi-cadangan`.
 
+### Eskalasi tidak bergerak (tahap L5)
+Nomor **WhatsApp** (`profiles.whatsapp`, opsional, hanya format yang diperiksa) diisi sendiri oleh pemilik akun (semua peran) lewat menu **Akun saya**, atau lewat ajakan sekali per masuk (dapat dilewati dengan "Isi nanti"; ditanyakan lagi pada masuk berikutnya bila masih kosong). Kode: `src/components/FormWhatsapp.jsx`, ajakan di `src/App.jsx` (`Shell`, state `waTutup`). Server: `sg_profil_whatsapp_atur(text)`.
+
+Tangga pengingat (ramah → tegas → mendesak) untuk Penegak yang **tidak bergerak**, dihitung ULANG setiap hari dari data sumbernya (bukan status tersimpan, jadi otomatis "reset" begitu ada tindak lanjut):
+- **SKU**: tidak ada `sku_progress`/`sku_riwayat` baru selama **7 hari**.
+- **Absensi**: **2 kali** latihan Jumat *terakhir* berturut-turut berstatus Alpa (izin/sakit tidak dihitung).
+- **Iuran**: **2 kali** latihan Jumat *terakhir* berturut-turut tanpa baris iuran (terpisah dari status absensi).
+
+Tingkat dihitung dari hari sejak kejadian pertama kali terpenuhi: **1 ramah** (hari 0-3), **2 tegas** (4-7), **3 mendesak** (8+, juga memberi tahu **semua pengurus** — Pembina, Dewan Ambalan, Admin — dan masuk daftar **Tindak Lanjut**). Maksimal 1 notifikasi per hari per kejadian; dijalankan dari `sigarda.notif_pengingat()` (pengingat harian 07.00 WIB) sehingga otomatis di luar **jam senyap 22.00-04.00 WIB** tanpa logika tambahan.
+
+Menu **Tindak Lanjut** (Pembina, Dewan Ambalan, Admin): daftar Penegak tingkat mendesak dengan tombol **Buka WhatsApp** (wa.me, teks siap-kirim; langsung ke nomor bila sudah diisi, atau tanpa nomor — pengguna memilih kontak sendiri — bila belum). **Tidak ada** pemeriksaan nomor benar-benar terdaftar/aktif di WhatsApp (perlu layanan WhatsApp Business API berbayar, di luar cakupan).
+
+Kode: `src/lib/eskalasiLogic.js` (`waLink`, `teksWaSiap`, `whatsappSah`, label), `src/pages/TindakLanjut.jsx`. Server: `sigarda.eskalasi_mulai_sku/absensi/iuran`, `eskalasi_tingkat`, `eskalasi_proses()`, `sg_eskalasi_daftar()` (Pembina/Dewan/Admin). Dijaga pengujian `eskalasi`, `migrasi-eskalasi`.
+
 ### Filter dinamis
 Semua filter (status, sangga, kelas, peran, agama, jenis kelamin, tahun ajaran) dibangun dari data yang ada. Filter **Status** (Aktif bawaan, Nonaktif, Alumni, Semua status) ada pada Anggota, Peserta, Reset PIN, Raport, dan rekap Absensi; daftar lain hanya memuat Penegak aktif.
 **Filter jenis kelamin** (Laki-laki, Perempuan, dan **Belum diisi** selama masih ada anggota yang kosong) tersedia pada semua daftar Penegak yang memakai filter: Anggota, Dashboard Admin, Peserta, Absensi (rekap dan catat), Portofolio, Raport, Sidang, Reset PIN, dan Rekap Iuran. Keterangan filter pada berkas Excel ikut menyebutnya.
@@ -526,6 +540,8 @@ bila kelak jauh lebih besar, langkah berikutnya memuat riwayat SKU per anggota s
 - [`2026-09-pemeriksaan-data.sql`](supabase/migrasi/2026-09-pemeriksaan-data.sql): Pemeriksaan Data (tahap L3). Hanya menambah fungsi `sg_pemeriksaan_data()` (Pembina dan Admin); tidak ada tabel atau kolom baru. Jalankan **setelah** `2026-09-tes-notifikasi.sql` (bila belum, berhenti dengan pesan yang menuntun). Edge Function **tidak berubah**. Tidak menghapus data; aman diulang. Jalankan sebelum `git push` (menu Pemeriksaan Data memanggil fungsi ini).
 
 - [`2026-09-cadangan.sql`](supabase/migrasi/2026-09-cadangan.sql): Cadangan data (tahap L4). Menambah fungsi `sg_cadangan_admin()` dan `sg_cadangan_status()` (keduanya Admin-only; tombol "Unduh cadangan" di menu Data Gudep) dan memperbarui `sigarda.notif_pengingat()` (pengingat bulanan ke Admin bila cadangan sudah sebulan tidak diunduh). Tidak ada tabel atau kolom baru. Jalankan **setelah** `2026-09-pemeriksaan-data.sql` (bila belum, berhenti dengan pesan yang menuntun). Edge Function **tidak berubah**. Tidak menghapus data; aman diulang. Jalankan sebelum `git push` (menu Data Gudep memanggil fungsi ini).
+
+- [`2026-09-eskalasi.sql`](supabase/migrasi/2026-09-eskalasi.sql): Eskalasi tidak bergerak (tahap L5). Menambah kolom `profiles.whatsapp` (opsional), nilai `'eskalasi'` pada `notifikasi.jenis`, fungsi `sg_profil_whatsapp_atur(text)` dan `sg_eskalasi_daftar()` (menu Tindak Lanjut), dan memperbarui `sigarda.notif_pengingat()` (tangga pengingat SKU/absensi/iuran tidak bergerak). Jalankan **setelah** `2026-09-cadangan.sql` (bila belum, berhenti dengan pesan yang menuntun). Edge Function **tidak berubah**. Tidak menghapus data; aman diulang. Jalankan sebelum `git push` (menu Akun saya dan Tindak Lanjut memanggil fungsi ini).
 
 **Memeriksa pemasangan.** Sesudah menjalankan migrasi dan men-deploy Edge Function, jalankan [`supabase/demo/periksa_pemasangan.sql`](supabase/demo/periksa_pemasangan.sql) di SQL Editor (hanya membaca; aman diulang). Hasilnya ringkasan per kategori (tabel, kolom, batasan, indeks, kebijakan akses, pemicu, fungsi) lalu daftar yang bermasalah:
 `KURANG` (belum ada, migrasi belum dijalankan), `BEDA` (ada tetapi isi fungsi bukan versi terbaru, jalankan ulang migrasi yang menimpanya), `HAK BEDA` atau `RLS BEDA`; ditambah pemeriksaan lingkungan notifikasi (pg_net, pg_cron, jadwal pengingat, konfigurasi push). Semua OK = database mutakhir.

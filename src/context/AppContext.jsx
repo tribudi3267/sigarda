@@ -1078,6 +1078,20 @@ export function AppProvider({ children }) {
       })
       : Promise.resolve(ditolak(notify, 'Hanya Admin Gudep yang dapat mengubah data gudep.'));
 
+  /* ---------------- Nomor WhatsApp milik sendiri (tahap L5) ---------------- */
+  const simpanWhatsapp = (nomor) =>
+    aksi(api().simpanWhatsapp(nomor), {
+      sukses: nomor ? 'Nomor WhatsApp tersimpan.' : 'Nomor WhatsApp dikosongkan.',
+      sesudah: async () => { setDb((d) => ({ ...d, users: d.users.map((u) => (u.id === sesiId ? { ...u, whatsapp: nomor || undefined } : u)) })); },
+    });
+
+  /* ---------------- Eskalasi: daftar Tindak Lanjut (Pembina, Dewan Ambalan, Admin) ---------------- */
+  const muatEskalasi = async () => {
+    const r = await api().muatEskalasi();
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  };
+
   /* ---------------- Dokumen terbit (surat pengantar ke guru agama) ---------------- */
   const MSG_SURAT = 'Hanya Pembina atau Admin Gudep yang dapat menerbitkan dan mencabut surat pengantar.';
   const bolehSurat = user?.role === 'admin' || (user?.role === 'penguji' && user.jabatan === 'Pembina');
@@ -1178,7 +1192,7 @@ export function AppProvider({ children }) {
     buatSesiAbsen, setStatusAbsen, tandaiBanyakAbsen, hapusSesiAbsen, semesterSiap, pastikanAbsensi,
     gantiPin, resetPin,
     simpanAnggota, imporAnggota, hapusAnggota, perbaruiRombel, lengkapiJenisKelamin,
-    simpanGudep,
+    simpanGudep, simpanWhatsapp, muatEskalasi,
     dokumen: db.dokumen, muatDokumen, terbitkanSuratAgama, cabutDokumen, bolehSurat,
     penugasan: db.penugasan, penugasanPeserta: db.penugasanPeserta, guruAgama: db.guruAgama, muatPenugasan, muatLogPenugasan, aturPenugasan, aturPenugasanPeserta, salinPenugasan, simpanGuruAgama, hapusGuruAgama, bolehAturPenugasan,
     bolehKepengurusan, terapkanKepengurusan, aturJabatanDewan, arsipkanDewanLama, muatLogKepengurusan,
