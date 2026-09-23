@@ -45,11 +45,11 @@ import LogoMark from './components/LogoMark';
 /**
  * Menu per peran, dikelompokkan menurut fungsinya (tampil sebagai kelompok di menu samping, dan berurutan di menu bawah ponsel).
  *  Utama            : Dashboard (Penegak: Beranda atau Garuda), Notifikasi (semua peran; lencana = belum dibaca), Bantuan (tahap L10, semua peran)
- *  Pengujian SKU    : Penegak: Poin SKU, Cetak. Dewan/Pembina: Antrian, Peserta, Sesi, Instrumen, Penugasan, Kepengurusan, Pemeriksaan Data (Pembina), Sidang, Cetak. Admin: Sesi, Instrumen, Sidang, Cetak
+ *  Pengujian SKU    : Penegak: Poin SKU, Cetak. Dewan/Pembina: Antrian, Peserta, Sesi, Instrumen, Penugasan, Pengurus (Pembina), Periksa Data (Dewan dan Pembina), Sidang, Cetak. Admin: Sesi, Instrumen, Sidang, Cetak
  *  Kegiatan Ambalan : Absensi, Iuran, Agenda (tahap L6, semua peran), Portofolio, Tindak Lanjut (tahap L5, pengurus), Raport dan Laporan (tahap L8, Pembina dan Admin)
  *  Materi           : Materi, Kelola Materi (Pembina dan Admin)
- *  Pengelolaan      : Anggota, Kepengurusan, Naik Kelas, Data Gudep, Pemeriksaan Data (Admin). Kepengurusan Dewan Ambalan juga untuk Pembina (di Pengujian SKU).
- * Pemeriksaan Data (tahap L3, Pembina dan Admin): ringkasan masalah kualitas data umum (lihat src/lib/pemeriksaanLogic.js).
+ *  Pengelolaan      : Anggota, Pengurus, Naik Kelas, Data Gudep, Periksa Data (Admin). Menu Pengurus (Kepengurusan Dewan Ambalan) juga untuk Pembina (di Pengujian SKU).
+ * Periksa Data (tahap L3; Pembina, Dewan Ambalan, dan Admin): ringkasan masalah kualitas data umum (lihat src/lib/pemeriksaanLogic.js).
  * Dewan Ambalan = jabatan pada akun Penegak: pemegangnya memilih tampilan Penegak atau Dewan (user.role berubah menjadi 'penguji' pada tampilan Dewan).
  * Akun saya dan Reset PIN anggota (pengurus) tidak ada di daftar ini: keduanya di menu akun (nama pengguna di menu samping atau header).
  */
@@ -66,8 +66,8 @@ function buatNav(user, peran, belumDibaca = 0) {
   const sesi = { id: 'sesi', label: 'Sesi ujian', ikon: 'sesi' };
   const cetak = { id: 'cetak', label: 'Cetak', ikon: 'cetak' };
   const penugasan = { id: 'penugasan', label: 'Penugasan', ikon: 'penugasan' };
-  const kepengurusan = { id: 'kepengurusan', label: 'Kepengurusan', ikon: 'perisai' };
-  const pemeriksaan = { id: 'pemeriksaan', label: 'Pemeriksaan Data', ikon: 'cari' };
+  const kepengurusan = { id: 'kepengurusan', label: 'Pengurus', ikon: 'perisai' };
+  const pemeriksaan = { id: 'pemeriksaan', label: 'Periksa Data', ikon: 'cari' };
   const tindakLanjut = { id: 'tindaklanjut', label: 'Tindak Lanjut', ikon: 'lonceng' };
   const agenda = { id: 'agenda', label: 'Agenda', ikon: 'kalender' };
   const kelolaBoleh = bolehKelolaMateri(user);
@@ -85,7 +85,7 @@ function buatNav(user, peran, belumDibaca = 0) {
   if (user.role === 'penguji') {
     return [
       { judul: 'Utama', item: [{ id: 'dashboard', label: 'Dashboard', ikon: 'dashboard' }, notifikasi, bantuan] },
-      { judul: 'Pengujian SKU', item: [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }, { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, sesi, ...(kelolaBoleh ? [instrumen, penugasan, kepengurusan, pemeriksaan] : []), sidang, cetak] },
+      { judul: 'Pengujian SKU', item: [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }, { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, sesi, ...(kelolaBoleh ? [instrumen, penugasan, kepengurusan] : []), pemeriksaan, sidang, cetak] },
       { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, ...(kelolaBoleh ? [raport, laporan] : [])] },
       { judul: 'Materi', item: [materi, ...(kelolaBoleh ? [kelola] : [])] },
     ];
@@ -268,7 +268,7 @@ function Shell() {
     isi = <Penugasan />;
   } else if (tabAktif === 'kepengurusan' && (user.role === 'admin' || (user.role === 'penguji' && user.jabatan === 'Pembina'))) {
     isi = <Kepengurusan />;
-  } else if (tabAktif === 'pemeriksaan' && bolehKelolaMateri(user)) {
+  } else if (tabAktif === 'pemeriksaan' && user.role !== 'peserta') {
     isi = <PemeriksaanData onNav={pindah} />;
   } else if (tabAktif === 'tindaklanjut' && user.role !== 'peserta') {
     isi = <TindakLanjut onNav={(id) => pindah(user.role === 'penguji' ? 'peserta' : 'rekap', id)} />;

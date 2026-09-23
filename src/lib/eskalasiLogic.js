@@ -49,6 +49,18 @@ export function teksWaAjakMasuk(nama, alamat = '') {
     + 'Kalau lupa PIN awal atau ada kendala, kabari kami ya, nanti dibantu. Terima kasih.';
 }
 
+/**
+ * Siapa boleh menghubungi siapa lewat tombol WhatsApp di Periksa Data dan daftar perangkat notifikasi. `peran` = label peran pada baris server
+ * ('Penegak', 'Pembina', 'Admin Gudep', selain itu Dewan Ambalan). Pembina dan Admin: Penegak, Dewan Ambalan, dan sesama Pembina; Dewan Ambalan:
+ * Penegak dan sesama Dewan. Admin Gudep tidak pernah dihubungi lewat tombol ini; diri sendiri juga tidak. `pengguna` = akun bentuk tampilan.
+ */
+export function bolehDihubungi(pengguna, { id, peran } = {}) {
+  if (!pengguna || (id && id === pengguna.id) || peran === 'Admin Gudep') return false;
+  const pembinaAtauAdmin = pengguna.role === 'admin' || (pengguna.role === 'penguji' && pengguna.jabatan === 'Pembina');
+  if (peran === 'Pembina') return pembinaAtauAdmin;
+  return pembinaAtauAdmin || pengguna.role === 'penguji';
+}
+
 /** Nomor WhatsApp tersimpan milik anggota `id` pada daftar `users` (bentuk tampilan); '' bila belum diisi atau formatnya tidak sah. */
 export function nomorWaAnggota(users, id) {
   const nomor = (users ?? []).find((u) => u.id === id)?.whatsapp;

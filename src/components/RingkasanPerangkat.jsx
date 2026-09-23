@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { nomorWaAnggota, teksWaAktifkanNotifikasi } from '../lib/eskalasiLogic';
+import { bolehDihubungi, nomorWaAnggota, teksWaAktifkanNotifikasi } from '../lib/eskalasiLogic';
 import TombolWhatsapp from './TombolWhatsapp';
 
 /**
- * Pembina dan Admin: berapa anggota yang sudah punya perangkat notifikasi, dan siapa yang belum (agar bisa diingatkan mengaktifkannya).
+ * Pengurus (Pembina, Dewan Ambalan, Admin): berapa anggota yang sudah punya perangkat notifikasi, dan siapa yang belum (agar bisa diingatkan mengaktifkannya).
  * Tiap anggota yang belum punya tombol WhatsApp berpesan siap-kirim; nomor diambil dari profil (`users`), tanpa nomor pengguna memilih kontak sendiri.
  */
 export default function RingkasanPerangkat() {
-  const { api, users } = useApp();
+  const { api, users, user } = useApp();
   const [d, setD] = useState(null);
   const [galat, setGalat] = useState('');
   const [buka, setBuka] = useState(false);
@@ -48,7 +48,7 @@ export default function RingkasanPerangkat() {
                       <p className="truncate font-medium">{a.nama}</p>
                       <p className="text-xs text-pramuka-500">{[a.peran, a.kelas].filter(Boolean).join(', ')}</p>
                     </div>
-                    <TombolWhatsapp nomor={nomor} nama={a.nama} teks={teksWaAktifkanNotifikasi(a.nama)} />
+                    {bolehDihubungi(user, a) && <TombolWhatsapp nomor={nomor} nama={a.nama} teks={teksWaAktifkanNotifikasi(a.nama)} />}
                   </li>
                 );
               })}

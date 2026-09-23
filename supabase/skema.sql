@@ -3742,12 +3742,14 @@ begin
   delete from public.push_langganan where endpoint = p_endpoint and penerima_id = auth.uid();
 end $$;
 
--- Pembina dan Admin: berapa anggota yang punya perangkat notifikasi, dan siapa yang belum.
+-- ===== Ringkasan perangkat notifikasi: fungsi (dipakai migrasi periksa-dewan) =====
+-- Pengurus (Pembina, Dewan Ambalan, Admin): berapa anggota yang punya perangkat notifikasi, dan siapa yang belum.
+-- Dewan Ambalan ikut membantu memeriksa (migrasi periksa-dewan); tombol WhatsApp per orang dibatasi di klien menurut peran (eskalasiLogic.bolehDihubungi).
 create function public.sg_push_ringkasan() returns jsonb language plpgsql stable security definer set search_path = public as
 $$
 begin
   perform sigarda.wajib_aktif();
-  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat melihat ringkasan perangkat.'; end if;
+  if not sigarda.pengurus() then raise exception 'Hanya pengurus (Pembina, Dewan Ambalan, dan Admin Gudep) yang dapat melihat ringkasan perangkat.'; end if;
   return (
     with a as (
       select p.id, p.nama, p.role, p.jabatan, p.kelas, exists (select 1 from public.push_langganan l where l.penerima_id = p.id) as ada
@@ -3763,9 +3765,10 @@ begin
     )
   );
 end $$;
+-- ===== akhir ringkasan perangkat notifikasi =====
 
 -- ===== Pemeriksaan data (tahap L3): fungsi =====
--- Pembina dan Admin: ringkasan masalah kualitas data yang umum ditemui (kelas belum format rombel baku, NTA kosong, jenis kelamin kosong,
+-- Pengurus (Pembina, Dewan Ambalan, Admin; Dewan ikut membantu memeriksa sejak migrasi periksa-dewan): ringkasan masalah kualitas data yang umum ditemui (kelas belum format rombel baku, NTA kosong, jenis kelamin kosong,
 -- rombel tanpa penugasan penguji, Pembina tanpa agama, akun yang belum pernah masuk). Sebagian besar hanya dapat diperbaiki Admin Gudep
 -- (lihat sg_anggota_jk_atur, sg_rombel_perbarui, sg_anggota_nta_atur, sg_anggota_agama_atur); Pembina tetap dapat melihatnya agar tahu apa
 -- yang perlu diminta ke Admin. "Perangkat tanpa notifikasi" TIDAK diulang di sini: sudah ada di sg_push_ringkasan. Tiap daftar dibatasi 300 baris.
@@ -3775,7 +3778,7 @@ $$
 declare v_ta text := sigarda.tahun_ajaran_kini();
 begin
   perform sigarda.wajib_aktif();
-  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat melihat pemeriksaan data.'; end if;
+  if not sigarda.pengurus() then raise exception 'Hanya pengurus (Pembina, Dewan Ambalan, dan Admin Gudep) yang dapat melihat pemeriksaan data.'; end if;
   return jsonb_build_object(
     'kelasLama', coalesce((
       select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'nis', x.nis, 'kelas', x.kelas) order by x.nis)

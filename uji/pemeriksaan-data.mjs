@@ -63,13 +63,17 @@ console.log('\n--- sg_pemeriksaan_data (server, PGlite + data contoh) ---');
   const admin = await sesi('admin');
   const pembina = await sesi('pembina');
   const peserta = await sesi('10231'); // Penegak biasa: tidak boleh memanggil
+  const dewanLama = await sesi('dewan'); // akun Dewan lama
+  const dewanPenegak = await sesi('10008'); // Penegak berjabatan (Sekretaris)
 
   const rAdmin = await admin.muatPemeriksaanData();
   ok(rAdmin.ok, `Admin dapat memuat pemeriksaan data (${rAdmin.ok ? 'ok' : rAdmin.pesan})`);
   const rPembina = await pembina.muatPemeriksaanData();
   ok(rPembina.ok, 'Pembina dapat memuat pemeriksaan data');
+  ok((await dewanLama.muatPemeriksaanData()).ok && (await dewanPenegak.muatPemeriksaanData()).ok, 'Dewan Ambalan (akun lama dan Penegak berjabatan) dapat memuat pemeriksaan data');
+  ok((await dewanLama.ringkasanPush()).ok && (await dewanPenegak.ringkasanPush()).ok, 'Dewan Ambalan dapat memuat ringkasan perangkat notifikasi');
   const rPeserta = await peserta.muatPemeriksaanData();
-  ok(!rPeserta.ok, 'Penegak biasa DITOLAK memanggil sg_pemeriksaan_data');
+  ok(!rPeserta.ok && /Hanya pengurus/.test(rPeserta.pesan), 'Penegak biasa DITOLAK memanggil sg_pemeriksaan_data');
 
   const d = rAdmin.data;
   ok(Object.keys(d).sort().join(',') === ['belumPernahMasuk', 'kelasLama', 'pembinaTanpaAgama', 'rombelTanpaPenguji', 'tanpaJk', 'tanpaNta'].sort().join(','), 'hasil memuat 6 kategori (tanpaPerangkat terpisah lewat sg_push_ringkasan)');
@@ -104,7 +108,7 @@ console.log('\n--- Halaman PemeriksaanData (render sisi server, konteks palsu) -
   const tampil = (nilai) => renderToStaticMarkup(h(KonteksApp.Provider, { value: nilai }, h(PemeriksaanData, { onNav: () => {} })));
   const admin = { role: 'admin' };
   const html = tampil({ user: admin, api: () => ({ muatPemeriksaanData: async () => ({ ok: false, pesan: 'x' }), ringkasanPush: async () => ({ ok: false }) }) });
-  ok(html.includes('Pemeriksaan Data') && html.includes('Memuat'), 'render awal (efek belum berjalan di sisi server): judul dan status memuat tampil, tanpa galat');
+  ok(html.includes('Periksa Data') && html.includes('Memuat'), 'render awal (efek belum berjalan di sisi server): judul dan status memuat tampil, tanpa galat');
 }
 
 console.log(`\nRINGKASAN: ${lulus} lulus, ${gagal} GAGAL.`);
