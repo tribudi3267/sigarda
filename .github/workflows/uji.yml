@@ -1,0 +1,46 @@
+name: Uji
+# Menjalankan build dan seluruh pengujian (Postgres sungguhan lewat PGlite) di GitHub pada setiap pull request dan setiap push ke main,
+# sehingga kegagalan terlihat sebelum digabung. Pengujian dibagi 4 mesin paralel (--shard) agar total waktu sekitar seperempat.
+# Tidak memakai rahasia apa pun dan tidak menyentuh Supabase asli.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: uji-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+  uji:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Uji migrasi membaca skema dari commit lama lewat "git show <hash>:supabase/skema.sql": butuh seluruh riwayat.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Jalankan pengujian (bagian ${{ matrix.shard }} dari 4)
+        run: npm run uji -- --shard=${{ matrix.shard }}/4
