@@ -325,6 +325,21 @@ Kode: `src/lib/laporanLogic.js` (murni: `rentangLaporan`, `rekapKeanggotaan`, `r
 (anggota, progres SKU, Agenda) atau lewat fungsi server yang sudah ada dan sudah menerima rentang tanggal bebas
 (`sg_iuran_agregat` lewat `muatIuranAgregat`, kehadiran lewat `muatHadirRentang`). Dijaga pengujian `laporan`.
 
+### Bantuan: panduan pengguna (tahap L10)
+Menu **Bantuan** (ikon tanda tanya, kelompok Utama, **semua peran**) memuat panduan pemakaian ringkas untuk empat peran: **Penegak,
+Dewan Ambalan, Pembina, dan Admin Gudep**. Panduan yang tampil pertama menyesuaikan peran dan tampilan yang sedang aktif (mis.
+Penegak berjabatan Dewan dalam tampilan Dewan melihat panduan Dewan Ambalan lebih dulu); tab di atas halaman memungkinkan membaca
+panduan peran lain (tidak ada yang dirahasiakan). Tiap peran punya daftar isi (di ponsel berupa bilah yang membuka daftar), dan bagian
+"Berlaku untuk semua peran" (PIN, notifikasi, pasang di Layar Utama HP, Akun saya, cara cetak).
+
+**Dokumen yang dapat dibagikan:** tombol **"Cetak atau simpan PDF"** pada halaman itu mencetak panduan peran yang sedang dipilih
+(pola cetak yang sama dengan dokumen lain di aplikasi: pilih "Simpan sebagai PDF" pada dialog cetak browser), jadi satu sumber isi
+untuk layar dan berkas -- tidak ada salinan terpisah yang bisa usang.
+
+**Memperbarui isi panduan:** semua teks ada di `src/data/panduanData.js` (data murni, bukan kode tampilan); ubah di sana lalu
+jalankan `npm run uji -- panduan`, yang memeriksa setiap bagian punya judul dan isi, dan id bagian tidak bentrok (dipakai sebagai
+jangkar daftar isi). Kode: `src/lib/panduanLogic.js` (`panduanAwal`), halaman `src/pages/Bantuan.jsx`.
+
 ### Instrumen penilaian SKU
 Tiap unit SKU (butir; butir agama per sub-butir, total 90 unit) dapat punya **instrumen**: cara uji, instruksi penguji, dan 1-15 kriteria (jenis Lisan/Praktik/Bukti kegiatan/Pengamatan, bobot 1-5, tanda **Wajib**, panduan penguji).
 - **Penilaian**: penguji memberi nilai 1-5 pada tiap kriteria di lembar penilaian. **Skor** (0-100) = 20 x jumlah(nilai x bobot) / jumlah(bobot), dibulatkan setengah ke atas. **Saran LULUS** bila skor mencapai ambang (bawaan 75) dan, bila "kriteria wajib menjadi syarat lulus" menyala (bawaan: menyala), setiap kriteria wajib bernilai minimal 3. Predikat: 90 ke atas Sangat baik, 75 ke atas Baik, selebihnya Cukup. Semua angka dapat diatur di tab Pengaturan.

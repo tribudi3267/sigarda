@@ -203,7 +203,7 @@ console.log('\n--- Pemasangan PWA dan aplikasi ---');
   const main = sumber('src/main.jsx');
   ok(/import\.meta\.env\.PROD/.test(main) && /daftarkanSW/.test(main), 'service worker hanya didaftarkan pada build terbit');
   const app = sumber('src/App.jsx');
-  ok((app.match(/, notifikasi\] \}/g) ?? []).length === 3 && /tabAktif === 'notifikasi'/.test(app) && /buka=notifikasi|params\.get\('buka'\)/.test(app) && /<BannerVersi \/>/.test(app), 'menu Notifikasi untuk ketiga peran, halaman, pembukaan dari klik notifikasi, dan banner versi baru');
+  ok((app.match(/, notifikasi(, bantuan)?\] \}/g) ?? []).length === 3 && /tabAktif === 'notifikasi'/.test(app) && /buka=notifikasi|params\.get\('buka'\)/.test(app) && /<BannerVersi \/>/.test(app), 'menu Notifikasi untuk ketiga peran, halaman, pembukaan dari klik notifikasi, dan banner versi baru');
   ok(/LencanaMenu/.test(sumber('src/components/MenuSamping.jsx')) && /LencanaMenu/.test(sumber('src/components/MenuBawah.jsx')), 'lencana belum dibaca tampil di menu samping dan menu bawah');
 }
 
