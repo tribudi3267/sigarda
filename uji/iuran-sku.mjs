@@ -22,9 +22,9 @@ const anon = buatKlienFake(pg);
 const rpc = async (k, nama, args) => { const { data, error } = await k.rpc(nama, args); return { data, err: error?.message ?? null }; };
 const ahmad = (await q(`select id from public.profiles where username = '10231'`))[0].id;
 const calon = (await q(`select id, username from public.profiles where role = 'peserta' and sigarda.tingkat_selesai(id, 'Bantara') and not sigarda.tingkat_selesai(id, 'Laksana') order by username`))[0];
-const sesiSem = (await q(`select tanggal::text t from public.absensi_sesi where tanggal between '2026-07-01' and '2026-12-31' order by tanggal`)).map((x) => x.t);
-const UJI = '2026-09-20';
-console.log(`   (${sesiSem.length} pertemuan Semester Ganjil 2026/2027: ${sesiSem[0]} s.d. ${sesiSem.at(-1)})`);
+const sesiSem = (await q(`select tanggal::text t from public.absensi_sesi where tanggal between '2026-07-01' and '2026-09-20' order by tanggal`)).map((x) => x.t);
+const UJI = '2026-09-20'; // sesiSem hanya sampai tanggal uji: data contoh memuat semua Jumat sampai HARI INI, jadi pada hari Jumat ada sesi tambahan sesudah tanggal uji
+console.log(`   (${sesiSem.length} pertemuan Semester Ganjil 2026/2027 sampai tanggal uji: ${sesiSem[0]} s.d. ${sesiSem.at(-1)})`);
 await q(`delete from public.iuran`); await q(`delete from public.iuran_log`);
 const isiKali = async (peserta, n, jenis = 'rutin') => { await q(`delete from public.iuran where peserta_id = $1`, [peserta]); for (const t of sesiSem.slice(0, n)) await q(`insert into public.iuran (tanggal, peserta_id, jumlah, jenis, oleh) values ($1, $2, 1000, $3, $4)`, [t, peserta, jenis, K.dewan.id]); };
 const ringkas = async (kk, peserta, tgl = UJI) => rpc(kk.k, 'sg_iuran_ringkas', { p_peserta_id: peserta, p_tanggal: tgl });
