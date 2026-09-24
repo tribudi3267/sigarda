@@ -1,6 +1,7 @@
 /**
  * PANDUAN PENGGUNA (tahap L10). Satu halaman ringkas per peran, bahasa sederhana untuk guru/Pembina Pramuka.
  * Isi murni data (tanpa React) supaya mudah ditinjau dan diuji terpisah dari tampilannya (src/pages/Bantuan.jsx).
+ * Setiap panduan punya `rujukan`: daftar { id, bagian } ke registri peraturan (src/data/peraturanData.js), ditampilkan sebagai bagian "Rujukan peraturan".
  * Setiap bagian: { id, judul, isi: [baris...] }. Baris boleh berupa teks biasa atau { label, teks } untuk sub-judul kecil.
  */
 
@@ -22,6 +23,12 @@ const PENEGAK = {
   id: 'penegak',
   label: 'Penegak',
   ringkasan: 'Untuk anggota Penegak kelas X, XI, dan XII -- termasuk yang berjabatan Dewan Ambalan saat memilih tampilan Penegak.',
+  rujukan: [
+    { id: 'sku-penegak-2011', bagian: 'Bab V (cara menyelesaikan dan menguji SKU)' },
+    { id: 'agama-182-1979', bagian: 'butir 1 SKU (agama)' },
+    { id: 'iuran-049-1987', bagian: 'iuran peserta didik kepada gugusdepan' },
+    { id: 'garuda-038-2017', bagian: 'syarat Penegak Garuda (Bab II butir 1c)' },
+  ],
   bagian: [
     {
       id: 'penegak-beranda',
@@ -76,6 +83,13 @@ const DEWAN = {
   id: 'dewan',
   label: 'Dewan Ambalan',
   ringkasan: 'Untuk Penegak yang berjabatan Dewan Ambalan (tampilan Dewan) dan akun Dewan Ambalan lama.',
+  rujukan: [
+    { id: 'gudep-231-2007', bagian: 'Bab IV butir 4 (Ambalan Penegak, Dewan Penegak, Dewan Kehormatan)' },
+    { id: 'polmekbin-176-2013', bagian: 'butir 7 (Organisasi)' },
+    { id: 'admin-satuan-041-1995', bagian: 'buku administrasi ambalan dipercayakan kepada Dewan Ambalan' },
+    { id: 'iuran-049-1987', bagian: 'iuran' },
+    { id: 'adart-2023', bagian: 'Anggaran Rumah Tangga Pasal 51 ayat (2) huruf a (pengukuhan Dewan Ambalan)' },
+  ],
   bagian: [
     {
       id: 'dewan-antrian',
@@ -90,7 +104,7 @@ const DEWAN = {
     { id: 'dewan-absensi', judul: 'Absensi', isi: ['Mencatat kehadiran latihan Jumat: Hadir, Izin, Sakit, atau Alpa untuk tiap Penegak.'] },
     { id: 'dewan-iuran', judul: 'Iuran', isi: ['Mencatat pembayaran iuran bumbung tiap Jumat, per Penegak atau sekaligus banyak.'] },
     { id: 'dewan-portofolio', judul: 'Portofolio', isi: ['Meninjau dan memberi catatan pada dokumen portofolio Calon Garuda (bukan mengisi milik Penegak, hanya menilai).'] },
-    { id: 'dewan-sidang', judul: 'Sidang', isi: ['Bila ditugaskan: mencatat keputusan Layak/Tidak Lulus pada Sidang Dewan Kehormatan sebelum pelantikan, dan mencetak Berita Acara.'] },
+    { id: 'dewan-sidang', judul: 'Sidang', isi: ['Bila ditugaskan: mencatat keputusan Layak/Tidak Lulus pada Sidang Dewan Kehormatan sebelum pelantikan, dan mencetak Berita Acara.', 'Ketua sidang pada Berita Acara adalah Pemangku Adat (ketua Dewan Kehormatan Penegak); bila jabatan itu belum diisi, dipakai Pradana.'] },
     { id: 'dewan-periksa', judul: 'Periksa Data', isi: ['Ikut membantu memeriksa data yang belum lengkap (NTA, jenis kelamin, rombel format lama, dan lainnya). Untuk akun yang belum pernah masuk dan anggota yang belum mengaktifkan notifikasi, tombol Buka WhatsApp mengirim pesan pengingat siap kirim ke Penegak dan sesama Dewan Ambalan.'] },
     { id: 'dewan-sesi', judul: 'Sesi ujian', isi: ['Jadwal ujian bersama (tanggal, tempat), butir yang diuji, dan daftar pesertanya. Papan sesi menampilkan keadaan tiap peserta dari hasil uji yang sudah dicatat. Dewan Ambalan, Pembina, dan Admin dapat membuat dan mengubah sesi.'] },
     { id: 'dewan-tindaklanjut', judul: 'Tindak Lanjut', isi: ['Daftar Penegak yang lama tidak bergerak (SKU, absensi, atau iuran); tombol untuk membuka WhatsApp dengan pesan pengingat siap kirim.'] },
@@ -109,11 +123,18 @@ const PEMBINA = {
   id: 'pembina',
   label: 'Pembina',
   ringkasan: 'Memiliki seluruh hak Dewan Ambalan (lihat bagian di atas), ditambah kewenangan berikut.',
+  rujukan: [
+    { id: 'adart-2023', bagian: 'Anggaran Rumah Tangga Pasal 33 ayat (6) dan Pasal 35 ayat (3) (evaluasi dan uji kecakapan oleh pembina)' },
+    { id: 'sku-penegak-2011', bagian: 'Bab V (penguji SKU adalah Pembina yang langsung membina)' },
+    { id: 'garuda-038-2017', bagian: 'Bab IV (tim penilai) dan Bab VII (penetapan)' },
+    { id: 'agama-182-1979', bagian: 'pengelolaan pendidikan agama dalam satuan' },
+    { id: 'gudep-231-2007', bagian: 'Bab IV butir 4 (Dewan Kehormatan Penegak)' },
+  ],
   bagian: [
     { id: 'pembina-dashboard', judul: 'Dashboard', isi: ['Ringkasan seluruh gudep (bukan hanya rombel yang menjadi tugas Anda): progres SKU, kehadiran, iuran, dan portofolio Garuda.'] },
     { id: 'pembina-instrumen', judul: 'Instrumen', isi: ['Menyusun kriteria penilaian rinci untuk tiap butir SKU (opsional; butir tanpa instrumen tetap memakai penilaian Lulus/Perlu diulang biasa).'] },
     { id: 'pembina-penugasan', judul: 'Penugasan', isi: ['Menentukan Pembina/Dewan Ambalan mana yang menguji rombel mana pada satu tahun ajaran, dan penugasan khusus untuk satu Penegak tertentu.'] },
-    { id: 'pembina-kepengurusan', judul: 'Pengurus', isi: ['Menetapkan jabatan Dewan Ambalan (Pradana, Pradani, dan lainnya) untuk Penegak aktif, satu per satu atau lewat berkas Excel.'] },
+    { id: 'pembina-kepengurusan', judul: 'Pengurus', isi: ['Menetapkan jabatan Dewan Ambalan (Pradana, Pradani, Pemangku Adat, dan lainnya) untuk Penegak aktif, satu per satu atau lewat berkas Excel. Pradana, Pradani, dan Pemangku Adat masing-masing hanya satu orang.', 'Mencatat nomor dan tanggal SK pengukuhan Dewan Ambalan dari Ketua Kwartir Ranting (dan rekomendasi Ketua Mabigus bila ada) pada bagian Pengukuhan oleh Kwartir Ranting, satu catatan per tahun ajaran.'] },
     { id: 'pembina-pemeriksaan', judul: 'Periksa Data (perbaikan)', isi: ['Selain melihat daftarnya seperti Dewan Ambalan, Pembina dan Admin mendapat tombol Perbaiki (tautan langsung ke menu yang tepat) untuk data yang belum lengkap. Tombol WhatsApp juga dapat dipakai untuk Pembina lain.'] },
     { id: 'pembina-kelolamateri', judul: 'Kelola Materi', isi: ['Menambah, mengubah, menghapus, dan menggeser urutan materi. Materi dapat dihubungkan ke butir SKU tertentu dan memakai tautan Google Drive; butir SKU yang belum punya materi ditandai agar mudah dilengkapi.'] },
     { id: 'pembina-raport', judul: 'Raport', isi: ['Menilai raport ekstrakurikuler Pramuka tiap semester (skor dari kehadiran, capaian SKU, dan sikap), lalu mencetak atau mengunduh Excel per kelas.'] },
@@ -128,6 +149,12 @@ const ADMIN = {
   id: 'admin',
   label: 'Admin Gudep',
   ringkasan: 'Memiliki seluruh hak Pembina (lihat bagian di atas), ditambah kewenangan berikut.',
+  rujukan: [
+    { id: 'nomor-gudep-050-2003', bagian: 'Bab III butir 6 (nomor gudep)' },
+    { id: 'gudep-231-2007', bagian: 'Bab IV (pimpinan gugusdepan) dan Majelis Pembimbing' },
+    { id: 'uu-12-2010', bagian: 'dasar hukum Gerakan Pramuka' },
+    { id: 'adart-2023', bagian: 'ketentuan organisasi gugusdepan' },
+  ],
   bagian: [
     { id: 'admin-anggota', judul: 'Anggota', isi: ['Menambah anggota satu per satu, atau mengimpor banyak sekaligus lewat berkas Excel. Jenis kelamin wajib diisi untuk anggota baru.'] },
     { id: 'admin-naikkelas', judul: 'Naik Kelas', isi: ['Proses tahunan: memindahkan rombel (X ke XI, XI ke XII) atau meluluskan Penegak kelas XII menjadi alumni, sekaligus untuk semua anggota.'] },

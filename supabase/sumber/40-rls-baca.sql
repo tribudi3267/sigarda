@@ -35,6 +35,7 @@ alter table public.penugasan_log enable row level security;
 alter table public.guru_agama enable row level security;
 alter table public.penugasan_peserta enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_penugasan_peserta_atur
 alter table public.kepengurusan_log enable row level security;    -- baca: pengurus; tulis: hanya fungsi kepengurusan
+alter table public.pengukuhan_dewan enable row level security;    -- baca: pengurus; tulis: hanya fungsi sg_pengukuhan_dewan_*
 alter table public.naik_kelas_batch enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_naik_kelas*
 alter table public.naik_kelas_log enable row level security;
 alter table public.agenda enable row level security;   -- baca: semua yang aktif; tulis: hanya fungsi sg_agenda_*
@@ -92,6 +93,8 @@ create policy baca_guru_agama on public.guru_agama for select to authenticated
 create policy baca_penugasan_peserta on public.penugasan_peserta for select to authenticated
   using ((select sigarda.aktif()) and (select sigarda.pengurus()));
 create policy baca_kepengurusan_log on public.kepengurusan_log for select to authenticated
+  using ((select sigarda.aktif()) and (select sigarda.pengurus()));
+create policy baca_pengukuhan_dewan on public.pengukuhan_dewan for select to authenticated
   using ((select sigarda.aktif()) and (select sigarda.pengurus()));
 -- ===== Kebijakan naik kelas =====
 create policy baca_naik_kelas_batch on public.naik_kelas_batch for select to authenticated

@@ -6,6 +6,7 @@ import KasIuran from '../components/KasIuran';
 import LembarIuran from '../components/LembarIuran';
 import PengaturanIuran from '../components/PengaturanIuran';
 import RekapIuran from '../components/RekapIuran';
+import SumberPeraturan from '../components/SumberPeraturan';
 
 /**
  * Menu Iuran bumbung kepramukaan.
@@ -31,6 +32,13 @@ export default function Iuran() {
       <div className="mb-4">
         <h1 className="text-2xl font-bold">Iuran bumbung kepramukaan</h1>
         <p className="text-sm text-pramuka-600">Iuran rutin latihan Jumat, dicatat oleh Dewan Ambalan atau asisten bendahara.</p>
+        <SumberPeraturan
+          className="mt-1"
+          rujukan={[
+            { id: 'iuran-049-1987', bagian: 'Pertama butir 1 (peserta didik membayar iuran kepada gugusdepannya)' },
+            { id: 'admin-satuan-041-1995', bagian: 'buku administrasi ambalan dipercayakan kepada Dewan Ambalan' },
+          ]}
+        />
       </div>
 
       <div role="tablist" aria-label="Bagian iuran" className="mb-4 inline-flex flex-wrap rounded-lg bg-pramuka-100 p-1">

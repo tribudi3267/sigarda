@@ -56,6 +56,22 @@ create table public.kepengurusan_log (
 );
 create index kepengurusan_log_waktu_idx on public.kepengurusan_log (id);
 -- ===== akhir tabel dewan penegak =====
+-- ===== Pengukuhan Dewan Ambalan (Fase A): tabel =====
+-- Pengukuhan kepengurusan Dewan Ambalan (ketua dan wakil ketua) oleh Ketua Kwartir Ranting: satu catatan per tahun ajaran. Dasar: AD/ART Munas 2023, Anggaran Rumah Tangga
+-- Pasal 51 ayat (2) huruf a (ditetapkan berdasarkan rekomendasi Ketua Majelis Pembimbing Gugusdepan dan dikukuhkan dengan surat keputusan Ketua Kwartir Ranting).
+-- Nomor dan tanggal rekomendasi Ketua Mabigus opsional, tetapi harus diisi berpasangan.
+create table public.pengukuhan_dewan (
+  tahun_ajaran text primary key check (tahun_ajaran ~ '^[0-9]{4}/[0-9]{4}$'),
+  nomor_sk text not null check (char_length(nomor_sk) between 1 and 80 and nomor_sk !~ '[[:cntrl:]<>]'),
+  tanggal_sk date not null,
+  rekomendasi_nomor text not null default '' check (char_length(rekomendasi_nomor) <= 80 and rekomendasi_nomor !~ '[[:cntrl:]<>]'),
+  rekomendasi_tanggal date,
+  catatan text not null default '' check (char_length(catatan) <= 200),
+  diubah_oleh uuid references public.profiles(id) on delete set null,
+  diubah_pada timestamptz not null default now(),
+  constraint pengukuhan_rekomendasi_pasangan check ((rekomendasi_nomor = '') = (rekomendasi_tanggal is null))
+);
+-- ===== akhir tabel pengukuhan dewan =====
 -- Guru agama di sekolah (per agama), rujukan surat pengantar bila tidak ada Pembina yang seagama dengan Penegak (dikelola Admin).
 create table public.guru_agama (
   id bigint generated always as identity primary key,

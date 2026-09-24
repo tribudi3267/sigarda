@@ -116,11 +116,16 @@ begin
     select 1 from public.penugasan_rombel where tahun_ajaran = sigarda.tahun_ajaran_kini() and rombel = v_kelas and penguji_id = p_penguji);
 end $$;
 
--- Jabatan Dewan tanpa selisih huruf: "pradana" -> "Pradana", "PRADANI" -> "Pradani"; selain itu spasi dirapikan dan ditulis apa adanya.
+-- ===== Jabatan tunggal dan ketua sidang (Fase A): bantu =====
+-- Jabatan Dewan tanpa selisih huruf: "pradana" -> "Pradana", "PRADANI" -> "Pradani", "pemangku  ADAT" -> "Pemangku Adat"; selain itu spasi dirapikan dan ditulis apa adanya.
 create function sigarda.jabatan_baku(p_teks text) returns text language sql immutable as
 $$
-  select case lower(sigarda.rapikan(p_teks)) when 'pradana' then 'Pradana' when 'pradani' then 'Pradani' else sigarda.rapikan(p_teks) end
+  select case lower(sigarda.rapikan(p_teks)) when 'pradana' then 'Pradana' when 'pradani' then 'Pradani' when 'pemangku adat' then 'Pemangku Adat' else sigarda.rapikan(p_teks) end
 $$;
+-- Jabatan yang hanya boleh dipegang satu anggota (cermin JABATAN_TUNGGAL di src/lib/dewanLogic.js; dijaga oleh pengujian).
+create function sigarda.jabatan_tunggal(p_jabatan text) returns boolean language sql immutable as
+$$ select p_jabatan in ('Pradana', 'Pradani', 'Pemangku Adat') $$;
+-- ===== akhir bantu jabatan tunggal =====
 
 -- Mencabut jabatan Dewan dari satu anggota (Penegak, atau akun Dewan lama) dan merapikan akibatnya: penugasan sebagai penguji dihapus (tercatat) dan
 -- pengajuan uji yang menunggu dan ditujukan kepadanya kembali ke antrian rombel. Pengujian yang sedang berjalan ("proses") dibiarkan

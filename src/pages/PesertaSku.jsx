@@ -6,6 +6,7 @@ import SkuChecklist from '../components/SkuChecklist';
 import TingkatTabs from '../components/TingkatTabs';
 import AjukanModal from '../components/AjukanModal';
 import { Icon, ProgressBar } from '../components/ui';
+import SumberPeraturan from '../components/SumberPeraturan';
 
 export default function PesertaSku({ tingkat, setTingkat, onBukaMateri }) {
   const { user, progress, batalkanAjuan, hanyaLihatSaya } = useApp();
@@ -47,6 +48,10 @@ export default function PesertaSku({ tingkat, setTingkat, onBukaMateri }) {
           <p className="text-sm text-pramuka-600">
             {TINGKAT[tingkat].butir.length} butir resmi Kwarnas. Butir 1 menyesuaikan agama kamu ({user.agama}).
           </p>
+          <SumberPeraturan
+            className="mt-1"
+            rujukan={[{ id: 'sku-penegak-2011', bagian: 'Bab V (cara menyelesaikan dan menguji SKU)' }, { id: 'agama-182-1979', bagian: 'untuk butir 1 (agama)' }]}
+          />
         </div>
         <TingkatTabs nilai={tingkat} onUbah={setTingkat} kunciLaksana={!laksanaTerbuka(progress, user)} />
       </div>

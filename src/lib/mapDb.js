@@ -320,6 +320,13 @@ export const susunLogKepengurusan = (baris = []) =>
     jabatanLama: r.jabatan_lama ?? null, jabatanBaru: r.jabatan_baru ?? null, alasan: r.alasan ?? '', olehNama: r.oleh_nama ?? '',
   })).sort((a, b) => b.id - a.id);
 
+/** Baris pengukuhan_dewan -> [{ tahunAjaran, nomorSk, tanggalSk, rekomNomor, rekomTanggal, catatan, diubahPada }] (tahun ajaran terbaru lebih dulu) */
+export const susunPengukuhanDewan = (baris = []) =>
+  baris.map((r) => ({
+    tahunAjaran: r.tahun_ajaran, nomorSk: r.nomor_sk, tanggalSk: String(r.tanggal_sk).slice(0, 10), rekomNomor: r.rekomendasi_nomor ?? '',
+    rekomTanggal: r.rekomendasi_tanggal ? String(r.rekomendasi_tanggal).slice(0, 10) : '', catatan: r.catatan ?? '', diubahPada: r.diubah_pada ?? null,
+  })).sort((a, b) => b.tahunAjaran.localeCompare(a.tahunAjaran));
+
 /** Baris naik_kelas_batch -> [{ id, waktu, tahunAjaran, ringkasan, olehNama, dibatalkanPada }] (terbaru lebih dulu) */
 export const susunBatchNaikKelas = (baris = []) =>
   baris.map((r) => ({

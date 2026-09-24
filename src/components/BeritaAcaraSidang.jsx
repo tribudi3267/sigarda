@@ -3,6 +3,7 @@ import { namaAmbalan } from '../lib/gudepLogic';
 import { useGudep } from '../lib/gudepStore';
 import { HASIL_MAGANG, HASIL_TUGAS, labelButirBelum } from '../lib/sidangLogic';
 import { alamatDasar, urlVerifikasi } from '../lib/verifikasiLogic';
+import SumberPeraturan from './SumberPeraturan';
 import BlokTtd from './BlokTtd';
 import KodeQr from './KodeQr';
 import { KopSurat } from './DokumenSku';
@@ -107,6 +108,15 @@ export default function BeritaAcaraSidang({ sidang, peserta, token = null, kode 
         <BlokTtd orang={{ jabatan: sidang.ketuaSebutan, nama: sidang.ketuaNama }} />
         <BlokTtd orang={{ jabatan: 'Pembina Pramuka Penegak', nama: G.pembina.nama, nta: G.pembina.nta }} />
       </div>
+
+      <SumberPeraturan
+        cetak
+        className="mt-4 text-[10px] leading-snug"
+        rujukan={[
+          { id: 'gudep-231-2007', bagian: 'Bab IV butir 4 g' },
+          { id: 'sku-penegak-2011', bagian: 'Bab V' },
+        ]}
+      />
 
       {token && (
         <div className="mt-5 flex items-start gap-3 border-t border-pramuka-200 pt-3 text-[10px] leading-snug text-pramuka-600 break-inside-avoid">

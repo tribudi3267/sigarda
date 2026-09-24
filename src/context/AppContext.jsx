@@ -1061,6 +1061,32 @@ export function AppProvider({ children }) {
     if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
     return r;
   };
+  /** Catatan pengukuhan Dewan Ambalan oleh Ketua Kwartir Ranting (dibaca pengurus; ditulis Pembina dan Admin). */
+  const muatPengukuhanDewan = async () => {
+    const r = await api().muatPengukuhanDewan();
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  };
+  const simpanPengukuhanDewan = async (d) => {
+    if (!bolehKepengurusan) return ditolak(notify, 'Hanya Pembina dan Admin Gudep yang dapat mencatat pengukuhan Dewan Ambalan.');
+    const r = await api().simpanPengukuhanDewan(d);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    notify('Pengukuhan Dewan Ambalan tersimpan.');
+    return r;
+  };
+  const hapusPengukuhanDewan = async (tahunAjaran) => {
+    if (!bolehKepengurusan) return ditolak(notify, 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan pengukuhan Dewan Ambalan.');
+    const r = await api().hapusPengukuhanDewan(tahunAjaran);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    notify('Catatan pengukuhan dihapus.');
+    return r;
+  };
 
   /** Riwayat kenaikan kelas dan perubahan status (pengurus): { batch, log }. */
   const muatNaikKelas = async () => {
@@ -1221,7 +1247,7 @@ export function AppProvider({ children }) {
     simpanGudep, simpanWhatsapp, muatEskalasi,
     dokumen: db.dokumen, muatDokumen, terbitkanSuratAgama, cabutDokumen, bolehSurat,
     penugasan: db.penugasan, penugasanPeserta: db.penugasanPeserta, guruAgama: db.guruAgama, muatPenugasan, muatLogPenugasan, aturPenugasan, aturPenugasanPeserta, salinPenugasan, simpanGuruAgama, hapusGuruAgama, bolehAturPenugasan,
-    bolehKepengurusan, terapkanKepengurusan, aturJabatanDewan, arsipkanDewanLama, muatLogKepengurusan,
+    bolehKepengurusan, terapkanKepengurusan, aturJabatanDewan, arsipkanDewanLama, muatLogKepengurusan, muatPengukuhanDewan, simpanPengukuhanDewan, hapusPengukuhanDewan,
     muatUlang: muatSemua,
     notifikasi: db.notifikasi, belumDibaca: jumlahBelumDibaca(db.notifikasi), segarkanNotifikasi, tandaiNotifikasi, api,
     notify, toast,

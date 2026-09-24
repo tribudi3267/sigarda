@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 /** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
@@ -348,6 +348,14 @@ export function buatApi(klien) {
     arsipkanDewanLama: (ids, aktifkan = false) => rpc('sg_dewan_lama_arsipkan', { p_ids: ids, p_aktifkan: aktifkan }),
     /** Riwayat kepengurusan Dewan Ambalan (pengurus), terbaru lebih dulu. */
     muatLogKepengurusan: () => muat(async () => susunLogKepengurusan(await ambilSemua('kepengurusan_log', { urut: ['id'] }))),
+    /** Catatan pengukuhan Dewan Ambalan oleh Ketua Kwartir Ranting (pengurus), tahun ajaran terbaru lebih dulu. */
+    muatPengukuhanDewan: () => muat(async () => susunPengukuhanDewan(await ambilSemua('pengukuhan_dewan', { urut: ['tahun_ajaran'] }))),
+    /** Mencatat atau memperbarui pengukuhan satu tahun ajaran (Pembina dan Admin). `d` = { tahunAjaran, nomorSk, tanggalSk, rekomNomor, rekomTanggal, catatan }. */
+    simpanPengukuhanDewan: (d) => rpc('sg_pengukuhan_dewan_simpan', {
+      p_tahun_ajaran: d.tahunAjaran, p_nomor_sk: d.nomorSk, p_tanggal_sk: d.tanggalSk, p_rekomendasi_nomor: d.rekomNomor ?? '', p_rekomendasi_tanggal: d.rekomTanggal || null, p_catatan: d.catatan ?? '',
+    }),
+    /** Menghapus catatan pengukuhan satu tahun ajaran (Pembina dan Admin). */
+    hapusPengukuhanDewan: (tahunAjaran) => rpc('sg_pengukuhan_dewan_hapus', { p_tahun_ajaran: tahunAjaran }),
     /** Rombel banyak Penegak sekaligus (Admin). `daftar` = [{ username (NIS), rombel }]. Semua atau tidak sama sekali. Mengembalikan jumlah baris. */
     perbaruiRombel: (daftar) => rpc('sg_rombel_perbarui', { p_data: daftar }),
 
