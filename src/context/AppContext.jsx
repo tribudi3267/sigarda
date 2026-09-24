@@ -78,6 +78,7 @@ export function AppProvider({ children }) {
   const lokalRef = useRef(null);
   const terakhirMuat = useRef(0);
   const semesterRef = useRef(new Set());        // salinan semesterSiap yang selalu mutakhir (untuk dipakai di dalam callback)
+  const riwayatDimuat = useRef(new Set());      // id Penegak yang riwayat SKU-nya sudah dimuat (sku_riwayat besar, dimuat malas per Penegak)
   const semesterSedangMuat = useRef(new Map()); // kunci -> janji, agar permintaan yang sama tidak diulang bersamaan
   const generasi = useRef(0);                   // naik tiap keluar/sesi berakhir; hasil muat lama diabaikan
   const sesiRef = useRef({});                   // daftar sesi terkini (untuk dipakai di dalam callback)
@@ -131,6 +132,7 @@ export function AppProvider({ children }) {
   const kosongkan = useCallback(() => {
     generasi.current += 1;
     semesterRef.current = new Set();
+    riwayatDimuat.current = new Set();
     semesterSedangMuat.current = new Map();
     setSemesterSiap({});
     setInstrumenSiap(false);
@@ -158,12 +160,28 @@ export function AppProvider({ children }) {
    * Memuat data yang boleh dibaca pengguna ini. Kehadiran hanya untuk semester aktif ditambah semester yang sebelumnya
    * sudah dibuka (agar penyegaran tidak membuat data yang sedang dilihat kembali kosong).
    */
+  /**
+   * Progres seluruh Penegak yang boleh dilihat, TANPA sku_riwayat (tabel terbesar). Riwayat hanya untuk Penegak yang rinciannya pernah
+   * dibuka (riwayatDimuat), dimuat ulang bersama agar tidak hilang saat penyegaran.
+   */
+  const muatProgressSemua = useCallback(async () => {
+    const a = api();
+    const ids = [...riwayatDimuat.current];
+    const [dasar, ...rinci] = await Promise.all([a.muatProgress(null, { riwayat: false }), ...ids.map((id) => a.muatProgress(id))]);
+    if (!dasar.ok) return dasar;
+    const gagal = rinci.find((r) => !r.ok);
+    if (gagal) return gagal;
+    const data = { ...dasar.data };
+    ids.forEach((id, i) => { data[id] = rinci[i].data[id] ?? {}; });
+    return { ok: true, data };
+  }, []);
+
   const muatSemua = useCallback(async () => {
     const a = api();
     const mulaiGenerasi = generasi.current;
     const daftarKunci = [...new Set([semesterDari(hariIni()), ...semesterRef.current])];
     const [u, p, sesi, pf, m, asisten, pengIuran, gudep, notif, ...hadir] = await Promise.all([
-      a.muatProfil(), a.muatProgress(), a.muatSesiAbsen(), a.muatPortofolio(), a.muatMateri(),
+      a.muatProfil(), muatProgressSemua(), a.muatSesiAbsen(), a.muatPortofolio(), a.muatMateri(),
       a.muatAsisten(), // penunjukan asisten bendahara: tidak wajib (basis data lama belum punya tabelnya), jadi tidak ikut pemeriksaan gagal
       a.muatPengaturanIuran(), // pengaturan iuran: bila fungsinya belum ada dipakai nilai bawaan
       a.muatGudep(), // data gudep: tidak wajib; belum tersimpan = nilai bawaan dari src/config.js
@@ -298,7 +316,11 @@ export function AppProvider({ children }) {
     };
     return {
       users: () => terapkan(api().muatProfil(), (users) => (d) => ({ ...d, users })),
-      progress: (pid) => terapkan(api().muatProgress(pid), (p) => (d) => ({ ...d, progress: pid ? { ...d.progress, [pid]: p[pid] ?? {} } : p })),
+      progress: (pid) => {
+        if (!pid) return terapkan(muatProgressSemua(), (p) => (d) => ({ ...d, progress: p }));
+        riwayatDimuat.current.add(pid);
+        return terapkan(api().muatProgress(pid), (p) => (d) => ({ ...d, progress: { ...d.progress, [pid]: p[pid] ?? {} } }));
+      },
       portofolio: (pid) => terapkan(api().muatPortofolio(pid), (p) => (d) => ({ ...d, portofolio: pid ? { ...d.portofolio, [pid]: p[pid] ?? {} } : p })),
       hadir: (tanggal) => terapkan(api().muatHadirTanggal(tanggal), (h) => (d) => ({ ...d, absensi: { ...d.absensi, hadir: { ...d.absensi.hadir, [tanggal]: h } } })),
       materi: () => terapkan(api().muatMateri(), (materi) => (d) => ({ ...d, materi })),
@@ -316,7 +338,7 @@ export function AppProvider({ children }) {
         terapkan(api().muatRaport(tahunAjaran, semester), (r) => (d) => ({ ...d, raport: { ...d.raport, [kunciSemester(tahunAjaran, semester)]: r } })),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notify, sesiBerakhir]);
+  }, [notify, sesiBerakhir, muatProgressSemua]);
 
   /** Menjalankan aksi ke server; galat ditampilkan sebagai toast, keberhasilan menyegarkan data. */
   const aksi = async (janji, { sukses, sesudah } = {}) => {
@@ -505,6 +527,9 @@ export function AppProvider({ children }) {
     bolehHapusSesi
       ? aksi(api().hapusSesi(id), { sukses: 'Sesi ujian dihapus (hasil penilaian tidak terpengaruh).', sesudah: () => pastikanSesiUjian(true) })
       : Promise.resolve(ditolak(notify, 'Hanya Pembina dan Admin Gudep yang dapat menghapus sesi ujian.'));
+
+  /** Memastikan riwayat SKU satu Penegak sudah dimuat (dipanggil saat rincian SKU dibuka); sekali per Penegak per sesi masuk. */
+  const pastikanRiwayat = (pesertaId) => (pesertaId && !riwayatDimuat.current.has(pesertaId) ? segarkan.progress(pesertaId) : Promise.resolve());
 
   /** Menyegarkan progres seluruh peserta yang boleh dilihat (papan sesi). Galat hanya ditampilkan sebagai toast. */
   const muatUlangProgress = () => segarkan.progress();
@@ -1182,7 +1207,7 @@ export function AppProvider({ children }) {
     raport: db.raport, bolehRaport, muatRaport, simpanRaport, hapusRaport, simpanPengaturanRaport,
     instrumen: db.instrumen, instrumenGalat: db.instrumenGalat, instrumenSiap, bolehKelolaInstrumen, pastikanInstrumen, simpanInstrumen, statusInstrumen, simpanPengaturanInstrumen,
     sesiUjian: db.sesiUjian, sesiUjianGalat: db.sesiUjianGalat, sesiUjianSiap, pastikanSesiUjian, simpanSesiUjian, ubahStatusSesiUjian, hapusSesiUjian, bolehHapusSesi,
-    muatUlangProgress, tokenSuratTingkat, tokenSidang, muatPenilaian,
+    muatUlangProgress, pastikanRiwayat, tokenSuratTingkat, tokenSidang, muatPenilaian,
     asisten: db.asisten, pengaturanIuran: db.pengaturanIuran, simpanPengaturanIuran, dewanAmbalan, asistenSaya, pencatatIuran, penunjukAsisten, versiIuran, bacaIuran, catatIuranSusulan, aturIuran, aturIuranBanyak, simpanKas, aturAsisten,
     daftarPeserta, daftarPesertaSemua, peranUser, hanyaLihatSaya, bolehKelolaAbsen,
     naikKelas, batalkanNaikKelas, aturStatusAnggota, muatNaikKelas,

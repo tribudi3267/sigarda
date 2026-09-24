@@ -17,7 +17,7 @@ import { siapkanPg, buatKlienFake } from '../../src/lokal/klienFake.js';
 import { isiDataContoh, isiStatusContoh } from '../../src/lokal/seedLokal.js';
 import { isiSekolahPenuh } from '../../src/lokal/sekolahPenuh.js';
 import { masukCepat } from '../../src/lokal/masukCepat.js';
-import { buatApi } from '../../src/lib/api.js';
+import { buatApi, HALAMAN_SEREMPAK, UKURAN_HALAMAN } from '../../src/lib/api.js';
 import { semesterDari, rentangKunci } from '../../src/lib/absensiLogic.js';
 import { hariIni } from '../../src/lib/format.js';
 import { PROFIL_JARINGAN, RTT_SERVER_MS, ringkasRantai, perkirakanSiap, simulasi } from './jaringan.mjs';
@@ -39,6 +39,12 @@ const ANGGARAN = {
 /** Urutan pemuatan saat masuk = AppContext.muatSemua (dijaga pengujian `profil-muat`: daftar ini harus sama dengan sumbernya). */
 export const BOOT = ['muatProfil', 'muatProgress', 'muatSesiAbsen', 'muatPortofolio', 'muatMateri', 'muatAsisten', 'muatPengaturanIuran', 'muatGudep', 'muatNotifikasi'];
 
+/**
+ * Halaman ke-2 dst. diminta serempak per gelombang (lihat ambilSemua di api.js): tiap "slot" gelombang menjadi satu rantai berurutan sendiri.
+ * Halaman pertama ikut slot 0. Pendekatan: gelombang lain dianggap mulai bersamaan dengan halaman pertama (sedikit terlalu optimistis).
+ */
+const slotHalaman = (a = 0) => { const ke = Math.floor(a / UKURAN_HALAMAN); return ke === 0 ? 0 : (ke - 1) % HALAMAN_SEREMPAK; };
+
 /** Membungkus klien agar setiap permintaan tercatat: rantai (tabel + filter) -> daftar { raw, gz } menurut urutan. */
 function pantau(klien, catatan) {
   const simpan = (kunci, data) => {
@@ -51,7 +57,7 @@ function pantau(klien, catatan) {
       const b = klien.from(tabel);
       const proxy = new Proxy(b, {
         get(t, k) {
-          if (k === 'then') return (ok, tolak) => t.then((r) => { simpan(`${tabel}|${(t.p ?? []).join(',')}`, r.data); return r; }).then(ok, tolak);
+          if (k === 'then') return (ok, tolak) => t.then((r) => { simpan(`${tabel}|${(t.p ?? []).join(',')}|s${slotHalaman(t.a)}`, r.data); return r; }).then(ok, tolak);
           const v = t[k];
           return typeof v === 'function' ? (...a) => { const h = v.apply(t, a); return h === t ? proxy : h; } : v;
         },
@@ -69,7 +75,7 @@ function pantau(klien, catatan) {
 async function jalankanBoot(api) {
   const s = semesterDari(hariIni());
   const r = rentangKunci(s);
-  const hasil = await Promise.all([...BOOT.map((n) => api[n]()), api.muatHadirRentang(r.mulai, r.akhir)]);
+  const hasil = await Promise.all([...BOOT.map((n) => (n === 'muatProgress' ? api[n](null, { riwayat: false }) : api[n]())), api.muatHadirRentang(r.mulai, r.akhir)]);
   const gagal = hasil.find((x) => !x.ok);
   if (gagal) throw new Error(`pemuatan gagal: ${gagal.pesan}`);
 }
