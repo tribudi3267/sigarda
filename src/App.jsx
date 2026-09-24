@@ -15,6 +15,7 @@ import FormWhatsapp from './components/FormWhatsapp';
 import { Modal } from './components/ui';
 import { parameterVerifikasi } from './lib/verifikasiLogic';
 import { parameterBerkasGaruda } from './lib/garudaLogic';
+import { pembinaAtauAdmin } from './lib/hakLogic';
 import { bolehKelolaMateri } from './lib/materiLogic';
 import LogoMark from './components/LogoMark';
 
@@ -270,7 +271,7 @@ function Shell() {
     isi = <NaikKelas />;
   } else if (tabAktif === 'penugasan' && user.role === 'penguji' && user.jabatan === 'Pembina') {
     isi = <Penugasan />;
-  } else if (tabAktif === 'kepengurusan' && (user.role === 'admin' || (user.role === 'penguji' && user.jabatan === 'Pembina'))) {
+  } else if (tabAktif === 'kepengurusan' && pembinaAtauAdmin(user)) {
     isi = <Kepengurusan />;
   } else if (tabAktif === 'pemeriksaan' && user.role !== 'peserta') {
     isi = <PemeriksaanData onNav={pindah} />;

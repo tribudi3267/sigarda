@@ -3,6 +3,8 @@
  * Bentuk satu kegiatan: { id, tahunAjaran, jenis, judul, tanggal, keterangan, pesertaTerkait, lewatiBatas }
  */
 
+import { hariIni as hariIniWib } from './format';
+
 /** Jenis baku (dengan judul bawaan yang bisa diubah pengguna) + 'lainnya' (judul bebas). Judul bawaan sama dengan
  * sigarda.kegiatan_judul_bawaan (SQL) untuk jenis yang juga didukung alur usulan (lihat JENIS_USULAN di kegiatanLogic.js). */
 export const JENIS_AGENDA = [
@@ -53,7 +55,7 @@ export function periksaAgenda(a, lewatiBatasBoleh = false) {
 }
 
 /** "H-30", "H-1", "Hari ini", atau "Lewat" (relatif terhadap `hariIni`, ISO date string, bawaan hari ini nyata). */
-export function hariMenuju(tanggal, hariIni = new Date().toISOString().slice(0, 10)) {
+export function hariMenuju(tanggal, hariIni = hariIniWib()) {
   const selisih = Math.round((new Date(tanggal) - new Date(hariIni)) / 86400000);
   if (selisih < 0) return 'Lewat';
   if (selisih === 0) return 'Hari ini';
@@ -61,5 +63,5 @@ export function hariMenuju(tanggal, hariIni = new Date().toISOString().slice(0, 
 }
 
 /** Kegiatan agenda mendatang (tanggal >= hariIni), terurut tanggal terdekat lebih dulu. */
-export const agendaMendatang = (daftar = [], hariIni = new Date().toISOString().slice(0, 10)) =>
+export const agendaMendatang = (daftar = [], hariIni = hariIniWib()) =>
   daftar.filter((a) => a.tanggal >= hariIni).sort((a, b) => a.tanggal.localeCompare(b.tanggal));

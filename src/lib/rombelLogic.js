@@ -56,7 +56,7 @@ export const geserTahunAjaran = (ta, n) => {
 
 /* ------------------------------ Penugasan ------------------------------ */
 
-/** Penegak aktif berjabatan Dewan Ambalan (cermin sigarda.penegak_dewan). */
+/** Penegak aktif berjabatan Dewan Ambalan (cermin klausa `role = 'peserta' and jabatan_dewan is not null` pada sigarda.pengurus/dewan/bisa_menguji; dijaga uji/paritas-hak.mjs). */
 export const penegakDewan = (u) => !!u && u.role === 'peserta' && !!u.jabatanDewan && (u.status ?? 'aktif') === 'aktif';
 /** Boleh menjadi penguji: penguji aktif (Pembina, atau akun Dewan lama yang belum diarsipkan) atau Penegak berjabatan Dewan (cermin sigarda.bisa_menguji). */
 export const bisaMenguji = (u) => !!u && (u.role === 'penguji' ? (u.status ?? 'aktif') === 'aktif' : penegakDewan(u));

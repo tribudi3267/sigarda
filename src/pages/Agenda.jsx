@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { JENIS_AGENDA, batasMusyawarah, hariMenuju, judulBawaanJenis, labelJenisAgenda, periksaAgenda } from '../lib/agendaLogic';
 import { JENIS_USULAN, bolehIngatkan, labelJenisUsulan, periksaTinjauan, periksaUsulan, usulanMenunggu, usulanTerakhir } from '../lib/kegiatanLogic';
 import { adalahPembina, tahunAjaranKini } from '../lib/rombelLogic';
+import { pembinaAtauAdmin, pembinaSaja, pradanaAtauPradani } from '../lib/hakLogic';
 import { fmtHariTanggal, fmtWaktu, hariIni } from '../lib/format';
 import { Field, Icon, Kosong, Modal } from '../components/ui';
 
@@ -52,7 +53,7 @@ function EditorAgenda({ awal, onTutup, onSimpan }) {
   const [dicoba, setDicoba] = useState(false);
   const [sibuk, setSibuk] = useState(false);
   const [galatKirim, setGalatKirim] = useState('');
-  const pembina = user.role === 'penguji' && user.jabatan === 'Pembina';
+  const pembina = pembinaSaja(user); // hanya Pembina (bukan Admin) yang boleh melewati batas Musyawarah: sigarda.pembina_saja
 
   const ubah = (k, v) => setA((x) => ({ ...x, [k]: v }));
   const galat = periksaAgenda(a, pembina);
@@ -215,7 +216,7 @@ function UsulanKegiatan({ onDisetujui }) {
   const [jenisForm, setJenisForm] = useState(null);
   const [tinjau, setTinjau] = useState(null);
   const taKini = tahunAjaranKini();
-  const pradanaPradani = ['Pradana', 'Pradani'].includes(user.jabatanDewan);
+  const pradanaPradani = pradanaAtauPradani(user);
   const pembina = adalahPembina(user);
 
   const muat = useCallback(async () => {
@@ -296,7 +297,7 @@ export default function Agenda() {
   const [daftar, setDaftar] = useState(null);
   const [galat, setGalat] = useState('');
   const [editor, setEditor] = useState(null); // null = tertutup, {} = baru, objek = ubah
-  const bolehKelola = user.role === 'admin' || (user.role === 'penguji' && user.jabatan === 'Pembina');
+  const bolehKelola = pembinaAtauAdmin(user);
 
   const muat = useCallback(async () => {
     const r = await api().muatAgenda();

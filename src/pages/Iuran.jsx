@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { pembinaAtauAdmin } from '../lib/hakLogic';
 import AsistenIuran from '../components/AsistenIuran';
 import KasIuran from '../components/KasIuran';
 import LembarIuran from '../components/LembarIuran';
@@ -20,7 +21,7 @@ export default function Iuran() {
     ...(pencatatIuran ? [{ id: 'catat', label: 'Catat' }] : []),
     { id: 'rekap', label: 'Rekap' },
     ...(pengurus ? [{ id: 'kas', label: 'Kas' }, { id: 'asisten', label: 'Asisten' }] : []),
-    ...(user.role === 'admin' || (user.role === 'penguji' && user.jabatan === 'Pembina') ? [{ id: 'pengaturan', label: 'Pengaturan' }] : []),
+    ...(pembinaAtauAdmin(user) ? [{ id: 'pengaturan', label: 'Pengaturan' }] : []),
   ];
   const [aktif, setAktif] = useState(tab[0].id);
   const dipakai = tab.some((t) => t.id === aktif) ? aktif : tab[0].id;
