@@ -19,7 +19,7 @@ set check_function_bodies = off;
 -- ---------------------------------------------------------------------------
 -- 0. Bersihkan versi lama
 -- ---------------------------------------------------------------------------
-drop table if exists public.kepengurusan_log, public.penugasan_peserta, public.penugasan_log, public.penugasan_rombel, public.guru_agama,
+drop table if exists public.pengukuhan_dewan, public.bina_damping, public.kepengurusan_log, public.penugasan_peserta, public.penugasan_log, public.penugasan_rombel, public.guru_agama,
   public.naik_kelas_log, public.naik_kelas_batch, public.notifikasi, public.push_langganan, public.push_konfigurasi, public.keepalive_konfigurasi,
   public.dokumen_terbit, public.dokumen_urut, public.iuran_kas, public.iuran_log, public.iuran, public.asisten_iuran,
   public.sesi_ujian_peserta, public.sesi_ujian_butir, public.sesi_ujian, public.sertifikat_tingkat, public.sku_penilaian, public.instrumen_panduan, public.instrumen_penguji, public.instrumen_kriteria, public.instrumen,
@@ -66,6 +66,7 @@ create table public.profiles (
   status text not null default 'aktif' check (status in ('aktif','nonaktif','alumni')),   -- Penegak: nonaktif = tidak melanjutkan Pramuka (masih siswa), alumni = sudah lulus; keduanya hanya dapat dilihat
   status_pada date,                                                -- sejak kapan status ini berlaku
   lulus_ta text check (lulus_ta is null or lulus_ta ~ '^[0-9]{4}/[0-9]{4}$'),   -- tahun ajaran kelulusan (angkatan), hanya alumni
+  pinsa boolean not null default false,                           -- Pimpinan Sangga (Penegak Calon Laksana ke atas, dipilih Bina Damping rombelnya); satu Pinsa per sangga per rombel; hilang sendiri bila pindah rombel/sangga atau tidak aktif
   wajib_ganti_pin boolean not null default true,
   pin_direset_oleh uuid references public.profiles(id) on delete set null,
   pin_direset_pada timestamptz,
@@ -75,10 +76,16 @@ create table public.profiles (
   constraint profil_penguji check (role <> 'penguji' or jabatan in ('Dewan Ambalan','Pembina')),
   constraint profil_admin check (role <> 'admin' or jabatan = 'Admin Gudep'),
   constraint profil_nta check (nta is null or nta ~ '^[0-9A-Za-z./ -]{1,40}$'),
-  constraint profil_jabatan_dewan check (jabatan_dewan is null or role = 'peserta' or (role = 'penguji' and jabatan = 'Dewan Ambalan'))
+  constraint profil_jabatan_dewan check (jabatan_dewan is null or role = 'peserta' or (role = 'penguji' and jabatan = 'Dewan Ambalan')),
+  constraint profil_pinsa check (not pinsa or role = 'peserta')
 );
--- Pradana dan Pradani masing-masing hanya satu pemegang (mereka menjadi ketua sidang dan penanda tangan Surat Tanda Lulus)
-create unique index profil_pradana_pradani_unik on public.profiles (jabatan_dewan) where jabatan_dewan in ('Pradana','Pradani');
+-- ===== Jabatan tunggal Dewan Ambalan (Fase A): indeks =====
+-- Pradana, Pradani, dan Pemangku Adat masing-masing hanya satu pemegang (Pemangku Adat = ketua sidang Dewan Kehormatan; Pradana dan Pradani
+-- menandatangani Surat Tanda Lulus). Daftar jabatan tunggal sama dengan sigarda.jabatan_tunggal.
+create unique index profil_pradana_pradani_unik on public.profiles (jabatan_dewan) where jabatan_dewan in ('Pradana','Pradani','Pemangku Adat');
+-- ===== akhir indeks jabatan tunggal =====
+-- Satu Pinsa untuk tiap sangga di dalam satu rombel (nama sangga tanpa membedakan huruf besar/kecil)
+create unique index profil_pinsa_unik on public.profiles (kelas, lower(sangga)) where pinsa;
 
 -- Katalog (diisi otomatis di bagian akhir berkas ini dari data aplikasi)
 create table public.sku_butir (
@@ -241,6 +248,37 @@ create table public.kepengurusan_log (
 );
 create index kepengurusan_log_waktu_idx on public.kepengurusan_log (id);
 -- ===== akhir tabel dewan penegak =====
+-- ===== Pengukuhan Dewan Ambalan (Fase A): tabel =====
+-- Pengukuhan kepengurusan Dewan Ambalan (ketua dan wakil ketua) oleh Ketua Kwartir Ranting: satu catatan per tahun ajaran. Dasar: AD/ART Munas 2023, Anggaran Rumah Tangga
+-- Pasal 51 ayat (2) huruf a (ditetapkan berdasarkan rekomendasi Ketua Majelis Pembimbing Gugusdepan dan dikukuhkan dengan surat keputusan Ketua Kwartir Ranting).
+-- Nomor dan tanggal rekomendasi Ketua Mabigus opsional, tetapi harus diisi berpasangan.
+create table public.pengukuhan_dewan (
+  tahun_ajaran text primary key check (tahun_ajaran ~ '^[0-9]{4}/[0-9]{4}$'),
+  nomor_sk text not null check (char_length(nomor_sk) between 1 and 80 and nomor_sk !~ '[[:cntrl:]<>]'),
+  tanggal_sk date not null,
+  rekomendasi_nomor text not null default '' check (char_length(rekomendasi_nomor) <= 80 and rekomendasi_nomor !~ '[[:cntrl:]<>]'),
+  rekomendasi_tanggal date,
+  catatan text not null default '' check (char_length(catatan) <= 200),
+  diubah_oleh uuid references public.profiles(id) on delete set null,
+  diubah_pada timestamptz not null default now(),
+  constraint pengukuhan_rekomendasi_pasangan check ((rekomendasi_nomor = '') = (rekomendasi_tanggal is null))
+);
+-- ===== akhir tabel pengukuhan dewan =====
+-- ===== Pinsa dan Bina Damping (fase B): tabel =====
+-- Bina Damping: 2 orang per rombel per tahun ajaran, Penegak berjabatan Dewan Ambalan yang minimal Calon Laksana (utamakan yang sudah Laksana), ditunjuk lewat
+-- sg_bina_damping_atur. Satu orang hanya satu rombel per tahun ajaran (persediaan pendamping terbatas). Tanpa kebijakan baca: dibaca lewat fungsi sg_* saja.
+-- Baris hilang sendiri (pemicu profiles_bina_damping_bersih) bila Penegaknya nonaktif/alumni atau tidak lagi berjabatan Dewan.
+create table public.bina_damping (
+  tahun_ajaran text not null check (tahun_ajaran ~ '^[0-9]{4}/[0-9]{4}$'),
+  rombel text not null check (rombel ~ '^(X|XI|XII)-(0[1-9]|10)$'),
+  penegak_id uuid not null references public.profiles(id) on delete cascade,
+  ditetapkan_oleh uuid references public.profiles(id) on delete set null,
+  ditetapkan_pada timestamptz not null default now(),
+  primary key (tahun_ajaran, rombel, penegak_id)
+);
+create unique index bina_damping_satu_rombel_idx on public.bina_damping (tahun_ajaran, penegak_id);
+create index bina_damping_penegak_idx on public.bina_damping (penegak_id);
+-- ===== akhir tabel pinsa bina damping =====
 -- Guru agama di sekolah (per agama), rujukan surat pengantar bila tidak ada Pembina yang seagama dengan Penegak (dikelola Admin).
 create table public.guru_agama (
   id bigint generated always as identity primary key,
@@ -1191,11 +1229,16 @@ begin
     select 1 from public.penugasan_rombel where tahun_ajaran = sigarda.tahun_ajaran_kini() and rombel = v_kelas and penguji_id = p_penguji);
 end $$;
 
--- Jabatan Dewan tanpa selisih huruf: "pradana" -> "Pradana", "PRADANI" -> "Pradani"; selain itu spasi dirapikan dan ditulis apa adanya.
+-- ===== Jabatan tunggal dan ketua sidang (Fase A): bantu =====
+-- Jabatan Dewan tanpa selisih huruf: "pradana" -> "Pradana", "PRADANI" -> "Pradani", "pemangku  ADAT" -> "Pemangku Adat"; selain itu spasi dirapikan dan ditulis apa adanya.
 create function sigarda.jabatan_baku(p_teks text) returns text language sql immutable as
 $$
-  select case lower(sigarda.rapikan(p_teks)) when 'pradana' then 'Pradana' when 'pradani' then 'Pradani' else sigarda.rapikan(p_teks) end
+  select case lower(sigarda.rapikan(p_teks)) when 'pradana' then 'Pradana' when 'pradani' then 'Pradani' when 'pemangku adat' then 'Pemangku Adat' else sigarda.rapikan(p_teks) end
 $$;
+-- Jabatan yang hanya boleh dipegang satu anggota (cermin JABATAN_TUNGGAL di src/lib/dewanLogic.js; dijaga oleh pengujian).
+create function sigarda.jabatan_tunggal(p_jabatan text) returns boolean language sql immutable as
+$$ select p_jabatan in ('Pradana', 'Pradani', 'Pemangku Adat') $$;
+-- ===== akhir bantu jabatan tunggal =====
 
 -- Mencabut jabatan Dewan dari satu anggota (Penegak, atau akun Dewan lama) dan merapikan akibatnya: penugasan sebagai penguji dihapus (tercatat) dan
 -- pengajuan uji yang menunggu dan ditujukan kepadanya kembali ke antrian rombel. Pengujian yang sedang berjalan ("proses") dibiarkan
@@ -1224,6 +1267,80 @@ begin
 end $$;
 -- ---- akhir bantu dewan penegak ----
 -- ---- akhir bantu penegakan ----
+
+-- ---- Pinsa dan Bina Damping (fase B): fungsi bantu ----
+-- Tingkat SKU seorang Penegak untuk penunjukan pendamping: 'calon-bantara' (butir Bantara belum semua lulus), 'calon-laksana' (Bantara selesai),
+-- 'laksana' (Bantara dan Laksana selesai).
+create function sigarda.tingkat_penegak(p_id uuid) returns text language sql stable security definer set search_path = public as
+$$
+  select case when not sigarda.tingkat_selesai(p_id, 'Bantara') then 'calon-bantara'
+              when not sigarda.tingkat_selesai(p_id, 'Laksana') then 'calon-laksana'
+              else 'laksana' end
+$$;
+
+-- Pemanggil adalah Bina Damping (aktif) untuk rombel ini pada tahun ajaran berjalan.
+create function sigarda.bina_damping_rombel(p_rombel text) returns boolean language plpgsql stable security definer set search_path = public as
+$$
+begin
+  return coalesce((select p.role = 'peserta' and p.status = 'aktif' and not p.wajib_ganti_pin
+                     and exists (select 1 from public.bina_damping b where b.penegak_id = p.id and b.rombel = p_rombel and b.tahun_ajaran = sigarda.tahun_ajaran_kini())
+                   from public.profiles p where p.id = auth.uid()), false);
+end $$;
+
+-- Boleh membagi sangga dan menentukan Pinsa di rombel ini: Pembina, Admin, atau Bina Damping rombel itu.
+create function sigarda.sangga_bisa_atur(p_rombel text) returns boolean language sql stable security definer set search_path = public as
+$$ select sigarda.pembina_atau_admin() or sigarda.bina_damping_rombel(p_rombel) $$;
+
+-- Peringatan (tidak memblokir) tentang susunan sangga sebuah rombel: [{ "sangga": nama atau null, "teks": ... }]. Batas: 2 Bina Damping, 4-5 sangga
+-- per rombel, 4-8 Penegak per sangga, dan tiap sangga punya Pinsa. Rombel tanpa anggota aktif tidak diperingatkan soal sangga.
+create function sigarda.sangga_peringatan(p_rombel text) returns jsonb language plpgsql stable security definer set search_path = public as
+$$
+declare v_p jsonb := '[]'::jsonb; v_r record; v_sangga int := 0; v_bd int;
+begin
+  select count(*) into v_bd from public.bina_damping where tahun_ajaran = sigarda.tahun_ajaran_kini() and rombel = p_rombel;
+  if v_bd < 2 then
+    v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', null, 'teks', format('Bina Damping rombel ini baru %s dari 2 orang.', v_bd)));
+  end if;
+  for v_r in
+    select min(sangga) as nama, count(*)::int as n, bool_or(pinsa) as ada_pinsa from public.profiles
+    where role = 'peserta' and status = 'aktif' and kelas = p_rombel group by lower(sangga) order by lower(sangga)
+  loop
+    v_sangga := v_sangga + 1;
+    if v_r.n < 4 or v_r.n > 8 then
+      v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', v_r.nama, 'teks', format('Sangga %s beranggotakan %s Penegak (seharusnya 4 sampai 8).', v_r.nama, v_r.n)));
+    end if;
+    if not v_r.ada_pinsa then
+      v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', v_r.nama, 'teks', format('Sangga %s belum punya Pinsa.', v_r.nama)));
+    end if;
+  end loop;
+  if v_sangga > 0 and (v_sangga < 4 or v_sangga > 5) then
+    v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', null, 'teks', format('Rombel ini punya %s sangga (seharusnya 4 sampai 5).', v_sangga)));
+  end if;
+  return v_p;
+end $$;
+
+-- Pinsa hilang sendiri bila Penegak pindah rombel atau sangga, atau tidak lagi aktif (jalur apa pun yang mengubahnya, termasuk naik kelas).
+create function sigarda.pinsa_bersihkan() returns trigger language plpgsql set search_path = public as
+$$
+begin
+  if new.pinsa and (new.role <> 'peserta' or new.status <> 'aktif' or new.kelas is distinct from old.kelas
+                    or lower(coalesce(new.sangga, '')) is distinct from lower(coalesce(old.sangga, ''))) then
+    new.pinsa := false;
+  end if;
+  return new;
+end $$;
+create trigger profiles_pinsa_bersih before update on public.profiles for each row execute function sigarda.pinsa_bersihkan();
+
+-- Bina Damping berakhir bila Penegaknya nonaktif/alumni atau tidak lagi berjabatan Dewan (dicabut, atau kepengurusan diganti).
+create function sigarda.bina_damping_bersihkan() returns trigger language plpgsql security definer set search_path = public as
+$$
+begin
+  delete from public.bina_damping where penegak_id = new.id;
+  return null;
+end $$;
+create trigger profiles_bina_damping_bersih after update of status, jabatan_dewan, role on public.profiles for each row
+  when (new.status <> 'aktif' or new.jabatan_dewan is null or new.role <> 'peserta') execute function sigarda.bina_damping_bersihkan();
+-- ---- akhir bantu pinsa bina damping ----
 
 -- ---- Dokumen terbit: fungsi bantu (dicerminkan src/lib/dokumenLogic.js suratAgamaAktif; dijaga oleh pengujian) ----
 -- Ada surat pengantar agama yang belum dicabut untuk Penegak ini dan memuat butir (unit) itu?
@@ -1460,8 +1577,10 @@ alter table public.asisten_iuran enable row level security;
 alter table public.penugasan_rombel enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_penugasan_*
 alter table public.penugasan_log enable row level security;
 alter table public.guru_agama enable row level security;
+alter table public.bina_damping enable row level security;   -- tanpa kebijakan: hanya lewat fungsi sg_bina_damping_* dan sg_sangga_*
 alter table public.penugasan_peserta enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_penugasan_peserta_atur
 alter table public.kepengurusan_log enable row level security;    -- baca: pengurus; tulis: hanya fungsi kepengurusan
+alter table public.pengukuhan_dewan enable row level security;    -- baca: pengurus; tulis: hanya fungsi sg_pengukuhan_dewan_*
 alter table public.naik_kelas_batch enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_naik_kelas*
 alter table public.naik_kelas_log enable row level security;
 alter table public.agenda enable row level security;   -- baca: semua yang aktif; tulis: hanya fungsi sg_agenda_*
@@ -1519,6 +1638,8 @@ create policy baca_guru_agama on public.guru_agama for select to authenticated
 create policy baca_penugasan_peserta on public.penugasan_peserta for select to authenticated
   using ((select sigarda.aktif()) and (select sigarda.pengurus()));
 create policy baca_kepengurusan_log on public.kepengurusan_log for select to authenticated
+  using ((select sigarda.aktif()) and (select sigarda.pengurus()));
+create policy baca_pengukuhan_dewan on public.pengukuhan_dewan for select to authenticated
   using ((select sigarda.aktif()) and (select sigarda.pengurus()));
 -- ===== Kebijakan naik kelas =====
 create policy baca_naik_kelas_batch on public.naik_kelas_batch for select to authenticated
@@ -2398,6 +2519,188 @@ begin
 end $$;
 -- ===== akhir fungsi penugasan =====
 
+-- ===== Pinsa dan Bina Damping (fase B): aksi =====
+-- Menunjuk Bina Damping satu rombel (menggantikan daftar lama; kosong = mengosongkan). Dewan Ambalan, Pembina, dan Admin Gudep.
+-- Bina Damping = Penegak aktif berjabatan Dewan Ambalan yang minimal Calon Laksana (Bantara selesai), maksimal 2 per rombel, satu rombel per orang per tahun
+-- ajaran. PRIORITAS: Penegak Dewan yang sudah Laksana lebih dulu; yang masih Calon Laksana hanya bila tidak ada lagi Penegak Dewan yang sudah Laksana
+-- dan belum bertugas. Mengembalikan jumlah perubahan (yang dicabut + yang ditambah).
+create function public.sg_bina_damping_atur(p_tahun_ajaran text, p_rombel text, p_penegak_ids uuid[]) returns int
+language plpgsql security definer set search_path = public as
+$$
+declare v_ids uuid[]; v_id uuid; v_p public.profiles; v_n int := 0; v_k int; v_bebas int;
+begin
+  perform sigarda.wajib_aktif();
+  if not (sigarda.dewan() or sigarda.pembina_atau_admin()) then
+    raise exception 'Hanya Dewan Ambalan, Pembina, dan Admin Gudep yang dapat menunjuk Bina Damping.';
+  end if;
+  if not sigarda.tahun_ajaran_sah(p_tahun_ajaran) then raise exception 'Tahun ajaran tidak sah. Contoh: 2026/2027.'; end if;
+  if not sigarda.rombel_sah(p_rombel) then raise exception 'Rombel tidak sah. Contoh: X-01, XI-05, XII-10.'; end if;
+  v_ids := coalesce((select array_agg(distinct x) from unnest(p_penegak_ids) x), '{}');
+  if cardinality(v_ids) > 2 then raise exception 'Bina Damping maksimal 2 orang per rombel.'; end if;
+  foreach v_id in array v_ids loop
+    select * into v_p from public.profiles where id = v_id and role = 'peserta';
+    if not found or v_p.status <> 'aktif' then raise exception 'Penegak tidak ditemukan atau tidak aktif.'; end if;
+    if v_p.jabatan_dewan is null then
+      raise exception '% bukan pengurus Dewan Ambalan. Bina Damping dipilih dari Penegak berjabatan Dewan Ambalan.', v_p.nama;
+    end if;
+    if not sigarda.tingkat_selesai(v_id, 'Bantara') then
+      raise exception '% belum menyelesaikan SKU Bantara. Bina Damping minimal Penegak Calon Laksana.', v_p.nama;
+    end if;
+    if exists (select 1 from public.bina_damping where tahun_ajaran = p_tahun_ajaran and penegak_id = v_id and rombel <> p_rombel) then
+      raise exception '% sudah menjadi Bina Damping rombel lain pada tahun ajaran ini.', v_p.nama;
+    end if;
+    if not sigarda.tingkat_selesai(v_id, 'Laksana') then
+      select count(*) into v_bebas from public.profiles q
+      where q.role = 'peserta' and q.status = 'aktif' and q.jabatan_dewan is not null and q.id <> all (v_ids)
+        and sigarda.tingkat_selesai(q.id, 'Bantara') and sigarda.tingkat_selesai(q.id, 'Laksana')
+        and not exists (select 1 from public.bina_damping b where b.tahun_ajaran = p_tahun_ajaran and b.penegak_id = q.id and b.rombel <> p_rombel);
+      if v_bebas > 0 then
+        raise exception '% masih Calon Laksana. Dahulukan Penegak berjabatan Dewan yang sudah Laksana (masih ada % yang belum bertugas).', v_p.nama, v_bebas;
+      end if;
+    end if;
+  end loop;
+
+  delete from public.bina_damping where tahun_ajaran = p_tahun_ajaran and rombel = p_rombel and not (penegak_id = any (v_ids));
+  get diagnostics v_k = row_count;
+  v_n := v_k;
+  foreach v_id in array v_ids loop
+    insert into public.bina_damping (tahun_ajaran, rombel, penegak_id, ditetapkan_oleh) values (p_tahun_ajaran, p_rombel, v_id, auth.uid()) on conflict do nothing;
+    get diagnostics v_k = row_count;
+    v_n := v_n + v_k;
+  end loop;
+  return v_n;
+end $$;
+
+-- Penunjukan Bina Damping satu tahun ajaran (bawaan: tahun ajaran berjalan) beserta calon yang dapat dipilih. Pengurus (Dewan, Pembina, Admin).
+-- { tahun_ajaran, bisa_atur (boleh menunjuk: Dewan, Pembina, Admin), penugasan: [{ rombel, penegak_id, nama, kelas, jabatan_dewan, tingkat }],
+--   calon: [{ id, nama, kelas, jabatan_dewan, tingkat, rombel }] } dengan calon = Penegak berjabatan Dewan yang minimal Calon Laksana (Laksana lebih dulu);
+-- rombel = tempat ia sudah bertugas pada tahun ajaran itu (null = belum).
+create function public.sg_bina_damping_daftar(p_tahun_ajaran text default null) returns jsonb
+language plpgsql stable security definer set search_path = public as
+$$
+declare v_ta text := coalesce(p_tahun_ajaran, sigarda.tahun_ajaran_kini());
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pengurus() then raise exception 'Hanya pengurus yang dapat melihat penunjukan Bina Damping.'; end if;
+  if not sigarda.tahun_ajaran_sah(v_ta) then raise exception 'Tahun ajaran tidak sah. Contoh: 2026/2027.'; end if;
+  return jsonb_build_object(
+    'tahun_ajaran', v_ta,
+    'bisa_atur', sigarda.dewan() or sigarda.pembina_atau_admin(),
+    'penugasan', coalesce((
+      select jsonb_agg(jsonb_build_object('rombel', b.rombel, 'penegak_id', p.id, 'nama', p.nama, 'kelas', p.kelas, 'jabatan_dewan', p.jabatan_dewan,
+                                          'tingkat', sigarda.tingkat_penegak(p.id)) order by b.rombel, p.nama)
+      from public.bina_damping b join public.profiles p on p.id = b.penegak_id where b.tahun_ajaran = v_ta), '[]'::jsonb),
+    'calon', coalesce((
+      select jsonb_agg(x.j order by x.urut, x.nama) from (
+        select p.nama, case when sigarda.tingkat_selesai(p.id, 'Laksana') then 0 else 1 end as urut,
+               jsonb_build_object('id', p.id, 'nama', p.nama, 'kelas', p.kelas, 'jabatan_dewan', p.jabatan_dewan, 'tingkat', sigarda.tingkat_penegak(p.id),
+                                  'rombel', (select b.rombel from public.bina_damping b where b.penegak_id = p.id and b.tahun_ajaran = v_ta)) as j
+        from public.profiles p
+        where p.role = 'peserta' and p.status = 'aktif' and p.jabatan_dewan is not null and sigarda.tingkat_selesai(p.id, 'Bantara')
+      ) x), '[]'::jsonb)
+  );
+end $$;
+
+-- Susunan sangga sebuah rombel beserta Bina Damping dan peringatannya. Boleh dibaca: pengurus, Bina Damping rombel itu, dan Penegak aktif rombel itu.
+-- { rombel, tahun_ajaran, bisa_atur, bina_damping: [{ id, nama, tingkat }], anggota: [{ id, nama, sangga, pinsa, tingkat, layak_pinsa }], peringatan: [{ sangga, teks }] }
+-- `tingkat` (kemajuan SKU sesama Penegak) dan `layak_pinsa` (Bantara selesai) hanya diperlihatkan kepada yang boleh mengatur dan pengurus; Penegak biasa menerima null/false.
+create function public.sg_sangga_rombel(p_rombel text) returns jsonb
+language plpgsql stable security definer set search_path = public as
+$$
+declare v_atur boolean; v_lihat boolean;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.rombel_sah(p_rombel) then raise exception 'Rombel tidak sah. Contoh: X-01, XI-05, XII-10.'; end if;
+  v_atur := sigarda.sangga_bisa_atur(p_rombel);
+  v_lihat := v_atur or sigarda.pengurus();
+  if not (v_lihat or exists (select 1 from public.profiles where id = auth.uid() and role = 'peserta' and status = 'aktif' and kelas = p_rombel)) then
+    raise exception 'Susunan sangga hanya dapat dilihat pengurus, Bina Damping, dan anggota rombel ini.';
+  end if;
+  return jsonb_build_object(
+    'rombel', p_rombel,
+    'tahun_ajaran', sigarda.tahun_ajaran_kini(),
+    'bisa_atur', v_atur,
+    'bina_damping', coalesce((
+      select jsonb_agg(jsonb_build_object('id', p.id, 'nama', p.nama, 'tingkat', case when v_lihat then sigarda.tingkat_penegak(p.id) end) order by p.nama)
+      from public.bina_damping b join public.profiles p on p.id = b.penegak_id
+      where b.rombel = p_rombel and b.tahun_ajaran = sigarda.tahun_ajaran_kini()), '[]'::jsonb),
+    'anggota', coalesce((
+      select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'sangga', x.sangga, 'pinsa', x.pinsa, 'tingkat', x.tingkat,
+                                          'layak_pinsa', x.tingkat is not null and x.tingkat <> 'calon-bantara') order by lower(x.sangga), x.pinsa desc, x.nama)
+      from (select p.id, p.nama, p.sangga, p.pinsa, case when v_lihat then sigarda.tingkat_penegak(p.id) end as tingkat
+            from public.profiles p where p.role = 'peserta' and p.status = 'aktif' and p.kelas = p_rombel) x), '[]'::jsonb),
+    'peringatan', sigarda.sangga_peringatan(p_rombel)
+  );
+end $$;
+
+-- Membagi sangga dan menentukan Pinsa di satu rombel (Bina Damping rombel itu, Pembina, dan Admin). p_data = [{ id, sangga?, pinsa? }] untuk Penegak aktif
+-- rombel itu; kunci yang tidak ada = tidak diubah. Semua atau tidak sama sekali. Pinsa minimal Calon Laksana, satu per sangga; pindah sangga otomatis melepas
+-- Pinsa-nya. Mengembalikan { diubah, peringatan } (peringatan tidak memblokir).
+create function public.sg_sangga_atur(p_rombel text, p_data jsonb) returns jsonb
+language plpgsql security definer set search_path = public as
+$$
+declare v_e jsonb; v_id uuid; v_t public.profiles; v_s text; v_pinsa boolean; v_lain text; v_n int := 0; v_tahap int;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.rombel_sah(p_rombel) then raise exception 'Rombel tidak sah. Contoh: X-01, XI-05, XII-10.'; end if;
+  if not sigarda.sangga_bisa_atur(p_rombel) then
+    raise exception 'Hanya Bina Damping rombel ini, Pembina, dan Admin Gudep yang dapat mengatur sangga.';
+  end if;
+  if p_data is null or jsonb_typeof(p_data) <> 'array' then raise exception 'Data sangga tidak sah.'; end if;
+  if jsonb_array_length(p_data) > 60 then raise exception 'Maksimal 60 Penegak per penyimpanan.'; end if;
+
+  -- Tahap 1: nama sangga.
+  for v_e in select * from jsonb_array_elements(p_data) loop
+    v_id := (v_e ->> 'id')::uuid;
+    select * into v_t from public.profiles where id = v_id and role = 'peserta' and kelas = p_rombel and status = 'aktif';
+    if not found then raise exception 'Penegak tidak ditemukan di rombel % atau tidak aktif.', p_rombel; end if;
+    if v_e ? 'sangga' then
+      v_s := sigarda.rapikan(v_e ->> 'sangga');
+      if v_s = '' or char_length(v_s) > 40 then raise exception 'Nama sangga wajib diisi (maksimal 40 karakter).'; end if;
+      v_s := coalesce((select sangga from public.profiles where role = 'peserta' and lower(sangga) = lower(v_s) limit 1), v_s);
+      if v_s <> v_t.sangga then
+        update public.profiles set sangga = v_s where id = v_id;
+        v_n := v_n + 1;
+      end if;
+    end if;
+  end loop;
+
+  -- Tahap 2: Pinsa. Yang dicabut lebih dulu (agar tukar Pinsa dalam satu simpanan berhasil), lalu yang ditetapkan.
+  for v_tahap in 1..2 loop
+    for v_e in select * from jsonb_array_elements(p_data) loop
+      if not (v_e ? 'pinsa') then continue; end if;
+      v_pinsa := (v_e ->> 'pinsa')::boolean;
+      if (v_tahap = 1) <> (not v_pinsa) then continue; end if;
+      v_id := (v_e ->> 'id')::uuid;
+      select * into v_t from public.profiles where id = v_id;
+      if v_pinsa is not distinct from v_t.pinsa then continue; end if;
+      if v_pinsa then
+        if not sigarda.tingkat_selesai(v_id, 'Bantara') then
+          raise exception '% belum menyelesaikan SKU Bantara. Pinsa dipilih dari Penegak Calon Laksana.', v_t.nama;
+        end if;
+        select nama into v_lain from public.profiles where role = 'peserta' and status = 'aktif' and kelas = v_t.kelas and lower(sangga) = lower(v_t.sangga) and pinsa and id <> v_id limit 1;
+        if v_lain is not null then raise exception 'Sangga % sudah punya Pinsa (%). Cabut dulu Pinsa yang lama.', v_t.sangga, v_lain; end if;
+      end if;
+      update public.profiles set pinsa = v_pinsa where id = v_id;
+      v_n := v_n + 1;
+    end loop;
+  end loop;
+  return jsonb_build_object('diubah', v_n, 'peringatan', sigarda.sangga_peringatan(p_rombel));
+end $$;
+
+-- Peran pendampingan diri sendiri (dipakai menu): rombel yang saya dampingi sebagai Bina Damping pada tahun ajaran berjalan, dan apakah saya Pinsa.
+create function public.sg_pendampingan_saya() returns jsonb
+language plpgsql stable security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  return jsonb_build_object(
+    'bina_damping', coalesce((select jsonb_agg(b.rombel order by b.rombel) from public.bina_damping b
+                              where b.penegak_id = auth.uid() and b.tahun_ajaran = sigarda.tahun_ajaran_kini()), '[]'::jsonb),
+    'pinsa', coalesce((select pinsa from public.profiles where id = auth.uid()), false));
+end $$;
+-- ===== akhir aksi pinsa bina damping =====
+
 -- ===== Naik kelas dan status anggota: fungsi =====
 -- Penegak berstatus nonaktif atau alumni hanya dapat DILIHAT (dan dicetak). Semua penulisan yang menyangkut Penegak itu ditolak pemicu di bawah,
 -- sehingga tidak bergantung pada tiap fungsi aksi. Pembaruan yang dipicu tindakan kunci asing (mis. penguji_id menjadi kosong saat akun
@@ -2766,10 +3069,10 @@ end $$;
 -- ===== akhir fungsi jenis kelamin =====
 
 -- ===== Jabatan Dewan Ambalan: fungsi =====
--- Jabatan Dewan Ambalan pada akun PENEGAK (isian bebas, mis. Pradana, Pradani, Wakil Pradana, Sekretaris, Bendahara, Ketua Bidang Kegiatan), oleh Pembina atau Admin Gudep.
+-- Jabatan Dewan Ambalan pada akun PENEGAK (isian bebas, mis. Pradana, Pradani, Pemangku Adat, Wakil Pradana, Sekretaris, Bendahara, Ketua Bidang Kegiatan), oleh Pembina atau Admin Gudep.
 -- p_data = [{"username": "10231", "jabatan": "Pradana"}, ...] (username = NIS Penegak); jabatan kosong mencabut jabatan (penugasan penguji ikut dihapus). Jabatan hanya untuk
--- Penegak yang AKTIF. Pradana dan Pradani masing-masing hanya satu pemegang: pemegang lama harus dikosongkan lebih dulu (boleh pada permintaan yang sama,
--- mis. [{"username": "lama", "jabatan": ""}, {"username": "baru", "jabatan": "Pradana"}]). Semua atau tidak sama sekali. Pradana menjadi ketua sidang; Pradana dan Pradani
+-- Penegak yang AKTIF. Pradana, Pradani, dan Pemangku Adat masing-masing hanya satu pemegang (sigarda.jabatan_tunggal): pemegang lama harus dikosongkan lebih dulu (boleh pada permintaan yang sama,
+-- mis. [{"username": "lama", "jabatan": ""}, {"username": "baru", "jabatan": "Pradana"}]). Semua atau tidak sama sekali. Pemangku Adat menjadi ketua sidang (cadangannya Pradana); Pradana dan Pradani
 -- menandatangani Surat Tanda Lulus. Dewan Ambalan berupa atribut akun Penegak (bukan akun terpisah): pemegang jabatan dapat memakai tampilan Dewan.
 -- Tercatat di kepengurusan_log. Mengembalikan jumlah anggota yang berubah.
 create function public.sg_anggota_jabatan_dewan_atur(p_data jsonb) returns int
@@ -2800,7 +3103,7 @@ begin
     end if;
     if v_t.role <> 'peserta' then raise exception '% bukan Penegak. Jabatan Dewan Ambalan hanya untuk Penegak.', v_t.nama; end if;
     if v_t.status <> 'aktif' then raise exception '% berstatus % dan tidak dapat menjabat. Aktifkan kembali lebih dulu.', v_t.nama, v_t.status; end if;
-    if v_jab in ('Pradana', 'Pradani') then
+    if sigarda.jabatan_tunggal(v_jab) then
       select nama into v_lain from public.profiles where jabatan_dewan = v_jab and id <> v_t.id limit 1;
       if found then raise exception '% sudah dijabat oleh %. Kosongkan jabatan itu lebih dulu.', v_jab, v_lain; end if;
     end if;
@@ -2815,7 +3118,7 @@ end $$;
 
 -- Kepengurusan Dewan Ambalan lewat berkas (Pembina atau Admin Gudep). p_data = [{"username": "10231", "jabatan": "Pradana"}, ...] (username = NIS; jabatan bebas).
 -- p_ganti = true: SELURUH kepengurusan diganti (pemegang jabatan yang tidak ada di berkas dicabut; termasuk jabatan pada akun Dewan lama). false: hanya yang ada di berkas
--- diberi atau diubah (Pradana atau Pradani yang berpindah tangan tetap mencabut pemegang lamanya). p_terapkan = false: PRATINJAU (tidak mengubah apa pun); true: menerapkan
+-- diberi atau diubah (jabatan tunggal yang berpindah tangan, yaitu Pradana, Pradani, atau Pemangku Adat, tetap mencabut pemegang lamanya). p_terapkan = false: PRATINJAU (tidak mengubah apa pun); true: menerapkan
 -- SEMUA atau tidak sama sekali. Hasil { galat, ringkasan { beri, ganti, cabut, sama, galat }, baris: [{ no, id, username, nama, kelas, dari_jabatan, jabatan, hasil:
 -- 'beri' | 'ganti' | 'sama' | 'cabut' | 'galat', pesan: [...] }] }. Peringatan (bukan galat): belum menyelesaikan seluruh butir Bantara.
 create function public.sg_kepengurusan_terapkan(p_data jsonb, p_ganti boolean default true, p_terapkan boolean default false) returns jsonb
@@ -2846,12 +3149,12 @@ begin
       v_hasil := 'galat'; v_pesan := array['Jabatan Dewan Ambalan kosong.'];
     elsif char_length(v_jab) not between 2 and 60 or v_jab ~ '[[:cntrl:]<>]' then
       v_hasil := 'galat'; v_pesan := array['Jabatan harus 2 sampai 60 karakter tanpa tanda < atau >.'];
-    elsif v_jab in ('Pradana', 'Pradani') and v_jab = any (v_tunggal) then
+    elsif sigarda.jabatan_tunggal(v_jab) and v_jab = any (v_tunggal) then
       v_hasil := 'galat'; v_pesan := array[v_jab || ' hanya boleh satu orang, tetapi muncul lebih dari sekali dalam berkas.'];
     end if;
     if v_user <> '' then v_pakai := v_pakai || v_user; end if;
     if v_hasil = 'ubah' then
-      if v_jab in ('Pradana', 'Pradani') then v_tunggal := v_tunggal || v_jab; end if;
+      if sigarda.jabatan_tunggal(v_jab) then v_tunggal := v_tunggal || v_jab; end if;
       if v_t.jabatan_dewan is not distinct from v_jab then v_hasil := 'sama'; v_sama := v_sama + 1;
       elsif v_t.jabatan_dewan is null then v_hasil := 'beri'; v_beri := v_beri + 1;
       else v_hasil := 'ganti'; v_ganti := v_ganti + 1; v_pesan := v_pesan || ('Jabatan berubah dari ' || v_t.jabatan_dewan || '.'); end if;
@@ -2864,11 +3167,11 @@ begin
       'hasil', v_hasil, 'pesan', to_jsonb(v_pesan)));
   end loop;
 
-  -- Pemegang jabatan yang dicabut: semua yang tidak ada di berkas (p_ganti), atau pemegang Pradana/Pradani yang jabatannya berpindah ke orang lain di berkas.
+  -- Pemegang jabatan yang dicabut: semua yang tidak ada di berkas (p_ganti), atau pemegang jabatan tunggal (Pradana, Pradani, Pemangku Adat) yang jabatannya berpindah ke orang lain di berkas.
   for v_r in
     select p.id, p.username, p.nama, p.kelas, p.role, p.jabatan_dewan from public.profiles p
     where p.jabatan_dewan is not null and p.username <> all (v_pakai)
-      and (p_ganti or (p.jabatan_dewan in ('Pradana', 'Pradani') and p.jabatan_dewan = any (v_tunggal)))
+      and (p_ganti or (sigarda.jabatan_tunggal(p.jabatan_dewan) and p.jabatan_dewan = any (v_tunggal)))
     order by p.nama
   loop
     v_cabut := v_cabut + 1;
@@ -2883,11 +3186,11 @@ begin
     if v_galat > 0 then raise exception 'Ada % baris bermasalah, jadi tidak ada yang diubah. Periksa pratinjau, perbaiki berkas, lalu coba lagi.', v_galat; end if;
     if v_beri + v_ganti + v_cabut = 0 then raise exception 'Tidak ada perubahan yang perlu diterapkan.'; end if;
     select nama into v_oleh from public.profiles where id = auth.uid();
-    -- mencabut lebih dulu agar Pradana dan Pradani berpindah tangan tanpa bentrok
+    -- mencabut lebih dulu agar jabatan tunggal berpindah tangan tanpa bentrok
     for v_r in select id from public.profiles where id = any (v_ids) loop
       perform sigarda.jabatan_dewan_lepas(v_r.id, case when p_ganti then 'Kepengurusan diganti' else 'Jabatan berpindah' end);
     end loop;
-    -- yang berganti jabatan dikosongkan sebentar agar pertukaran Pradana dan Pradani tidak bentrok dengan indeks unik
+    -- yang berganti jabatan dikosongkan sebentar agar pertukaran jabatan tunggal tidak bentrok dengan indeks unik
     update public.profiles set jabatan_dewan = null
       where id in (select (x ->> 'id')::uuid from jsonb_array_elements(v_baris) x where x ->> 'hasil' = 'ganti');
     for v_e in select * from jsonb_array_elements(v_baris) loop
@@ -2952,6 +3255,46 @@ begin
 end $$;
 -- ===== akhir fungsi jabatan dewan =====
 
+
+-- ===== Pengukuhan Dewan Ambalan (Fase A): fungsi =====
+-- Mencatat pengukuhan kepengurusan Dewan Ambalan oleh Ketua Kwartir Ranting untuk satu tahun ajaran (Pembina atau Admin Gudep): nomor dan tanggal SK, dan (opsional, berpasangan)
+-- nomor dan tanggal rekomendasi Ketua Mabigus. Tanggal tidak boleh di masa depan (WIB) dan rekomendasi tidak boleh sesudah SK. Simpan ulang = perbarui.
+-- Aturan isian dicerminkan periksaPengukuhan di src/lib/dewanLogic.js (dijaga oleh pengujian).
+create function public.sg_pengukuhan_dewan_simpan(
+  p_tahun_ajaran text, p_nomor_sk text, p_tanggal_sk date, p_rekomendasi_nomor text default '', p_rekomendasi_tanggal date default null, p_catatan text default ''
+) returns void language plpgsql security definer set search_path = public as
+$$
+declare v_nomor text := sigarda.rapikan(p_nomor_sk); v_rn text := sigarda.rapikan(p_rekomendasi_nomor); v_cat text := sigarda.rapikan(p_catatan);
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mencatat pengukuhan Dewan Ambalan.'; end if;
+  if not sigarda.tahun_ajaran_sah(p_tahun_ajaran) then raise exception 'Tahun ajaran tidak sah. Contoh: 2026/2027.'; end if;
+  if char_length(v_nomor) not between 1 and 80 or v_nomor ~ '[[:cntrl:]<>]' then raise exception 'Nomor SK pengukuhan wajib diisi (maksimal 80 karakter, tanpa tanda < atau >).'; end if;
+  if p_tanggal_sk is null then raise exception 'Tanggal SK pengukuhan wajib diisi.'; end if;
+  if p_tanggal_sk < date '2000-01-01' or p_tanggal_sk > sigarda.hari_ini() then raise exception 'Tanggal SK pengukuhan tidak boleh sebelum tahun 2000 atau di masa depan.'; end if;
+  if char_length(v_rn) > 80 or v_rn ~ '[[:cntrl:]<>]' then raise exception 'Nomor rekomendasi maksimal 80 karakter, tanpa tanda < atau >.'; end if;
+  if (v_rn = '') <> (p_rekomendasi_tanggal is null) then raise exception 'Isi nomor dan tanggal rekomendasi Ketua Mabigus sekaligus, atau kosongkan keduanya.'; end if;
+  if p_rekomendasi_tanggal is not null and (p_rekomendasi_tanggal < date '2000-01-01' or p_rekomendasi_tanggal > p_tanggal_sk) then
+    raise exception 'Tanggal rekomendasi tidak boleh sebelum tahun 2000 atau sesudah tanggal SK.';
+  end if;
+  if char_length(v_cat) > 200 then raise exception 'Catatan maksimal 200 karakter.'; end if;
+  insert into public.pengukuhan_dewan (tahun_ajaran, nomor_sk, tanggal_sk, rekomendasi_nomor, rekomendasi_tanggal, catatan, diubah_oleh, diubah_pada)
+  values (p_tahun_ajaran, v_nomor, p_tanggal_sk, v_rn, p_rekomendasi_tanggal, v_cat, auth.uid(), now())
+  on conflict (tahun_ajaran) do update
+    set nomor_sk = excluded.nomor_sk, tanggal_sk = excluded.tanggal_sk, rekomendasi_nomor = excluded.rekomendasi_nomor, rekomendasi_tanggal = excluded.rekomendasi_tanggal,
+        catatan = excluded.catatan, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
+end $$;
+
+-- Menghapus catatan pengukuhan satu tahun ajaran (Pembina atau Admin Gudep), mis. salah tahun ajaran.
+create function public.sg_pengukuhan_dewan_hapus(p_tahun_ajaran text) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan pengukuhan Dewan Ambalan.'; end if;
+  delete from public.pengukuhan_dewan where tahun_ajaran = p_tahun_ajaran;
+  if not found then raise exception 'Belum ada catatan pengukuhan untuk tahun ajaran itu.'; end if;
+end $$;
+-- ===== akhir fungsi pengukuhan dewan =====
 -- ===== Materi SKU (Pembina dan Admin Gudep) =====
 create function public.sg_materi_simpan(
   p_id uuid, p_judul text, p_deskripsi text, p_tautan text, p_file_id text, p_resource_key text,
@@ -3689,19 +4032,24 @@ $$
     (select jsonb_strip_nulls(jsonb_build_object('nama', p.nilai -> 'nama', 'singkat', p.nilai -> 'singkat', 'sekolah', p.nilai -> 'sekolah', 'kota', p.nilai -> 'kota'))
      from public.pengaturan p where p.kunci = 'gudep.data'), '{}'::jsonb)
 $$;
--- Ketua sidang untuk berita acara: anggota Dewan Ambalan berjabatan Pradana (nama; sebutan "Pradana Dewan Ambalan"). Bila belum ada Pradana,
--- dipakai pengaturan lama sidang.nama_ketua dan sidang.sebutan_ketua (bawaan: kosong dan "Ketua Dewan Penegak / Pemangku Adat").
+-- ===== Ketua sidang (Fase A): fungsi =====
+-- Ketua sidang untuk berita acara = anggota Dewan Ambalan berjabatan PEMANGKU ADAT (sebutan "Pemangku Adat Dewan Ambalan"): Dewan Kehormatan Penegak diketuai
+-- Pemangku Adat (Jukran Kwarnas 05/2026 Pasal 24 ayat (15), yang menggantikan SK 231/2007; SK Kwarnas 176/2013 butir 7 c). Bila belum ada Pemangku Adat, dipakai Pradana ("Pradana Dewan Ambalan").
+-- Bila belum ada keduanya, dipakai pengaturan lama sidang.nama_ketua dan sidang.sebutan_ketua (bawaan: kosong dan "Ketua Dewan Penegak / Pemangku Adat").
 -- Cermin ketuaSidang di src/lib/dewanLogic.js (dijaga oleh pengujian).
 create function sigarda.ketua_sidang(out o_nama text, out o_sebutan text) language plpgsql stable security definer set search_path = public as
 $$
 begin
-  select sigarda.rapikan(nama), 'Pradana Dewan Ambalan' into o_nama, o_sebutan
-  from public.profiles where jabatan_dewan = 'Pradana' and status = 'aktif' and (role = 'peserta' or (role = 'penguji' and jabatan = 'Dewan Ambalan')) limit 1;
+  select sigarda.rapikan(nama), jabatan_dewan || ' Dewan Ambalan' into o_nama, o_sebutan
+  from public.profiles
+  where jabatan_dewan in ('Pemangku Adat', 'Pradana') and status = 'aktif' and (role = 'peserta' or (role = 'penguji' and jabatan = 'Dewan Ambalan'))
+  order by case jabatan_dewan when 'Pemangku Adat' then 0 else 1 end limit 1;
   if not found then
     o_nama := sigarda.pengaturan_teks('sidang.nama_ketua', '');
     o_sebutan := sigarda.pengaturan_teks('sidang.sebutan_ketua', 'Ketua Dewan Penegak / Pemangku Adat');
   end if;
 end $$;
+-- ===== akhir fungsi ketua sidang =====
 -- ===== akhir fungsi gudep =====
 
 -- ===== Dokumen terbit: fungsi aksi =====
@@ -3987,6 +4335,7 @@ begin
       'penugasan_log', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penugasan_log t),
       'penugasan_peserta', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penugasan_peserta t),
       'kepengurusan_log', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.kepengurusan_log t),
+      'pengukuhan_dewan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.pengukuhan_dewan t),
       'guru_agama', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.guru_agama t),
       'dokumen_terbit', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_terbit t),
       'dokumen_urut', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_urut t),
@@ -4009,7 +4358,8 @@ begin
       'sesi_ujian_butir', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian_butir t),
       'sesi_ujian_peserta', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian_peserta t),
       'agenda', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.agenda t),
-      'kegiatan_usulan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.kegiatan_usulan t)
+      'kegiatan_usulan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.kegiatan_usulan t),
+      'bina_damping', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.bina_damping t)
     )
   ) into v_hasil;
   insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada)
@@ -4595,7 +4945,7 @@ grant select on public.profiles, public.sku_butir, public.sku_unit, public.pf_it
   public.sesi_ujian, public.sesi_ujian_butir, public.sesi_ujian_peserta,
   public.iuran, public.iuran_log, public.iuran_kas, public.asisten_iuran,
   public.penugasan_rombel, public.penugasan_log, public.guru_agama, public.dokumen_terbit, public.dokumen_urut, public.notifikasi,
-  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda, public.kegiatan_usulan to authenticated;
+  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda, public.kegiatan_usulan, public.pengukuhan_dewan to authenticated;
 
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function
@@ -4630,12 +4980,13 @@ grant execute on function
   public.sg_gudep_simpan(jsonb),
   public.sg_naik_kelas(text, jsonb, boolean), public.sg_naik_kelas_batalkan(bigint), public.sg_anggota_status_atur(uuid, text, text, text),
   public.sg_notifikasi_tandai(bigint[]), public.sg_push_kunci(), public.sg_push_simpan(text, text, text, text), public.sg_push_hapus(text), public.sg_push_ringkasan(), public.sg_notifikasi_tes(),
-  public.sg_penugasan_peserta_atur(text, uuid, uuid[], text), public.sg_kepengurusan_terapkan(jsonb, boolean, boolean), public.sg_dewan_lama_arsipkan(uuid[], boolean),
+  public.sg_penugasan_peserta_atur(text, uuid, uuid[], text), public.sg_kepengurusan_terapkan(jsonb, boolean, boolean), public.sg_pengukuhan_dewan_simpan(text, text, date, text, date, text), public.sg_pengukuhan_dewan_hapus(text), public.sg_dewan_lama_arsipkan(uuid[], boolean),
   public.sg_pemeriksaan_data(), public.sg_cadangan_admin(), public.sg_cadangan_status(),
   public.sg_profil_whatsapp_atur(text), public.sg_eskalasi_daftar(),
   public.sg_agenda_simpan(bigint, text, text, text, date, text, uuid[], boolean), public.sg_agenda_hapus(bigint),
   public.sg_kegiatan_usul(text, text, date, text, text), public.sg_kegiatan_tinjau(bigint, text, text), public.sg_kegiatan_ping(bigint),
-  public.sg_garuda_berkas_baca(uuid), public.sg_garuda_token_buat(uuid), public.sg_garuda_token_cabut(uuid)
+  public.sg_garuda_berkas_baca(uuid), public.sg_garuda_token_buat(uuid), public.sg_garuda_token_cabut(uuid),
+  public.sg_bina_damping_atur(text, text, uuid[]), public.sg_bina_damping_daftar(text), public.sg_sangga_rombel(text), public.sg_sangga_atur(text, jsonb), public.sg_pendampingan_saya()
   to authenticated;
 -- Fungsi yang boleh dipanggil tanpa login (hanya membaca): verifikasi keaslian dokumen, identitas gudep di halaman masuk, dan
 -- tautan berbagi baca-saja Berkas Calon Garuda (tahap L7)

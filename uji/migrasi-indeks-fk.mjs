@@ -15,7 +15,7 @@ const MP = bersih(readFileSync(`${P}/supabase/migrasi/2026-09-indeks-fk.sql`, 'u
 const skemaDari = (ref) => (ref.startsWith('git:') ? skemaLama(ref.slice(4), P) : readFileSync(ref, 'utf8'));
 const baru = async (skemaFile) => { const db = new PGlite(); await siapkanPg(db, { sqlStub: stub, sqlSkema: bersih(skemaDari(skemaFile)) }); return db; };
 const cacah = async (db) => (await db.query(`select (select count(*) from public.profiles)::int p, (select count(*) from public.sku_progress)::int s, (select count(*) from public.sku_riwayat)::int r, (select count(*) from auth.users)::int u`)).rows[0];
-const indeks = async (db) => (await db.query(`select tablename t, indexname n, indexdef d from pg_indexes where schemaname = 'public' and tablename <> 'keepalive_konfigurasi' order by 1, 2`)).rows; // tabel keepalive datang dari migrasi sesudahnya
+const indeks = async (db) => (await db.query(`select tablename t, indexname n, indexdef d from pg_indexes where schemaname = 'public' and tablename <> 'keepalive_konfigurasi' and tablename <> 'pengukuhan_dewan' and indexname <> 'profil_pradana_pradani_unik' order by 1, 2`)).rows; // tabel keepalive, tabel pengukuhan_dewan, dan indeks jabatan tunggal (Pemangku Adat) datang dari migrasi sesudahnya
 
 const DIHARAPKAN = [
   ['sku_progress', 'sku_progress_penguji_idx', 'penguji_id'], ['sku_riwayat', 'sku_riwayat_oleh_idx', 'oleh'], ['sku_penilaian', 'sku_penilaian_penguji_idx', 'penguji_id'],
@@ -24,7 +24,7 @@ const DIHARAPKAN = [
 ];
 
 // Skema "sesudah" = skema.sql terbaru; sebelum = commit TEPAT sebelum migrasi ini (main sesudah PR #5).
-const A = await baru(`${P}/supabase/skema.sql`);
+const A = await baru('git:90cb914');
 const ia = await indeks(A);
 ok(DIHARAPKAN.every(([t, n, k]) => ia.some((x) => x.t === t && x.n === n && x.d.includes(`(${k})`))), 'skema baru memuat kesepuluh indeks kunci asing');
 

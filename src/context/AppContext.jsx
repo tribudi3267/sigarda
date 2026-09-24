@@ -42,7 +42,7 @@ export function useApp() {
   return ctx;
 }
 
-const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '', asisten: [], pengaturanIuran: PENGATURAN_IURAN_BAWAAN, penugasan: {}, penugasanPeserta: {}, guruAgama: [], dokumen: null, notifikasi: [] };
+const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '', asisten: [], pengaturanIuran: PENGATURAN_IURAN_BAWAAN, penugasan: {}, penugasanPeserta: {}, guruAgama: [], dokumen: null, notifikasi: [], pendampingan: { binaDamping: [], pinsa: false } };
 const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi waktu Edge Function)
 const JEDA_SEGARKAN_MS = 30000;
 const JEDA_NOTIFIKASI_MS = 60000; // Kotak Notifikasi ditarik ulang tiap menit selama halaman terlihat
@@ -181,12 +181,13 @@ export function AppProvider({ children }) {
     const a = api();
     const mulaiGenerasi = generasi.current;
     const daftarKunci = [...new Set([semesterDari(hariIni()), ...semesterRef.current])];
-    const [u, p, sesi, pf, m, asisten, pengIuran, gudep, notif, ...hadir] = await Promise.all([
+    const [u, p, sesi, pf, m, asisten, pengIuran, gudep, notif, pend, ...hadir] = await Promise.all([
       a.muatProfil(), muatProgressSemua(), a.muatSesiAbsen(), a.muatPortofolio(), a.muatMateri(),
       a.muatAsisten(), // penunjukan asisten bendahara: tidak wajib (basis data lama belum punya tabelnya), jadi tidak ikut pemeriksaan gagal
       a.muatPengaturanIuran(), // pengaturan iuran: bila fungsinya belum ada dipakai nilai bawaan
       a.muatGudep(), // data gudep: tidak wajib; belum tersimpan = nilai bawaan dari src/config.js
       a.muatNotifikasi(), // Kotak Notifikasi: tidak wajib (basis data lama belum punya tabelnya)
+      a.muatPendampinganSaya(), // peran Bina Damping/Pinsa (fase B): tidak wajib (basis data lama belum punya fungsinya)
       ...daftarKunci.map((k) => { const r = rentangKunci(k); return a.muatHadirRentang(r.mulai, r.akhir); }),
     ]);
     const gagal = [u, p, sesi, pf, m, ...hadir].find((r) => !r.ok);
@@ -196,7 +197,7 @@ export function AppProvider({ children }) {
     if (gudep.ok) setGudep(gudep.data);
     setDb((d) => ({
       ...d, // sidang dan pengaturan dimuat terpisah (muatSidang) dan tidak boleh hilang saat penyegaran
-      users: u.data, progress: p.data, portofolio: pf.data, materi: m.data, asisten: asisten.ok ? asisten.data : [], notifikasi: notif.ok ? notif.data : d.notifikasi, pengaturanIuran: pengIuran.ok ? gabungPengaturanIuran(pengIuran.data) : PENGATURAN_IURAN_BAWAAN,
+      users: u.data, progress: p.data, portofolio: pf.data, materi: m.data, asisten: asisten.ok ? asisten.data : [], notifikasi: notif.ok ? notif.data : d.notifikasi, pendampingan: pend.ok ? pend.data : d.pendampingan, pengaturanIuran: pengIuran.ok ? gabungPengaturanIuran(pengIuran.data) : PENGATURAN_IURAN_BAWAAN,
       absensi: gabungHadirSemester(d.absensi, sesi.data, daftarKunci, hadirGabung),
     }));
     tandaiSiap(daftarKunci);
@@ -325,6 +326,7 @@ export function AppProvider({ children }) {
       portofolio: (pid) => terapkan(api().muatPortofolio(pid), (p) => (d) => ({ ...d, portofolio: pid ? { ...d.portofolio, [pid]: p[pid] ?? {} } : p })),
       hadir: (tanggal) => terapkan(api().muatHadirTanggal(tanggal), (h) => (d) => ({ ...d, absensi: { ...d.absensi, hadir: { ...d.absensi.hadir, [tanggal]: h } } })),
       materi: () => terapkan(api().muatMateri(), (materi) => (d) => ({ ...d, materi })),
+      pendampingan: () => terapkan(api().muatPendampinganSaya(), (pendampingan) => (d) => ({ ...d, pendampingan })),
       asisten: () => terapkan(api().muatAsisten(), (asisten) => (d) => ({ ...d, asisten })),
       pengaturanIuran: () => terapkan(api().muatPengaturanIuran(), (p) => (d) => ({ ...d, pengaturanIuran: gabungPengaturanIuran(p) })),
       sidang: async () => {
@@ -1061,6 +1063,68 @@ export function AppProvider({ children }) {
     if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
     return r;
   };
+  /** Catatan pengukuhan Dewan Ambalan oleh Ketua Kwartir Ranting (dibaca pengurus; ditulis Pembina dan Admin). */
+  const muatPengukuhanDewan = async () => {
+    const r = await api().muatPengukuhanDewan();
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  };
+  const simpanPengukuhanDewan = async (d) => {
+    if (!bolehKepengurusan) return ditolak(notify, 'Hanya Pembina dan Admin Gudep yang dapat mencatat pengukuhan Dewan Ambalan.');
+    const r = await api().simpanPengukuhanDewan(d);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    notify('Pengukuhan Dewan Ambalan tersimpan.');
+    return r;
+  };
+  const hapusPengukuhanDewan = async (tahunAjaran) => {
+    if (!bolehKepengurusan) return ditolak(notify, 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan pengukuhan Dewan Ambalan.');
+    const r = await api().hapusPengukuhanDewan(tahunAjaran);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    notify('Catatan pengukuhan dihapus.');
+    return r;
+  };
+
+
+  /* ---------------- Pinsa dan Bina Damping (fase B; hak ditegakkan server, tampilan hanya mengikuti hasil server) ---------------- */
+  const pendampingan = db.pendampingan;
+  const muatBinaDamping = useCallback(async (tahunAjaran = null) => {
+    const r = await api().muatBinaDamping(tahunAjaran);
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  }, [sesiBerakhir]);
+  /** Menunjuk Bina Damping satu rombel (Dewan, Pembina, Admin; server memeriksa). ids = daftar lengkap (maks 2). */
+  const aturBinaDamping = async (tahunAjaran, rombel, ids) => {
+    const r = await api().aturBinaDamping(tahunAjaran, rombel, ids);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    await segarkan.pendampingan();
+    if (r.data > 0) notify(`Bina Damping rombel ${rombel} disimpan.`);
+    return r;
+  };
+  const muatSanggaRombel = useCallback(async (rombel) => {
+    const r = await api().muatSanggaRombel(rombel);
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  }, [sesiBerakhir]);
+  /** Membagi sangga dan menentukan Pinsa di satu rombel. daftar = [{ id, sangga?, pinsa? }]. Hasil: { diubah, peringatan }. */
+  const aturSangga = async (rombel, daftar) => {
+    const r = await api().aturSangga(rombel, daftar);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    await Promise.all([segarkan.users(), segarkan.pendampingan()]);
+    if (r.data?.diubah > 0) notify('Susunan sangga disimpan.');
+    return r;
+  };
 
   /** Riwayat kenaikan kelas dan perubahan status (pengurus): { batch, log }. */
   const muatNaikKelas = async () => {
@@ -1221,7 +1285,8 @@ export function AppProvider({ children }) {
     simpanGudep, simpanWhatsapp, muatEskalasi,
     dokumen: db.dokumen, muatDokumen, terbitkanSuratAgama, cabutDokumen, bolehSurat,
     penugasan: db.penugasan, penugasanPeserta: db.penugasanPeserta, guruAgama: db.guruAgama, muatPenugasan, muatLogPenugasan, aturPenugasan, aturPenugasanPeserta, salinPenugasan, simpanGuruAgama, hapusGuruAgama, bolehAturPenugasan,
-    bolehKepengurusan, terapkanKepengurusan, aturJabatanDewan, arsipkanDewanLama, muatLogKepengurusan,
+    pendampingan, muatBinaDamping, aturBinaDamping, muatSanggaRombel, aturSangga,
+    bolehKepengurusan, terapkanKepengurusan, aturJabatanDewan, arsipkanDewanLama, muatLogKepengurusan, muatPengukuhanDewan, simpanPengukuhanDewan, hapusPengukuhanDewan,
     muatUlang: muatSemua,
     notifikasi: db.notifikasi, belumDibaca: jumlahBelumDibaca(db.notifikasi), segarkanNotifikasi, tandaiNotifikasi, api,
     notify, toast,

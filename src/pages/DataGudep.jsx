@@ -7,6 +7,7 @@ import { namaBerkasCadangan, perluCadangan } from '../lib/cadanganLogic';
 import { waktuRelatif } from '../lib/notifikasiLogic';
 import { KopSurat } from '../components/DokumenSku';
 import { Field } from '../components/ui';
+import SumberPeraturan from '../components/SumberPeraturan';
 
 /** Panel "Cadangan data" (Admin Gudep): status cadangan terakhir dan tombol unduh (tahap L4). */
 function CadanganData() {
@@ -142,6 +143,13 @@ export default function DataGudep() {
           dokumen cetak; tidak perlu lagi mengubah kode aplikasi. Perbarui isian ini setiap ada pergantian pengurus atau pejabat (mis. tahun ajaran baru):
           dokumen yang dibuat sesudahnya memakai data terbaru, sedangkan berita acara sidang dan surat pengantar yang sudah terbit tetap memuat nama saat dibuat.
         </p>
+        <SumberPeraturan
+          className="mt-1"
+          rujukan={[
+            { id: 'nomor-gudep-050-2003', bagian: 'Bab III butir 6 (nomor gudep; ganjil putra, genap putri)' },
+            { id: 'gudep-05-2026', bagian: 'Pasal 12 (nomor gugus depan ditetapkan SK Kwartir Cabang), Pasal 16 (Majelis Pembimbing), dan Pasal 29 (Ketua Gugus Depan)' },
+          ]}
+        />
       </div>
 
       <section className="panel space-y-1 p-4" aria-labelledby="gudep-identitas">

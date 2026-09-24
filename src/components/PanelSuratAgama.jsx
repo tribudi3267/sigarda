@@ -6,6 +6,7 @@ import { FORMAT_SURAT_BAWAAN, KUNCI_FORMAT_SURAT, contohNomorSurat, nomorUrutBer
 import { labelUnit } from '../lib/verifikasiLogic';
 import BuatSuratModal from './BuatSuratModal';
 import { Field } from './ui';
+import SumberPeraturan from './SumberPeraturan';
 
 /** Format nomor surat (Pembina dan Admin): mesin nomor yang sama dengan berita acara sidang, tanpa kode {tingkat}. */
 function FormatNomorSurat() {
@@ -66,6 +67,13 @@ export default function PanelSuratAgama({ peserta, terpilihId, setTerpilihId }) 
 
   return (
     <div className="mt-3">
+      <SumberPeraturan
+        className="mb-2"
+        rujukan={[
+          { id: 'agama-182-1979', bagian: 'Bab V butir 17 (pengelolaan pendidikan agama dalam satuan pramuka)' },
+          { id: 'sku-penegak-2011', bagian: 'Bab V (penguji dapat meminta bantuan ahli di luar Gerakan Pramuka; penyelesaian akhir tanggung jawab Pembina)' },
+        ]}
+      />
       {dokumen === null && <p className="text-sm text-pramuka-600" role="status">Memuat surat...</p>}
 
       {dokumen !== null && daftar.length === 0 && (

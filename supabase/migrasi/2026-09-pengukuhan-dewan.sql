@@ -1,133 +1,59 @@
--- ===== Data anggota (Admin Gudep). Pembuatan dan penghapusan akun lewat Edge Function. =====
-create function public.sg_anggota_ubah(
-  p_id uuid, p_nama text, p_kelas text default null, p_sangga text default null,
-  p_agama text default null, p_calon_garuda boolean default null
-) returns void language plpgsql security definer set search_path = public as
-$$
-declare v_t public.profiles; v_nama text := sigarda.rapikan(p_nama); v_kelas text; v_sangga text;
+-- ============================================================================
+-- MIGRASI: Fase A -- pengukuhan Dewan Ambalan (SK Kwartir Ranting) dan Pemangku Adat sebagai ketua sidang. AMAN untuk database berisi data.
+--
+-- Jalankan SETELAH migrasi sebelumnya (lihat README). Isi:
+--   * Jabatan tunggal: Pemangku Adat kini, seperti Pradana dan Pradani, hanya boleh dipegang satu anggota (indeks unik profil_pradana_pradani_unik
+--     diganti). Penulisan jabatan "pemangku adat" yang sudah ada dirapikan menjadi "Pemangku Adat" lebih dulu. Bila ternyata ada LEBIH DARI SATU
+--     pemegang, migrasi berhenti dengan pesan: sisakan satu (menu Kepengurusan), lalu jalankan lagi.
+--   * sigarda.jabatan_baku (membakukan "Pemangku Adat"), sigarda.jabatan_tunggal (baru), dan fungsi jabatan
+--     (sg_anggota_jabatan_dewan_atur, sg_kepengurusan_terapkan, dst.) ditulis ulang: perilaku Pradana dan Pradani SAMA, ditambah Pemangku Adat.
+--   * sigarda.ketua_sidang: ketua sidang = Pemangku Adat (Dewan Kehormatan Penegak diketuai Pemangku Adat, Jukran Kwarnas 05/2026 Pasal 24 ayat (15) dan SK 176/2013);
+--     bila belum ada, Pradana; bila belum ada juga, pengaturan lama. Berita acara yang sudah dibuat TIDAK berubah (nama disalin saat sidang).
+--   * Tabel public.pengukuhan_dewan (nomor dan tanggal SK Ketua Kwartir Ranting, rekomendasi Ketua Mabigus opsional; satu per tahun ajaran;
+--     AD/ART Munas 2023 ART Pasal 51 ayat (2) huruf a) dengan RLS baca-pengurus, dan fungsi sg_pengukuhan_dewan_simpan / sg_pengukuhan_dewan_hapus
+--     (Pembina dan Admin).
+--   * sg_cadangan_admin() ditulis ulang agar tabel baru ikut diekspor.
+-- Edge Function TIDAK berubah dan tidak perlu di-deploy ulang. TIDAK menghapus data. Aman diulang.
+--
+-- Cara: Supabase > SQL Editor > New query > tempel seluruh isi berkas ini > Run.
+-- Isi sama dengan bagian yang sama di supabase/sumber (dijaga oleh pengujian kesetaraan).
+-- ============================================================================
+set check_function_bodies = off;
+begin;
+
+do $$
 begin
-  perform sigarda.wajib_aktif();
-  if coalesce((select role from public.profiles where id = auth.uid()), '') <> 'admin' then
-    raise exception 'Hanya Admin Gudep yang dapat mengubah data anggota.';
-  end if;
-  select * into v_t from public.profiles where id = p_id;
-  if not found then raise exception 'Anggota tidak ditemukan.'; end if;
-  if v_nama = '' then raise exception 'Nama wajib diisi.'; end if;
-  if char_length(v_nama) > 120 then raise exception 'Nama maksimal 120 karakter.'; end if;
-
-  if v_t.role <> 'peserta' then
-    update public.profiles set nama = v_nama where id = p_id;
-    -- Agama Pembina (butir agama hanya boleh diuji Pembina yang seagama): null = tidak diubah, '' = dikosongkan. Dewan dan Admin tidak berAgama.
-    if v_t.role = 'penguji' and v_t.jabatan = 'Pembina' and p_agama is not null then
-      if p_agama <> '' and p_agama not in ('Islam','Katolik','Protestan','Hindu','Buddha','Khonghucu') then raise exception 'Agama tidak dikenal.'; end if;
-      update public.profiles set agama = nullif(p_agama, '') where id = p_id;
-    end if;
-    return;
-  end if;
-
-  v_kelas := sigarda.rapikan(p_kelas);
-  v_sangga := sigarda.rapikan(p_sangga);
-  if v_kelas = '' or v_sangga = '' then raise exception 'Kelas dan sangga peserta wajib diisi.'; end if;
-  if p_agama is null or p_agama = '' then raise exception 'Agama wajib diisi. Butir 1 SKU menyesuaikan agama peserta.'; end if;
-  if p_agama not in ('Islam','Katolik','Protestan','Hindu','Buddha','Khonghucu') then raise exception 'Agama tidak dikenal.'; end if;
-  -- Kelas berupa rombel baku (X-01..XII-10). Nilai lama yang tidak diubah (mis. "X") dibiarkan agar data lain tetap dapat diubah;
-  -- rapikan massal lewat sg_rombel_perbarui.
-  if lower(v_kelas) = lower(coalesce(v_t.kelas, '')) then
-    v_kelas := v_t.kelas;
-  else
-    v_kelas := sigarda.rombel_baku(v_kelas);
-    if not sigarda.rombel_sah(v_kelas) then raise exception 'Kelas harus berupa rombel: X-01 sampai X-10, XI-01 sampai XI-10, atau XII-01 sampai XII-10.'; end if;
-  end if;
-  v_sangga := coalesce((select sangga from public.profiles where role = 'peserta' and lower(sangga) = lower(v_sangga) limit 1), v_sangga);
-
-  update public.profiles set nama = v_nama, kelas = v_kelas, sangga = v_sangga, agama = p_agama where id = p_id;
-
-  if p_calon_garuda is true then
-    if v_t.calon_garuda is null then
-      if sigarda.layak_garuda(p_id) then
-        update public.profiles set calon_garuda = sigarda.hari_ini() where id = p_id;
-      else
-        raise exception 'Status Calon Garuda hanya untuk peserta yang seluruh SKU Bantara dan Laksana-nya lulus.';
-      end if;
-    end if;
-  elsif p_calon_garuda is false then
-    update public.profiles set calon_garuda = null where id = p_id;
+  if to_regprocedure('public.sg_kepengurusan_terapkan(jsonb, boolean, boolean)') is null then
+    raise exception 'Jalankan lebih dulu skema dan migrasi sebelumnya sampai 2026-09-usulan-kegiatan.sql (lihat README), baru migrasi ini.';
   end if;
 end $$;
 
--- Agama Pembina, oleh Admin Gudep. p_data = [{"username": "budi.santoso", "agama": "Islam"}, ...]; agama kosong menghapus. Hanya untuk Pembina
--- (Dewan Ambalan dan Admin tidak berAgama). Dipakai import Excel Pembina (agama diisi sesudah akun dibuat). Mengembalikan jumlah Pembina yang diperbarui.
-create function public.sg_anggota_agama_atur(p_data jsonb) returns int
-language plpgsql security definer set search_path = public as
-$$
-declare v_e jsonb; v_user text; v_agama text; v_n int := 0; v_k int;
+-- Rapikan penulisan lama, lalu pastikan paling banyak satu pemegang Pemangku Adat (indeks unik di bawah menolak dua).
+update public.profiles set jabatan_dewan = 'Pemangku Adat'
+  where jabatan_dewan is not null and jabatan_dewan <> 'Pemangku Adat' and lower(regexp_replace(btrim(jabatan_dewan), '\s+', ' ', 'g')) = 'pemangku adat';
+do $$
 begin
-  perform sigarda.wajib_admin('Hanya Admin Gudep yang dapat mengubah agama Pembina.');
-  if p_data is null or jsonb_typeof(p_data) <> 'array' then raise exception 'Data agama tidak valid.'; end if;
-  if jsonb_array_length(p_data) > 500 then raise exception 'Maksimal 500 baris agama per permintaan.'; end if;
-  for v_e in select * from jsonb_array_elements(p_data) loop
-    v_user := lower(btrim(coalesce(v_e ->> 'username', '')));
-    v_agama := sigarda.rapikan(coalesce(v_e ->> 'agama', ''));
-    if v_user = '' then raise exception 'Nama pengguna Pembina wajib diisi.'; end if;
-    if v_agama <> '' and v_agama not in ('Islam','Katolik','Protestan','Hindu','Buddha','Khonghucu') then raise exception 'Agama "%" tidak dikenal.', v_agama; end if;
-    update public.profiles set agama = nullif(v_agama, '') where username = v_user and role = 'penguji' and jabatan = 'Pembina';
-    get diagnostics v_k = row_count;
-    v_n := v_n + v_k;
-  end loop;
-  return v_n;
-end $$;
-
--- NTA (Nomor Tanda Anggota) anggota, oleh Admin Gudep. p_data = [{"username": "10231", "nta": "11.03.10.701.00123"}, ...]; nta kosong menghapus NTA.
--- Dipakai formulir ubah anggota dan import Excel (NTA diisi sesudah akun dibuat). Mengembalikan jumlah anggota yang ditemukan dan diperbarui.
-create function public.sg_anggota_nta_atur(p_data jsonb) returns int
-language plpgsql security definer set search_path = public as
-$$
-declare v_e jsonb; v_user text; v_nta text; v_n int := 0; v_k int;
-begin
-  perform sigarda.wajib_aktif();
-  if coalesce((select role from public.profiles where id = auth.uid()), '') <> 'admin' then
-    raise exception 'Hanya Admin Gudep yang dapat mengubah NTA anggota.';
+  if (select count(*) from public.profiles where jabatan_dewan = 'Pemangku Adat') > 1 then
+    raise exception 'Ada lebih dari satu anggota berjabatan Pemangku Adat. Sisakan satu (menu Kepengurusan atau ubah jabatan), lalu jalankan migrasi ini lagi.';
   end if;
-  if p_data is null or jsonb_typeof(p_data) <> 'array' then raise exception 'Data NTA tidak valid.'; end if;
-  if jsonb_array_length(p_data) > 500 then raise exception 'Maksimal 500 baris NTA per permintaan.'; end if;
-  for v_e in select * from jsonb_array_elements(p_data) loop
-    v_user := lower(btrim(coalesce(v_e ->> 'username', '')));
-    v_nta := sigarda.rapikan(coalesce(v_e ->> 'nta', ''));
-    if v_user = '' then raise exception 'Nama pengguna anggota wajib diisi.'; end if;
-    if v_nta <> '' and v_nta !~ '^[0-9A-Za-z./ -]{1,40}$' then
-      raise exception 'NTA "%" tidak valid: maksimal 40 karakter (huruf, angka, titik, garis miring, strip, spasi).', v_nta;
-    end if;
-    update public.profiles set nta = nullif(v_nta, '') where username = v_user;
-    get diagnostics v_k = row_count;
-    v_n := v_n + v_k;
-  end loop;
-  return v_n;
 end $$;
+drop index if exists public.profil_pradana_pradani_unik;
+-- ===== Jabatan tunggal Dewan Ambalan (Fase A): indeks =====
+-- Pradana, Pradani, dan Pemangku Adat masing-masing hanya satu pemegang (Pemangku Adat = ketua sidang Dewan Kehormatan; Pradana dan Pradani
+-- menandatangani Surat Tanda Lulus). Daftar jabatan tunggal sama dengan sigarda.jabatan_tunggal.
+create unique index profil_pradana_pradani_unik on public.profiles (jabatan_dewan) where jabatan_dewan in ('Pradana','Pradani','Pemangku Adat');
+-- ===== akhir indeks jabatan tunggal =====
 
--- ===== Jenis kelamin: fungsi =====
--- Jenis kelamin anggota (semua peran), oleh Admin Gudep. p_data = [{"username": "10231", "jk": "L"}, ...]; jk 'L' (laki-laki) atau 'P' (perempuan); jk kosong
--- menghapus. Dipakai formulir tambah dan ubah anggota, import Excel (diisi sesudah akun dibuat; Edge Function tidak membawanya), dan "Lengkapi jenis kelamin"
--- untuk anggota lama. Semua atau tidak sama sekali. Mengembalikan jumlah anggota yang ditemukan dan diperbarui.
-create function public.sg_anggota_jk_atur(p_data jsonb) returns int
-language plpgsql security definer set search_path = public as
+-- ===== Jabatan tunggal dan ketua sidang (Fase A): bantu =====
+-- Jabatan Dewan tanpa selisih huruf: "pradana" -> "Pradana", "PRADANI" -> "Pradani", "pemangku  ADAT" -> "Pemangku Adat"; selain itu spasi dirapikan dan ditulis apa adanya.
+create or replace function sigarda.jabatan_baku(p_teks text) returns text language sql immutable as
 $$
-declare v_e jsonb; v_user text; v_jk text; v_n int := 0; v_k int;
-begin
-  perform sigarda.wajib_admin('Hanya Admin Gudep yang dapat mengubah jenis kelamin anggota.');
-  if p_data is null or jsonb_typeof(p_data) <> 'array' then raise exception 'Data jenis kelamin tidak valid.'; end if;
-  if jsonb_array_length(p_data) > 500 then raise exception 'Maksimal 500 baris jenis kelamin per permintaan.'; end if;
-  for v_e in select * from jsonb_array_elements(p_data) loop
-    v_user := lower(btrim(coalesce(v_e ->> 'username', '')));
-    v_jk := upper(btrim(coalesce(v_e ->> 'jk', '')));
-    if v_user = '' then raise exception 'Nama pengguna anggota wajib diisi.'; end if;
-    if v_jk not in ('', 'L', 'P') then raise exception 'Jenis kelamin "%" tidak dikenal (pilih L atau P).', v_e ->> 'jk'; end if;
-    update public.profiles set jenis_kelamin = nullif(v_jk, '') where username = v_user;
-    get diagnostics v_k = row_count;
-    v_n := v_n + v_k;
-  end loop;
-  return v_n;
-end $$;
--- ===== akhir fungsi jenis kelamin =====
+  select case lower(sigarda.rapikan(p_teks)) when 'pradana' then 'Pradana' when 'pradani' then 'Pradani' when 'pemangku adat' then 'Pemangku Adat' else sigarda.rapikan(p_teks) end
+$$;
+-- Jabatan yang hanya boleh dipegang satu anggota (cermin JABATAN_TUNGGAL di src/lib/dewanLogic.js; dijaga oleh pengujian).
+create or replace function sigarda.jabatan_tunggal(p_jabatan text) returns boolean language sql immutable as
+$$ select p_jabatan in ('Pradana', 'Pradani', 'Pemangku Adat') $$;
+-- ===== akhir bantu jabatan tunggal =====
 
 -- ===== Jabatan Dewan Ambalan: fungsi =====
 -- Jabatan Dewan Ambalan pada akun PENEGAK (isian bebas, mis. Pradana, Pradani, Pemangku Adat, Wakil Pradana, Sekretaris, Bendahara, Ketua Bidang Kegiatan), oleh Pembina atau Admin Gudep.
@@ -136,7 +62,7 @@ end $$;
 -- mis. [{"username": "lama", "jabatan": ""}, {"username": "baru", "jabatan": "Pradana"}]). Semua atau tidak sama sekali. Pemangku Adat menjadi ketua sidang (cadangannya Pradana); Pradana dan Pradani
 -- menandatangani Surat Tanda Lulus. Dewan Ambalan berupa atribut akun Penegak (bukan akun terpisah): pemegang jabatan dapat memakai tampilan Dewan.
 -- Tercatat di kepengurusan_log. Mengembalikan jumlah anggota yang berubah.
-create function public.sg_anggota_jabatan_dewan_atur(p_data jsonb) returns int
+create or replace function public.sg_anggota_jabatan_dewan_atur(p_data jsonb) returns int
 language plpgsql security definer set search_path = public as
 $$
 declare v_e jsonb; v_user text; v_jab text; v_n int := 0; v_lain text; v_t public.profiles; v_oleh text;
@@ -182,7 +108,7 @@ end $$;
 -- diberi atau diubah (jabatan tunggal yang berpindah tangan, yaitu Pradana, Pradani, atau Pemangku Adat, tetap mencabut pemegang lamanya). p_terapkan = false: PRATINJAU (tidak mengubah apa pun); true: menerapkan
 -- SEMUA atau tidak sama sekali. Hasil { galat, ringkasan { beri, ganti, cabut, sama, galat }, baris: [{ no, id, username, nama, kelas, dari_jabatan, jabatan, hasil:
 -- 'beri' | 'ganti' | 'sama' | 'cabut' | 'galat', pesan: [...] }] }. Peringatan (bukan galat): belum menyelesaikan seluruh butir Bantara.
-create function public.sg_kepengurusan_terapkan(p_data jsonb, p_ganti boolean default true, p_terapkan boolean default false) returns jsonb
+create or replace function public.sg_kepengurusan_terapkan(p_data jsonb, p_ganti boolean default true, p_terapkan boolean default false) returns jsonb
 language plpgsql security definer set search_path = public as
 $$
 declare
@@ -268,7 +194,7 @@ end $$;
 -- Mengarsipkan akun Dewan Ambalan LAMA (akun penguji berjabatan Dewan Ambalan; kini Dewan adalah atribut akun Penegak), oleh Admin Gudep. Arsip = status nonaktif:
 -- akun tidak lagi menjadi penguji atau pengurus, riwayat penilaian dan iuran atas nama akun itu tetap. p_aktifkan = true membatalkan arsip. Mengembalikan jumlah akun
 -- yang berubah. Jabatan Dewan yang masih dipegang akun itu dicabut lebih dulu dan pengajuan uji yang menunggunya kembali ke antrian rombel.
-create function public.sg_dewan_lama_arsipkan(p_ids uuid[], p_aktifkan boolean default false) returns int
+create or replace function public.sg_dewan_lama_arsipkan(p_ids uuid[], p_aktifkan boolean default false) returns int
 language plpgsql security definer set search_path = public as
 $$
 declare v_id uuid; v_n int := 0; v_t public.profiles;
@@ -297,7 +223,7 @@ end $$;
 
 -- Berita acara sidang memuat QR verifikasi. Token dan kode dibuat saat berita acara pertama kali dicetak (idempoten: cetak ulang memakai yang sama).
 -- Dewan Ambalan, Pembina, dan Admin Gudep. Mengembalikan { token, kode }. Token dijawab sg_verifikasi_token; kode dijawab sg_verifikasi_kode.
-create function public.sg_sidang_token(p_id int) returns jsonb
+create or replace function public.sg_sidang_token(p_id int) returns jsonb
 language plpgsql security definer set search_path = public as
 $$
 declare v_s public.sidang_dk; v_token text;
@@ -316,12 +242,53 @@ begin
 end $$;
 -- ===== akhir fungsi jabatan dewan =====
 
+-- ===== Ketua sidang (Fase A): fungsi =====
+-- Ketua sidang untuk berita acara = anggota Dewan Ambalan berjabatan PEMANGKU ADAT (sebutan "Pemangku Adat Dewan Ambalan"): Dewan Kehormatan Penegak diketuai
+-- Pemangku Adat (Jukran Kwarnas 05/2026 Pasal 24 ayat (15), yang menggantikan SK 231/2007; SK Kwarnas 176/2013 butir 7 c). Bila belum ada Pemangku Adat, dipakai Pradana ("Pradana Dewan Ambalan").
+-- Bila belum ada keduanya, dipakai pengaturan lama sidang.nama_ketua dan sidang.sebutan_ketua (bawaan: kosong dan "Ketua Dewan Penegak / Pemangku Adat").
+-- Cermin ketuaSidang di src/lib/dewanLogic.js (dijaga oleh pengujian).
+create or replace function sigarda.ketua_sidang(out o_nama text, out o_sebutan text) language plpgsql stable security definer set search_path = public as
+$$
+begin
+  select sigarda.rapikan(nama), jabatan_dewan || ' Dewan Ambalan' into o_nama, o_sebutan
+  from public.profiles
+  where jabatan_dewan in ('Pemangku Adat', 'Pradana') and status = 'aktif' and (role = 'peserta' or (role = 'penguji' and jabatan = 'Dewan Ambalan'))
+  order by case jabatan_dewan when 'Pemangku Adat' then 0 else 1 end limit 1;
+  if not found then
+    o_nama := sigarda.pengaturan_teks('sidang.nama_ketua', '');
+    o_sebutan := sigarda.pengaturan_teks('sidang.sebutan_ketua', 'Ketua Dewan Penegak / Pemangku Adat');
+  end if;
+end $$;
+-- ===== akhir fungsi ketua sidang =====
+
+-- ===== Pengukuhan Dewan Ambalan (Fase A): tabel =====
+-- Pengukuhan kepengurusan Dewan Ambalan (ketua dan wakil ketua) oleh Ketua Kwartir Ranting: satu catatan per tahun ajaran. Dasar: AD/ART Munas 2023, Anggaran Rumah Tangga
+-- Pasal 51 ayat (2) huruf a (ditetapkan berdasarkan rekomendasi Ketua Majelis Pembimbing Gugusdepan dan dikukuhkan dengan surat keputusan Ketua Kwartir Ranting).
+-- Nomor dan tanggal rekomendasi Ketua Mabigus opsional, tetapi harus diisi berpasangan.
+create table if not exists public.pengukuhan_dewan (
+  tahun_ajaran text primary key check (tahun_ajaran ~ '^[0-9]{4}/[0-9]{4}$'),
+  nomor_sk text not null check (char_length(nomor_sk) between 1 and 80 and nomor_sk !~ '[[:cntrl:]<>]'),
+  tanggal_sk date not null,
+  rekomendasi_nomor text not null default '' check (char_length(rekomendasi_nomor) <= 80 and rekomendasi_nomor !~ '[[:cntrl:]<>]'),
+  rekomendasi_tanggal date,
+  catatan text not null default '' check (char_length(catatan) <= 200),
+  diubah_oleh uuid references public.profiles(id) on delete set null,
+  diubah_pada timestamptz not null default now(),
+  constraint pengukuhan_rekomendasi_pasangan check ((rekomendasi_nomor = '') = (rekomendasi_tanggal is null))
+);
+-- ===== akhir tabel pengukuhan dewan =====
+
+alter table public.pengukuhan_dewan enable row level security;
+revoke all on public.pengukuhan_dewan from anon, authenticated;
+drop policy if exists baca_pengukuhan_dewan on public.pengukuhan_dewan;
+create policy baca_pengukuhan_dewan on public.pengukuhan_dewan for select to authenticated
+  using ((select sigarda.aktif()) and (select sigarda.pengurus()));
 
 -- ===== Pengukuhan Dewan Ambalan (Fase A): fungsi =====
 -- Mencatat pengukuhan kepengurusan Dewan Ambalan oleh Ketua Kwartir Ranting untuk satu tahun ajaran (Pembina atau Admin Gudep): nomor dan tanggal SK, dan (opsional, berpasangan)
 -- nomor dan tanggal rekomendasi Ketua Mabigus. Tanggal tidak boleh di masa depan (WIB) dan rekomendasi tidak boleh sesudah SK. Simpan ulang = perbarui.
 -- Aturan isian dicerminkan periksaPengukuhan di src/lib/dewanLogic.js (dijaga oleh pengujian).
-create function public.sg_pengukuhan_dewan_simpan(
+create or replace function public.sg_pengukuhan_dewan_simpan(
   p_tahun_ajaran text, p_nomor_sk text, p_tanggal_sk date, p_rekomendasi_nomor text default '', p_rekomendasi_tanggal date default null, p_catatan text default ''
 ) returns void language plpgsql security definer set search_path = public as
 $$
@@ -347,7 +314,7 @@ begin
 end $$;
 
 -- Menghapus catatan pengukuhan satu tahun ajaran (Pembina atau Admin Gudep), mis. salah tahun ajaran.
-create function public.sg_pengukuhan_dewan_hapus(p_tahun_ajaran text) returns void language plpgsql security definer set search_path = public as
+create or replace function public.sg_pengukuhan_dewan_hapus(p_tahun_ajaran text) returns void language plpgsql security definer set search_path = public as
 $$
 begin
   perform sigarda.wajib_aktif();
@@ -356,3 +323,70 @@ begin
   if not found then raise exception 'Belum ada catatan pengukuhan untuk tahun ajaran itu.'; end if;
 end $$;
 -- ===== akhir fungsi pengukuhan dewan =====
+
+create or replace function public.sg_cadangan_admin() returns jsonb language plpgsql security definer set search_path = public as
+$$
+declare v_hasil jsonb;
+begin
+  perform sigarda.wajib_admin('Hanya Admin Gudep yang dapat mengunduh cadangan.');
+  select jsonb_build_object(
+    'dibuat_pada', now(),
+    'tabel', jsonb_build_object(
+      'profiles', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.profiles t),
+      'sku_butir', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sku_butir t),
+      'sku_unit', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sku_unit t),
+      'pf_item', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.pf_item t),
+      'sku_progress', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sku_progress t),
+      'sku_riwayat', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sku_riwayat t),
+      'absensi_sesi', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.absensi_sesi t),
+      'absensi_hadir', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.absensi_hadir t),
+      'iuran', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.iuran t),
+      'iuran_log', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.iuran_log t),
+      'iuran_kas', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.iuran_kas t),
+      'asisten_iuran', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.asisten_iuran t),
+      'penugasan_rombel', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penugasan_rombel t),
+      'penugasan_log', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penugasan_log t),
+      'penugasan_peserta', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penugasan_peserta t),
+      'kepengurusan_log', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.kepengurusan_log t),
+      'pengukuhan_dewan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.pengukuhan_dewan t),
+      'guru_agama', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.guru_agama t),
+      'dokumen_terbit', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_terbit t),
+      'dokumen_urut', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_urut t),
+      'naik_kelas_batch', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.naik_kelas_batch t),
+      'naik_kelas_log', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.naik_kelas_log t),
+      'portofolio', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.portofolio t),
+      'portofolio_jurnal', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.portofolio_jurnal t),
+      'materi', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.materi t),
+      'pengaturan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.pengaturan t),
+      'sidang_urut', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sidang_urut t),
+      'sidang_dk', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sidang_dk t),
+      'raport', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.raport t),
+      'instrumen', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.instrumen t),
+      'instrumen_kriteria', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.instrumen_kriteria t),
+      'instrumen_penguji', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.instrumen_penguji t),
+      'instrumen_panduan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.instrumen_panduan t),
+      'sku_penilaian', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sku_penilaian t),
+      'sertifikat_tingkat', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sertifikat_tingkat t),
+      'sesi_ujian', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian t),
+      'sesi_ujian_butir', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian_butir t),
+      'sesi_ujian_peserta', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian_peserta t),
+      'agenda', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.agenda t),
+      'kegiatan_usulan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.kegiatan_usulan t),
+      'bina_damping', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.bina_damping t)
+    )
+  ) into v_hasil;
+  insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada)
+    values ('cadangan.terakhir', jsonb_build_object('pada', now(), 'oleh', (select nama from public.profiles where id = auth.uid())), auth.uid(), now())
+    on conflict (kunci) do update set nilai = excluded.nilai, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
+  return v_hasil;
+end $$;
+
+grant select on public.pengukuhan_dewan to authenticated;
+revoke all on function public.sg_pengukuhan_dewan_simpan(text, text, date, text, date, text), public.sg_pengukuhan_dewan_hapus(text) from public, anon, authenticated;
+grant execute on function public.sg_pengukuhan_dewan_simpan(text, text, date, text, date, text), public.sg_pengukuhan_dewan_hapus(text) to authenticated;
+-- Fungsi sigarda.* baru (jabatan_tunggal): hak dijalankan ulang di sini (grant "all functions in schema" tidak retroaktif untuk fungsi baru migrasi ini).
+revoke all on all functions in schema sigarda from public, anon;
+grant execute on all functions in schema sigarda to authenticated, service_role;
+
+commit;
+notify pgrst, 'reload schema';

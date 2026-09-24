@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { BAGIAN_UMUM, PANDUAN } from '../data/panduanData';
 import { panduanAwal, PERAN_PANDUAN } from '../lib/panduanLogic';
+import { daftarRujukan } from '../lib/peraturanLogic';
 import { Icon } from '../components/ui';
 
+const ID_RUJUKAN = 'rujukan-peraturan';
 const gulirKe = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
 function DaftarIsi({ panduan, tocBuka, setTocBuka }) {
@@ -35,6 +37,13 @@ function DaftarIsi({ panduan, tocBuka, setTocBuka }) {
                   </a>
                 </li>
               ))}
+              {daftarRujukan(panduan.rujukan).length > 0 && (
+                <li>
+                  <a href={`#${ID_RUJUKAN}`} onClick={(e) => { e.preventDefault(); setTocBuka(false); gulirKe(ID_RUJUKAN); }} className="block rounded-md px-2 py-1.5 text-sm text-pramuka-700 hover:bg-pramuka-100">
+                    Rujukan peraturan
+                  </a>
+                </li>
+              )}
             </ol>
           </nav>
         </div>
@@ -99,6 +108,22 @@ export default function Bantuan() {
               </ul>
             </article>
           ))}
+
+          {daftarRujukan(panduan.rujukan).length > 0 && (
+            <article id={ID_RUJUKAN} className="panel scroll-mt-36 p-4 sm:p-5 lg:scroll-mt-24">
+              <h3 className="text-lg font-bold text-pramuka-900">Rujukan peraturan</h3>
+              <p className="mt-1 text-sm text-pramuka-700">Aturan di panduan ini bersandar pada peraturan Kwartir Nasional berikut. Judul di bawah adalah tautan ke berkas aslinya.</p>
+              <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-pramuka-800">
+                {daftarRujukan(panduan.rujukan).map((x) => (
+                  <li key={`${x.id}|${x.bagian}`} className="break-words">
+                    <a href={x.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-pramuka-700 underline decoration-dotted underline-offset-2 hover:text-pramuka-900">{x.judul}</a>
+                    {x.bagian && <span>, {x.bagian}</span>}
+                    <span className="hidden print:inline"> ({x.url})</span>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          )}
         </div>
       </div>
     </div>

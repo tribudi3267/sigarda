@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { JABATAN_DEWAN, PESAN_JABATAN, akunDewanLama, daftarPengurusDewan, jabatanDewanSah, normalisasiJabatanDewan, rencanaJabatanDewan } from '../lib/dewanLogic';
+import { JABATAN_DEWAN, PESAN_JABATAN, akunDewanLama, daftarPengurusDewan, jabatanDewanSah, normalisasiJabatanDewan, periksaPengukuhan, rencanaJabatanDewan } from '../lib/dewanLogic';
+import { tahunAjaranKini } from '../lib/rombelLogic';
 import { bacaExcelKepengurusan, unduhBerkasKepengurusan } from '../lib/kepengurusanExcel';
 import { normalisasiNama } from '../lib/cariNama';
-import { fmtWaktu } from '../lib/format';
+import { fmtTanggal, fmtWaktu, hariIni } from '../lib/format';
 import { BadgeStatus, Field, Icon, Kosong, Modal } from '../components/ui';
+import SumberPeraturan from '../components/SumberPeraturan';
 
 const MAKS_BYTE = 5 * 1024 * 1024;
 const LABEL_HASIL = { beri: 'Diberi', ganti: 'Diganti', sama: 'Tetap', cabut: 'Dicabut', galat: 'Galat' };
@@ -67,7 +69,7 @@ function FormJabatan({ awal, onTutup }) {
           </select>
         </Field>
       )}
-      <Field label="Jabatan Dewan Ambalan" htmlFor="kp-jabatan" bantuan="Isian bebas; daftar hanya saran. Pradana dan Pradani masing-masing hanya satu orang.">
+      <Field label="Jabatan Dewan Ambalan" htmlFor="kp-jabatan" bantuan="Isian bebas; daftar hanya saran. Pradana, Pradani, dan Pemangku Adat masing-masing hanya satu orang. Pemangku Adat menjadi ketua sidang Dewan Kehormatan.">
         <input id="kp-jabatan" className="input" list="kp-saran" maxLength={60} autoComplete="off" value={jabatan} onChange={(e) => setJabatan(e.target.value)} onBlur={() => setJabatan(normalisasiJabatanDewan(jabatan))} />
         <datalist id="kp-saran">{JABATAN_DEWAN.map((j) => <option key={j} value={j} />)}</datalist>
       </Field>
@@ -133,6 +135,126 @@ function Pratinjau({ hasil }) {
         </details>
       )}
     </div>
+  );
+}
+
+/** Formulir pengukuhan Dewan Ambalan oleh Ketua Kwartir Ranting (satu catatan per tahun ajaran). */
+function FormPengukuhan({ awal, onTutup, onSimpan }) {
+  const { simpanPengukuhanDewan } = useApp();
+  const [f, setF] = useState(awal);
+  const [galat, setGalat] = useState({});
+  const [pesan, setPesan] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
+  const kirim = async () => {
+    const g = periksaPengukuhan(f, hariIni());
+    setGalat(g);
+    setPesan('');
+    if (Object.keys(g).length) return;
+    setSibuk(true);
+    const r = await simpanPengukuhanDewan(f);
+    setSibuk(false);
+    if (!r.ok) return setPesan(r.pesan);
+    return onSimpan();
+  };
+  const kolom = (k, label, opsi = {}) => (
+    <Field label={label} htmlFor={`kp-sk-${k}`} bantuan={opsi.bantuan}>
+      <input id={`kp-sk-${k}`} className="input" type={opsi.tipe ?? 'text'} maxLength={opsi.maks} autoComplete="off" value={f[k] ?? ''} onChange={set(k)} aria-invalid={!!galat[k]} disabled={opsi.mati} />
+      {galat[k] && <p role="alert" className="mt-1 text-xs font-medium text-red-700">{galat[k]}</p>}
+    </Field>
+  );
+  return (
+    <Modal
+      buka
+      tutup={onTutup}
+      judul="Pengukuhan Dewan Ambalan"
+      aksi={
+        <>
+          <button className="btn btn-outline" onClick={onTutup}>Batal</button>
+          <button className="btn btn-primary" onClick={kirim} disabled={sibuk}>{sibuk ? 'Menyimpan...' : 'Simpan'}</button>
+        </>
+      }
+    >
+      {kolom('tahunAjaran', 'Tahun ajaran', { bantuan: 'Contoh: 2025/2026.', maks: 9, mati: !!awal.tetap })}
+      {kolom('nomorSk', 'Nomor SK Ketua Kwartir Ranting', { maks: 80, bantuan: 'Surat keputusan yang mengukuhkan ketua dan wakil ketua Dewan Ambalan.' })}
+      {kolom('tanggalSk', 'Tanggal SK', { tipe: 'date' })}
+      {kolom('rekomNomor', 'Nomor rekomendasi Ketua Mabigus (opsional)', { maks: 80 })}
+      {kolom('rekomTanggal', 'Tanggal rekomendasi (opsional)', { tipe: 'date', bantuan: 'Isi bersama nomor rekomendasi. Tidak boleh sesudah tanggal SK.' })}
+      <Field label="Catatan (opsional)" htmlFor="kp-sk-catatan">
+        <textarea id="kp-sk-catatan" className="input" rows={2} maxLength={200} value={f.catatan ?? ''} onChange={set('catatan')} />
+        {galat.catatan && <p role="alert" className="mt-1 text-xs font-medium text-red-700">{galat.catatan}</p>}
+      </Field>
+      {pesan && <p role="alert" className="text-sm font-medium text-red-700">{pesan}</p>}
+    </Modal>
+  );
+}
+
+/**
+ * Pengukuhan Dewan Ambalan oleh Ketua Kwartir Ranting (AD/ART Munas 2023, ART Pasal 51 ayat (2) huruf a): ketua dan wakil ketua Dewan Ambalan ditetapkan berdasarkan
+ * rekomendasi Ketua Majelis Pembimbing Gugusdepan dan dikukuhkan dengan SK Ketua Kwartir Ranting. Aplikasi hanya MENCATAT nomor dan tanggal SK (satu per tahun ajaran).
+ */
+function PengukuhanDewan() {
+  const { muatPengukuhanDewan, hapusPengukuhanDewan } = useApp();
+  const ta = tahunAjaranKini();
+  const [daftar, setDaftar] = useState(null);
+  const [galat, setGalat] = useState('');
+  const [form, setForm] = useState(null);
+  const muatRef = useRef(muatPengukuhanDewan);
+  muatRef.current = muatPengukuhanDewan;
+  const muat = useCallback(async () => {
+    const r = await muatRef.current();
+    if (r.ok) { setDaftar(r.data); setGalat(''); } else setGalat(r.pesan);
+  }, []);
+  useEffect(() => { muat(); }, [muat]);
+
+  const kini = daftar?.find((x) => x.tahunAjaran === ta);
+  const lain = (daftar ?? []).filter((x) => x.tahunAjaran !== ta);
+  const kosong = (tahunAjaran) => ({ tahunAjaran, nomorSk: '', tanggalSk: '', rekomNomor: '', rekomTanggal: '', catatan: '' });
+  const hapus = async (x) => {
+    if (!window.confirm(`Hapus catatan pengukuhan tahun ajaran ${x.tahunAjaran}?`)) return;
+    const r = await hapusPengukuhanDewan(x.tahunAjaran);
+    if (!r.ok) setGalat(r.pesan); else muat();
+  };
+  const baris = (x) => (
+    <div className="min-w-0 text-sm">
+      <p className="font-semibold text-pramuka-900">Tahun ajaran {x.tahunAjaran}: SK Nomor {x.nomorSk}, tanggal {fmtTanggal(x.tanggalSk)}</p>
+      {x.rekomNomor && <p className="text-pramuka-700">Rekomendasi Ketua Mabigus: nomor {x.rekomNomor}, tanggal {fmtTanggal(x.rekomTanggal)}</p>}
+      {x.catatan && <p className="text-pramuka-600">{x.catatan}</p>}
+    </div>
+  );
+
+  return (
+    <section aria-labelledby="kp-sk" className="mb-8">
+      <h2 id="kp-sk" className="text-lg font-bold">Pengukuhan oleh Kwartir Ranting</h2>
+      <p className="mb-2 text-sm text-pramuka-700">
+        Ketua dan wakil ketua Dewan Ambalan dikukuhkan dengan SK Ketua Kwartir Ranting berdasarkan rekomendasi Ketua Majelis Pembimbing Gugusdepan. Catat nomor dan tanggal SK-nya di sini.
+      </p>
+      {galat && <p role="alert" className="mb-2 text-sm font-medium text-red-700">{galat}</p>}
+      {daftar === null && !galat && <p className="text-sm text-pramuka-600">Memuat...</p>}
+      {daftar !== null && (
+        <div className="panel divide-y divide-pramuka-100">
+          <div className="flex flex-wrap items-start justify-between gap-3 p-3">
+            {kini ? baris(kini) : (
+              <p className="min-w-0 text-sm font-medium text-amber-900">Belum ada catatan SK pengukuhan untuk tahun ajaran {ta}.</p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <button className="btn btn-outline btn-sm" onClick={() => setForm(kini ? { ...kini, tetap: true } : kosong(ta))}>{kini ? 'Ubah' : 'Catat SK pengukuhan'}</button>
+              {kini && <button className="btn btn-outline btn-sm" onClick={() => hapus(kini)}>Hapus</button>}
+            </div>
+          </div>
+          {lain.map((x) => (
+            <div key={x.tahunAjaran} className="flex flex-wrap items-start justify-between gap-3 p-3">
+              {baris(x)}
+              <div className="flex flex-wrap gap-2">
+                <button className="btn btn-outline btn-sm" onClick={() => setForm({ ...x, tetap: true })}>Ubah</button>
+                <button className="btn btn-outline btn-sm" onClick={() => hapus(x)}>Hapus</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {form && <FormPengukuhan awal={form} onTutup={() => setForm(null)} onSimpan={() => { setForm(null); muat(); }} />}
+    </section>
   );
 }
 
@@ -262,6 +384,14 @@ export default function Kepengurusan() {
         untuk menguji sesuai penugasan, mencatat iuran, dan mengelola kegiatan. Jabatan berlaku setahun; sesudah Musyawarah Ambalan, ganti kepengurusan lewat berkas. Jabatan dicabut otomatis
         bila Penegak menjadi nonaktif atau alumni.
       </p>
+      <SumberPeraturan
+        className="mb-4"
+        rujukan={[
+          { id: 'gudep-05-2026', bagian: 'Pasal 24 ayat (13)-(15) (Pradana, Dewan Ambalan Penegak, dan Dewan Kehormatan Penegak)' },
+          { id: 'polmekbin-176-2013', bagian: 'butir 7 (Organisasi)' },
+          { id: 'adart-2023', bagian: 'Anggaran Rumah Tangga Pasal 51 ayat (2) huruf a (pengukuhan)' },
+        ]}
+      />
 
       {info && <p role="status" className="mb-3 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">{info}</p>}
       {galat && <p role="alert" className="mb-3 text-sm font-medium text-red-700">{galat}</p>}
@@ -349,6 +479,8 @@ export default function Kepengurusan() {
           {lamaAktif.length > 0 && <button className="btn btn-outline btn-sm mt-3" onClick={arsipkan}>Arsipkan {lamaAktif.length} akun Dewan lama</button>}
         </section>
       )}
+
+      <PengukuhanDewan />
 
       <section className="mt-8">
         <Riwayat ulang={riwayatKe} />
