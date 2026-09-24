@@ -12,6 +12,8 @@
 import { petaPengaturan, petaProfil, petaSidang, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
+/** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
+export const HALAMAN_SEREMPAK = 4;
 
 // Nama (slug) Edge Function di Supabase. Biasanya "sigarda". Bila dashboard membuat nama lain saat deploy lewat editor,
 // isi VITE_NAMA_FUNGSI dengan nama yang tertera pada alamat fungsi (bagian akhir dari .../functions/v1/NAMA).
@@ -41,17 +43,22 @@ export function buatApi(klien) {
    * `filter` = [[kolom, nilai], ...] (sama dengan) atau [kolom, 'gte' | 'lte', nilai] (rentang).
    */
   async function ambilSemua(tabel, { urut = [], filter = [] } = {}) {
-    const semua = [];
-    for (let dari = 0; ; dari += UKURAN_HALAMAN) {
+    const halaman = async (ke) => {
       let q = klien.from(tabel).select('*');
       for (const f of filter) q = f.length === 3 ? q[f[1] === 'lte' ? 'lte' : 'gte'](f[0], f[2]) : q.eq(f[0], f[1]);
       for (const k of urut) q = q.order(k);
-      const { data, error } = await q.range(dari, dari + UKURAN_HALAMAN - 1);
+      const { data, error } = await q.range(ke * UKURAN_HALAMAN, (ke + 1) * UKURAN_HALAMAN - 1);
       if (error) throw error;
-      semua.push(...(data ?? []));
-      if ((data ?? []).length < UKURAN_HALAMAN) break;
+      return data ?? [];
+    };
+    const semua = await halaman(0);
+    if (semua.length < UKURAN_HALAMAN) return semua;
+    // Tabel besar: gelombang halaman serempak (tanpa hitung jumlah baris); berhenti pada halaman pertama yang tidak penuh.
+    for (let ke = 1; ; ke += HALAMAN_SEREMPAK) {
+      const gelombang = await Promise.all(Array.from({ length: HALAMAN_SEREMPAK }, (_, i) => halaman(ke + i)));
+      for (const g of gelombang) semua.push(...g);
+      if (gelombang.some((g) => g.length < UKURAN_HALAMAN)) return semua;
     }
-    return semua;
   }
 
   async function rpc(nama, args = {}) {
@@ -109,12 +116,16 @@ export function buatApi(klien) {
     /* ------------------------- Membaca data ------------------------- */
     muatProfil: () => muat(async () => (await ambilSemua('profiles', { urut: ['id'] })).map(petaProfil)),
 
-    muatProgress: (pesertaId = null) =>
+    /**
+     * Progres SKU. `riwayat: false` melewatkan tabel sku_riwayat (bagian terbesar, satu baris per kejadian): dipakai pengurus saat masuk;
+     * riwayat satu Penegak dimuat saat rincian SKU-nya dibuka (muatProgress(pesertaId)).
+     */
+    muatProgress: (pesertaId = null, { riwayat: denganRiwayat = true } = {}) =>
       muat(async () => {
         const filter = pesertaId ? [['peserta_id', pesertaId]] : [];
         const [baris, riwayat] = await Promise.all([
           ambilSemua('sku_progress', { filter, urut: ['peserta_id', 'sku_id'] }),
-          ambilSemua('sku_riwayat', { filter, urut: ['id'] }),
+          denganRiwayat ? ambilSemua('sku_riwayat', { filter, urut: ['id'] }) : [],
         ]);
         return susunProgress(baris, riwayat);
       }),

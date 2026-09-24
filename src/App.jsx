@@ -1,38 +1,14 @@
-import { useEffect, useState } from 'react';
+import { lazy, useEffect, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import Layout from './components/Layout';
 import Login from './components/Login';
 import PesertaBeranda from './pages/PesertaBeranda';
-import PesertaSku from './pages/PesertaSku';
 import GarudaDashboard from './pages/GarudaDashboard';
 import PengujiDashboard from './pages/PengujiDashboard';
-import PesertaDetail from './pages/PesertaDetail';
 import AdminDashboard from './pages/AdminDashboard';
-import AdminAnggota from './pages/AdminAnggota';
-import { AbsensiPeserta, AbsensiPengurus } from './pages/Absensi';
-import PortofolioPengurus from './pages/Portofolio';
-import CetakDokumen from './pages/CetakDokumen';
-import Akun from './pages/Akun';
-import ResetPin from './pages/ResetPin';
 import GantiPinWajib from './pages/GantiPinWajib';
-import Materi from './pages/Materi';
-import KelolaMateri from './pages/KelolaMateri';
-import Sidang from './pages/Sidang';
-import Raport from './pages/Raport';
-import KelolaInstrumen from './pages/KelolaInstrumen';
-import Penugasan from './pages/Penugasan';
-import DataGudep from './pages/DataGudep';
-import NaikKelas from './pages/NaikKelas';
-import Kepengurusan from './pages/Kepengurusan';
-import SesiUjian from './pages/SesiUjian';
-import Iuran from './pages/Iuran';
-import Notifikasi from './pages/Notifikasi';
-import PemeriksaanData from './pages/PemeriksaanData';
-import TindakLanjut from './pages/TindakLanjut';
-import Agenda from './pages/Agenda';
-import Laporan from './pages/Laporan';
-import Bantuan from './pages/Bantuan';
 import BannerVersi from './components/BannerVersi';
+import BatasHalaman from './components/BatasHalaman';
 import HalamanVerifikasi from './components/HalamanVerifikasi';
 import HalamanBerkasGaruda from './components/HalamanBerkasGaruda';
 import FormWhatsapp from './components/FormWhatsapp';
@@ -41,6 +17,34 @@ import { parameterVerifikasi } from './lib/verifikasiLogic';
 import { parameterBerkasGaruda } from './lib/garudaLogic';
 import { bolehKelolaMateri } from './lib/materiLogic';
 import LogoMark from './components/LogoMark';
+
+// Halaman selain beranda dimuat malas (berkasnya diunduh saat pertama dibuka); lihat BatasHalaman.
+const PesertaSku = lazy(() => import('./pages/PesertaSku'));
+const PesertaDetail = lazy(() => import('./pages/PesertaDetail'));
+const AdminAnggota = lazy(() => import('./pages/AdminAnggota'));
+const AbsensiPeserta = lazy(() => import('./pages/Absensi').then((m) => ({ default: m.AbsensiPeserta })));
+const AbsensiPengurus = lazy(() => import('./pages/Absensi').then((m) => ({ default: m.AbsensiPengurus })));
+const PortofolioPengurus = lazy(() => import('./pages/Portofolio'));
+const CetakDokumen = lazy(() => import('./pages/CetakDokumen'));
+const Akun = lazy(() => import('./pages/Akun'));
+const ResetPin = lazy(() => import('./pages/ResetPin'));
+const Materi = lazy(() => import('./pages/Materi'));
+const KelolaMateri = lazy(() => import('./pages/KelolaMateri'));
+const Sidang = lazy(() => import('./pages/Sidang'));
+const Raport = lazy(() => import('./pages/Raport'));
+const KelolaInstrumen = lazy(() => import('./pages/KelolaInstrumen'));
+const Penugasan = lazy(() => import('./pages/Penugasan'));
+const DataGudep = lazy(() => import('./pages/DataGudep'));
+const NaikKelas = lazy(() => import('./pages/NaikKelas'));
+const Kepengurusan = lazy(() => import('./pages/Kepengurusan'));
+const SesiUjian = lazy(() => import('./pages/SesiUjian'));
+const Iuran = lazy(() => import('./pages/Iuran'));
+const Notifikasi = lazy(() => import('./pages/Notifikasi'));
+const PemeriksaanData = lazy(() => import('./pages/PemeriksaanData'));
+const TindakLanjut = lazy(() => import('./pages/TindakLanjut'));
+const Agenda = lazy(() => import('./pages/Agenda'));
+const Laporan = lazy(() => import('./pages/Laporan'));
+const Bantuan = lazy(() => import('./pages/Bantuan'));
 
 /**
  * Menu per peran, dikelompokkan menurut fungsinya (tampil sebagai kelompok di menu samping, dan berurutan di menu bawah ponsel).
@@ -322,7 +326,7 @@ function Shell() {
   return (
     <>
       <Layout nav={nav} grup={grup} tab={tabAktif} setTab={pilihTab}>
-        {isi}
+        <BatasHalaman>{isi}</BatasHalaman>
       </Layout>
       {/* Ajakan isi nomor WhatsApp (tahap L5): satu kali per masuk, dapat dilewati, tampil lagi pada masuk berikutnya bila masih kosong. */}
       <Modal buka={!user.whatsapp && !waTutup} tutup={() => setWaTutup(true)} judul="Isi nomor WhatsApp">

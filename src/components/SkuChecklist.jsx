@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { hurufSub } from '../data/skuData';
 import { useApp } from '../context/AppContext';
 import { hitungMateriPerButir } from '../lib/materiLogic';
@@ -22,7 +22,9 @@ const FILTER = [
  * renderAksi(poin, entry) mengembalikan tombol aksi per unit (ajukan, uji, dll).
  */
 export default function SkuChecklist({ tingkat, peserta, renderAksi, onBukaMateri }) {
-  const { progress, users, materi } = useApp();
+  const { progress, users, materi, pastikanRiwayat } = useApp();
+  // Riwayat SKU tidak ikut dimuat saat masuk (tabel terbesar); dimuat malas saat rincian Penegak ini dibuka.
+  useEffect(() => { pastikanRiwayat?.(peserta?.id); }, [peserta?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [filter, setFilter] = useState('semua');
   const [terbuka, setTerbuka] = useState(null);
   const [kriteriaTerbuka, setKriteriaTerbuka] = useState(null);
