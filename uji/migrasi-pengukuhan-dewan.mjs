@@ -49,12 +49,14 @@ ok(pa.kebijakan.length === 1 && pa.kebijakan[0].cmd === 'SELECT' && pa.rls[0].re
 ok(pa.hakTabel.length === 1 && pa.hakTabel[0].privilege_type === 'SELECT', 'authenticated hanya SELECT pada tabel (anon tidak punya hak apa pun)');
 ok(/Pemangku Adat/.test(pa.indeksJabatan[0]?.indexdef ?? ''), 'indeks unik jabatan memuat Pemangku Adat');
 
-const SEBELUM = 'git:90cb914'; // commit TEPAT sebelum migrasi ini
+const SEBELUM = 'git:90cb914'; // commit TEPAT sebelum migrasi Fase A DAN Fase B; urutan migrasi: pinsa-bina-damping dulu, lalu pengukuhan-dewan
+const MB = bersih(readFileSync(`${P}/supabase/migrasi/2026-09-pinsa-bina-damping.sql`, 'utf8'));
 
 console.log('--- Database berisi data: kesetaraan, data utuh, idempoten ---');
 const B1 = await baru(SEBELUM);
 await isiDataContoh(B1);
 await B1.query('update public.profiles set wajib_ganti_pin = false');
+await B1.exec(MB); // migrasi Fase B lebih dulu (tabel bina_damping harus ada untuk sg_cadangan_admin)
 const sebelum = await cacah(B1);
 ok((await B1.query(`select to_regclass('public.pengukuhan_dewan') as t`)).rows[0].t === null, 'prasyarat: skema lama belum punya tabel pengukuhan_dewan');
 ok(!/Pemangku Adat/.test((await B1.query(`select indexdef from pg_indexes where indexname = 'profil_pradana_pradani_unik'`)).rows[0].indexdef), 'prasyarat: indeks lama belum memuat Pemangku Adat');
@@ -98,6 +100,7 @@ console.log('\n--- Dua pemegang Pemangku Adat sebelum migrasi: gagal jelas dan t
 {
   const B2 = await baru(SEBELUM);
   await isiDataContoh(B2);
+  await B2.exec(MB);
   await B2.query(`update public.profiles set jabatan_dewan = 'Pemangku Adat' where username in ('10231', '10008')`);
   let galat = null;
   try { await B2.exec(MP); } catch (e) { galat = e.message; await B2.exec('rollback'); }

@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
+import { petaPengaturan, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 /** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
@@ -348,6 +348,17 @@ export function buatApi(klien) {
     arsipkanDewanLama: (ids, aktifkan = false) => rpc('sg_dewan_lama_arsipkan', { p_ids: ids, p_aktifkan: aktifkan }),
     /** Riwayat kepengurusan Dewan Ambalan (pengurus), terbaru lebih dulu. */
     muatLogKepengurusan: () => muat(async () => susunLogKepengurusan(await ambilSemua('kepengurusan_log', { urut: ['id'] }))),
+    /* ------------------- Pinsa dan Bina Damping (fase B) ------------------- */
+    /** Peran pendampingan diri sendiri: { binaDamping: [rombel], pinsa }. Semua peran (Pembina/Admin/Dewan lama menerima daftar kosong). */
+    muatPendampinganSaya: async () => { const r = await rpc('sg_pendampingan_saya'); return r.ok ? { ok: true, data: susunPendampingan(r.data) } : r; },
+    /** Penunjukan Bina Damping satu tahun ajaran (pengurus) beserta calon yang dapat dipilih. Bawaan: tahun ajaran berjalan. */
+    muatBinaDamping: async (tahunAjaran = null) => { const r = await rpc('sg_bina_damping_daftar', { p_tahun_ajaran: tahunAjaran }); return r.ok ? { ok: true, data: susunBinaDamping(r.data) } : r; },
+    /** Menunjuk Bina Damping satu rombel (Dewan, Pembina, Admin). `ids` = daftar LENGKAP (maks 2; kosong = mengosongkan). Mengembalikan jumlah perubahan. */
+    aturBinaDamping: (tahunAjaran, rombel, ids) => rpc('sg_bina_damping_atur', { p_tahun_ajaran: tahunAjaran, p_rombel: rombel, p_penegak_ids: ids }),
+    /** Susunan sangga satu rombel (pengurus, Bina Damping rombel itu, anggota rombel itu). */
+    muatSanggaRombel: async (rombel) => { const r = await rpc('sg_sangga_rombel', { p_rombel: rombel }); return r.ok ? { ok: true, data: susunSanggaRombel(r.data) } : r; },
+    /** Membagi sangga dan menentukan Pinsa (Bina Damping rombel itu, Pembina, Admin). `daftar` = [{ id, sangga?, pinsa? }]. Hasil: { diubah, peringatan }. */
+    aturSangga: (rombel, daftar) => rpc('sg_sangga_atur', { p_rombel: rombel, p_data: daftar }),
     /** Catatan pengukuhan Dewan Ambalan oleh Ketua Kwartir Ranting (pengurus), tahun ajaran terbaru lebih dulu. */
     muatPengukuhanDewan: () => muat(async () => susunPengukuhanDewan(await ambilSemua('pengukuhan_dewan', { urut: ['tahun_ajaran'] }))),
     /** Mencatat atau memperbarui pengukuhan satu tahun ajaran (Pembina dan Admin). `d` = { tahunAjaran, nomorSk, tanggalSk, rekomNomor, rekomTanggal, catatan }. */

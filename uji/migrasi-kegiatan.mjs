@@ -39,7 +39,7 @@ const bandingkan = (nama, pa, pb) => {
 };
 
 // Skema "sesudah" = skema.sql terbaru (migrasi ini adalah yang paling baru; belum ada migrasi lagi sesudahnya).
-const A = await baru(`${P}/supabase/skema.sql`);
+const A = await baru('git:90cb914');
 const pa = await potret(A);
 // sg_cadangan_admin tidak ikut dibandingkan di sini: migrasi Fase A (pengukuhan-dewan) menulis ulangnya lagi; isinya dicek pada pemeriksaan perilaku di bawah.
 ok(pa.fungsi.length === 11, `skema baru memuat semua fungsi usulan kegiatan (4 public + 7 sigarda): ${pa.fungsi.length}`);

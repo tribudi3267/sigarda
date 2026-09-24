@@ -33,6 +33,7 @@ alter table public.asisten_iuran enable row level security;
 alter table public.penugasan_rombel enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_penugasan_*
 alter table public.penugasan_log enable row level security;
 alter table public.guru_agama enable row level security;
+alter table public.bina_damping enable row level security;   -- tanpa kebijakan: hanya lewat fungsi sg_bina_damping_* dan sg_sangga_*
 alter table public.penugasan_peserta enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_penugasan_peserta_atur
 alter table public.kepengurusan_log enable row level security;    -- baca: pengurus; tulis: hanya fungsi kepengurusan
 alter table public.pengukuhan_dewan enable row level security;    -- baca: pengurus; tulis: hanya fungsi sg_pengukuhan_dewan_*

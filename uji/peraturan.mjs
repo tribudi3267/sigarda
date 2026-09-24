@@ -89,6 +89,7 @@ console.log('--- Halaman memakai registri (tidak menulis nomor SK dan alamat sen
     'src/pages/Portofolio.jsx': 'garuda-038-2017',
     'src/pages/PesertaSku.jsx': 'sku-penegak-2011',
     'src/pages/Absensi.jsx': 'admin-satuan-041-1995',
+    'src/pages/Sangga.jsx': 'polmekbin-176-2013',
     'src/components/BeritaAcaraSidang.jsx': 'gudep-231-2007',
     'src/components/Footer.jsx': 'sku-penegak-2011',
     'src/components/PanelSuratAgama.jsx': 'agama-182-1979',

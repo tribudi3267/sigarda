@@ -4,7 +4,7 @@
  * Server menyimpan data dalam tabel (snake_case). Seluruh halaman aplikasi memakai bentuk data
  * bersarang berikut, sehingga lapisan ini menjembataninya:
  *
- *   users[]                        { id, username, role, nama, nis, kelas, sangga, agama, jabatan, jabatanDewan, calonGaruda, nta,
+ *   users[]                        { id, username, role, nama, nis, kelas, sangga, agama, jabatan, jabatanDewan, pinsa, calonGaruda, nta,
  *                                    wajibGantiPin, pinDireset:{oleh,waktu}, pinDiubah, dibuat }
  *   progress[pesertaId][skuId]     { status, jadwal, pengujiId, tanggalUji, nilai, catatan, catatanPeserta,
  *                                    verifikasi, diverifikasiPada, riwayat:[{waktu,teks,oleh}] }
@@ -29,6 +29,7 @@ export function petaProfil(r) {
     agama: atau(r.agama),
     jabatan: atau(r.jabatan),
     jabatanDewan: atau(r.jabatan_dewan),
+    pinsa: r.pinsa ? true : undefined,
     jenisKelamin: atau(r.jenis_kelamin),
     whatsapp: atau(r.whatsapp),
     status: r.status ?? 'aktif',
@@ -370,3 +371,32 @@ export const susunNotifikasi = (baris = []) =>
     id: Number(r.id), jenis: r.jenis, judul: r.judul, isi: r.isi ?? '', tautan: r.tautan ?? {}, dibuat: r.dibuat,
     dibaca: !!r.dibaca_pada, dibacaPada: r.dibaca_pada ?? null, pushStatus: r.push_status ?? null,
   }));
+
+/* ---------------- Pinsa dan Bina Damping (fase B) ---------------- */
+
+/** sg_pendampingan_saya -> { binaDamping: [rombel], pinsa } (rombel yang saya dampingi pada tahun ajaran berjalan, dan apakah saya Pinsa). */
+export const susunPendampingan = (d) => ({ binaDamping: Array.isArray(d?.bina_damping) ? d.bina_damping : [], pinsa: !!d?.pinsa });
+
+/**
+ * sg_sangga_rombel -> { rombel, tahunAjaran, bisaAtur, binaDamping: [{ id, nama, tingkat }], anggota: [{ id, nama, sangga, pinsa, tingkat, layakPinsa }],
+ * peringatan: [{ sangga, teks }] }. tingkat = 'calon-bantara' | 'calon-laksana' | 'laksana' atau null (tidak boleh dilihat).
+ */
+export const susunSanggaRombel = (d) => ({
+  rombel: d.rombel,
+  tahunAjaran: d.tahun_ajaran,
+  bisaAtur: !!d.bisa_atur,
+  binaDamping: (d.bina_damping ?? []).map((b) => ({ id: b.id, nama: b.nama, tingkat: b.tingkat ?? null })),
+  anggota: (d.anggota ?? []).map((a) => ({ id: a.id, nama: a.nama, sangga: a.sangga, pinsa: !!a.pinsa, tingkat: a.tingkat ?? null, layakPinsa: !!a.layak_pinsa })),
+  peringatan: (d.peringatan ?? []).map((p) => ({ sangga: p.sangga ?? null, teks: p.teks })),
+});
+
+/**
+ * sg_bina_damping_daftar -> { tahunAjaran, bisaAtur, penugasan: [{ rombel, id, nama, kelas, jabatanDewan, tingkat }],
+ * calon: [{ id, nama, kelas, jabatanDewan, tingkat, rombel }] } (calon = Penegak berjabatan Dewan minimal Calon Laksana, yang sudah Laksana lebih dulu).
+ */
+export const susunBinaDamping = (d) => ({
+  tahunAjaran: d.tahun_ajaran,
+  bisaAtur: !!d.bisa_atur,
+  penugasan: (d.penugasan ?? []).map((p) => ({ rombel: p.rombel, id: p.penegak_id, nama: p.nama, kelas: p.kelas ?? null, jabatanDewan: p.jabatan_dewan ?? null, tingkat: p.tingkat })),
+  calon: (d.calon ?? []).map((c) => ({ id: c.id, nama: c.nama, kelas: c.kelas ?? null, jabatanDewan: c.jabatan_dewan ?? null, tingkat: c.tingkat, rombel: c.rombel ?? null })),
+});

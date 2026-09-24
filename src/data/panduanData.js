@@ -59,6 +59,7 @@ const PENEGAK = {
       ],
     },
     { id: 'penegak-agenda', judul: 'Agenda', isi: ['Melihat jadwal kegiatan Ambalan setahun (Musyawarah, pelantikan, perkemahan, dan lain-lain), dengan pengingat H-30/H-7/H-1.'] },
+    { id: 'penegak-sangga', judul: 'Sangga (bila Anda Bina Damping)', isi: ['Menu Sangga muncul bila Anda ditunjuk Dewan Ambalan sebagai Bina Damping sebuah rombel (2 orang per rombel, dipilih dari Penegak berjabatan Dewan Ambalan). Di sana Anda membagi sangga di rombel itu (4 sampai 8 Penegak per sangga, 4 sampai 5 sangga per rombel) dan menentukan Pinsa, yaitu Pimpinan Sangga: seorang Penegak yang sudah menyelesaikan SKU Bantara. Peringatan jumlah anggota hanya pengingat, tidak menghalangi penyimpanan. Bila Anda sendiri ditunjuk sebagai Pinsa, Bina Damping rombel Anda yang menetapkannya.'] },
     {
       id: 'penegak-cetak',
       judul: 'Cetak',
@@ -108,6 +109,7 @@ const DEWAN = {
     { id: 'dewan-periksa', judul: 'Periksa Data', isi: ['Ikut membantu memeriksa data yang belum lengkap (NTA, jenis kelamin, rombel format lama, dan lainnya). Untuk akun yang belum pernah masuk dan anggota yang belum mengaktifkan notifikasi, tombol Buka WhatsApp mengirim pesan pengingat siap kirim ke Penegak dan sesama Dewan Ambalan.'] },
     { id: 'dewan-sesi', judul: 'Sesi ujian', isi: ['Jadwal ujian bersama (tanggal, tempat), butir yang diuji, dan daftar pesertanya. Papan sesi menampilkan keadaan tiap peserta dari hasil uji yang sudah dicatat. Dewan Ambalan, Pembina, dan Admin dapat membuat dan mengubah sesi.'] },
     { id: 'dewan-tindaklanjut', judul: 'Tindak Lanjut', isi: ['Daftar Penegak yang lama tidak bergerak (SKU, absensi, atau iuran); tombol untuk membuka WhatsApp dengan pesan pengingat siap kirim.'] },
+    { id: 'dewan-bina-damping', judul: 'Sangga dan Bina Damping', isi: ['Di menu Sangga, tab Bina Damping: menunjuk 2 Bina Damping untuk tiap rombel pada tahun ajaran berjalan. Calon adalah Penegak berjabatan Dewan Ambalan yang minimal Calon Laksana; utamakan yang sudah Laksana (Calon Laksana baru dapat dipilih bila tidak ada lagi yang sudah Laksana dan belum bertugas). Satu orang hanya untuk satu rombel per tahun ajaran, dan penunjukan berakhir sendiri bila Penegaknya nonaktif atau tidak lagi berjabatan. Tab Sangga menampilkan susunan sangga dan Pinsa tiap rombel.'] },
     {
       id: 'dewan-pradana',
       judul: 'Khusus Pradana atau Pradani',
@@ -140,6 +142,7 @@ const PEMBINA = {
     { id: 'pembina-raport', judul: 'Raport', isi: ['Menilai raport ekstrakurikuler Pramuka tiap semester (skor dari kehadiran, capaian SKU, dan sikap), lalu mencetak atau mengunduh Excel per kelas.'] },
     { id: 'pembina-laporan', judul: 'Laporan', isi: ['Menyusun laporan tahunan gugus depan (Excel dan PDF) untuk diserahkan ke Kwartir Ranting, dengan tembusan Kwartir Cabang.'] },
     { id: 'pembina-agenda', judul: 'Agenda', isi: ['Menambah dan mengubah jadwal kegiatan Ambalan, serta meninjau (menyetujui atau menolak) usulan kegiatan dari Pradana/Pradani.'] },
+    { id: 'pembina-sangga', judul: 'Sangga dan Bina Damping', isi: ['Menu Sangga: melihat dan mengatur susunan sangga tiap rombel (nama sangga, Pinsa) dan penunjukan Bina Damping (bersama Dewan Ambalan dan Admin). Pembina dapat membetulkan susunan sangga di rombel mana pun bila Bina Damping belum ada atau keliru.'] },
     { id: 'pembina-berkas-garuda', judul: 'Berkas Calon Garuda', isi: ['Dari menu Portofolio: mencetak berkas lengkap satu Calon Garuda, atau membuat tautan berbagi baca-saja untuk penilai Kwartir tanpa perlu akun SIGARDA.'] },
     { id: 'pembina-agama', judul: 'Butir agama', isi: ['Hanya Pembina yang SEAGAMA dengan Penegak yang dapat menilai Butir 1 (agama), kecuali belum ada Pembina beragama itu, atau ada surat pengantar resmi ke guru agama sekolah.'] },
   ],
@@ -158,6 +161,7 @@ const ADMIN = {
   bagian: [
     { id: 'admin-anggota', judul: 'Anggota', isi: ['Menambah anggota satu per satu, atau mengimpor banyak sekaligus lewat berkas Excel. Jenis kelamin wajib diisi untuk anggota baru.'] },
     { id: 'admin-naikkelas', judul: 'Naik Kelas', isi: ['Proses tahunan: memindahkan rombel (X ke XI, XI ke XII) atau meluluskan Penegak kelas XII menjadi alumni, sekaligus untuk semua anggota.'] },
+    { id: 'admin-sangga', judul: 'Sangga dan Bina Damping', isi: ['Sama dengan Pembina: menu Sangga untuk mengatur sangga, Pinsa, dan penunjukan Bina Damping tiap rombel. Setelah Naik Kelas, Pinsa otomatis terlepas karena rombel berubah; Bina Damping ditunjuk ulang untuk tahun ajaran baru.'] },
     { id: 'admin-gudep', judul: 'Data Gudep', isi: ['Mengisi identitas gugus depan (nama, nomor, Kwarran, Kwarcab, Pembina Gudep, Ka. Mabigus) -- dipakai sebagai kop pada SEMUA dokumen cetak aplikasi.'] },
     { id: 'admin-cadangan', judul: 'Cadangan data', isi: ['Tombol "Unduh cadangan" (di menu Data Gudep) mengunduh seluruh data isian aplikasi (tanpa akun login). Lakukan rutin, minimal sebulan sekali; aplikasi akan mengingatkan bila sudah lewat 30 hari.'] },
     { id: 'admin-resetpin', judul: 'Reset PIN', isi: ['Membuatkan PIN baru bagi anggota yang lupa PIN-nya.'] },

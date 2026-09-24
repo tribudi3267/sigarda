@@ -72,6 +72,21 @@ create table public.pengukuhan_dewan (
   constraint pengukuhan_rekomendasi_pasangan check ((rekomendasi_nomor = '') = (rekomendasi_tanggal is null))
 );
 -- ===== akhir tabel pengukuhan dewan =====
+-- ===== Pinsa dan Bina Damping (fase B): tabel =====
+-- Bina Damping: 2 orang per rombel per tahun ajaran, Penegak berjabatan Dewan Ambalan yang minimal Calon Laksana (utamakan yang sudah Laksana), ditunjuk lewat
+-- sg_bina_damping_atur. Satu orang hanya satu rombel per tahun ajaran (persediaan pendamping terbatas). Tanpa kebijakan baca: dibaca lewat fungsi sg_* saja.
+-- Baris hilang sendiri (pemicu profiles_bina_damping_bersih) bila Penegaknya nonaktif/alumni atau tidak lagi berjabatan Dewan.
+create table public.bina_damping (
+  tahun_ajaran text not null check (tahun_ajaran ~ '^[0-9]{4}/[0-9]{4}$'),
+  rombel text not null check (rombel ~ '^(X|XI|XII)-(0[1-9]|10)$'),
+  penegak_id uuid not null references public.profiles(id) on delete cascade,
+  ditetapkan_oleh uuid references public.profiles(id) on delete set null,
+  ditetapkan_pada timestamptz not null default now(),
+  primary key (tahun_ajaran, rombel, penegak_id)
+);
+create unique index bina_damping_satu_rombel_idx on public.bina_damping (tahun_ajaran, penegak_id);
+create index bina_damping_penegak_idx on public.bina_damping (penegak_id);
+-- ===== akhir tabel pinsa bina damping =====
 -- Guru agama di sekolah (per agama), rujukan surat pengantar bila tidak ada Pembina yang seagama dengan Penegak (dikelola Admin).
 create table public.guru_agama (
   id bigint generated always as identity primary key,

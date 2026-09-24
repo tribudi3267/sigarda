@@ -24,7 +24,7 @@ const DIHARAPKAN = [
 ];
 
 // Skema "sesudah" = skema.sql terbaru; sebelum = commit TEPAT sebelum migrasi ini (main sesudah PR #5).
-const A = await baru(`${P}/supabase/skema.sql`);
+const A = await baru('git:90cb914');
 const ia = await indeks(A);
 ok(DIHARAPKAN.every(([t, n, k]) => ia.some((x) => x.t === t && x.n === n && x.d.includes(`(${k})`))), 'skema baru memuat kesepuluh indeks kunci asing');
 

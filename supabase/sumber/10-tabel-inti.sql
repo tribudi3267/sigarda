@@ -17,6 +17,7 @@ create table public.profiles (
   status text not null default 'aktif' check (status in ('aktif','nonaktif','alumni')),   -- Penegak: nonaktif = tidak melanjutkan Pramuka (masih siswa), alumni = sudah lulus; keduanya hanya dapat dilihat
   status_pada date,                                                -- sejak kapan status ini berlaku
   lulus_ta text check (lulus_ta is null or lulus_ta ~ '^[0-9]{4}/[0-9]{4}$'),   -- tahun ajaran kelulusan (angkatan), hanya alumni
+  pinsa boolean not null default false,                           -- Pimpinan Sangga (Penegak Calon Laksana ke atas, dipilih Bina Damping rombelnya); satu Pinsa per sangga per rombel; hilang sendiri bila pindah rombel/sangga atau tidak aktif
   wajib_ganti_pin boolean not null default true,
   pin_direset_oleh uuid references public.profiles(id) on delete set null,
   pin_direset_pada timestamptz,
@@ -26,13 +27,16 @@ create table public.profiles (
   constraint profil_penguji check (role <> 'penguji' or jabatan in ('Dewan Ambalan','Pembina')),
   constraint profil_admin check (role <> 'admin' or jabatan = 'Admin Gudep'),
   constraint profil_nta check (nta is null or nta ~ '^[0-9A-Za-z./ -]{1,40}$'),
-  constraint profil_jabatan_dewan check (jabatan_dewan is null or role = 'peserta' or (role = 'penguji' and jabatan = 'Dewan Ambalan'))
+  constraint profil_jabatan_dewan check (jabatan_dewan is null or role = 'peserta' or (role = 'penguji' and jabatan = 'Dewan Ambalan')),
+  constraint profil_pinsa check (not pinsa or role = 'peserta')
 );
 -- ===== Jabatan tunggal Dewan Ambalan (Fase A): indeks =====
 -- Pradana, Pradani, dan Pemangku Adat masing-masing hanya satu pemegang (Pemangku Adat = ketua sidang Dewan Kehormatan; Pradana dan Pradani
 -- menandatangani Surat Tanda Lulus). Daftar jabatan tunggal sama dengan sigarda.jabatan_tunggal.
 create unique index profil_pradana_pradani_unik on public.profiles (jabatan_dewan) where jabatan_dewan in ('Pradana','Pradani','Pemangku Adat');
 -- ===== akhir indeks jabatan tunggal =====
+-- Satu Pinsa untuk tiap sangga di dalam satu rombel (nama sangga tanpa membedakan huruf besar/kecil)
+create unique index profil_pinsa_unik on public.profiles (kelas, lower(sangga)) where pinsa;
 
 -- Katalog (diisi otomatis di bagian akhir berkas ini dari data aplikasi)
 create table public.sku_butir (
