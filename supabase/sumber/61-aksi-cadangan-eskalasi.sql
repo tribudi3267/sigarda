@@ -91,7 +91,8 @@ end $$;
 -- Tangga eskalasi untuk Penegak yang "tidak bergerak", dijalankan dari sigarda.notif_pengingat() (pengingat harian 07.00 WIB, jadi otomatis
 -- di luar jam senyap 22.00-04.00 WIB tanpa logika tambahan). Tiga kejadian independen, masing-masing dihitung ULANG setiap hari dari data
 -- sumbernya (BUKAN status tersimpan) sehingga otomatis "reset" begitu ada tindak lanjut -- tanpa perlu tabel status terpisah:
---   sku      : tidak ada sku_progress/riwayat baru (peserta ATAU penguji) selama >= 7 hari.
+--   sku      : tidak ada sku_progress/riwayat baru (peserta ATAU penguji) selama >= 7 hari. TIDAK dihitung selama ada pra-uji yang menunggu penilai (Fase E):
+--              penghambatnya penilai, bukan Penegak; yang macet muncul di Periksa Data (praUjiMacet) dan diingatkan sigarda.pra_uji_pengingat.
 --   absensi  : 2 kali latihan Jumat TERAKHIR berturut-turut berstatus Alpa ('A'; izin/sakit tidak dihitung).
 --   iuran    : 2 kali latihan Jumat TERAKHIR berturut-turut tanpa baris iuran (terpisah dari status absensi, sesuai catatan tabel iuran).
 -- "mulai" = tanggal kejadian PERTAMA kali memenuhi syarat (tetap sejak itu selama belum ada tindak lanjut, tidak ikut mundur bila kejadian
@@ -101,6 +102,7 @@ create function sigarda.eskalasi_mulai_sku(p_peserta uuid) returns date language
 $$
 declare v_terakhir date;
 begin
+  if exists (select 1 from public.sku_pra_uji where peserta_id = p_peserta and status = 'menunggu') then return null; end if;
   select greatest(
     coalesce((select max(diubah)::date from public.sku_progress where peserta_id = p_peserta), (select dibuat from public.profiles where id = p_peserta)),
     coalesce((select max(waktu)::date from public.sku_riwayat where peserta_id = p_peserta), (select dibuat from public.profiles where id = p_peserta))

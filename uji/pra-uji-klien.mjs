@@ -9,7 +9,7 @@ import { isiDataContoh } from '../src/lokal/seedLokal.js';
 import { PIN_DEMO } from '../src/lokal/pinDemo.js';
 import { buatApi } from '../src/lib/api.js';
 import { tahunAjaranKini } from '../src/lib/rombelLogic.js';
-import { hariMenunggu, jalurPraUji, jalurTahap, menuPraUjiTampil, namaTahap, penilaiPraUji, teksPosisiPraUji, ujiResmiTampil } from '../src/lib/praUjiLogic.js';
+import { butirMenungguPra, hariMenunggu, jalurPraUji, jalurTahap, menuPraUjiTampil, namaTahap, penilaiPraUji, teksPosisiPraUji, ujiResmiTampil } from '../src/lib/praUjiLogic.js';
 import { tujuanNotifikasi } from '../src/lib/notifikasiLogic.js';
 import { KonteksApp } from '../src/context/AppContext.jsx';
 import JalurPraUji from '../src/components/JalurPraUji.jsx';
@@ -45,6 +45,16 @@ console.log('--- Logika murni: jalur per butir ---');
   ok(j.langkah.map((l) => l.tahap).join() === 'bina_damping,pembina' && keadaan(j) === 'menunggu,nanti', 'jalur Laksana tanpa tahap Pinsa');
   ok(jalurTahap('Bantara').join() === 'pinsa,bina_damping,pembina' && jalurTahap('Laksana').join() === 'bina_damping,pembina', 'urutan tahap nominal');
   ok(namaTahap('bina_damping') === 'Bina Damping' && hariMenunggu('2026-09-20T00:00:00Z', Date.parse('2026-09-24T12:00:00Z')) === 4 && hariMenunggu(null) === 0, 'nama tahap dan lama menunggu');
+}
+
+console.log('\n--- Logika murni: butir menunggu pra-uji di Beranda ---');
+{
+  const e = (id, status) => ({ poin: { id, tingkat: 'Bantara' }, entry: { status } });
+  const r = (id, skuId, status, jadwal) => ({ id, skuId, status, jadwal, tahap: 'pinsa' });
+  const hasil = butirMenungguPra([e('A', 'belum'), e('B', 'ulang'), e('C', 'diajukan'), e('D', 'lulus'), e('E', 'belum')],
+    [r(1, 'A', 'menunggu', '2030-02-01'), r(2, 'B', 'menunggu', '2030-01-05'), r(3, 'C', 'menunggu', '2030-01-01'), r(4, 'D', 'menunggu', '2030-01-01'), r(5, 'E', 'lulus', '2030-01-01')]);
+  ok(hasil.map((x) => x.poin.id).join() === 'B,A', 'hanya butir yang menunggu pra-uji dan belum diajukan/lulus, jadwal terdekat dulu');
+  ok(butirMenungguPra([], []).length === 0 && butirMenungguPra([e('A', 'belum')], []).length === 0, 'tanpa baris pra-uji: kosong');
 }
 
 console.log('\n--- Logika murni: menu dan uji resmi ---');

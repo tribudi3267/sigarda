@@ -32,8 +32,8 @@ const bandingkan = (nama, pa, pb) => {
   }
 };
 
-// Skema "sesudah" = skema.sql terbaru (migrasi ini yang paling baru).
-const A = await baru(`${P}/supabase/skema.sql`);
+// Skema "sesudah" = skema pada commit migrasi ini (bukan skema.sql terbaru).
+const A = await baru('git:558483c'); // skema TEPAT sesudah migrasi ini; skema.sql terbaru memuat tahap sesudahnya (Fase E menulis ulang sg_pemeriksaan_data)
 const pa = await potret(A);
 ok(pa.fungsi.length === 2 && pa.hakFungsi.filter((x) => x.grantee === 'authenticated').length === 2, 'skema baru memuat kedua fungsi, dapat dipanggil authenticated');
 

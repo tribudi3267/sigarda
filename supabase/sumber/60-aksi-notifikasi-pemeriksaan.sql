@@ -92,7 +92,8 @@ end $$;
 
 -- ===== Pemeriksaan data (tahap L3): fungsi =====
 -- Pengurus (Pembina, Dewan Ambalan, Admin; Dewan ikut membantu memeriksa sejak migrasi periksa-dewan): ringkasan masalah kualitas data yang umum ditemui (kelas belum format rombel baku, NTA kosong, jenis kelamin kosong,
--- rombel tanpa penugasan penguji, Pembina tanpa agama, akun yang belum pernah masuk). Sebagian besar hanya dapat diperbaiki Admin Gudep
+-- rombel tanpa penugasan penguji, Pembina tanpa agama, akun yang belum pernah masuk; dan untuk pra-uji (Fase E): praUjiAktif, rombel tanpa 2 Bina Damping, sangga tanpa Pinsa,
+-- pra-uji yang macet). Tiga daftar pra-uji hanya ditampilkan klien bila praUjiAktif. Sebagian besar hanya dapat diperbaiki Admin Gudep
 -- (lihat sg_anggota_jk_atur, sg_rombel_perbarui, sg_anggota_nta_atur, sg_anggota_agama_atur); Pembina tetap dapat melihatnya agar tahu apa
 -- yang perlu diminta ke Admin. "Perangkat tanpa notifikasi" TIDAK diulang di sini: sudah ada di sg_push_ringkasan. Tiap daftar dibatasi 300 baris.
 create function public.sg_pemeriksaan_data() returns jsonb
@@ -103,6 +104,7 @@ begin
   perform sigarda.wajib_aktif();
   if not sigarda.pengurus() then raise exception 'Hanya pengurus (Pembina, Dewan Ambalan, dan Admin Gudep) yang dapat melihat pemeriksaan data.'; end if;
   return jsonb_build_object(
+    'praUjiAktif', sigarda.pra_uji_aktif(),
     'kelasLama', coalesce((
       select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'nis', x.nis, 'kelas', x.kelas) order by x.nis)
       from (select id, nama, nis, kelas from public.profiles where role = 'peserta' and status = 'aktif' and not sigarda.rombel_sah(kelas) limit 300) x
@@ -123,6 +125,35 @@ begin
         from (select k || '-' || lpad(n::text, 2, '0') as rombel from (values ('X'), ('XI'), ('XII')) t(k), generate_series(1, 10) n) rb
         where exists (select 1 from public.profiles p2 where p2.role = 'peserta' and p2.status = 'aktif' and p2.kelas = rb.rombel)
           and not exists (select 1 from public.penugasan_rombel r where r.tahun_ajaran = v_ta and r.rombel = rb.rombel)
+      ) x
+    ), '[]'::jsonb),
+    'rombelTanpaBinaDamping', coalesce((
+      select jsonb_agg(jsonb_build_object('rombel', x.rombel, 'jumlah', x.jumlah, 'binaDamping', x.bd) order by x.rombel)
+      from (
+        select rb.rombel, (select count(*) from public.profiles p2 where p2.role = 'peserta' and p2.status = 'aktif' and p2.kelas = rb.rombel) as jumlah,
+               (select count(*) from public.bina_damping b where b.tahun_ajaran = v_ta and b.rombel = rb.rombel) as bd
+        from (select k || '-' || lpad(n::text, 2, '0') as rombel from (values ('X'), ('XI'), ('XII')) t(k), generate_series(1, 10) n) rb
+        where exists (select 1 from public.profiles p2 where p2.role = 'peserta' and p2.status = 'aktif' and p2.kelas = rb.rombel)
+          and (select count(*) from public.bina_damping b where b.tahun_ajaran = v_ta and b.rombel = rb.rombel) < 2
+      ) x
+    ), '[]'::jsonb),
+    'sanggaTanpaPinsa', coalesce((
+      select jsonb_agg(jsonb_build_object('rombel', x.kelas, 'sangga', x.sangga, 'jumlah', x.jumlah) order by x.kelas, x.sangga)
+      from (
+        select p.kelas, min(p.sangga) as sangga, count(*) as jumlah from public.profiles p
+        where p.role = 'peserta' and p.status = 'aktif' and sigarda.rombel_sah(p.kelas) and btrim(coalesce(p.sangga, '')) <> ''
+        group by p.kelas, lower(btrim(p.sangga)) having not bool_or(p.pinsa) limit 300
+      ) x
+    ), '[]'::jsonb),
+    'praUjiMacet', coalesce((
+      select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'kelas', x.kelas, 'butir', x.butir, 'tahap', x.tahap, 'hari', x.hari, 'tanpaPenilai', x.tanpa_penilai) order by x.hari desc)
+      from (
+        select r.id, p.nama, p.kelas, sigarda.notif_label_butir(r.sku_id) as butir, r.tahap, floor(extract(epoch from now() - r.dibuat) / 86400)::int as hari,
+               not exists (select 1 from sigarda.pra_uji_penilai_daftar(r.peserta_id, r.sku_id, r.tahap)) as tanpa_penilai
+        from public.sku_pra_uji r join public.profiles p on p.id = r.peserta_id
+        where r.status = 'menunggu'
+          and (r.dibuat < now() - interval '3 days' or not exists (select 1 from sigarda.pra_uji_penilai_daftar(r.peserta_id, r.sku_id, r.tahap)))
+        limit 300
       ) x
     ), '[]'::jsonb),
     'pembinaTanpaAgama', coalesce((

@@ -47,7 +47,7 @@ const bandingkan = (nama, pa, pb) => {
   }
 };
 
-const A = await baru(`${P}/supabase/skema.sql`);
+const A = await baru('git:535c4b5'); // skema TEPAT sesudah migrasi ini (Fase D); skema.sql terbaru memuat Fase E yang menulis ulang beberapa fungsi pra-uji
 const pa = await potret(A);
 ok(pa.fungsi.some((f) => f.proname === 'sg_pra_uji_catat') && pa.fungsi.some((f) => f.proname === 'pra_uji_aktif'), 'skema baru memuat fungsi pra-uji');
 ok(pa.hakTabel.length === 1 && pa.hakTabel[0].privilege_type === 'SELECT' && pa.rls[0].relrowsecurity === true, 'sku_pra_uji: RLS aktif, hanya hak SELECT bagi authenticated');

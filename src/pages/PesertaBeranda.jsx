@@ -1,16 +1,18 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { AMBANG_HADIR } from '../config';
 import { cariPoin, hitungProgres, laksanaTerbuka, layakGaruda, PERAN, tingkatSelesai } from '../lib/skuLogic';
 import { periodeDari, rekapAbsensi, sesiPeriode, tahunAjaranDari, PERIODE } from '../lib/absensiLogic';
 import { fmtTanggal, hariIni } from '../lib/format';
 import useAbsensiPeriode from '../hooks/useAbsensiPeriode';
+import { butirMenungguPra, jalurPraUji, teksPosisiPraUji } from '../lib/praUjiLogic';
 import JadwalUjianBersama from '../components/JadwalUjianBersama';
 import KartuIuran from '../components/KartuIuran';
 import { Badge, Icon, Kosong, Lencana, ProgressBar, TeksPoin } from '../components/ui';
 
 export default function PesertaBeranda({ setTab, setTingkat }) {
-  const { user, users, progress, absensi, peranUser, batalkanAjuan, daftarCalonGaruda, hanyaLihatSaya } = useApp();
+  const { user, users, progress, absensi, peranUser, batalkanAjuan, daftarCalonGaruda, hanyaLihatSaya, praUjiAktif, pastikanPraUji, praUjiPeserta } = useApp();
+  useEffect(() => { if (praUjiAktif) pastikanPraUji(user.id); }, [praUjiAktif, user.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const bantara = hitungProgres(progress, user, 'Bantara');
   const laksana = hitungProgres(progress, user, 'Laksana');
@@ -24,7 +26,10 @@ export default function PesertaBeranda({ setTab, setTingkat }) {
   const agenda = entri
     .filter((x) => x.entry.status === 'diajukan' || x.entry.status === 'proses')
     .sort((a, b) => (a.entry.jadwal ?? '9999').localeCompare(b.entry.jadwal ?? '9999'));
-  const diulang = entri.filter((x) => x.entry.status === 'ulang');
+  // Butir yang masih menunggu pra-uji (Pinsa/Bina Damping) belum berstatus diajukan, tetapi sudah menjadi agenda: tampilkan bersama pengujian resmi.
+  const barisPra = praUjiPeserta(user.id);
+  const menungguPra = butirMenungguPra(entri, barisPra);
+  const diulang = entri.filter((x) => x.entry.status === 'ulang' && !menungguPra.some((m) => m.poin.id === x.poin.id));
   const namaPenguji = (id) => users.find((u) => u.id === id)?.nama ?? '-';
 
   // Kehadiran saya pada semester berjalan
@@ -138,7 +143,7 @@ export default function PesertaBeranda({ setTab, setTingkat }) {
 
       <section>
         <h2 className="mb-2 text-lg font-bold">Agenda pengujian</h2>
-        {agenda.length === 0 ? (
+        {agenda.length === 0 && menungguPra.length === 0 ? (
           <Kosong judul="Belum ada jadwal pengujian" teks="Pilih butir yang sudah kamu kuasai, lalu ajukan ke penguji.">
             <button className="btn btn-primary btn-sm" onClick={() => lihat(bantaraSelesai ? 'Laksana' : 'Bantara')}>
               Pilih butir untuk diajukan
@@ -146,6 +151,23 @@ export default function PesertaBeranda({ setTab, setTingkat }) {
           </Kosong>
         ) : (
           <ul className="panel divide-y divide-pramuka-100">
+            {menungguPra.map(({ poin, entry, pra }) => (
+              <li key={`pra-${poin.id}`} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div><TeksPoin poin={poin} /></div>
+                  <span className="shrink-0 rounded bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900 ring-1 ring-inset ring-amber-300">Pra-uji</span>
+                </div>
+                <p className="mt-2 flex items-center gap-1.5 text-xs text-pramuka-600">
+                  <Icon nama="kalender" className="h-3.5 w-3.5" />
+                  {poin.tingkat}, uji resmi diinginkan {fmtTanggal(pra.jadwal)}. {teksPosisiPraUji(jalurPraUji(barisPra.filter((r) => r.skuId === poin.id), entry.status, poin.tingkat))}.
+                </p>
+                {!hanyaLihatSaya && (
+                  <button className="btn btn-outline btn-sm mt-2" onClick={() => batalkanAjuan(poin.id)}>
+                    Batalkan pengajuan
+                  </button>
+                )}
+              </li>
+            ))}
             {agenda.map(({ poin, entry }) => (
               <li key={poin.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">

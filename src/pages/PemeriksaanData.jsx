@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { KATEGORI_PEMERIKSAAN, gabungHasilPemeriksaan, jumlahKategori, tabPerbaikan, totalMasalah } from '../lib/pemeriksaanLogic';
+import { gabungHasilPemeriksaan, jumlahKategori, kategoriTampil, tabPerbaikan, totalMasalah } from '../lib/pemeriksaanLogic';
+import { namaTahap } from '../lib/praUjiLogic';
 import { bolehDihubungi, nomorWaAnggota, teksWaAjakMasuk } from '../lib/eskalasiLogic';
 import { alamatDasar } from '../lib/verifikasiLogic';
 import RingkasanPerangkat from '../components/RingkasanPerangkat';
@@ -69,6 +70,9 @@ const RENDER = (users, user) => ({
   tanpaNta: (x) => <Baris key={x.id} kiri={x.nama} kanan={`NIS ${x.nis || '-'}, ${x.kelas || '-'}`} />,
   tanpaJk: (x) => <Baris key={x.id} kiri={x.nama} kanan={[x.peran, x.kelas].filter(Boolean).join(', ')} />,
   rombelTanpaPenguji: (x) => <Baris key={x.rombel} kiri={x.rombel} kanan={`${x.jumlah} Penegak aktif`} />,
+  rombelTanpaBinaDamping: (x) => <Baris key={x.rombel} kiri={x.rombel} kanan={`${x.binaDamping} dari 2 Bina Damping, ${x.jumlah} Penegak aktif`} />,
+  sanggaTanpaPinsa: (x) => <Baris key={`${x.rombel}|${x.sangga}`} kiri={x.sangga} kanan={`${x.rombel}, ${x.jumlah} Penegak`} />,
+  praUjiMacet: (x) => <Baris key={x.id} kiri={x.nama} kanan={`${x.butir}, tahap ${namaTahap(x.tahap)}, ${x.hari === 0 ? 'sejak hari ini' : `${x.hari} hari`}${x.tanpaPenilai ? ', tanpa penilai' : ''}`} />,
   pembinaTanpaAgama: (x) => <Baris key={x.id} kiri={x.nama} />,
   belumPernahMasuk: (x) => (
     <Baris
@@ -112,7 +116,7 @@ export default function PemeriksaanData({ onNav }) {
       {galat && <p className="mb-4 text-sm text-red-700" role="alert">{galat}</p>}
       {hasil && (
         <div className="grid gap-3 md:grid-cols-2">
-          {KATEGORI_PEMERIKSAAN.filter((k) => k.kunci !== 'tanpaPerangkat').map((k) => (
+          {kategoriTampil(hasil).filter((k) => k.kunci !== 'tanpaPerangkat').map((k) => (
             <Kategori key={k.kunci} kategori={k} daftar={hasil[k.kunci] ?? []} tab={tabPerbaikan(k, user)} onNav={onNav} render={render[k.kunci]} />
           ))}
           <div className="md:col-span-2">
