@@ -10,6 +10,7 @@ import { periksaBaris, POLA_NTA } from '../lib/importAnggota';
 import { normalisasiRombel, PESAN_ROMBEL, penegakDewan } from '../lib/rombelLogic';
 import { rencanaJabatanDewan } from '../lib/dewanLogic';
 import { PESAN_JK, normalisasiJenisKelamin } from '../lib/jenisKelaminLogic';
+import { pembinaAtauAdmin } from '../lib/hakLogic';
 import { bolehKelolaMateri, validasiMateri } from '../lib/materiLogic';
 import { hariIni } from '../lib/format';
 import { resetGudep, setGudep, tambahGudep } from '../lib/gudepStore';
@@ -412,7 +413,7 @@ export function AppProvider({ children }) {
 
   /** Pembina atau Admin mengalihkan pengajuan ke penguji lain (atau ke antrian bersama rombel); alasan tercatat di riwayat. */
   const alihkanPengajuan = (data) =>
-    user?.role === 'admin' || (user?.role === 'penguji' && user.jabatan === 'Pembina')
+    pembinaAtauAdmin(user)
       ? aksi(api().alihkanPengajuan(data), { sukses: 'Pengajuan dialihkan.', sesudah: () => segarkan.progress(data.pesertaId) })
       : Promise.resolve(ditolak(notify, 'Hanya Pembina atau Admin Gudep yang dapat mengalihkan pengajuan.'));
 
@@ -438,7 +439,7 @@ export function AppProvider({ children }) {
   };
 
   /* ------------------ Instrumen penilaian (dimuat sekali, sesuai kebutuhan) ------------------ */
-  const bolehKelolaInstrumen = user?.role === 'admin' || (user?.role === 'penguji' && user?.jabatan === 'Pembina');
+  const bolehKelolaInstrumen = pembinaAtauAdmin(user);
   const MSG_INSTRUMEN = 'Hanya Pembina dan Admin Gudep yang dapat mengelola instrumen penilaian.';
 
   /** Memuat instrumen dan pengaturannya bila belum, atau ulang bila `paksa`. Aman dipanggil berulang (permintaan yang sama dipakai bersama). */
@@ -485,7 +486,7 @@ export function AppProvider({ children }) {
   /* ------------------ Sesi ujian dan QR Surat Tanda Lulus ------------------ */
   const MSG_SESI = 'Hanya Dewan Ambalan, Pembina, dan Admin Gudep yang dapat mengelola sesi ujian.';
   const pengurus = user?.role === 'penguji' || user?.role === 'admin';
-  const bolehHapusSesi = user?.role === 'admin' || (user?.role === 'penguji' && user?.jabatan === 'Pembina');
+  const bolehHapusSesi = pembinaAtauAdmin(user);
 
   /** Memuat daftar sesi ujian bila belum, atau ulang bila `paksa` (papan sesi memakainya untuk penyegaran berkala). */
   const pastikanSesiUjian = useCallback(async (paksa = false) => {
@@ -601,7 +602,7 @@ export function AppProvider({ children }) {
 
   /** Pengaturan iuran (standar, ambang rutin, batas nilai): hanya Pembina dan Admin. */
   const simpanPengaturanIuran = (nilai) =>
-    user?.role === 'admin' || (user?.role === 'penguji' && user?.jabatan === 'Pembina')
+    pembinaAtauAdmin(user)
       ? aksi(api().simpanPengaturanIuran(nilai), { sukses: 'Pengaturan iuran tersimpan.', sesudah: () => Promise.all([segarkan.pengaturanIuran(), Promise.resolve(naikkanIuran())]) })
       : Promise.resolve(ditolak(notify, 'Hanya Pembina dan Admin Gudep yang dapat mengubah pengaturan iuran.'));
 
@@ -676,7 +677,7 @@ export function AppProvider({ children }) {
 
   /* --------------- Sidang Dewan Kehormatan dan pengaturannya --------------- */
   const bolehSidang = user?.role === 'penguji' || user?.role === 'admin';
-  const bolehHapusSidang = user?.role === 'admin' || (user?.role === 'penguji' && user?.jabatan === 'Pembina');
+  const bolehHapusSidang = pembinaAtauAdmin(user);
   const MSG_SIDANG = 'Hanya Dewan Ambalan, Pembina, atau Admin Gudep yang dapat mengelola sidang.';
 
   /** Memuat catatan sidang dan pengaturan (dipanggil halaman Sidang saat dibuka). */
@@ -1013,7 +1014,7 @@ export function AppProvider({ children }) {
     return r;
   };
   /* ---------------- Kepengurusan Dewan Ambalan (Pembina dan Admin; jabatan = atribut akun Penegak) ---------------- */
-  const bolehKepengurusan = user?.role === 'admin' || (user?.role === 'penguji' && user.jabatan === 'Pembina');
+  const bolehKepengurusan = pembinaAtauAdmin(user);
   const MSG_KEPENGURUSAN = 'Hanya Pembina dan Admin Gudep yang dapat mengatur kepengurusan Dewan Ambalan.';
   /**
    * Kepengurusan lewat berkas. terapkan = false: pratinjau; true: menerapkan lalu menyegarkan data. Mengembalikan { ok, data } dengan data =
@@ -1070,7 +1071,7 @@ export function AppProvider({ children }) {
 
   /* ---------------- Penugasan penguji per rombel dan guru agama (Admin mengatur, pengurus melihat) ---------------- */
   const MSG_PENUGASAN = 'Hanya Pembina dan Admin Gudep yang dapat mengatur penugasan penguji.';
-  const bolehAturPenugasan = user?.role === 'admin' || (user?.role === 'penguji' && user.jabatan === 'Pembina');
+  const bolehAturPenugasan = pembinaAtauAdmin(user);
 
   /** Memuat penugasan tahun ajaran ini dan daftar guru agama (pengurus). Mengembalikan { ok }. */
   const muatPenugasan = useCallback(async (tahunAjaran) => {
@@ -1119,7 +1120,7 @@ export function AppProvider({ children }) {
 
   /* ---------------- Dokumen terbit (surat pengantar ke guru agama) ---------------- */
   const MSG_SURAT = 'Hanya Pembina atau Admin Gudep yang dapat menerbitkan dan mencabut surat pengantar.';
-  const bolehSurat = user?.role === 'admin' || (user?.role === 'penguji' && user.jabatan === 'Pembina');
+  const bolehSurat = pembinaAtauAdmin(user);
 
   /** Memuat dokumen terbit (pengurus: semua; Penegak: miliknya). Mengembalikan { ok }. Aman dipanggil berulang. */
   const muatDokumen = useCallback(async () => {

@@ -18,6 +18,7 @@
  */
 import { DAFTAR_TINGKAT, TINGKAT } from '../data/skuData';
 import { normalisasiNama } from './cariNama';
+import { pembinaAtauAdmin } from './hakLogic';
 import { buatId } from './format';
 
 /* ------------------------------- Katalog butir ------------------------------ */
@@ -242,5 +243,4 @@ export function geserMateri(daftar, id, arah) {
 /* ---------------------------------- Hak akses ------------------------------- */
 
 /** Hanya Pembina dan Admin Gudep yang boleh menambah, mengubah, dan menghapus materi. */
-export const bolehKelolaMateri = (user) =>
-  !!user && (user.role === 'admin' || (user.role === 'penguji' && user.jabatan === 'Pembina'));
+export const bolehKelolaMateri = pembinaAtauAdmin; // sigarda.kelola_materi (sama dengan pembina_atau_admin)

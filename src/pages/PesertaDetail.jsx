@@ -9,6 +9,7 @@ import TingkatTabs from '../components/TingkatTabs';
 import UjiModal from '../components/UjiModal';
 import UbahStatusModal from '../components/UbahStatusModal';
 import { anggotaAktif, statusAnggota } from '../lib/naikKelasLogic';
+import { pembinaAtauAdmin } from '../lib/hakLogic';
 import { Avatar, BadgePeran, BadgeStatus, Icon, Kosong, ProgressBar } from '../components/ui';
 
 /** Halaman rincian satu peserta. Pembina/Dewan Ambalan dapat menilai, admin hanya melihat. */
@@ -25,7 +26,7 @@ export default function PesertaDetail({ pesertaId, onKembali, onCetak, onBukaPor
 
   const aktif = anggotaAktif(peserta);
   const bisaMenguji = user.role === 'penguji' && aktif; // nonaktif dan alumni hanya dapat dilihat
-  const bisaUbahStatus = user.role === 'admin' || (user.role === 'penguji' && user.jabatan === 'Pembina');
+  const bisaUbahStatus = pembinaAtauAdmin(user);
   const laksanaBuka = laksanaTerbuka(progress, peserta);
   const h = hitungProgres(progress, peserta, tingkat);
 

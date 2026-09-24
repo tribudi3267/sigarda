@@ -2,7 +2,7 @@
  * NOTIFIKASI (murni, tanpa React). Dijaga oleh uji/notifikasi-klien.mjs.
  * Notifikasi dibuat server (pemicu di basis data); di sini hanya penghitung lencana, label, tujuan tautan, dan waktu relatif.
  */
-import { fmtTanggal } from './format';
+import { fmtTanggal, hariIni } from './format';
 
 export const LABEL_JENIS = {
   ajukan: 'Pengajuan', alih: 'Dialihkan', mulai: 'Pengujian', hasil: 'Hasil', pengingat: 'Pengingat', lama: 'Menunggu lama', sesi: 'Sesi ujian', surat: 'Surat', tes: 'Uji', eskalasi: 'Eskalasi', agenda: 'Agenda', musyawarah: 'Musyawarah Ambalan', kegiatan: 'Usulan Kegiatan',
@@ -69,7 +69,7 @@ export function waktuRelatif(iso, sekarang = Date.now()) {
   if (jam < 24) return `${jam} jam lalu`;
   const hari = Math.floor(jam / 24);
   if (hari < 7) return `${hari} hari lalu`;
-  return fmtTanggal(new Date(t).toISOString().slice(0, 10));
+  return fmtTanggal(hariIni(new Date(t))) // tanggal menurut WIB, bukan UTC;
 }
 
 /** Menandai secara lokal (sebelum server menjawab): id tertentu, atau semua bila ids kosong. */

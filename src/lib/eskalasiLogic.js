@@ -3,6 +3,8 @@
  * Server menghitung kejadian dan tingkat; di sini hanya format nomor WhatsApp, tautan wa.me, dan label tampilan.
  */
 
+import { pembinaAtauAdmin } from './hakLogic';
+
 const JENIS = ['sku', 'absensi', 'iuran'];
 const LABEL_JENIS = { sku: 'SKU', absensi: 'Absensi', iuran: 'Iuran' };
 const TINGKAT_LABEL = { 1: 'Ramah', 2: 'Tegas', 3: 'Mendesak' };
@@ -56,9 +58,9 @@ export function teksWaAjakMasuk(nama, alamat = '') {
  */
 export function bolehDihubungi(pengguna, { id, peran } = {}) {
   if (!pengguna || (id && id === pengguna.id) || peran === 'Admin Gudep') return false;
-  const pembinaAtauAdmin = pengguna.role === 'admin' || (pengguna.role === 'penguji' && pengguna.jabatan === 'Pembina');
-  if (peran === 'Pembina') return pembinaAtauAdmin;
-  return pembinaAtauAdmin || pengguna.role === 'penguji';
+  const pembinaAdmin = pembinaAtauAdmin(pengguna);
+  if (peran === 'Pembina') return pembinaAdmin;
+  return pembinaAdmin || pengguna.role === 'penguji';
 }
 
 /** Nomor WhatsApp tersimpan milik anggota `id` pada daftar `users` (bentuk tampilan); '' bila belum diisi atau formatnya tidak sah. */

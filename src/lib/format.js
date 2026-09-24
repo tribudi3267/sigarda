@@ -1,12 +1,17 @@
 const p2 = (n) => String(n).padStart(2, '0');
 export const keIso = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 
-export const hariIni = () => keIso(new Date());
+/** Tanggal hari ini menurut WIB (Asia/Jakarta), BUKAN zona waktu perangkat: sama dengan sigarda.hari_ini() di server (dijaga uji/paritas-hak.mjs). */
+const WIB = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' });
+export const hariIni = (sekarang = new Date()) => {
+  const b = Object.fromEntries(WIB.formatToParts(sekarang).map((p) => [p.type, p.value]));
+  return `${b.year}-${b.month}-${b.day}`;
+};
 
+/** Tanggal `hari` hari sebelum hari ini (WIB), format ISO. */
 export const tanggalLalu = (hari) => {
-  const d = new Date();
-  d.setDate(d.getDate() - hari);
-  return keIso(d);
+  const [y, m, d] = hariIni().split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d - hari)).toISOString().slice(0, 10);
 };
 
 export const fmtTanggal = (iso) =>
