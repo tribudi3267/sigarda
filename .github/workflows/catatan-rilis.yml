@@ -1,0 +1,42 @@
+name: Catatan rilis
+# Pada setiap pull request: menyusun apa yang harus dikerjakan pemilik SEBELUM menggabungkan (migrasi SQL baru, Edge Function yang berubah),
+# lalu menaruhnya sebagai SATU komentar yang diperbarui (bukan komentar baru tiap dorongan). Situs terbit otomatis saat merge ke main, jadi migrasi
+# harus dijalankan lebih dulu. Hanya pengingat: tidak menjalankan migrasi dan tidak men-deploy apa pun, tidak memakai rahasia, hanya membaca git.
+# Bukan syarat merge (ruleset hanya mewajibkan build + uji). Pada PR dari fork token hanya-baca: komentar dilewati, ringkasan tetap tampil di tab Actions.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+  pull-requests: write
+concurrency:
+  group: catatan-rilis-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  catatan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Susun catatan rilis
+        run: |
+          node scripts/catatan-rilis.mjs "origin/${{ github.base_ref }}" HEAD --keluar=catatan-rilis.md
+          cat catatan-rilis.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Tulis atau perbarui komentar pada PR
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          id=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate --jq '.[] | select(.body | contains("<!-- catatan-rilis-otomatis -->")) | .id' | head -n1)
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/${{ github.repository }}/issues/comments/$id" -F body=@catatan-rilis.md > /dev/null
+          else
+            gh api --method POST "repos/${{ github.repository }}/issues/$PR/comments" -F body=@catatan-rilis.md > /dev/null
+          fi
