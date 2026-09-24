@@ -29,7 +29,7 @@ export default function Sangga() {
         className="mb-4"
         rujukan={[
           { id: 'polmekbin-176-2013', bagian: 'butir 6 b (calon penegak didampingi dua penegak bantara/laksana: pendamping kanan dan kiri) dan butir 7 a (sangga 4-8 orang)' },
-          { id: 'gudep-231-2007', bagian: 'Bab IV butir 4 (Ambalan Penegak, sangga, dan Pemimpin Sangga)' },
+          { id: 'gudep-05-2026', bagian: 'Pasal 24 ayat (3)-(4) dan (12)-(13) (sangga 4-8 Penegak, Pemimpin Sangga, dan Pradana)' },
         ]}
       />
 

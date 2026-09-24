@@ -7,7 +7,7 @@
 --     pemegang, migrasi berhenti dengan pesan: sisakan satu (menu Kepengurusan), lalu jalankan lagi.
 --   * sigarda.jabatan_baku (membakukan "Pemangku Adat"), sigarda.jabatan_tunggal (baru), dan fungsi jabatan
 --     (sg_anggota_jabatan_dewan_atur, sg_kepengurusan_terapkan, dst.) ditulis ulang: perilaku Pradana dan Pradani SAMA, ditambah Pemangku Adat.
---   * sigarda.ketua_sidang: ketua sidang = Pemangku Adat (Dewan Kehormatan Penegak diketuai Pemangku Adat, SK Kwarnas 231/2007 dan 176/2013);
+--   * sigarda.ketua_sidang: ketua sidang = Pemangku Adat (Dewan Kehormatan Penegak diketuai Pemangku Adat, Jukran Kwarnas 05/2026 Pasal 24 ayat (15) dan SK 176/2013);
 --     bila belum ada, Pradana; bila belum ada juga, pengaturan lama. Berita acara yang sudah dibuat TIDAK berubah (nama disalin saat sidang).
 --   * Tabel public.pengukuhan_dewan (nomor dan tanggal SK Ketua Kwartir Ranting, rekomendasi Ketua Mabigus opsional; satu per tahun ajaran;
 --     AD/ART Munas 2023 ART Pasal 51 ayat (2) huruf a) dengan RLS baca-pengurus, dan fungsi sg_pengukuhan_dewan_simpan / sg_pengukuhan_dewan_hapus
@@ -244,7 +244,7 @@ end $$;
 
 -- ===== Ketua sidang (Fase A): fungsi =====
 -- Ketua sidang untuk berita acara = anggota Dewan Ambalan berjabatan PEMANGKU ADAT (sebutan "Pemangku Adat Dewan Ambalan"): Dewan Kehormatan Penegak diketuai
--- Pemangku Adat (SK Kwarnas 231/2007 Bab IV butir 4 g; SK Kwarnas 176/2013 butir 7 c). Bila belum ada Pemangku Adat, dipakai Pradana ("Pradana Dewan Ambalan").
+-- Pemangku Adat (Jukran Kwarnas 05/2026 Pasal 24 ayat (15), yang menggantikan SK 231/2007; SK Kwarnas 176/2013 butir 7 c). Bila belum ada Pemangku Adat, dipakai Pradana ("Pradana Dewan Ambalan").
 -- Bila belum ada keduanya, dipakai pengaturan lama sidang.nama_ketua dan sidang.sebutan_ketua (bawaan: kosong dan "Ketua Dewan Penegak / Pemangku Adat").
 -- Cermin ketuaSidang di src/lib/dewanLogic.js (dijaga oleh pengujian).
 create or replace function sigarda.ketua_sidang(out o_nama text, out o_sebutan text) language plpgsql stable security definer set search_path = public as

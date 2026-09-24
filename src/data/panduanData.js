@@ -85,7 +85,7 @@ const DEWAN = {
   label: 'Dewan Ambalan',
   ringkasan: 'Untuk Penegak yang berjabatan Dewan Ambalan (tampilan Dewan) dan akun Dewan Ambalan lama.',
   rujukan: [
-    { id: 'gudep-231-2007', bagian: 'Bab IV butir 4 (Ambalan Penegak, Dewan Penegak, Dewan Kehormatan)' },
+    { id: 'gudep-05-2026', bagian: 'Pasal 24 (Ambalan Penegak, Dewan Ambalan, Dewan Kehormatan Penegak)' },
     { id: 'polmekbin-176-2013', bagian: 'butir 7 (Organisasi)' },
     { id: 'admin-satuan-041-1995', bagian: 'buku administrasi ambalan dipercayakan kepada Dewan Ambalan' },
     { id: 'iuran-049-1987', bagian: 'iuran' },
@@ -130,7 +130,7 @@ const PEMBINA = {
     { id: 'sku-penegak-2011', bagian: 'Bab V (penguji SKU adalah Pembina yang langsung membina)' },
     { id: 'garuda-038-2017', bagian: 'Bab IV (tim penilai) dan Bab VII (penetapan)' },
     { id: 'agama-182-1979', bagian: 'pengelolaan pendidikan agama dalam satuan' },
-    { id: 'gudep-231-2007', bagian: 'Bab IV butir 4 (Dewan Kehormatan Penegak)' },
+    { id: 'gudep-05-2026', bagian: 'Pasal 24 ayat (15) (Dewan Kehormatan Penegak)' },
   ],
   bagian: [
     { id: 'pembina-dashboard', judul: 'Dashboard', isi: ['Ringkasan seluruh gudep (bukan hanya rombel yang menjadi tugas Anda): progres SKU, kehadiran, iuran, dan portofolio Garuda.'] },
@@ -154,7 +154,7 @@ const ADMIN = {
   ringkasan: 'Memiliki seluruh hak Pembina (lihat bagian di atas), ditambah kewenangan berikut.',
   rujukan: [
     { id: 'nomor-gudep-050-2003', bagian: 'Bab III butir 6 (nomor gudep)' },
-    { id: 'gudep-231-2007', bagian: 'Bab IV (pimpinan gugusdepan) dan Majelis Pembimbing' },
+    { id: 'gudep-05-2026', bagian: 'Pasal 12, 16, dan 29 (nomor gugus depan, Majelis Pembimbing, Ketua Gugus Depan)' },
     { id: 'uu-12-2010', bagian: 'dasar hukum Gerakan Pramuka' },
     { id: 'adart-2023', bagian: 'ketentuan organisasi gugusdepan' },
   ],

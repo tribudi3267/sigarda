@@ -710,7 +710,7 @@ export default function Sidang() {
       <SumberPeraturan
         className="mb-4"
         rujukan={[
-          { id: 'gudep-231-2007', bagian: 'Bab IV butir 4 g (Dewan Kehormatan Penegak menentukan pelantikan)' },
+          { id: 'gudep-05-2026', bagian: 'Pasal 24 ayat (15) (Dewan Kehormatan Penegak diketuai Pemangku Adat, Pembina sebagai penasihat)' },
           { id: 'polmekbin-176-2013', bagian: 'butir 6 (mekanisme pembinaan) dan butir 7 c (Dewan Kehormatan Penegak)' },
           { id: 'sku-penegak-2011', bagian: 'Bab V butir 2 (upacara pelantikan kenaikan tingkat)' },
         ]}

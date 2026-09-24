@@ -147,7 +147,7 @@ export default function DataGudep() {
           className="mt-1"
           rujukan={[
             { id: 'nomor-gudep-050-2003', bagian: 'Bab III butir 6 (nomor gudep; ganjil putra, genap putri)' },
-            { id: 'gudep-231-2007', bagian: 'Bab IV butir 1 (Ketua Gudep) dan butir i (Majelis Pembimbing)' },
+            { id: 'gudep-05-2026', bagian: 'Pasal 12 (nomor gugus depan ditetapkan SK Kwartir Cabang), Pasal 16 (Majelis Pembimbing), dan Pasal 29 (Ketua Gugus Depan)' },
           ]}
         />
       </div>

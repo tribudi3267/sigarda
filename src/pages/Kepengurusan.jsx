@@ -387,7 +387,7 @@ export default function Kepengurusan() {
       <SumberPeraturan
         className="mb-4"
         rujukan={[
-          { id: 'gudep-231-2007', bagian: 'Bab IV butir 4 (Ambalan Penegak, Dewan Penegak, Dewan Kehormatan)' },
+          { id: 'gudep-05-2026', bagian: 'Pasal 24 ayat (13)-(15) (Pradana, Dewan Ambalan Penegak, dan Dewan Kehormatan Penegak)' },
           { id: 'polmekbin-176-2013', bagian: 'butir 7 (Organisasi)' },
           { id: 'adart-2023', bagian: 'Anggaran Rumah Tangga Pasal 51 ayat (2) huruf a (pengukuhan)' },
         ]}

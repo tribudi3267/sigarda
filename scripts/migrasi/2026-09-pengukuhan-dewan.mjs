@@ -21,7 +21,7 @@ const kepala = `-- =============================================================
 --     pemegang, migrasi berhenti dengan pesan: sisakan satu (menu Kepengurusan), lalu jalankan lagi.
 --   * sigarda.jabatan_baku (membakukan "Pemangku Adat"), sigarda.jabatan_tunggal (baru), dan fungsi jabatan
 --     (sg_anggota_jabatan_dewan_atur, sg_kepengurusan_terapkan, dst.) ditulis ulang: perilaku Pradana dan Pradani SAMA, ditambah Pemangku Adat.
---   * sigarda.ketua_sidang: ketua sidang = Pemangku Adat (Dewan Kehormatan Penegak diketuai Pemangku Adat, SK Kwarnas 231/2007 dan 176/2013);
+--   * sigarda.ketua_sidang: ketua sidang = Pemangku Adat (Dewan Kehormatan Penegak diketuai Pemangku Adat, Jukran Kwarnas 05/2026 Pasal 24 ayat (15) dan SK 176/2013);
 --     bila belum ada, Pradana; bila belum ada juga, pengaturan lama. Berita acara yang sudah dibuat TIDAK berubah (nama disalin saat sidang).
 --   * Tabel public.pengukuhan_dewan (nomor dan tanggal SK Ketua Kwartir Ranting, rekomendasi Ketua Mabigus opsional; satu per tahun ajaran;
 --     AD/ART Munas 2023 ART Pasal 51 ayat (2) huruf a) dengan RLS baca-pengurus, dan fungsi sg_pengukuhan_dewan_simpan / sg_pengukuhan_dewan_hapus

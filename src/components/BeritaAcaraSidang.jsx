@@ -113,7 +113,7 @@ export default function BeritaAcaraSidang({ sidang, peserta, token = null, kode 
         cetak
         className="mt-4 text-[10px] leading-snug"
         rujukan={[
-          { id: 'gudep-231-2007', bagian: 'Bab IV butir 4 g' },
+          { id: 'gudep-05-2026', bagian: 'Pasal 24 ayat (15)' },
           { id: 'sku-penegak-2011', bagian: 'Bab V' },
         ]}
       />

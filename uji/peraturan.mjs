@@ -1,7 +1,7 @@
 // Fase A: registri peraturan kepramukaan (src/data/peraturanData.js), rujukannya (peraturanLogic.js), dan penjaga agar halaman selalu memakai registri
 // (judul dan tautan berkas asli di satu tempat). Tautan yang masih hidup diperiksa terpisah: npm run periksa-peraturan (butuh internet).
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { PERATURAN, DAFTAR_ID_PERATURAN, ASAL_TAUTAN_SAH, HALAMAN_PERATURAN } from '../src/data/peraturanData.js';
+import { PERATURAN, DAFTAR_ID_PERATURAN, HALAMAN_PERATURAN } from '../src/data/peraturanData.js';
 import { daftarRujukan, labelRujukan, selesaikanRujukan, tautanSah } from '../src/lib/peraturanLogic.js';
 import { PANDUAN, PERAN_PANDUAN } from '../src/data/panduanData.js';
 
@@ -13,12 +13,12 @@ console.log('--- Registri ---');
 {
   ok(DAFTAR_ID_PERATURAN.length >= 10, `${DAFTAR_ID_PERATURAN.length} peraturan terdaftar`);
   ok(HALAMAN_PERATURAN === 'https://pramuka.or.id/peraturan', 'halaman rujukan resmi = pramuka.or.id/peraturan');
-  ok(ASAL_TAUTAN_SAH.every((a) => a.startsWith('https://')), 'asal tautan yang sah semuanya https');
+  ok(DAFTAR_ID_PERATURAN.every((i) => PERATURAN[i].url.startsWith('https://')), 'semua tautan https');
   for (const id of DAFTAR_ID_PERATURAN) {
     const p = PERATURAN[id];
     ok(/^[a-z0-9]+(-[a-z0-9]+)*$/.test(id), `${id}: id huruf kecil dan tanda hubung`);
     ok(p.nama?.length >= 4 && p.judul?.length >= 20, `${id}: punya nama dan judul lengkap`);
-    ok(tautanSah(p.url), `${id}: tautan dari asal yang sah (${p.url})`);
+    ok(tautanSah(p.url), `${id}: tautan https yang sah (${p.url})`);
     ok(!/\s/.test(p.url), `${id}: alamat tanpa spasi (gunakan %20)`);
   }
   // Nomor unik pada judul: tidak ada dua id yang menunjuk berkas sama.
@@ -29,13 +29,14 @@ console.log('--- Registri ---');
 console.log('--- Logika rujukan ---');
 {
   ok(selesaikanRujukan('garuda-038-2017')?.nama === 'SK Kwarnas 038/2017', 'id string diselesaikan');
-  ok(selesaikanRujukan({ id: 'gudep-231-2007', bagian: 'Bab IV' })?.bagian === 'Bab IV', 'id dengan bagian diselesaikan');
+  ok(selesaikanRujukan({ id: 'gudep-05-2026', bagian: 'Pasal 24' })?.bagian === 'Pasal 24', 'id dengan bagian diselesaikan');
   ok(selesaikanRujukan('tidak-ada-2000') === null, 'id tak dikenal = null');
   ok(daftarRujukan(['uu-12-2010', 'tidak-ada-2000', 'uu-12-2010']).length === 1, 'id tak dikenal dibuang dan duplikat tidak dimuat dua kali');
   ok(daftarRujukan(undefined).length === 0 && daftarRujukan('uu-12-2010').length === 1, 'rujukan kosong atau tunggal aman');
-  ok(daftarRujukan([{ id: 'gudep-231-2007', bagian: 'a' }, { id: 'gudep-231-2007', bagian: 'b' }]).length === 2, 'peraturan sama dengan bagian berbeda tetap dua rujukan');
-  ok(labelRujukan(selesaikanRujukan({ id: 'gudep-231-2007', bagian: 'Bab IV' })) === 'SK Kwarnas 231/2007, Bab IV', 'label rujukan');
-  ok(!tautanSah('http://pramuka.or.id/x.pdf') && !tautanSah('https://contoh.com/x.pdf') && !tautanSah(null), 'tautan luar atau tanpa https ditolak');
+  ok(daftarRujukan([{ id: 'gudep-05-2026', bagian: 'a' }, { id: 'gudep-05-2026', bagian: 'b' }]).length === 2, 'peraturan sama dengan bagian berbeda tetap dua rujukan');
+  ok(labelRujukan(selesaikanRujukan({ id: 'gudep-05-2026', bagian: 'Pasal 24' })) === 'Jukran Kwarnas 05/2026, Pasal 24', 'label rujukan');
+  ok(tautanSah('https://contoh.com/x.pdf') && tautanSah('https://drive.google.com/uc?export=download&id=abc'), 'tautan https dari mana pun diterima (asal bebas)');
+  ok(!tautanSah('http://pramuka.or.id/x.pdf') && !tautanSah('https://contoh.com/a b.pdf') && !tautanSah('') && !tautanSah(null), 'tautan tanpa https, berspasi, atau kosong ditolak');
 }
 
 console.log('--- Panduan memakai registri ---');
@@ -82,15 +83,15 @@ console.log('--- Halaman memakai registri (tidak menulis nomor SK dan alamat sen
 
   // Komponen dipasang di halaman utama yang bersandar pada peraturan.
   const wajib = {
-    'src/pages/Kepengurusan.jsx': 'gudep-231-2007',
-    'src/pages/Sidang.jsx': 'gudep-231-2007',
+    'src/pages/Kepengurusan.jsx': 'gudep-05-2026',
+    'src/pages/Sidang.jsx': 'gudep-05-2026',
     'src/pages/Iuran.jsx': 'iuran-049-1987',
-    'src/pages/DataGudep.jsx': 'nomor-gudep-050-2003',
+    'src/pages/DataGudep.jsx': 'gudep-05-2026',
     'src/pages/Portofolio.jsx': 'garuda-038-2017',
     'src/pages/PesertaSku.jsx': 'sku-penegak-2011',
     'src/pages/Absensi.jsx': 'admin-satuan-041-1995',
     'src/pages/Sangga.jsx': 'polmekbin-176-2013',
-    'src/components/BeritaAcaraSidang.jsx': 'gudep-231-2007',
+    'src/components/BeritaAcaraSidang.jsx': 'gudep-05-2026',
     'src/components/Footer.jsx': 'sku-penegak-2011',
     'src/components/PanelSuratAgama.jsx': 'agama-182-1979',
   };

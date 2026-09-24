@@ -5,7 +5,8 @@
  * komponen SumberPeraturan (src/components/SumberPeraturan.jsx) dengan id dari sini; jangan menulis nomor SK atau alamat berkas langsung di halaman
  * (dijaga uji/peraturan.mjs). Peraturan baru: tambahkan di sini, lalu pakai idnya.
  *
- * Tautan = berkas ASLI pada halaman resmi Kwartir Nasional https://pramuka.or.id/peraturan (tidak menyalin isi peraturan ke repositori).
+ * Tautan = berkas peraturan TERBARU di mana pun tersedia (utamakan pramuka.or.id; bila peraturan baru belum dimuat di situs Kwarnas, pakai berkas yang
+ * ditautkan Kwarda/Kwarcab), harus https. Isi peraturan TIDAK disalin ke repositori.
  * `npm run periksa-peraturan` memeriksa bahwa semua tautan masih hidup (butuh internet; tidak ikut `npm run uji`).
  * Bila suatu berkas hilang dari situs, arahkan `url` ke halaman peraturan dan jelaskan di `catatan` (contoh: SK 273/1993 dan SK 145/2021 berkasnya sudah
  * dihapus dari Google Drive Kwarnas, jadi belum dimasukkan).
@@ -13,7 +14,6 @@
  * Bentuk: { nama: sebutan pendek, judul: judul lengkap, url, catatan? }.
  */
 export const HALAMAN_PERATURAN = 'https://pramuka.or.id/peraturan';
-export const ASAL_TAUTAN_SAH = ['https://pramuka.or.id/', 'https://drive.google.com/file/d/'];
 
 export const PERATURAN = {
   'uu-12-2010': {
@@ -37,10 +37,11 @@ export const PERATURAN = {
     judul: 'Keputusan Kwarnas Nomor 038 Tahun 2017 tentang Petunjuk Penyelenggaraan Pramuka Garuda',
     url: 'https://pramuka.or.id/files/document/SK-038-2017-Jukran-Pramuka-Garuda.pdf',
   },
-  'gudep-231-2007': {
-    nama: 'SK Kwarnas 231/2007',
-    judul: 'Keputusan Kwarnas Nomor 231 Tahun 2007 tentang Petunjuk Penyelenggaraan Gugusdepan Gerakan Pramuka',
-    url: 'https://pramuka.or.id/files/document/Salinan-SK-231-2007-Jukran-Gugusdepan.pdf',
+  'gudep-05-2026': {
+    nama: 'Jukran Kwarnas 05/2026',
+    judul: 'Petunjuk Penyelenggaraan Gerakan Pramuka Nomor 05 Tahun 2026 tentang Peraturan Gugus Depan Gerakan Pramuka',
+    url: 'https://drive.google.com/uc?export=download&id=1CoB-Z58kEarG1gZjpdrMdGPhXLXYWy-4',
+    catatan: 'Ditetapkan 13 Juli 2026; MENCABUT Keputusan Kwarnas Nomor 231 Tahun 2007. Belum dimuat di halaman peraturan Kwarnas; berkas di Google Drive yang ditautkan Kwarda DIY (bppramukadiy.or.id).',
   },
   'polmekbin-176-2013': {
     nama: 'SK Kwarnas 176/2013',
