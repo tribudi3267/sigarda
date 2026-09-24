@@ -11,6 +11,7 @@
     "skema": "node scripts/buat-skema.mjs",
     "periksa": "node scripts/buat-periksa.mjs",
     "profil": "node scripts/profil-muat.mjs",
+    "catatan-rilis": "node scripts/catatan-rilis.mjs",
     "uji": "node uji/jalankan.mjs"
   },
   "dependencies": {

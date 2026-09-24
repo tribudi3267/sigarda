@@ -681,6 +681,8 @@ Edge Function tidak dapat diperiksa dari SQL: barisnya bertanda PERIKSA MANUAL (
 
 Urutan pembaruan: jalankan migrasi lebih dulu (aplikasi lama tetap berjalan), lalu `git push` untuk kode baru.
 
+**Catatan rilis otomatis.** Setiap pull request mendapat satu komentar "Catatan rilis (otomatis)" (`.github/workflows/catatan-rilis.yml`) yang mendaftar migrasi SQL baru (berurutan menurut daftar di atas), Edge Function yang berubah, dan peringatan (mis. skema berubah tanpa migrasi, migrasi lama diubah, migrasi belum tercantum di README). Karena situs terbit otomatis saat digabung ke `main`, kerjakan daftar itu **sebelum menggabungkan**. Pratinjau lokal: `npm run catatan-rilis` (membandingkan dengan `origin/main`; `npm run catatan-rilis -- <dasar> <kepala>` untuk rentang lain). Hanya pengingat: migrasi dan deploy Edge Function tetap dikerjakan pemilik. Uji `catatan-rilis` menjaga setiap berkas `supabase/migrasi` tercantum di README.
+
 ### Uji kinerja dan beban (tahap L2)
 Tiga alat, hanya membaca, untuk mengetahui seberapa cepat SIGARDA terasa di HP siswa dan seberapa dekat pemakaian mendekati batas paket gratis Supabase, SEBELUM uji coba pengguna sungguhan:
 
