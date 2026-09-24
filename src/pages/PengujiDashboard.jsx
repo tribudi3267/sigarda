@@ -9,6 +9,7 @@ import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar'
 import AlihkanModal from '../components/AlihkanModal';
 import RingkasanGudep from '../components/RingkasanGudep';
 import UjiModal from '../components/UjiModal';
+import { menuPraUjiTampil, ujiResmiTampil } from '../lib/praUjiLogic';
 import { Avatar, Badge, BadgePeran, Icon, Kosong, ProgressBar, TeksPoin } from '../components/ui';
 
 /** Baris penugasan tahun ajaran berjalan (rombel dan khusus Penegak) untuk menyaring antrian bersama rombel; dimuat sekali. penugasan null selama belum termuat (aturan lama). */
@@ -20,9 +21,9 @@ function usePenugasanKini() {
 }
 
 function Dashboard({ onNav }) {
-  const { user, users, progress, dokumen } = useApp();
+  const { user, users, progress, dokumen, praUjiAktif, pendampingan } = useApp();
   const { penugasan, penugasanPeserta } = usePenugasanKini();
-  const antrian = antrianPengujian(progress, users, user.id, penugasan, dokumen ?? [], penugasanPeserta);
+  const antrian = antrianPengujian(progress, users, user.id, penugasan, dokumen ?? [], penugasanPeserta, praUjiAktif);
   const menunggu = antrian.filter((a) => a.entry.status === 'diajukan').length;
 
   return (
@@ -32,15 +33,25 @@ function Dashboard({ onNav }) {
         <p className="text-sm text-pramuka-600">Ringkasan SKU, absensi latihan Jumat, dan jurnal portofolio Garuda.</p>
       </div>
 
-      <section className="jahitan mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white p-4">
-        <div>
-          <p className="font-semibold text-pramuka-900">Antrian pengujian SKU</p>
-          <p className="text-sm text-pramuka-600">
-            {menunggu} menunggu, {antrian.length - menunggu} sedang diuji (ditujukan kepada Anda atau antrian rombel Anda)
-          </p>
-        </div>
-        <button className="btn btn-primary btn-sm" onClick={() => onNav('antrian')}>Buka antrian</button>
-      </section>
+      {ujiResmiTampil(user, praUjiAktif) ? (
+        <section className="jahitan mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white p-4">
+          <div>
+            <p className="font-semibold text-pramuka-900">Antrian pengujian SKU</p>
+            <p className="text-sm text-pramuka-600">
+              {menunggu} menunggu, {antrian.length - menunggu} sedang diuji (ditujukan kepada Anda atau antrian rombel Anda)
+            </p>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={() => onNav('antrian')}>Buka antrian</button>
+        </section>
+      ) : (
+        <section className="jahitan mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white p-4">
+          <div>
+            <p className="font-semibold text-pramuka-900">Pra-uji SKU</p>
+            <p className="text-sm text-pramuka-600">Uji resmi hanya dilakukan Pembina. Dewan Ambalan berperan di pra-uji sebagai Pinsa atau Bina Damping.</p>
+          </div>
+          {menuPraUjiTampil(user, pendampingan, praUjiAktif) && <button className="btn btn-primary btn-sm" onClick={() => onNav('pra-uji')}>Buka pra-uji</button>}
+        </section>
+      )}
 
       <ProgresRombel penugasan={penugasan} onNav={onNav} />
 
@@ -50,7 +61,7 @@ function Dashboard({ onNav }) {
 }
 
 function Antrian({ onBuka }) {
-  const { user, users, progress, dokumen } = useApp();
+  const { user, users, progress, dokumen, praUjiAktif } = useApp();
   const [semua, setSemua] = useState(false);
   const [uji, setUji] = useState(null);
   const [alih, setAlih] = useState(null);
@@ -61,7 +72,7 @@ function Antrian({ onBuka }) {
   const rombel = useMemo(() => rombelDariPenugasan(penugasan, user.id), [penugasan, user.id]);
   const [hanyaSaya, setHanyaSaya] = useState(true);
   const batasRombel = semua && hanyaSaya && rombel.length > 0;
-  const antrian = antrianPengujian(progress, users, semua ? null : user.id, penugasan, dokumen ?? [], penugasanPeserta)
+  const antrian = antrianPengujian(progress, users, semua ? null : user.id, penugasan, dokumen ?? [], penugasanPeserta, praUjiAktif)
     .filter((a) => !batasRombel || rombel.includes(a.peserta.kelas));
   const menunggu = antrian.filter((a) => a.entry.status === 'diajukan').length;
 
@@ -93,7 +104,7 @@ function Antrian({ onBuka }) {
       ) : (
         <ul className="panel divide-y divide-pramuka-100">
           {antrian.map(({ peserta, poin, entry, bersama }) => {
-            const boleh = bolehMenilaiPoin(user, poin, { users, peserta, dokumen, penugasan: penugasan ?? [], penugasanPeserta });
+            const boleh = bolehMenilaiPoin(user, poin, { users, peserta, dokumen, penugasan: penugasan ?? [], penugasanPeserta, praUji: praUjiAktif });
             return (
             <li key={`${peserta.id}-${poin.id}`} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 gap-3">
@@ -115,7 +126,7 @@ function Antrian({ onBuka }) {
                 <button
                   className="btn btn-primary btn-sm"
                   disabled={!boleh}
-                  title={boleh ? undefined : pesanTidakBolehMenilai(poin)}
+                  title={boleh ? undefined : pesanTidakBolehMenilai(poin, praUjiAktif)}
                   onClick={() => setUji({ pesertaId: peserta.id, poin })}
                 >
                   Nilai

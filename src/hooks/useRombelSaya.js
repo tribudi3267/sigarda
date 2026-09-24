@@ -5,17 +5,17 @@ import { filterEfektif, rombelSaya, tahunAjaranKini } from '../lib/rombelLogic';
 
 /**
  * Konteks untuk bolehMenilaiPoin: pengguna, surat pengantar, penugasan rombel dan penugasan khusus Penegak tahun ajaran berjalan (dimuat sekali per sesi
- * bila belum ada). Butir Laksana bagi penguji yang bukan Pembina hanya boleh dinilai bila ia ditugaskan untuk Penegak itu.
+ * bila belum ada) dan sakelar pra-uji (hidup: uji resmi hanya Pembina). Butir Laksana bagi penguji yang bukan Pembina hanya boleh dinilai bila ia ditugaskan untuk Penegak itu.
  */
 export function useKonteksMenilai() {
-  const { user, users, dokumen, penugasan, penugasanPeserta, muatPenugasan } = useApp();
+  const { user, users, dokumen, penugasan, penugasanPeserta, muatPenugasan, praUjiAktif } = useApp();
   const ta = tahunAjaranKini();
   const pengurus = user?.role !== 'peserta';
   const termuat = penugasan[ta] != null;
   useEffect(() => { if (pengurus && !termuat) muatPenugasan(ta); }, [pengurus, termuat, ta, muatPenugasan]);
   return useMemo(
-    () => ({ users, dokumen: dokumen ?? [], penugasan: penugasan[ta] ?? [], penugasanPeserta: (penugasanPeserta ?? {})[ta] ?? [] }),
-    [users, dokumen, penugasan, penugasanPeserta, ta]
+    () => ({ users, dokumen: dokumen ?? [], penugasan: penugasan[ta] ?? [], penugasanPeserta: (penugasanPeserta ?? {})[ta] ?? [], praUji: praUjiAktif }),
+    [users, dokumen, penugasan, penugasanPeserta, ta, praUjiAktif]
   );
 }
 

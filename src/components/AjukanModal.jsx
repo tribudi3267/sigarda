@@ -3,9 +3,12 @@ import { useApp } from '../context/AppContext';
 import { hariIni } from '../lib/format';
 import { Field, Modal, TeksPoin } from './ui';
 
-/** Peserta mengagendakan setoran/pengujian satu poin SKU. Daftar penguji dihitung server (penugasan rombel, agama, butir Laksana). */
+/**
+ * Peserta mengagendakan setoran/pengujian satu poin SKU. Pra-uji hidup: pengajuan lebih dulu melewati Pinsa/Bina Damping lalu diuji Pembina (server memilih; tanpa pilihan penguji).
+ * Pra-uji mati: daftar penguji dihitung server (penugasan rombel, agama, butir Laksana).
+ */
 export default function AjukanModal({ poin, onTutup }) {
-  const { ajukan, pengujiPilihan } = useApp();
+  const { ajukan, pengujiPilihan, praUjiAktif } = useApp();
 
   const [pilihan, setPilihan] = useState(null); // null = memuat
   const [galatMuat, setGalatMuat] = useState('');
@@ -16,6 +19,7 @@ export default function AjukanModal({ poin, onTutup }) {
   const [sibuk, setSibuk] = useState(false);
 
   useEffect(() => {
+    if (praUjiAktif) return undefined; // jalur pra-uji ditentukan server; tanpa memilih penguji
     let batal = false;
     pengujiPilihan(poin.id).then((r) => {
       if (batal) return;
@@ -24,7 +28,7 @@ export default function AjukanModal({ poin, onTutup }) {
     });
     return () => { batal = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [poin.id]);
+  }, [poin.id, praUjiAktif]);
 
   const daftar = pilihan?.penguji ?? [];
   const kosong = pilihan && daftar.length === 0;
@@ -33,7 +37,7 @@ export default function AjukanModal({ poin, onTutup }) {
     if (sibuk) return;
     setSibuk(true);
     setGalat('');
-    const hasil = await ajukan({ skuId: poin.id, jadwal, pengujiId: pengujiId || null, catatan });
+    const hasil = await ajukan({ skuId: poin.id, jadwal, pengujiId: praUjiAktif ? null : pengujiId || null, catatan });
     setSibuk(false);
     if (hasil.ok) onTutup();
     else setGalat(hasil.pesan);
@@ -54,7 +58,7 @@ export default function AjukanModal({ poin, onTutup }) {
       aksi={
         <>
           <button className="btn btn-outline" onClick={onTutup}>Batal</button>
-          <button className="btn btn-primary" onClick={kirim} disabled={sibuk || !pilihan || kosong}>{sibuk ? 'Mengirim...' : 'Kirim pengajuan'}</button>
+          <button className="btn btn-primary" onClick={kirim} disabled={sibuk || (!praUjiAktif && (!pilihan || kosong))}>{sibuk ? 'Mengirim...' : 'Kirim pengajuan'}</button>
         </>
       }
     >
@@ -66,6 +70,13 @@ export default function AjukanModal({ poin, onTutup }) {
         <input id="jadwal" type="date" className="input" min={hariIni()} value={jadwal} onChange={(e) => setJadwal(e.target.value)} />
       </Field>
 
+      {praUjiAktif ? (
+        <p className="mb-4 rounded-md bg-pramuka-50 px-3 py-2 text-sm text-pramuka-800">
+          {poin.tingkat === 'Bantara' ? 'Pengajuan diteruskan berjenjang: Pinsa sangga kamu, Bina Damping rombelmu, lalu diuji Pembina.' : 'Pengajuan diteruskan berjenjang: Bina Damping rombelmu yang sudah Laksana, lalu diuji Pembina.'}{' '}
+          Tahap yang tidak punya penilai dilewati otomatis. Kamu diberi tahu di setiap tahap.
+        </p>
+      ) : (
+      <>
       <Field label={label} htmlFor="penguji" bantuan={bantuan}>
         <select id="penguji" className="input" value={pengujiId} onChange={(e) => setPengujiId(e.target.value)} disabled={!pilihan || kosong}>
           {!pilihan && <option value="">{galatMuat ? 'Daftar penguji tidak tersedia' : 'Memuat daftar penguji...'}</option>}
@@ -93,8 +104,10 @@ export default function AjukanModal({ poin, onTutup }) {
         </p>
       )}
       {galatMuat && <p role="alert" className="-mt-2 mb-4 text-sm font-medium text-red-700">{galatMuat}</p>}
+      </>
+      )}
 
-      <Field label="Catatan untuk penguji (opsional)" htmlFor="catatan">
+      <Field label="Catatan untuk penilai dan penguji (opsional)" htmlFor="catatan">
         <textarea id="catatan" rows={3} className="input" value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Contoh: siap praktik di lapangan upacara" />
       </Field>
 

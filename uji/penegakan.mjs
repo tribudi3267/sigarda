@@ -49,7 +49,7 @@ ok((await q('select sigarda.tahun_ajaran_kini() t'))[0].t === ta, `tahunAjaranKi
 ok(tahunAjaranKini('2026-07-01') === '2026/2027' && tahunAjaranKini('2026-06-30') === '2025/2026' && tahunAjaranKini('2027-01-15') === '2026/2027', 'batas Juli dan Juni');
 
 console.log('\n--- Kesetaraan server dan klien: penguji_sah untuk semua Penegak x semua butir, pada beberapa keadaan ---');
-const bandingkan = async (nama) => {
+const bandingkan = async (nama, praUji = false) => {
   U = await users();
   const baris = await penugasanKini();
   const khusus = await penugasanPesertaKini();
@@ -58,14 +58,14 @@ const bandingkan = async (nama) => {
     for (const tingkat of ['Bantara', 'Laksana']) {
       for (const poin of daftarPoin(tingkat, p.agama)) {
         const s = (await q('select o_penguji::text id, o_rombel from sigarda.penguji_sah($1, $2)', [p.id, poin.id]));
-        const c = pengujiSah({ users: U, penugasan: baris, penugasanPeserta: khusus, peserta: p, poin });
+        const c = pengujiSah({ users: U, penugasan: baris, penugasanPeserta: khusus, peserta: p, poin, praUji });
         const idS = s.map((x) => x.id).sort().join(), idC = c.penguji.map((x) => x.id).sort().join();
         const rS = s.length > 0 && s[0].o_rombel;
         n++;
         if (idS !== idC || (s.length > 0 && rS !== c.dariRombel)) { sama = false; console.log('   beda:', p.nama, poin.id, idS, idC, rS, c.dariRombel); }
         for (const u of U.filter((x) => x.role === 'penguji')) {
           const sv = (await q('select sigarda.penguji_peran_ok($1, $2, $3) v', [p.id, u.id, poin.id]))[0].v;
-          if (sv !== pengujiPeranOk(U, p, u, poin, [], { penugasan: baris, penugasanPeserta: khusus })) { sama = false; console.log('   beda peran_ok:', p.nama, poin.id, u.nama); }
+          if (sv !== pengujiPeranOk(U, p, u, poin, [], { penugasan: baris, penugasanPeserta: khusus, praUji })) { sama = false; console.log('   beda peran_ok:', p.nama, poin.id, u.nama); }
         }
       }
     }
@@ -84,6 +84,17 @@ await bandingkan('penugasan diubah (X-01 hanya Dewan, XII-02 dan X-05 hanya Dewa
 await q(`insert into public.penugasan_peserta (tahun_ajaran, peserta_id, penguji_id) values ($1, $2, $3), ($1, $4, $5)`, [ta, rina, pembina, made, dewan]);
 await bandingkan('penugasan khusus Penegak (Rina hanya Pembina, Made hanya Dewan)');
 await q(`delete from public.penugasan_peserta where tahun_ajaran = $1`, [ta]);
+// Sakelar pra-uji hidup (fase D): uji resmi hanya Pembina; klien menyalurkan sakelar itu ke semua aturan penguji
+await q(`insert into public.pengaturan (kunci, nilai) values ('pra_uji.aktif', '{"aktif": true}'::jsonb) on conflict (kunci) do update set nilai = excluded.nilai`);
+await bandingkan('sakelar pra-uji HIDUP (uji resmi hanya Pembina)', true);
+{
+  const sah = pengujiSah({ users: U, penugasan: await penugasanKini(), peserta: U.find((u) => u.id === ahmad), poin: cariPoin('BAN-05'), praUji: true });
+  ok(sah.penguji.length > 0 && sah.penguji.every((u) => u.role === 'penguji' && u.jabatan === 'Pembina'), 'sakelar hidup: penguji sah butir Bantara hanya Pembina (Dewan tersingkir)');
+  ok(antrianPengujian({ [ahmad]: { 'BAN-05': { status: 'diajukan', pengujiId: null, jadwal: hariIni } } }, U, dewan, await penugasanKini(), [], [], true).length === 0 && antrianPengujian({ [ahmad]: { 'BAN-05': { status: 'diajukan', pengujiId: null, jadwal: hariIni } } }, U, pembina, await penugasanKini(), [], [], true).length === 1, 'sakelar hidup: antrian rombel hanya tampil bagi Pembina');
+  ok(!bolehMenilaiPoin({ role: 'penguji', jabatan: 'Dewan Ambalan' }, cariPoin('BAN-05'), { users: U, peserta: U.find((u) => u.id === ahmad), praUji: true }) && bolehMenilaiPoin(U.find((u) => u.id === pembina), cariPoin('BAN-05'), { users: U, peserta: U.find((u) => u.id === ahmad), praUji: true }), 'sakelar hidup: Dewan tidak boleh menilai butir Bantara, Pembina boleh');
+  ok(/hanya dilakukan Pembina/.test(pesanTidakBolehMenilai(cariPoin('BAN-05'), true)), 'pesan penolakan menyebut uji resmi hanya Pembina');
+}
+await q(`delete from public.pengaturan where kunci = 'pra_uji.aktif'`);
 // kembalikan keadaan contoh
 await q(`delete from public.penugasan_rombel where tahun_ajaran = $1 and rombel in ('XII-02', 'X-05')`, [ta]);
 await q(`insert into public.penugasan_rombel (tahun_ajaran, rombel, penguji_id) values ($1, 'X-01', $2) on conflict do nothing`, [ta, pembina]);
