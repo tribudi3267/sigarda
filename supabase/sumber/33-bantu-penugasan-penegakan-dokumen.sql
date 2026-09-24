@@ -94,14 +94,19 @@ language sql stable security definer set search_path = public as
 $$ select exists (select 1 from sigarda.penguji_sah(p_peserta, p_sku) s where s.o_penguji = p_penguji) $$;
 
 -- ---- Dewan Ambalan sebagai atribut Penegak: fungsi bantu (dicerminkan src/lib/rombelLogic.js dan dewanLogic.js; dijaga oleh pengujian) ----
+-- ===== Pra-uji berjenjang (fase C): bisa_menguji =====
 -- Boleh menguji: Pembina, Dewan Ambalan lama (belum diarsipkan), atau Penegak aktif berjabatan Dewan Ambalan. Admin Gudep tidak menguji.
+-- Sakelar pra-uji HIDUP: uji resmi HANYA Pembina (AD/ART Munas 2023 Pasal 33 ayat (6) dan 35 ayat (3)); Dewan Ambalan tidak menguji.
 create function sigarda.bisa_menguji(p_id uuid) returns boolean language sql stable security definer set search_path = public as
 $$
   select exists (
     select 1 from public.profiles
-    where id = p_id and status = 'aktif' and (role = 'penguji' or (role = 'peserta' and jabatan_dewan is not null))
+    where id = p_id and status = 'aktif'
+      and case when sigarda.pra_uji_aktif() then role = 'penguji' and jabatan = 'Pembina'
+               else role = 'penguji' or (role = 'peserta' and jabatan_dewan is not null) end
   )
 $$;
+-- ===== akhir bisa_menguji pra-uji =====
 
 -- Penguji ini DITUGASKAN untuk Penegak ini pada tahun ajaran berjalan? Penugasan khusus Penegak (bila ada) menggantikan penugasan rombelnya.
 create function sigarda.ditugaskan(p_peserta uuid, p_penguji uuid) returns boolean language plpgsql stable security definer set search_path = public as

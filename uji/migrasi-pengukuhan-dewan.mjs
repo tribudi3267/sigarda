@@ -41,7 +41,7 @@ const bandingkan = (nama, pa, pb) => {
   }
 };
 
-const A = await baru(`${P}/supabase/skema.sql`);
+const A = await baru('git:6ad8610'); // skema TEPAT sesudah migrasi ini (main sesudah PR #13 dan #14); skema.sql terbaru sudah memuat tahap sesudahnya (sg_cadangan_admin dengan sku_pra_uji)
 const pa = await potret(A);
 ok(pa.fungsi.length === 9, `skema baru memuat semua fungsi yang terkait (6 public + 3 sigarda): ${pa.fungsi.length}`);
 ok(pa.kolom.length === 8 && pa.batasan.length >= 6, `tabel pengukuhan_dewan: ${pa.kolom.length} kolom, ${pa.batasan.length} batasan`);

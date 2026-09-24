@@ -5,7 +5,7 @@
 import { fmtTanggal, hariIni } from './format';
 
 export const LABEL_JENIS = {
-  ajukan: 'Pengajuan', alih: 'Dialihkan', mulai: 'Pengujian', hasil: 'Hasil', pengingat: 'Pengingat', lama: 'Menunggu lama', sesi: 'Sesi ujian', surat: 'Surat', tes: 'Uji', eskalasi: 'Eskalasi', agenda: 'Agenda', musyawarah: 'Musyawarah Ambalan', kegiatan: 'Usulan Kegiatan',
+  ajukan: 'Pengajuan', alih: 'Dialihkan', mulai: 'Pengujian', hasil: 'Hasil', pengingat: 'Pengingat', lama: 'Menunggu lama', sesi: 'Sesi ujian', surat: 'Surat', tes: 'Uji', eskalasi: 'Eskalasi', agenda: 'Agenda', musyawarah: 'Musyawarah Ambalan', kegiatan: 'Usulan Kegiatan', pra_uji: 'Pra-uji',
 };
 
 /**

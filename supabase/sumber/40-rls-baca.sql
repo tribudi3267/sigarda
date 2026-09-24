@@ -34,6 +34,7 @@ alter table public.penugasan_rombel enable row level security;   -- baca: pengur
 alter table public.penugasan_log enable row level security;
 alter table public.guru_agama enable row level security;
 alter table public.bina_damping enable row level security;   -- tanpa kebijakan: hanya lewat fungsi sg_bina_damping_* dan sg_sangga_*
+alter table public.sku_pra_uji enable row level security;   -- baca: pemilik, penilai, dan pengurus; tulis: hanya fungsi sg_pra_uji_* dan sg_sku_ajukan/batal
 alter table public.penugasan_peserta enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_penugasan_peserta_atur
 alter table public.kepengurusan_log enable row level security;    -- baca: pengurus; tulis: hanya fungsi kepengurusan
 alter table public.pengukuhan_dewan enable row level security;    -- baca: pengurus; tulis: hanya fungsi sg_pengukuhan_dewan_*
@@ -132,6 +133,12 @@ create policy baca_instrumen_penguji on public.instrumen_penguji for select to a
 create policy baca_instrumen_panduan on public.instrumen_panduan for select to authenticated using ((select sigarda.pengurus()));
 create policy baca_penilaian on public.sku_penilaian for select to authenticated
   using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+
+-- ===== Pra-uji berjenjang (fase C): kebijakan =====
+-- Pra-uji: Penegak melihat pengajuannya sendiri, penilai (Pinsa/Bina Damping) yang sudah memutuskan, pengurus semua. Antrian penilai lewat sg_pra_uji_antrian.
+create policy baca_pra_uji on public.sku_pra_uji for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or penilai_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan pra-uji =====
 
 -- Sesi ujian: pengurus melihat semua; Penegak hanya sesi yang mencantumkan dirinya.
 create policy baca_sesi_ujian on public.sesi_ujian for select to authenticated

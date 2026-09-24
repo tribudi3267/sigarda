@@ -86,6 +86,7 @@ create trigger notif_dokumen after insert on public.dokumen_terbit
 -- ===== Agenda tahunan (tahap L6): pengingat ===== (penanda ketiga yang membungkus fungsi SAMA; dipakai migrasi L6)
 -- ===== Usulan Musyawarah Ambalan (tahap L6b): pengingat ===== (penanda keempat, fungsi SAMA; dipakai migrasi L6b)
 -- ===== Usulan kegiatan lain (tahap L6b): pengingat ===== (penanda kelima, fungsi SAMA; dipakai migrasi L6b)
+-- ===== Pra-uji berjenjang (fase C): pengingat ===== (penanda keenam, fungsi SAMA; dipakai migrasi pra-uji)
 -- Pengingat harian (dijalankan pg_cron pukul 07.00 WIB): pengujian dan sesi ujian besok, pengajuan yang menunggu lebih dari 3 hari,
 -- cadangan data yang sudah sebulan tidak diunduh (tahap L4), tangga eskalasi tidak bergerak (tahap L5), agenda tahunan H-30/H-7/H-1
 -- (tahap L6), usulan Musyawarah Ambalan belum terjadwal H-60 lalu tiap 14 hari (tahap L6b), usulan 10 kegiatan lain belum terjadwal
@@ -128,6 +129,7 @@ begin
   perform sigarda.agenda_proses();
   perform sigarda.musyawarah_pengingat();
   perform sigarda.kegiatan_pengingat();
+  perform sigarda.pra_uji_pengingat();
   delete from public.notifikasi where dibuat < now() - interval '90 days';
 end $$;
 -- ===== akhir pengingat cadangan =====
@@ -135,6 +137,7 @@ end $$;
 -- ===== akhir pengingat agenda =====
 -- ===== akhir pengingat usulan musyawarah =====
 -- ===== akhir pengingat usulan kegiatan lain =====
+-- ===== akhir pengingat pra-uji =====
 
 -- Mengantre Web Push: satu permintaan HTTP per pernyataan INSERT (pg_net) ke Edge Function notif-push, hanya untuk penerima yang punya perangkat.
 -- Tanpa konfigurasi (sigarda.push_atur) atau tanpa pg_net tidak ada yang dikirim; Kotak Notifikasi di aplikasi tetap berjalan. Galat push tidak

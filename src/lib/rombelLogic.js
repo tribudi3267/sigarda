@@ -58,14 +58,20 @@ export const geserTahunAjaran = (ta, n) => {
 
 /** Penegak aktif berjabatan Dewan Ambalan (cermin klausa `role = 'peserta' and jabatan_dewan is not null` pada sigarda.pengurus/dewan/bisa_menguji; dijaga uji/paritas-hak.mjs). */
 export const penegakDewan = (u) => !!u && u.role === 'peserta' && !!u.jabatanDewan && (u.status ?? 'aktif') === 'aktif';
-/** Boleh menjadi penguji: penguji aktif (Pembina, atau akun Dewan lama yang belum diarsipkan) atau Penegak berjabatan Dewan (cermin sigarda.bisa_menguji). */
-export const bisaMenguji = (u) => !!u && (u.role === 'penguji' ? (u.status ?? 'aktif') === 'aktif' : penegakDewan(u));
+/**
+ * Boleh menjadi penguji: penguji aktif (Pembina, atau akun Dewan lama yang belum diarsipkan) atau Penegak berjabatan Dewan (cermin sigarda.bisa_menguji).
+ * `praUji` = sakelar pengaturan 'pra_uji.aktif' hidup: uji resmi HANYA Pembina aktif (Dewan Ambalan tidak menguji, hanya pra-uji). Fase D menyalurkan sakelar ini ke
+ * seluruh aturan penguji di klien; sementara itu hanya predikat ini yang punya parameternya (dijaga uji/paritas-hak.mjs).
+ */
+export const bisaMenguji = (u, praUji = false) => !!u && (praUji
+  ? u.role === 'penguji' && u.jabatan === 'Pembina' && (u.status ?? 'aktif') === 'aktif'
+  : u.role === 'penguji' ? (u.status ?? 'aktif') === 'aktif' : penegakDewan(u));
 export const adalahPembina = (u) => !!u && u.role === 'penguji' && u.jabatan === 'Pembina';
 
 /** Pembina lebih dulu, lalu Dewan Ambalan, masing-masing menurut nama. */
 export const daftarPengujiUrut = (users) =>
   users
-    .filter(bisaMenguji)
+    .filter((u) => bisaMenguji(u))
     .sort((a, b) => Number(!adalahPembina(a)) - Number(!adalahPembina(b)) || a.nama.localeCompare(b.nama, 'id'));
 
 /** Himpunan kunci `${pengujiId}|${rombel}` dari daftar [{ rombel, pengujiId }]. */
