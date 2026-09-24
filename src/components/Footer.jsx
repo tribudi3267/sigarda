@@ -3,6 +3,7 @@ import { useGudep } from '../lib/gudepStore';
 import { TINGKAT } from '../data/skuData';
 import { ITEM_PORTOFOLIO } from '../data/portofolioData';
 import { LogoSigarda } from './LogoMark';
+import SumberPeraturan from './SumberPeraturan';
 
 // Jalur SIGARDA: tiga tahap yang diwadahi aplikasi. Jumlah diambil dari data resmi, bukan angka tetap.
 const JALUR = [
@@ -67,7 +68,7 @@ export default function Footer({ ciut = false }) {
           <p>
             &copy; {new Date().getFullYear()} {G.nama}. {APP.nama} v{APP.versi}
           </p>
-          <p>Butir SKU mengacu pada Keputusan Kwarnas No. 198 Tahun 2011, Lampiran III (Golongan Penegak).</p>
+          <SumberPeraturan gelap judul="Butir SKU mengacu pada" rujukan="sku-penegak-2011" className="md:max-w-xl md:text-right" />
         </div>
       </div>
     </footer>

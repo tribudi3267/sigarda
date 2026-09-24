@@ -18,6 +18,7 @@ import LengkapiJenisKelaminModal from '../components/LengkapiJenisKelaminModal';
 import UbahStatusModal from '../components/UbahStatusModal';
 import { LOKAL } from '../lib/supabaseClient';
 import { Avatar, BadgePeran, BadgeStatus, Field, Icon, Kosong, Modal } from '../components/ui';
+import SumberPeraturan from '../components/SumberPeraturan';
 
 const BARU = { role: 'peserta', nama: '', jenisKelamin: '', nis: '', username: '', kelas: '', sangga: '', agama: AGAMA[0], jabatan: '', jabatanDewan: '', pin: '', nta: '' };
 const TAB_PENUGASAN = 'penugasan';
@@ -181,12 +182,13 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
           <Field
             label="Agama"
             htmlFor="f-agama"
-            bantuan="Butir 1 SKU (sub-butir ketakwaan) menyesuaikan agama. Dokumen Kwarnas hanya merinci lima agama; untuk Khonghucu, materi butir 1 ditetapkan Pembina."
+            bantuan="Butir 1 SKU (sub-butir ketakwaan) menyesuaikan agama. Panduan SKU Penegak hanya merinci lima agama; untuk Khonghucu, materi butir 1 ditetapkan Pembina."
           >
             <select id="f-agama" className="input" value={f.agama ?? ''} onChange={set('agama')}>
               {AGAMA.map((a) => <option key={a}>{a}</option>)}
             </select>
           </Field>
+          <SumberPeraturan className="-mt-2 mb-4" ringkas rujukan={[{ id: 'sku-penegak-2011', bagian: 'butir 1 SKU (ketakwaan)' }, 'agama-182-1979']} />
           {agamaBerubah && (
             <p className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-950">
               Mengubah agama mengganti sub-butir pada butir 1. Progres sub-butir agama sebelumnya tidak ikut dihitung.

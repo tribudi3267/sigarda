@@ -8,7 +8,7 @@ import { isiDataContoh } from '../src/lokal/seedLokal.js';
 import { PIN_DEMO } from '../src/lokal/pinDemo.js';
 import { buatApi } from '../src/lib/api.js';
 import {
-  JABATAN_DEWAN, akunDewanLama, daftarPengurusDewan, jabatanDewanSah, ketuaSidang, normalisasiJabatanDewan, pejabatDewan, penandaTanganDewan, rencanaJabatanDewan,
+  JABATAN_DEWAN, JABATAN_TUNGGAL, akunDewanLama, daftarPengurusDewan, jabatanDewanSah, ketuaSidang, normalisasiJabatanDewan, pejabatDewan, penandaTanganDewan, periksaPengukuhan, rencanaJabatanDewan,
 } from '../src/lib/dewanLogic.js';
 import { periksaBaris } from '../src/lib/importAnggota.js';
 
@@ -196,6 +196,99 @@ console.log('\n--- Klien: impor Excel Dewan (jabatan dan NTA) ---');
   ok(!hasil[6].siap && /NTA tidak valid/.test(hasil[6].galat.join()), 'impor Dewan: NTA keliru ditolak');
   const pembina = periksaBaris([{ no: 2, nama: 'Pembina Baru', ...kp, jabatanDewan: 'Pradana' }], users, 'pembina');
   ok(pembina[0].siap && pembina[0].data.jabatanDewan === '', 'impor Pembina: kolom jabatan diabaikan');
+}
+
+console.log('\n--- Fase A: jabatan tunggal dan Pemangku Adat sebagai ketua sidang (cadangan Pradana) ---');
+{
+  ok(JABATAN_TUNGGAL.includes('Pemangku Adat') && JABATAN_DEWAN.includes('Pemangku Adat'), 'klien: Pemangku Adat adalah saran jabatan dan jabatan tunggal');
+  for (const j of ['Pradana', 'Pradani', 'Pemangku Adat', 'Sekretaris', 'Bendahara', 'Wakil Pradana', 'pradana', 'Ketua Bidang']) {
+    const srv = (await q('select sigarda.jabatan_tunggal($1) t', [j]))[0].t;
+    ok(srv === JABATAN_TUNGGAL.includes(j), `jabatan_tunggal("${j}") server = klien (${srv})`);
+  }
+  for (const t of ['pemangku adat', ' PEMANGKU  ADAT ', 'Pemangku Adat', 'pradana', 'PRADANI', 'Kerani', 'Ketua Bidang Kegiatan']) {
+    const srv = (await q('select sigarda.jabatan_baku($1) t', [t]))[0].t;
+    ok(srv === normalisasiJabatanDewan(t), `jabatan_baku("${t}") server = klien ("${srv}")`);
+  }
+  // Pemangku Adat: hanya satu pemegang; yang kedua ditolak; rencana klien mengosongkan pemegang lama
+  let r = await K.admin.a.aturJabatanDewan([{ username: '10008', jabatan: 'pemangku adat' }]);
+  ok(r.ok && (await jabatanDari('10008')) === 'Pemangku Adat', 'Admin mengangkat Pemangku Adat (huruf dibakukan)');
+  r = await K.admin.a.aturJabatanDewan([{ username: '10007', jabatan: 'Pemangku Adat' }]);
+  ok(cocok(r, /Pemangku Adat sudah dijabat oleh/), 'Pemangku Adat kedua ditolak');
+  const rc = rencanaJabatanDewan(await pengguna(), { id: 'x', username: '10007' }, 'Pemangku Adat');
+  ok(rc.menggantikan?.username === '10008' && rc.daftar.length === 2 && rc.daftar[0].jabatan === '', 'klien: rencana mengosongkan pemegang Pemangku Adat lama lebih dulu');
+  r = await K.admin.a.aturJabatanDewan(rc.daftar);
+  ok(r.ok && (await jabatanDari('10007')) === 'Pemangku Adat' && (await jabatanDari('10008')) === null, 'pertukaran Pemangku Adat dalam satu permintaan berhasil');
+  const berkas = await K.pembina.a.terapkanKepengurusan([{ username: '10008', jabatan: 'Pemangku Adat' }, { username: '10007', jabatan: 'Bendahara' }], false, true);
+  ok(berkas.ok && (await jabatanDari('10008')) === 'Pemangku Adat' && (await jabatanDari('10007')) === 'Bendahara', 'berkas Kepengurusan memindahkan Pemangku Adat ke orang lain');
+  const dobel = await K.pembina.a.terapkanKepengurusan([{ username: '10008', jabatan: 'Pemangku Adat' }, { username: '10007', jabatan: 'Pemangku Adat' }], false, false);
+  ok(dobel.ok && dobel.data.galat === 1 && dobel.data.baris[1].hasil === 'galat' && /hanya boleh satu orang/.test(dobel.data.baris[1].pesan.join()), 'berkas dengan dua Pemangku Adat: yang kedua ditolak pada pratinjau');
+
+  // Ketua sidang: Pemangku Adat lebih dulu, lalu Pradana, lalu pengaturan lama; klien sama dengan server
+  await q('delete from public.sidang_dk where peserta_id = $1', [madeId]);
+  let sn2 = await sidang(madeId);
+  const namaPa = (await q(`select nama from public.profiles where username = '10008'`))[0].nama;
+  ok(sn2.ketua_nama === namaPa && sn2.ketua_sebutan === 'Pemangku Adat Dewan Ambalan', 'ketua sidang = Pemangku Adat (bukan Pradana) bila keduanya ada: ' + sn2.ketua_nama);
+  ok(JSON.stringify(ketuaSidang(pejabatDewan(await pengguna()), { namaLama: 'Lama', sebutanLama: 'Sebutan Lama' })) === JSON.stringify({ nama: sn2.ketua_nama, sebutan: sn2.ketua_sebutan }), 'klien (ketuaSidang) sama dengan server: Pemangku Adat lebih dulu');
+  await q(`update public.profiles set status = 'nonaktif' where username = '10008'`);
+  await q('delete from public.sidang_dk where peserta_id = $1', [madeId]);
+  sn2 = await sidang(madeId);
+  ok(sn2.ketua_sebutan === 'Pradana Dewan Ambalan', 'Pemangku Adat nonaktif: cadangannya Pradana');
+  ok(JSON.stringify(ketuaSidang(pejabatDewan(await pengguna()), { namaLama: 'Lama', sebutanLama: 'Sebutan Lama' })) === JSON.stringify({ nama: sn2.ketua_nama, sebutan: sn2.ketua_sebutan }), 'klien sama dengan server: cadangan Pradana');
+  await q(`update public.profiles set status = 'aktif' where username = '10008'`);
+  await K.admin.a.aturJabatanDewan([{ username: '10008', jabatan: '' }, { username: '10007', jabatan: '' }]);
+  await K.admin.a.aturJabatanDewan([{ username: '10119', jabatan: 'Pradana' }]);
+}
+
+console.log('\n--- Fase A: pengukuhan Dewan Ambalan oleh Kwartir Ranting (server = klien) ---');
+{
+  const hari = (await q('select sigarda.hari_ini()::text h'))[0].h;
+  const geser = (t, n) => { const d = new Date(t + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const dasar = { tahunAjaran: '2026/2027', nomorSk: '188.4/123/2026', tanggalSk: '2026-08-15', rekomNomor: '', rekomTanggal: '', catatan: '' };
+  const kasus = [
+    ['sah: hanya SK', dasar],
+    ['sah: SK dan rekomendasi', { ...dasar, rekomNomor: 'Mabigus/07/2026', rekomTanggal: '2026-08-01' }],
+    ['sah: rekomendasi sama dengan tanggal SK', { ...dasar, rekomNomor: 'M/1', rekomTanggal: '2026-08-15' }],
+    ['sah: tanggal SK hari ini', { ...dasar, tanggalSk: hari }],
+    ['sah: nomor 80 karakter dan catatan 200', { ...dasar, nomorSk: 'x'.repeat(80), catatan: 'c'.repeat(200) }],
+    ['sah: spasi ganda dirapikan', { ...dasar, nomorSk: '  188   /1  ' }],
+    ['tahun ajaran salah (lompat dua tahun)', { ...dasar, tahunAjaran: '2026/2028' }],
+    ['tahun ajaran salah (pemisah)', { ...dasar, tahunAjaran: '2026-2027' }],
+    ['nomor SK kosong', { ...dasar, nomorSk: '   ' }],
+    ['nomor SK 81 karakter', { ...dasar, nomorSk: 'x'.repeat(81) }],
+    ['nomor SK memuat <', { ...dasar, nomorSk: '188<1' }],
+    ['nomor SK memuat karakter kendali', { ...dasar, nomorSk: '188\u00011' }],
+    ['tanggal SK di masa depan', { ...dasar, tanggalSk: geser(hari, 1) }],
+    ['tanggal SK sebelum 2000', { ...dasar, tanggalSk: '1999-12-31' }],
+    ['rekomendasi hanya nomor', { ...dasar, rekomNomor: 'M/1' }],
+    ['rekomendasi hanya tanggal', { ...dasar, rekomTanggal: '2026-08-01' }],
+    ['rekomendasi sesudah SK', { ...dasar, rekomNomor: 'M/1', rekomTanggal: '2026-08-16' }],
+    ['rekomendasi sebelum 2000', { ...dasar, rekomNomor: 'M/1', rekomTanggal: '1999-01-01' }],
+    ['nomor rekomendasi 81 karakter', { ...dasar, rekomNomor: 'r'.repeat(81), rekomTanggal: '2026-08-01' }],
+    ['catatan 201 karakter', { ...dasar, catatan: 'c'.repeat(201) }],
+  ];
+  let cocokSemua = true;
+  for (const [nama, d] of kasus) {
+    const klien = Object.keys(periksaPengukuhan(d, hari)).length === 0;
+    const srv = await sebagai(pembinaId, 'select public.sg_pengukuhan_dewan_simpan($1, $2, $3::date, $4, $5::date, $6)', [d.tahunAjaran, d.nomorSk, d.tanggalSk, d.rekomNomor, d.rekomTanggal || null, d.catatan]);
+    const sama = klien === srv.ok;
+    if (!sama) cocokSemua = false;
+    ok(sama, `pengukuhan "${nama}": klien ${klien ? 'sah' : 'ditolak'} = server ${srv.ok ? 'sah' : 'ditolak (' + (srv.pesan ?? '').slice(0, 60) + ')'}`);
+  }
+  ok(cocokSemua, 'semua kasus pengukuhan: aturan klien (periksaPengukuhan) sama dengan server');
+
+  // Hak: hanya Pembina dan Admin
+  const dw = await sebagai(K.dewan.id, 'select public.sg_pengukuhan_dewan_simpan($1, $2, $3::date, $4, $5::date, $6)', ['2026/2027', '1', '2026-08-15', '', null, '']);
+  ok(!dw.ok && /Hanya Pembina dan Admin Gudep/.test(dw.pesan ?? ''), 'Dewan tidak dapat mencatat pengukuhan');
+  const pn = await sebagai(K.ahmad.id, 'select public.sg_pengukuhan_dewan_simpan($1, $2, $3::date, $4, $5::date, $6)', ['2026/2027', '1', '2026-08-15', '', null, '']);
+  ok(!pn.ok && /Hanya Pembina dan Admin Gudep/.test(pn.pesan ?? ''), 'Penegak tidak dapat mencatat pengukuhan');
+  ok((await K.admin.a.simpanPengukuhanDewan({ ...dasar, nomorSk: 'ADM/1' })).ok, 'Admin dapat mencatat pengukuhan (lewat api klien)');
+  const baca = await K.pembina.a.muatPengukuhanDewan();
+  ok(baca.ok && baca.data.length === 1 && baca.data[0].tahunAjaran === '2026/2027' && baca.data[0].nomorSk === 'ADM/1' && baca.data[0].tanggalSk === '2026-08-15' && baca.data[0].rekomTanggal === '', 'muatPengukuhanDewan: pemetaan ke bentuk halaman (tanggal ISO, rekomendasi kosong)');
+  ok((await K.ahmad.a.muatPengukuhanDewan()).data?.length === 0, 'Penegak biasa tidak membaca catatan pengukuhan (RLS)');
+  ok((await K.dewan.a.muatPengukuhanDewan()).data?.length === 1, 'Dewan (pengurus) dapat membaca catatan pengukuhan');
+  ok(cocok(await K.dewan.a.hapusPengukuhanDewan('2026/2027'), /Hanya Pembina dan Admin Gudep/), 'Dewan tidak dapat menghapus catatan pengukuhan');
+  ok(cocok(await K.pembina.a.hapusPengukuhanDewan('2030/2031'), /Belum ada catatan pengukuhan/), 'menghapus tahun ajaran yang tidak ada ditolak');
+  ok((await K.pembina.a.hapusPengukuhanDewan('2026/2027')).ok && (await q('select count(*)::int n from public.pengukuhan_dewan'))[0].n === 0, 'Pembina menghapus catatan pengukuhan');
 }
 
 console.log(`\nRINGKASAN JABATAN-DEWAN: ${lulus} lulus, ${gagal} GAGAL`);

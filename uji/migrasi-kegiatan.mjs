@@ -20,7 +20,7 @@ const potret = async (db) => {
   return {
     fungsi: await q(`select n.nspname, p.proname, pg_get_function_identity_arguments(p.oid) args, p.prosecdef, p.provolatile, pg_get_function_result(p.oid) hasil, md5(p.prosrc) badan
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-      where (n.nspname = 'public' and p.proname in ('sg_kegiatan_usul','sg_kegiatan_tinjau','sg_kegiatan_ping','sg_cadangan_admin','sg_agenda_simpan'))
+      where (n.nspname = 'public' and p.proname in ('sg_kegiatan_usul','sg_kegiatan_tinjau','sg_kegiatan_ping','sg_agenda_simpan'))
          or (n.nspname = 'sigarda' and p.proname in ('pembina_saja','pradana_atau_pradani','kegiatan_judul_bawaan','kegiatan_bulan_tanggal','musyawarah_pengingat','kegiatan_pengingat','notif_pengingat'))
       order by 1, 2`),
     hakFungsi: await q(`select routine_schema, routine_name, grantee, privilege_type from information_schema.role_routine_grants
@@ -39,9 +39,10 @@ const bandingkan = (nama, pa, pb) => {
 };
 
 // Skema "sesudah" = skema.sql terbaru (migrasi ini adalah yang paling baru; belum ada migrasi lagi sesudahnya).
-const A = await baru(`${P}/supabase/skema.sql`);
+const A = await baru('git:90cb914');
 const pa = await potret(A);
-ok(pa.fungsi.length === 12, `skema baru memuat semua fungsi usulan kegiatan (5 public + 7 sigarda): ${pa.fungsi.length}`);
+// sg_cadangan_admin tidak ikut dibandingkan di sini: migrasi Fase A (pengukuhan-dewan) menulis ulangnya lagi; isinya dicek pada pemeriksaan perilaku di bawah.
+ok(pa.fungsi.length === 11, `skema baru memuat semua fungsi usulan kegiatan (4 public + 7 sigarda): ${pa.fungsi.length}`);
 ok(pa.hakFungsi.filter((x) => x.grantee === 'authenticated').length === 3, 'ketiga fungsi sg_kegiatan_* dapat dipanggil authenticated');
 ok(pa.kebijakan.length === 1 && pa.kebijakan[0].cmd === 'SELECT', 'kebijakan baca_kegiatan_usulan ada (SELECT saja, tulis hanya lewat fungsi)');
 ok(pa.batasanNotif.length === 1 && /'kegiatan'/.test(pa.batasanNotif[0].def), 'batasan notifikasi_jenis_check memuat "kegiatan"');

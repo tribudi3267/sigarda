@@ -14,6 +14,7 @@ import { useIuranTanggal } from '../hooks/useIuran';
 import PilihNominal from '../components/PilihNominal';
 import { NOMINAL_TOMBOL, rupiah } from '../lib/iuranLogic';
 import { Avatar, BadgeAbsen, BadgePeran, Icon, Kosong, MuatAbsensi, ProgressBar } from '../components/ui';
+import SumberPeraturan from '../components/SumberPeraturan';
 
 const KOTAK = 'inline-flex h-6 w-6 items-center justify-center rounded text-xs font-bold ring-1 ring-inset';
 
@@ -43,6 +44,13 @@ export function AbsensiPeserta() {
         <div>
           <h1 className="text-2xl font-bold">Absensi latihan Jumat</h1>
           <p className="text-sm text-pramuka-600">Kehadiran latihan rutin ambalan setiap hari Jumat, dicatat oleh pengurus.</p>
+          <SumberPeraturan
+            className="mt-1"
+            rujukan={[
+              { id: 'admin-satuan-041-1995', bagian: 'daftar hadir latihan (buku administrasi ambalan)' },
+              { id: 'sku-penegak-2011', bagian: 'SKU Bantara dan Laksana butir 5 (kehadiran pertemuan ambalan)' },
+            ]}
+          />
         </div>
         <PilihPeriode nilai={per} ubah={setPer} />
       </div>

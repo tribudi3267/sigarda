@@ -10,6 +10,7 @@ import PortofolioChecklist from '../components/PortofolioChecklist';
 import RekapKesiapan, { JurnalTerbaru } from '../components/RekapKesiapan';
 import { TampilanBerkasGaruda } from '../components/BerkasGaruda';
 import { Avatar, Icon, Kosong, ProgressBar } from '../components/ui';
+import SumberPeraturan from '../components/SumberPeraturan';
 
 function Detail({ pesertaId, onKembali, onBukaSku }) {
   const { daftarPesertaSemua: daftarPeserta } = useApp();
@@ -100,6 +101,12 @@ export default function PortofolioPengurus({ fokusId, onBuka, onKembali, onBukaS
         <div>
           <h1 className="text-2xl font-bold">Portofolio Penegak Garuda</h1>
           <p className="text-sm text-pramuka-600">Rekap kesiapan 26 dokumen portofolio seluruh Calon Garuda.</p>
+          <SumberPeraturan
+            className="mt-1"
+            rujukan={[
+              { id: 'garuda-038-2017', bagian: 'Bab II butir 1c (syarat Penegak Garuda), Bab IV (tim penilai), Bab VII (penetapan oleh Ketua Kwarcab)' },
+            ]}
+          />
         </div>
         <button className="btn btn-gold btn-sm" onClick={unduh} disabled={mengunduh || rekap.length === 0}>
           <Icon nama="unduh" className="h-4 w-4" /> {mengunduh ? 'Menyiapkan...' : 'Unduh Excel (.xlsx)'}

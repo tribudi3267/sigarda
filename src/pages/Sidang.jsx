@@ -11,6 +11,7 @@ import { ketuaSidang, pejabatDewan } from '../lib/dewanLogic';
 import BeritaAcaraSidang from '../components/BeritaAcaraSidang';
 import FilterBar, { FILTER_AWAL, terapkanFilter } from '../components/FilterBar';
 import { Avatar, Badge, Icon, Kosong, Modal, ProgressBar } from '../components/ui';
+import SumberPeraturan from '../components/SumberPeraturan';
 
 const CHIP = 'inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset';
 const BATAS_DAFTAR = 30;
@@ -436,9 +437,9 @@ function PengaturanSidang() {
   const [mode, setMode] = useState(awalUrai ? 'pilihan' : 'manual');
   const [pilih, setPilih] = useState(awalUrai ?? PILIHAN_AWAL);
   const [formatManual, setFormatManual] = useState(awal.format);
-  // Ketua sidang = anggota Dewan Ambalan berjabatan Pradana (diatur Admin di menu Anggota); pengaturan lama hanya cadangan bila belum ada Pradana
-  const pradana = pejabatDewan(users).pradana;
-  const ketua = ketuaSidang({ pradana }, { namaLama: awal.namaKetua, sebutanLama: awal.sebutanKetua });
+  // Ketua sidang = anggota Dewan Ambalan berjabatan Pemangku Adat (ketua Dewan Kehormatan; diatur di menu Kepengurusan); cadangannya Pradana, lalu pengaturan lama
+  const pejabat = pejabatDewan(users);
+  const ketua = ketuaSidang(pejabat, { namaLama: awal.namaKetua, sebutanLama: awal.sebutanKetua });
   const [proses, setProses] = useState(false);
   const tahunIni = Number(hariIni().slice(0, 4));
   const [tahunUrut, setTahunUrut] = useState(tahunIni);
@@ -612,9 +613,10 @@ function PengaturanSidang() {
       <section className="panel mb-4 p-4">
         <h2 className="text-base font-bold">Tanda tangan</h2>
         <p className="mt-2 text-sm text-pramuka-700">
-          Ketua sidang pada berita acara adalah anggota Dewan Ambalan yang berjabatan <b>Pradana</b>. Jabatan diatur oleh Admin Gudep di menu <b>Anggota</b>{' '}
-          (ubah anggota Dewan Ambalan; mis. pada pergantian pengurus tahun ajaran baru); berita acara yang sudah dibuat tetap memuat nama saat sidang dicatat.
-          {!pradana.nama && ' Belum ada anggota Dewan Ambalan yang berjabatan Pradana, jadi dipakai pengaturan lama (nama kosong dicetak garis untuk tanda tangan).'}
+          Ketua sidang pada berita acara adalah anggota Dewan Ambalan yang berjabatan <b>Pemangku Adat</b> (ketua Dewan Kehormatan). Jabatan diatur oleh Pembina atau Admin Gudep di menu <b>Kepengurusan</b>{' '}
+          (mis. pada pergantian pengurus tahun ajaran baru); berita acara yang sudah dibuat tetap memuat nama saat sidang dicatat.
+          {!pejabat.pemangkuAdat.nama && pejabat.pradana.nama && ' Belum ada anggota yang berjabatan Pemangku Adat, jadi sementara dipakai Pradana.'}
+          {!pejabat.pemangkuAdat.nama && !pejabat.pradana.nama && ' Belum ada anggota yang berjabatan Pemangku Adat maupun Pradana, jadi dipakai pengaturan lama (nama kosong dicetak garis untuk tanda tangan).'}
         </p>
 
         <div className="mt-4 rounded-lg bg-pramuka-50 px-3 py-3 text-center text-sm">
@@ -705,6 +707,14 @@ export default function Sidang() {
       <p className="mb-4 text-sm text-pramuka-600">
         Keputusan Lulus atau Tidak Lulus SKU untuk pelantikan (Layak dan Lulus, atau Ditunda / Remedi), lengkap dengan berita acara siap cetak.
       </p>
+      <SumberPeraturan
+        className="mb-4"
+        rujukan={[
+          { id: 'gudep-05-2026', bagian: 'Pasal 24 ayat (15) (Dewan Kehormatan Penegak diketuai Pemangku Adat, Pembina sebagai penasihat)' },
+          { id: 'polmekbin-176-2013', bagian: 'butir 6 (mekanisme pembinaan) dan butir 7 c (Dewan Kehormatan Penegak)' },
+          { id: 'sku-penegak-2011', bagian: 'Bab V butir 2 (upacara pelantikan kenaikan tingkat)' },
+        ]}
+      />
 
       <div role="tablist" aria-label="Menu sidang" className="mb-4 inline-flex rounded-lg bg-pramuka-100 p-1">
         {TAB.map(([k, v]) => (

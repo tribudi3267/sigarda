@@ -37,7 +37,10 @@ dan mencatat bukti kesamaannya. Diperbarui setiap ada cermin baru.
 | Skor instrumen | `instrumenLogic.hitungSkorInstrumen` | `sigarda.instrumen_hitung` | tampilan (server menghitung ulang) | `instrumen` (JS = SQL) |
 | Iuran (rekap, saran nilai butir SKU) | `iuranLogic` (hanya merekap dan menampilkan) | `sg_iuran_ringkas`, `sigarda.iuran_*` (server yang menghitung) | tampilan | `iuran-sku` (server), `iuran-klien` (rekap klien pada data tetap) |
 | Aturan isian Data Gudep | `gudepLogic.periksaGudep` | `sg_gudep_simpan` | validasi | `gudep` |
-| Ketua sidang | `dewanLogic.ketuaSidang` | `sigarda.ketua_sidang` | tampilan | `jabatan-dewan` (nilai tetap; server diuji terpisah) |
+| Jabatan tunggal Dewan (Pradana, Pradani, Pemangku Adat) dan pembakuan jabatan | `dewanLogic.JABATAN_TUNGGAL`, `normalisasiJabatanDewan` | `sigarda.jabatan_tunggal`, `sigarda.jabatan_baku`, indeks `profil_pradana_pradani_unik` | tampilan (server menegakkan lewat indeks unik) | `jabatan-dewan` (dibandingkan langsung dengan SQL), `migrasi-pengukuhan-dewan` |
+| Ketua sidang (Pemangku Adat, cadangan Pradana, lalu pengaturan lama) | `dewanLogic.ketuaSidang` | `sigarda.ketua_sidang` | tampilan (nama disalin ke catatan sidang oleh server) | `jabatan-dewan` (klien dibandingkan dengan server pada tiga keadaan) |
+| Isian pengukuhan Dewan oleh Kwartir Ranting (nomor SK, tanggal, rekomendasi berpasangan, batas panjang, tanggal tidak di masa depan WIB) | `dewanLogic.periksaPengukuhan` | `sg_pengukuhan_dewan_simpan` | tampilan | `jabatan-dewan` (20 kasus dibandingkan langsung dengan SQL) |
+| Rujukan peraturan (judul dan tautan berkas asli) | `data/peraturanData.js` + `peraturanLogic.js` (klien saja; tidak ada cermin server) | - | dokumentasi | `peraturan` (id dikenal, asal tautan sah, halaman tidak menulis nomor SK/alamat sendiri); tautan hidup: `npm run periksa-peraturan` |
 | Eskalasi (tingkat, label) | `eskalasiLogic` | `sigarda.eskalasi_*` | tampilan (server menghitung dan mengirim) | `eskalasi` |
 | Jenis notifikasi | `notifikasiLogic.LABEL_JENIS` | batasan tabel `notifikasi` | tampilan | `notifikasi-klien` |
 | `bolehDihubungi` (tombol WhatsApp) | `eskalasiLogic.bolehDihubungi` | tidak ada (sengaja klien saja) | tampilan | aman: data profil sudah terbaca pengurus lewat RLS |

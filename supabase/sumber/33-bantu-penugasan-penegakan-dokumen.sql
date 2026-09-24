@@ -116,11 +116,16 @@ begin
     select 1 from public.penugasan_rombel where tahun_ajaran = sigarda.tahun_ajaran_kini() and rombel = v_kelas and penguji_id = p_penguji);
 end $$;
 
--- Jabatan Dewan tanpa selisih huruf: "pradana" -> "Pradana", "PRADANI" -> "Pradani"; selain itu spasi dirapikan dan ditulis apa adanya.
+-- ===== Jabatan tunggal dan ketua sidang (Fase A): bantu =====
+-- Jabatan Dewan tanpa selisih huruf: "pradana" -> "Pradana", "PRADANI" -> "Pradani", "pemangku  ADAT" -> "Pemangku Adat"; selain itu spasi dirapikan dan ditulis apa adanya.
 create function sigarda.jabatan_baku(p_teks text) returns text language sql immutable as
 $$
-  select case lower(sigarda.rapikan(p_teks)) when 'pradana' then 'Pradana' when 'pradani' then 'Pradani' else sigarda.rapikan(p_teks) end
+  select case lower(sigarda.rapikan(p_teks)) when 'pradana' then 'Pradana' when 'pradani' then 'Pradani' when 'pemangku adat' then 'Pemangku Adat' else sigarda.rapikan(p_teks) end
 $$;
+-- Jabatan yang hanya boleh dipegang satu anggota (cermin JABATAN_TUNGGAL di src/lib/dewanLogic.js; dijaga oleh pengujian).
+create function sigarda.jabatan_tunggal(p_jabatan text) returns boolean language sql immutable as
+$$ select p_jabatan in ('Pradana', 'Pradani', 'Pemangku Adat') $$;
+-- ===== akhir bantu jabatan tunggal =====
 
 -- Mencabut jabatan Dewan dari satu anggota (Penegak, atau akun Dewan lama) dan merapikan akibatnya: penugasan sebagai penguji dihapus (tercatat) dan
 -- pengajuan uji yang menunggu dan ditujukan kepadanya kembali ke antrian rombel. Pengujian yang sedang berjalan ("proses") dibiarkan
@@ -149,6 +154,80 @@ begin
 end $$;
 -- ---- akhir bantu dewan penegak ----
 -- ---- akhir bantu penegakan ----
+
+-- ---- Pinsa dan Bina Damping (fase B): fungsi bantu ----
+-- Tingkat SKU seorang Penegak untuk penunjukan pendamping: 'calon-bantara' (butir Bantara belum semua lulus), 'calon-laksana' (Bantara selesai),
+-- 'laksana' (Bantara dan Laksana selesai).
+create function sigarda.tingkat_penegak(p_id uuid) returns text language sql stable security definer set search_path = public as
+$$
+  select case when not sigarda.tingkat_selesai(p_id, 'Bantara') then 'calon-bantara'
+              when not sigarda.tingkat_selesai(p_id, 'Laksana') then 'calon-laksana'
+              else 'laksana' end
+$$;
+
+-- Pemanggil adalah Bina Damping (aktif) untuk rombel ini pada tahun ajaran berjalan.
+create function sigarda.bina_damping_rombel(p_rombel text) returns boolean language plpgsql stable security definer set search_path = public as
+$$
+begin
+  return coalesce((select p.role = 'peserta' and p.status = 'aktif' and not p.wajib_ganti_pin
+                     and exists (select 1 from public.bina_damping b where b.penegak_id = p.id and b.rombel = p_rombel and b.tahun_ajaran = sigarda.tahun_ajaran_kini())
+                   from public.profiles p where p.id = auth.uid()), false);
+end $$;
+
+-- Boleh membagi sangga dan menentukan Pinsa di rombel ini: Pembina, Admin, atau Bina Damping rombel itu.
+create function sigarda.sangga_bisa_atur(p_rombel text) returns boolean language sql stable security definer set search_path = public as
+$$ select sigarda.pembina_atau_admin() or sigarda.bina_damping_rombel(p_rombel) $$;
+
+-- Peringatan (tidak memblokir) tentang susunan sangga sebuah rombel: [{ "sangga": nama atau null, "teks": ... }]. Batas: 2 Bina Damping, 4-5 sangga
+-- per rombel, 4-8 Penegak per sangga, dan tiap sangga punya Pinsa. Rombel tanpa anggota aktif tidak diperingatkan soal sangga.
+create function sigarda.sangga_peringatan(p_rombel text) returns jsonb language plpgsql stable security definer set search_path = public as
+$$
+declare v_p jsonb := '[]'::jsonb; v_r record; v_sangga int := 0; v_bd int;
+begin
+  select count(*) into v_bd from public.bina_damping where tahun_ajaran = sigarda.tahun_ajaran_kini() and rombel = p_rombel;
+  if v_bd < 2 then
+    v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', null, 'teks', format('Bina Damping rombel ini baru %s dari 2 orang.', v_bd)));
+  end if;
+  for v_r in
+    select min(sangga) as nama, count(*)::int as n, bool_or(pinsa) as ada_pinsa from public.profiles
+    where role = 'peserta' and status = 'aktif' and kelas = p_rombel group by lower(sangga) order by lower(sangga)
+  loop
+    v_sangga := v_sangga + 1;
+    if v_r.n < 4 or v_r.n > 8 then
+      v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', v_r.nama, 'teks', format('Sangga %s beranggotakan %s Penegak (seharusnya 4 sampai 8).', v_r.nama, v_r.n)));
+    end if;
+    if not v_r.ada_pinsa then
+      v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', v_r.nama, 'teks', format('Sangga %s belum punya Pinsa.', v_r.nama)));
+    end if;
+  end loop;
+  if v_sangga > 0 and (v_sangga < 4 or v_sangga > 5) then
+    v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', null, 'teks', format('Rombel ini punya %s sangga (seharusnya 4 sampai 5).', v_sangga)));
+  end if;
+  return v_p;
+end $$;
+
+-- Pinsa hilang sendiri bila Penegak pindah rombel atau sangga, atau tidak lagi aktif (jalur apa pun yang mengubahnya, termasuk naik kelas).
+create function sigarda.pinsa_bersihkan() returns trigger language plpgsql set search_path = public as
+$$
+begin
+  if new.pinsa and (new.role <> 'peserta' or new.status <> 'aktif' or new.kelas is distinct from old.kelas
+                    or lower(coalesce(new.sangga, '')) is distinct from lower(coalesce(old.sangga, ''))) then
+    new.pinsa := false;
+  end if;
+  return new;
+end $$;
+create trigger profiles_pinsa_bersih before update on public.profiles for each row execute function sigarda.pinsa_bersihkan();
+
+-- Bina Damping berakhir bila Penegaknya nonaktif/alumni atau tidak lagi berjabatan Dewan (dicabut, atau kepengurusan diganti).
+create function sigarda.bina_damping_bersihkan() returns trigger language plpgsql security definer set search_path = public as
+$$
+begin
+  delete from public.bina_damping where penegak_id = new.id;
+  return null;
+end $$;
+create trigger profiles_bina_damping_bersih after update of status, jabatan_dewan, role on public.profiles for each row
+  when (new.status <> 'aktif' or new.jabatan_dewan is null or new.role <> 'peserta') execute function sigarda.bina_damping_bersihkan();
+-- ---- akhir bantu pinsa bina damping ----
 
 -- ---- Dokumen terbit: fungsi bantu (dicerminkan src/lib/dokumenLogic.js suratAgamaAktif; dijaga oleh pengujian) ----
 -- Ada surat pengantar agama yang belum dicabut untuk Penegak ini dan memuat butir (unit) itu?

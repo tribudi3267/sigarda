@@ -16,6 +16,7 @@ import { Modal } from './components/ui';
 import { parameterVerifikasi } from './lib/verifikasiLogic';
 import { parameterBerkasGaruda } from './lib/garudaLogic';
 import { pembinaAtauAdmin } from './lib/hakLogic';
+import { menuSanggaTampil } from './lib/sanggaLogic';
 import { bolehKelolaMateri } from './lib/materiLogic';
 import LogoMark from './components/LogoMark';
 
@@ -44,6 +45,7 @@ const Notifikasi = lazy(() => import('./pages/Notifikasi'));
 const PemeriksaanData = lazy(() => import('./pages/PemeriksaanData'));
 const TindakLanjut = lazy(() => import('./pages/TindakLanjut'));
 const Agenda = lazy(() => import('./pages/Agenda'));
+const Sangga = lazy(() => import('./pages/Sangga'));
 const Laporan = lazy(() => import('./pages/Laporan'));
 const Bantuan = lazy(() => import('./pages/Bantuan'));
 
@@ -51,14 +53,14 @@ const Bantuan = lazy(() => import('./pages/Bantuan'));
  * Menu per peran, dikelompokkan menurut fungsinya (tampil sebagai kelompok di menu samping, dan berurutan di menu bawah ponsel).
  *  Utama            : Dashboard (Penegak: Beranda atau Garuda), Notifikasi (semua peran; lencana = belum dibaca), Bantuan (tahap L10, semua peran)
  *  Pengujian SKU    : Penegak: Poin SKU, Cetak. Dewan/Pembina: Antrian, Peserta, Sesi, Instrumen, Penugasan, Pengurus (Pembina), Periksa Data (Dewan dan Pembina), Sidang, Cetak. Admin: Sesi, Instrumen, Sidang, Cetak
- *  Kegiatan Ambalan : Absensi, Iuran, Agenda (tahap L6, semua peran), Portofolio, Tindak Lanjut (tahap L5, pengurus), Raport dan Laporan (tahap L8, Pembina dan Admin)
+ *  Kegiatan Ambalan : Absensi, Iuran, Agenda (tahap L6, semua peran), Sangga (fase B; pengurus, dan Penegak yang menjadi Bina Damping), Portofolio, Tindak Lanjut (tahap L5, pengurus), Raport dan Laporan (tahap L8, Pembina dan Admin)
  *  Materi           : Materi, Kelola Materi (Pembina dan Admin)
  *  Pengelolaan      : Anggota, Pengurus, Naik Kelas, Data Gudep, Periksa Data (Admin). Menu Pengurus (Kepengurusan Dewan Ambalan) juga untuk Pembina (di Pengujian SKU).
  * Periksa Data (tahap L3; Pembina, Dewan Ambalan, dan Admin): ringkasan masalah kualitas data umum (lihat src/lib/pemeriksaanLogic.js).
  * Dewan Ambalan = jabatan pada akun Penegak: pemegangnya memilih tampilan Penegak atau Dewan (user.role berubah menjadi 'penguji' pada tampilan Dewan).
  * Akun saya dan Reset PIN anggota (pengurus) tidak ada di daftar ini: keduanya di menu akun (nama pengguna di menu samping atau header).
  */
-function buatNav(user, peran, belumDibaca = 0) {
+function buatNav(user, peran, belumDibaca = 0, pendampingan = null) {
   const materi = { id: 'materi', label: 'Materi', ikon: 'buku' };
   const kelola = { id: 'kelolamateri', label: 'Kelola Materi', ikon: 'pustaka' };
   const raport = { id: 'raport', label: 'Raport', ikon: 'raport' };
@@ -75,6 +77,8 @@ function buatNav(user, peran, belumDibaca = 0) {
   const pemeriksaan = { id: 'pemeriksaan', label: 'Periksa Data', ikon: 'cari' };
   const tindakLanjut = { id: 'tindaklanjut', label: 'Tindak Lanjut', ikon: 'lonceng' };
   const agenda = { id: 'agenda', label: 'Agenda', ikon: 'kalender' };
+  const sangga = { id: 'sangga', label: 'Sangga', ikon: 'anggota' };
+  const adaSangga = menuSanggaTampil(user, pendampingan);
   const kelolaBoleh = bolehKelolaMateri(user);
   const notifikasi = { id: 'notifikasi', label: 'Notifikasi', ikon: 'lonceng', lencana: belumDibaca };
   const bantuan = { id: 'bantuan', label: 'Bantuan', ikon: 'tanya' };
@@ -83,7 +87,7 @@ function buatNav(user, peran, belumDibaca = 0) {
     return [
       { judul: 'Utama', item: [peran === 'calon-garuda' ? { id: 'beranda', label: 'Garuda', ikon: 'bintang' } : { id: 'beranda', label: 'Beranda', ikon: 'beranda' }, notifikasi, bantuan] },
       { judul: 'Pengujian SKU', item: [{ id: 'sku', label: 'Poin SKU', ikon: 'daftar' }, cetak] },
-      { judul: 'Kegiatan Ambalan', item: [absensi, iuran, agenda] },
+      { judul: 'Kegiatan Ambalan', item: [absensi, iuran, agenda, ...(adaSangga ? [sangga] : [])] },
       { judul: 'Materi', item: [materi] },
     ];
   }
@@ -91,14 +95,14 @@ function buatNav(user, peran, belumDibaca = 0) {
     return [
       { judul: 'Utama', item: [{ id: 'dashboard', label: 'Dashboard', ikon: 'dashboard' }, notifikasi, bantuan] },
       { judul: 'Pengujian SKU', item: [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }, { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, sesi, ...(kelolaBoleh ? [instrumen, penugasan, kepengurusan] : []), pemeriksaan, sidang, cetak] },
-      { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, ...(kelolaBoleh ? [raport, laporan] : [])] },
+      { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, sangga, ...(kelolaBoleh ? [raport, laporan] : [])] },
       { judul: 'Materi', item: [materi, ...(kelolaBoleh ? [kelola] : [])] },
     ];
   }
   return [
     { judul: 'Utama', item: [{ id: 'rekap', label: 'Dashboard', ikon: 'dashboard' }, notifikasi, bantuan] },
     { judul: 'Pengujian SKU', item: [sesi, instrumen, sidang, cetak] },
-    { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, raport, laporan] },
+    { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, sangga, raport, laporan] },
     { judul: 'Materi', item: [materi, kelola] },
     { judul: 'Pengelolaan', item: [{ id: 'anggota', label: 'Anggota', ikon: 'anggota' }, kepengurusan, { id: 'naikkelas', label: 'Naik Kelas', ikon: 'naikkelas' }, { id: 'gudep', label: 'Data Gudep', ikon: 'perisai' }, pemeriksaan] },
   ];
@@ -158,7 +162,7 @@ function LayarArsip() {
 }
 
 function Shell() {
-  const { user, peranUser, status, galatMuat, belumDibaca, segarkanNotifikasi } = useApp();
+  const { user, peranUser, status, galatMuat, belumDibaca, segarkanNotifikasi, pendampingan } = useApp();
   const [tab, setTab] = useState(null);
   const [fokusId, setFokusId] = useState(null); // peserta yang sedang dibuka penguji/admin
   const [jenisCetak, setJenisCetak] = useState('kartu'); // tab awal halaman Cetak (kartu | stl | surat)
@@ -212,7 +216,7 @@ function Shell() {
   // Akun Dewan Ambalan LAMA yang sudah diarsipkan: Dewan kini jabatan pada akun Penegak, jadi masuk memakai akun Penegak sendiri
   if (user.role === 'penguji' && (user.status ?? 'aktif') !== 'aktif') return <LayarArsip />;
 
-  const grup = buatNav(user, peranUser, belumDibaca);
+  const grup = buatNav(user, peranUser, belumDibaca, pendampingan);
   const nav = grup.flatMap((g) => g.item);
   // Bila menu yang dipilih tidak ada lagi (mis. peran berubah), kembali ke menu pertama. Akun saya dan Reset PIN dibuka dari menu akun.
   const halamanAkun = tab === 'akun' || (tab === 'resetpin' && user.role !== 'peserta');
@@ -279,6 +283,8 @@ function Shell() {
     isi = <TindakLanjut onNav={(id) => pindah(user.role === 'penguji' ? 'peserta' : 'rekap', id)} />;
   } else if (tabAktif === 'agenda') {
     isi = <Agenda />;
+  } else if (tabAktif === 'sangga') {
+    isi = <Sangga />;
   } else if (tabAktif === 'materi') {
     isi = <Materi key={materiButir ?? 'semua'} butirAwal={materiButir} onKelola={bukaKelola} />;
   } else if (tabAktif === 'kelolamateri') {
