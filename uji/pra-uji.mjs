@@ -1,0 +1,260 @@
+// Fase C: mesin pra-uji berjenjang di server (PGlite). Sakelar pra_uji.aktif, jalur Bantara (Penegak > Pinsa > Bina Damping > Pembina) dan Laksana
+// (Penegak > Bina Damping yang sudah Laksana > Pembina), aturan pengaman, notifikasi berkata kunci, melewati tahap, pengingat, RLS, dan pembatalan.
+import { PGlite } from '@electric-sql/pglite';
+import { readFileSync } from 'node:fs';
+import { siapkanPg, buatKlienFake, sqlSebagai } from '../src/lokal/klienFake.js';
+import { isiDataContoh } from '../src/lokal/seedLokal.js';
+import { PIN_DEMO } from '../src/lokal/pinDemo.js';
+import { buatApi } from '../src/lib/api.js';
+import { tahunAjaranKini } from '../src/lib/rombelLogic.js';
+
+const P = process.cwd().replace(/\\/g, '/');
+let gagal = 0, lulus = 0;
+const ok = (c, m) => { if (c) { lulus++; console.log('ok   :', m); } else { gagal++; console.log('GAGAL:', m); } };
+const pg = new PGlite();
+await siapkanPg(pg, { sqlStub: readFileSync(`${P}/supabase/lokal/stub.sql`, 'utf8'), sqlSkema: readFileSync(`${P}/supabase/skema.sql`, 'utf8').replace(/^﻿/, '') });
+await isiDataContoh(pg);
+await pg.query('update public.profiles set wajib_ganti_pin = false');
+const q = async (sql, p = []) => (await pg.query(sql, p)).rows;
+const masuk = async (nama, pin) => { const k = buatKlienFake(pg); const a = buatApi(k); const r = await a.masuk(nama, pin); return { k, a, id: r.id }; };
+const K = { admin: await masuk('admin', PIN_DEMO.admin), pembina: await masuk('pembina', PIN_DEMO.pembina), dewan: await masuk('dewan', PIN_DEMO.dewan) };
+const NIS = ['10231', '10232', '10118', '10007', '10008', '10233', '10234'];
+const N = {}; for (const nis of NIS) N[nis] = await masuk(nis, PIN_DEMO.penegak);
+const [ahmad, siti, dimas, bagas, nadia, rizky, kevin] = NIS.map((n) => N[n].id);
+const ta = tahunAjaranKini();
+const sebagai = async (id, sql, args = []) => { try { return { ok: true, rows: (await sqlSebagai(pg, id, sql, args)).rows }; } catch (e) { return { ok: false, pesan: e.message }; } };
+const cocok = (r, re) => !r.ok && re.test(r.pesan ?? '');
+const ajukan = (id, sku, jadwal = '2030-01-10', penguji = null) => sebagai(id, 'select public.sg_sku_ajukan($1, $2::date, $3::uuid, $4)', [sku, jadwal, penguji, 'siap']);
+const catat = (id, pid, hasil, cat = '') => sebagai(id, 'select public.sg_pra_uji_catat($1, $2, $3) as h', [pid, hasil, cat]);
+const antrian = (id) => sebagai(id, 'select public.sg_pra_uji_antrian() as a');
+const baris = (pid, sku) => q('select id, tahap, status, penilai_nama from public.sku_pra_uji where peserta_id = $1 and sku_id = $2 order by id', [pid, sku]);
+const menunggu = async (pid, sku) => (await baris(pid, sku)).filter((b) => b.status === 'menunggu');
+const progres = async (pid, sku) => (await q('select status, penguji_id from public.sku_progress where peserta_id = $1 and sku_id = $2', [pid, sku]))[0];
+const notif = (pid, jenis = 'pra_uji') => q('select judul, isi from public.notifikasi where penerima_id = $1 and jenis = $2 order by id', [pid, jenis]);
+const tulisSku = (pid, tingkat) => q(
+  `insert into public.sku_progress (peserta_id, sku_id, status) select p.id, u.id, 'lulus' from public.profiles p join public.sku_unit u on u.tingkat = $2 and (u.agama is null or u.agama = p.agama)
+   where p.id = $1 on conflict (peserta_id, sku_id) do update set status = 'lulus'`, [pid, tingkat]);
+
+console.log('--- Persiapan: rombel X-01 (Ahmad, Siti Pinsa, Bagas dan Nadia Bina Damping, Kevin) dan X-02 (Dimas, Rizky) ---');
+const B = (await q(`select id from public.sku_unit where tingkat = 'Bantara' and agama is null order by butir_no, id limit 4`)).map((x) => x.id);
+const L = (await q(`select id from public.sku_unit where tingkat = 'Laksana' and agama is null order by butir_no, id limit 2`)).map((x) => x.id);
+const [B1, B2, B3, B4] = B; const [L1, L2] = L;
+await q('delete from public.penugasan_rombel'); await q('delete from public.penugasan_peserta');
+await q('delete from public.sku_progress where peserta_id = any($1::uuid[])', [[ahmad, siti, dimas, bagas, nadia, rizky, kevin]]);
+await q(`update public.profiles set kelas = 'X-01', sangga = 'Sangga Merak' where id = any($1::uuid[])`, [[ahmad, siti]]);
+await q(`update public.profiles set kelas = 'X-01', sangga = 'Sangga Elang' where id = any($1::uuid[])`, [[bagas, nadia, kevin]]);
+await q(`update public.profiles set kelas = 'X-02', sangga = 'Sangga Rajawali' where id = any($1::uuid[])`, [[dimas, rizky]]);
+for (const id of [siti, bagas, nadia, dimas, kevin, rizky]) await tulisSku(id, 'Bantara');
+await tulisSku(bagas, 'Laksana');
+await tulisSku(ahmad, 'Bantara');
+await q('delete from public.sku_progress where peserta_id = $1 and sku_id = any($2::text[])', [ahmad, [B1, B2, B3, B4]]);
+let r = await K.pembina.a.aturJabatanDewan([{ username: '10007', jabatan: 'Bendahara' }, { username: '10008', jabatan: 'Sekretaris' }, { username: '10118', jabatan: 'Humas' }]);
+ok(r.ok, 'jabatan Dewan untuk Bagas, Nadia, dan Dimas');
+await q(`update public.profiles set pinsa = true where id = $1`, [siti]);
+await q(`insert into public.bina_damping (tahun_ajaran, rombel, penegak_id) values ($1, 'X-01', $2), ($1, 'X-01', $3), ($1, 'X-02', (select id from public.profiles where username = '10118'))`, [ta, bagas, nadia]);
+ok((await q('select sigarda.tingkat_penegak($1) t', [bagas]))[0].t === 'laksana' && (await q('select sigarda.tingkat_penegak($1) t', [nadia]))[0].t === 'calon-laksana', 'Bagas sudah Laksana, Nadia Calon Laksana');
+ok(B.length === 4 && L.length === 2, 'butir non-agama tersedia untuk uji (' + B.join(',') + ' | ' + L.join(',') + ')');
+
+console.log('\n--- Sakelar: bawaan mati, hak mengubah ---');
+ok((await q('select sigarda.pra_uji_aktif() a'))[0].a === false, 'bawaan: pra-uji mati');
+ok((await q('select sigarda.bisa_menguji($1) b', [nadia]))[0].b === true, 'sakelar mati: Penegak berjabatan (Nadia) masih boleh menguji seperti sebelumnya');
+r = await sebagai(siti, 'select public.sg_pra_uji_sakelar(true)');
+ok(cocok(r, /Hanya Pembina atau Admin Gudep/), 'Penegak (Pinsa) tidak dapat mengubah sakelar');
+r = await sebagai(K.dewan.id, 'select public.sg_pra_uji_sakelar(true)');
+ok(cocok(r, /Hanya Pembina atau Admin Gudep/), 'akun Dewan lama tidak dapat mengubah sakelar');
+r = await catat(bagas, 1, 'lulus');
+ok(cocok(r, /Pra-uji belum diaktifkan/), 'keputusan pra-uji ditolak selama sakelar mati');
+r = await antrian(bagas);
+ok(r.ok && r.rows[0].a.aktif === false && r.rows[0].a.menunggu.length === 0, 'antrian kosong selama sakelar mati');
+// pengajuan lama (ke Nadia) sebelum sakelar hidup
+r = await ajukan(ahmad, B4, '2030-01-09', nadia);
+ok(r.ok && (await progres(ahmad, B4))?.penguji_id === nadia, 'sakelar mati: pengajuan Ahmad ke Nadia berjalan seperti biasa ' + (r.pesan ?? ''));
+
+console.log('\n--- Menghidupkan sakelar ---');
+r = await sebagai(K.pembina.id, 'select public.sg_pra_uji_sakelar(true) as h');
+ok(r.ok && r.rows[0].h.aktif === true && r.rows[0].h.dialihkan === 1, 'Pembina menghidupkan sakelar; 1 pengajuan ke penguji non-Pembina dialihkan');
+r = await sebagai(K.pembina.id, 'select public.sg_pra_uji_sakelar(true) as h');
+ok(r.ok && r.rows[0].h.dialihkan === 0, 'menghidupkan lagi tidak mengubah apa pun');
+ok((await progres(ahmad, B4)).penguji_id === null && (await progres(ahmad, B4)).status === 'diajukan', 'pengajuan itu kembali ke antrian rombel (penguji kosong, tetap diajukan)');
+ok((await q(`select 1 from public.sku_riwayat where peserta_id = $1 and sku_id = $2 and teks like 'Dikembalikan ke antrian rombel%'`, [ahmad, B4])).length === 1, 'pengembalian tercatat di riwayat');
+ok((await q('select sigarda.bisa_menguji($1) b', [nadia]))[0].b === false && (await q('select sigarda.bisa_menguji($1) b', [K.pembina.id]))[0].b === true && (await q('select sigarda.bisa_menguji($1) b', [K.dewan.id]))[0].b === false,
+  'sakelar hidup: hanya Pembina yang bisa menguji (Nadia dan akun Dewan lama tidak)');
+r = await sebagai(K.admin.id, 'select public.sg_sku_ajukan($1, $2::date, $3::uuid, $4)', [B4, '2030-01-11', null, '']);
+ok(!r.ok, 'Admin tidak dapat mengajukan (bukan Penegak)');
+// Dewan tidak lagi mencatat hasil uji resmi
+r = await sebagai('service', `select public.sg_sku_catat_internal($1::uuid, $2::uuid, $3, 'proses', '2030-01-10'::date, null, '')`, [nadia, ahmad, B4]);
+ok(cocok(r, /Hanya Pembina yang dapat mencatat hasil uji resmi/), 'Nadia (Dewan) ditolak mencatat hasil uji resmi: ' + (r.pesan ?? ''));
+r = await sebagai('service', `select public.sg_sku_catat_internal($1::uuid, $2::uuid, $3, 'proses', '2030-01-10'::date, null, '')`, [K.pembina.id, ahmad, B4]);
+ok(r.ok && (await progres(ahmad, B4)).status === 'proses', 'Pembina tetap dapat mencatat hasil uji resmi');
+
+console.log('\n--- Jalur Bantara: Penegak > Pinsa ---');
+r = await ajukan(ahmad, B1);
+ok(r.ok, 'Ahmad mengajukan Bantara butir (jalur pra-uji)');
+let m = await menunggu(ahmad, B1);
+ok(m.length === 1 && m[0].tahap === 'pinsa' && !(await progres(ahmad, B1)), 'pengajuan menunggu pra-uji Pinsa; belum ada pengajuan uji resmi');
+r = await ajukan(ahmad, B1);
+ok(cocok(r, /sedang menunggu pra-uji/), 'pengajuan ganda ditolak');
+ok((await notif(siti)).some((n) => /pra-uji Pinsa/.test(n.isi)) && (await notif(bagas)).length === 0 && (await notif(K.pembina.id)).length === 0, 'hanya Pinsa (Siti) diberi tahu; Bina Damping dan Pembina belum');
+r = await antrian(siti);
+ok(r.ok && r.rows[0].a.menunggu.length === 1 && r.rows[0].a.menunggu[0].peserta_nama && r.rows[0].a.menunggu[0].tahap === 'pinsa', 'antrian Siti memuat pengajuan Ahmad lengkap dengan nama');
+r = await antrian(bagas);
+ok(r.ok && r.rows[0].a.menunggu.length === 0, 'antrian Bagas (Bina Damping) masih kosong');
+r = await catat(bagas, m[0].id, 'lulus');
+ok(cocok(r, /Anda tidak dapat menilai pra-uji ini/), 'Bina Damping tidak dapat menilai tahap Pinsa');
+r = await catat(rizky, m[0].id, 'lulus');
+ok(cocok(r, /Anda tidak dapat menilai pra-uji ini/), 'Penegak lain tidak dapat menilai');
+r = await catat(ahmad, m[0].id, 'lulus');
+ok(cocok(r, /Anda tidak dapat menilai pra-uji ini/), 'Penegak tidak dapat menilai pengajuannya sendiri');
+r = await catat(siti, m[0].id, 'belum');
+ok(cocok(r, /Isi catatan/), 'belum lulus wajib berisi catatan');
+r = await catat(siti, m[0].id, 'mungkin', 'x');
+ok(cocok(r, /lulus atau belum lulus/), 'hasil tidak dikenal ditolak');
+r = await catat(siti, m[0].id, 'belum', 'Ulangi bagian dua');
+ok(r.ok && r.rows[0].h.tujuan === null && !(await progres(ahmad, B1)), 'Siti: belum lulus; pengajuan tidak diteruskan');
+ok((await baris(ahmad, B1))[0].status === 'belum' && (await baris(ahmad, B1))[0].penilai_nama, 'baris tersimpan sebagai belum lulus dengan nama penilai');
+let n = await notif(ahmad);
+ok(n.some((x) => /Pra-uji belum lulus/.test(x.judul) && !/diteruskan/.test(x.isi)), 'Ahmad diberi tahu belum lulus (tanpa kata teruskan)');
+r = await catat(siti, m[0].id, 'lulus');
+ok(cocok(r, /sudah tidak menunggu/), 'baris yang sudah diputuskan tidak dapat diputuskan lagi');
+r = await sebagai(ahmad, 'select public.sg_sku_batal($1)', [B1]);
+ok(cocok(r, /Hanya pengajuan yang belum mulai diuji/), 'tidak ada pengajuan aktif untuk dibatalkan');
+
+console.log('\n--- Ajukan ulang: lulus Pinsa > Bina Damping > Pembina ---');
+r = await ajukan(ahmad, B1);
+ok(r.ok, 'Ahmad mengajukan ulang setelah belum lulus');
+m = await menunggu(ahmad, B1);
+r = await catat(siti, m[0].id, 'lulus', 'Baik');
+ok(r.ok && r.rows[0].h.tujuan === 'bina_damping', 'Siti meluluskan; tujuan tahap Bina Damping');
+m = await menunggu(ahmad, B1);
+ok(m.length === 1 && m[0].tahap === 'bina_damping' && !(await progres(ahmad, B1)), 'pengajuan diteruskan otomatis ke Bina Damping');
+n = await notif(ahmad);
+ok(n.some((x) => /diteruskan ke pra-uji selanjutnya/.test(x.isi)), 'Ahmad menerima kata kunci "diteruskan ke pra-uji selanjutnya"');
+ok((await notif(bagas)).length === 1 && (await notif(nadia)).length === 1 && /pra-uji Bina Damping/.test((await notif(bagas))[0].isi), 'Bagas dan Nadia (Bina Damping) diberi tahu; pengajuan baru');
+r = await antrian(siti);
+ok(r.ok && r.rows[0].a.menunggu.length === 0 && r.rows[0].a.selesai.length === 2, 'antrian Siti kosong; riwayat penilai memuat 2 keputusan');
+r = await catat(siti, m[0].id, 'lulus');
+ok(cocok(r, /Anda tidak dapat menilai pra-uji ini/), 'Pinsa tidak dapat menilai tahap Bina Damping');
+r = await catat(dimas, m[0].id, 'lulus');
+ok(cocok(r, /Anda tidak dapat menilai pra-uji ini/), 'Bina Damping rombel lain (Dimas, X-02) tidak dapat menilai');
+r = await catat(nadia, m[0].id, 'lulus', 'Sudah baik');
+ok(r.ok && r.rows[0].h.tujuan === 'pembina', 'Nadia (Bina Damping, Bantara butir) meluluskan; tujuan Pembina');
+ok((await progres(ahmad, B1))?.status === 'diajukan' && (await progres(ahmad, B1)).penguji_id === null, 'pengajuan uji resmi terbentuk di antrian rombel (penguji kosong)');
+n = await notif(ahmad);
+ok(n.some((x) => /diteruskan ke pengujian resmi ke Pembina/.test(x.isi)), 'Ahmad menerima kata kunci "diteruskan ke pengujian resmi ke Pembina"');
+ok((await notif(K.pembina.id, 'ajukan')).length >= 1 && (await notif(nadia, 'ajukan')).filter((x) => /Ahmad/.test(x.isi) && /butir 1|butir/.test(x.isi)).length === 1, 'Pembina menerima pengajuan uji resmi; Nadia hanya punya notifikasi ajukan lama (sebelum sakelar)');
+ok((await q(`select teks from public.sku_riwayat where peserta_id = $1 and sku_id = $2 order by id`, [ahmad, B1])).map((x) => x.teks).join(' | ').includes('Diteruskan ke pengujian resmi Pembina'), 'riwayat SKU mencatat perjalanan pra-uji');
+r = await sebagai(ahmad, 'select public.sg_sku_batal($1)', [B1]);
+ok(r.ok && (await progres(ahmad, B1)).status === 'belum', 'sesudah diteruskan ke Pembina, pengajuan dapat dibatalkan Penegak (seperti pengajuan biasa)');
+
+console.log('\n--- Pembatalan saat menunggu pra-uji ---');
+r = await ajukan(ahmad, B2);
+r = await sebagai(ahmad, 'select public.sg_sku_batal($1)', [B2]);
+ok(r.ok && (await baris(ahmad, B2))[0].status === 'dibatalkan' && (await menunggu(ahmad, B2)).length === 0, 'Penegak membatalkan pengajuan yang masih menunggu pra-uji');
+
+console.log('\n--- Pembina mengambil alih butir yang masih menunggu pra-uji ---');
+r = await ajukan(ahmad, B2);
+ok(r.ok && (await menunggu(ahmad, B2)).length === 1, 'Ahmad mengajukan lagi; menunggu pra-uji Pinsa');
+r = await sebagai('service', `select public.sg_sku_catat_internal($1::uuid, $2::uuid, $3, 'proses', '2030-01-12'::date, null, '')`, [K.pembina.id, ahmad, B2]);
+ok(r.ok && (await progres(ahmad, B2)).status === 'proses' && (await menunggu(ahmad, B2)).length === 0 && (await baris(ahmad, B2)).at(-1).status === 'dibatalkan',
+  'Pembina memulai uji resmi langsung: pra-uji yang menunggu ditutup (dibatalkan)');
+
+console.log('\n--- Pinsa mengajukan sendiri melewati tahap Pinsa ---');
+await q('delete from public.sku_progress where peserta_id = $1 and sku_id = $2', [siti, B3]);
+r = await ajukan(siti, B3);
+m = await menunggu(siti, B3);
+ok(r.ok && m.length === 1 && m[0].tahap === 'bina_damping', 'Siti (Pinsa) mengajukan butir sendiri: langsung tahap Bina Damping');
+r = await catat(siti, m[0].id, 'lulus');
+ok(!r.ok, 'Siti tidak menilai pengajuannya sendiri');
+
+console.log('\n--- Jalur Laksana: hanya Bina Damping yang sudah Laksana ---');
+r = await ajukan(kevin, L1);
+m = await menunggu(kevin, L1);
+ok(r.ok && m.length === 1 && m[0].tahap === 'bina_damping', 'Kevin mengajukan butir Laksana: langsung Bina Damping (tanpa Pinsa)');
+ok((await notif(bagas)).some((x) => /Kevin/.test(x.isi)) && !(await notif(nadia)).some((x) => /Kevin/.test(x.isi)), 'Bagas (sudah Laksana) diberi tahu; Nadia (Calon Laksana) tidak');
+r = await antrian(nadia);
+ok(r.ok && !r.rows[0].a.menunggu.some((x) => x.sku_id === L1), 'Nadia (belum Laksana dan belum lulus butir itu) tidak dapat menilai butir Laksana');
+r = await catat(nadia, m[0].id, 'lulus');
+ok(cocok(r, /Anda tidak dapat menilai pra-uji ini/), 'penilaian Nadia atas butir Laksana ditolak');
+r = await catat(bagas, m[0].id, 'lulus');
+ok(r.ok && r.rows[0].h.tujuan === 'pembina' && (await progres(kevin, L1)).status === 'diajukan', 'Bagas meluluskan; langsung ke uji resmi Pembina');
+// Bina Damping mengajukan sendiri: disaring Bina Damping lain
+await tulisSku(nadia, 'Bantara');
+r = await q(`insert into public.sku_progress (peserta_id, sku_id, status) values ($1, $2, 'belum') on conflict (peserta_id, sku_id) do update set status = 'belum'`, [nadia, B3]);
+r = await ajukan(nadia, B3);
+m = await menunggu(nadia, B3);
+ok(m.length === 1 && m[0].tahap === 'bina_damping', 'Nadia (Bina Damping) mengajukan butirnya sendiri: tahap Bina Damping');
+r = await catat(nadia, m[0].id, 'lulus');
+ok(!r.ok, 'Nadia tidak menilai dirinya sendiri');
+r = await catat(bagas, m[0].id, 'lulus');
+ok(r.ok && r.rows[0].h.tujuan === 'pembina', 'Bagas (Bina Damping lain) menyaring Nadia');
+
+console.log('\n--- Rombel tanpa Bina Damping yang sudah Laksana: butir Laksana turun ke Pembina ---');
+r = await ajukan(rizky, L1);
+ok(r.ok && (await menunggu(rizky, L1)).length === 0 && (await progres(rizky, L1))?.status === 'diajukan', 'Rizky (X-02, Bina Damping Dimas belum Laksana): langsung ke uji resmi Pembina');
+ok((await q(`select 1 from public.sku_riwayat where peserta_id = $1 and sku_id = $2 and teks like '%tanpa pra-uji%'`, [rizky, L1])).length === 1, 'riwayat menyebut tanpa pra-uji');
+r = await ajukan(rizky, B1);
+ok(cocok(r, /sudah lulus/), 'Rizky mengajukan butir Bantara yang sudah lulus: ditolak');
+await q(`update public.sku_progress set status = 'belum' where peserta_id = $1 and sku_id = $2`, [rizky, B2]);
+r = await ajukan(rizky, B2);
+m = await menunggu(rizky, B2);
+ok(r.ok && m.length === 1 && m[0].tahap === 'bina_damping', 'Rizky butir Bantara: tanpa Pinsa di sangganya, langsung Bina Damping (Dimas sudah lulus butir itu) ');
+
+console.log('\n--- Melewati tahap oleh Pembina/Admin ---');
+r = await sebagai(siti, 'select public.sg_pra_uji_lewati($1, $2)', [m[0].id, 'x']);
+ok(cocok(r, /Hanya Pembina atau Admin Gudep/), 'Penegak tidak dapat melewati tahap');
+r = await sebagai(K.pembina.id, 'select public.sg_pra_uji_lewati($1, $2)', [m[0].id, '']);
+ok(cocok(r, /Isi alasan/), 'melewati tahap wajib beralasan');
+r = await sebagai(K.pembina.id, 'select public.sg_pra_uji_lewati($1, $2) as t', [m[0].id, 'Bina Damping berhalangan']);
+ok(r.ok && r.rows[0].t === 'pembina' && (await progres(rizky, B2))?.status === 'diajukan', 'Pembina melewati tahap Bina Damping: langsung ke uji resmi');
+ok((await baris(rizky, B2))[0].status === 'dilewati', 'baris tercatat sebagai dilewati');
+ok((await notif(rizky)).some((x) => /diteruskan ke pengujian resmi ke Pembina/.test(x.isi)), 'Rizky diberi tahu diteruskan ke Pembina');
+
+console.log('\n--- Pengingat ---');
+r = await ajukan(kevin, L2);
+m = await menunggu(kevin, L2);
+await q(`update public.sku_pra_uji set dibuat = now() - interval '4 days' where id = $1`, [m[0].id]);
+await q('select sigarda.notif_pengingat()');
+ok((await notif(bagas)).some((x) => /menunggu lebih dari 3 hari/.test(x.judul)), 'penilai (Bagas) diingatkan pra-uji yang menunggu lebih dari 3 hari');
+await q('select sigarda.notif_pengingat()');
+ok((await notif(bagas)).filter((x) => /menunggu lebih dari 3 hari/.test(x.judul)).length === 1, 'pengingat hanya sekali per pengajuan');
+await q('delete from public.bina_damping where rombel = $1', ['X-01']);
+await q(`update public.sku_pra_uji set dibuat = now() - interval '5 days' where id = $1`, [m[0].id]);
+await q(`delete from public.notifikasi where kunci like 'pra-%'`);
+await q('select sigarda.notif_pengingat()');
+ok((await notif(K.pembina.id)).some((x) => /Pra-uji tanpa penilai/.test(x.judul)), 'tanpa penilai: hanya Pembina diingatkan (pengajuan TIDAK lolos otomatis)');
+ok((await menunggu(kevin, L2)).length === 1, 'pengajuan tetap menunggu');
+await q(`insert into public.bina_damping (tahun_ajaran, rombel, penegak_id) values ($1, 'X-01', $2), ($1, 'X-01', $3)`, [ta, bagas, nadia]);
+
+console.log('\n--- Penegak tak aktif dan RLS ---');
+r = await sebagai(ahmad, 'select id, status from public.sku_pra_uji');
+ok(r.ok && r.rows.length > 0 && (await sebagai(ahmad, 'select id from public.sku_pra_uji where peserta_id <> $1', [ahmad])).rows.length === 0, 'Penegak hanya membaca pra-uji miliknya ' + (r.pesan ?? ''));
+r = await sebagai(rizky, 'select id from public.sku_pra_uji where peserta_id = $1', [ahmad]);
+ok(r.ok && r.rows.length === 0, 'Penegak lain tidak dapat membaca pra-uji Ahmad');
+r = await sebagai(K.pembina.id, 'select id from public.sku_pra_uji');
+ok(r.ok && r.rows.length > 5, 'Pembina membaca semua pra-uji');
+r = await sebagai(siti, 'select id from public.sku_pra_uji where penilai_id = $1', [siti]);
+ok(r.ok && r.rows.length === 2, 'penilai membaca keputusannya sendiri');
+r = await sebagai(ahmad, `insert into public.sku_pra_uji (peserta_id, sku_id, tahap, jadwal) values ($1, $2, 'pinsa', '2030-01-01')`, [ahmad, B2]);
+ok(!r.ok, 'Penegak tidak dapat menulis langsung ke tabel pra-uji');
+m = await menunggu(kevin, L2);
+r = await sebagai(K.pembina.id, `select public.sg_anggota_status_atur($1, 'nonaktif', 'tidak melanjutkan', null)`, [kevin]);
+ok(r.ok, 'Pembina menonaktifkan Kevin');
+ok((await baris(kevin, L2))[0].status === 'dibatalkan', 'pengajuan pra-uji Kevin yang menunggu dibatalkan otomatis saat ia nonaktif');
+r = await sebagai(K.admin.id, 'select public.sg_cadangan_admin() as d');
+ok(r.ok && Array.isArray(r.rows[0].d.data?.sku_pra_uji ?? r.rows[0].d.tabel?.sku_pra_uji ?? r.rows[0].d.sku_pra_uji), 'cadangan data memuat tabel sku_pra_uji');
+
+console.log('\n--- Mematikan sakelar: pra-uji yang menunggu diteruskan ke Pembina ---');
+await q(`insert into public.sku_progress (peserta_id, sku_id, status) values ($1, $2, 'belum') on conflict (peserta_id, sku_id) do update set status = 'belum'`, [rizky, B4]);
+r = await ajukan(rizky, B4);
+ok(r.ok && (await menunggu(rizky, B4)).length === 1, 'Rizky mengajukan; menunggu pra-uji (Bina Damping Dimas)');
+const sisa = (await q("select count(*)::int n from public.sku_pra_uji where status = 'menunggu'"))[0].n;
+r = await sebagai(K.admin.id, 'select public.sg_pra_uji_sakelar(false) as h');
+ok(r.ok && r.rows[0].h.aktif === false && sisa === 2 && r.rows[0].h.dialihkan === sisa, 'Admin mematikan sakelar; semua pra-uji yang menunggu (' + sisa + ': Siti dan Rizky) diteruskan');
+ok((await progres(siti, B3))?.status === 'diajukan' && (await q("select count(*)::int n from public.sku_pra_uji where status = 'menunggu'"))[0].n === 0, 'tidak ada lagi pra-uji yang menunggu');
+ok((await progres(rizky, B4))?.status === 'diajukan' && (await baris(rizky, B4))[0].status === 'dilewati', 'pra-uji menunggu berubah menjadi uji resmi (antrian rombel)');
+ok((await q('select sigarda.bisa_menguji($1) b', [nadia]))[0].b === true, 'sakelar mati: Dewan boleh menguji lagi seperti sebelum pra-uji');
+r = await antrian(bagas);
+ok(r.ok && r.rows[0].a.aktif === false, 'antrian kosong dan tidak aktif');
+
+console.log(`\nRINGKASAN: ${lulus} lulus, ${gagal} gagal`);
+process.exit(gagal ? 1 : 0);

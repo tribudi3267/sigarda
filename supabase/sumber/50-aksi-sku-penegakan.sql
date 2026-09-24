@@ -22,6 +22,12 @@ begin
     raise exception 'Selesaikan seluruh butir Bantara lebih dulu.';
   end if;
   if p_jadwal is null then raise exception 'Tanggal pengujian wajib diisi.'; end if;
+  if char_length(coalesce(p_catatan, '')) > 500 then raise exception 'Catatan maksimal 500 karakter.'; end if;
+  -- Sakelar pra-uji hidup: pengajuan lebih dulu melewati pra-uji Pinsa/Bina Damping (p_penguji_id diabaikan; uji resmi selalu ke antrian Pembina rombel).
+  if sigarda.pra_uji_aktif() then
+    perform sigarda.pra_uji_mulai(v_uid, p_sku_id, p_jadwal, p_catatan);
+    return;
+  end if;
   -- Ketat saat memilih penguji: hanya penguji yang sah (penugasan rombel, butir Laksana dan butir agama hanya Pembina, agama seagama).
   -- p_penguji_id kosong = antrian bersama rombel: penguji yang sah mana pun mengambilnya lewat "Mulai uji".
   if p_penguji_id is not null and not sigarda.bisa_menguji(p_penguji_id) then
@@ -40,7 +46,6 @@ begin
       raise exception 'Penguji ini tidak bertugas pada rombel Anda. Pilih penguji dari daftar.';
     end if;
   end if;
-  if char_length(coalesce(p_catatan, '')) > 500 then raise exception 'Catatan maksimal 500 karakter.'; end if;
 
   insert into public.sku_progress (peserta_id, sku_id, status, jadwal, penguji_id, catatan_peserta, diubah)
   values (v_uid, p_sku_id, 'diajukan', p_jadwal, p_penguji_id, btrim(coalesce(p_catatan, '')), now())
@@ -59,6 +64,12 @@ begin
   perform sigarda.wajib_aktif();
   if not exists (select 1 from public.profiles where id = v_uid and role = 'peserta') then
     raise exception 'Hanya peserta yang dapat membatalkan pengajuan.';
+  end if;
+  -- Pengajuan yang masih menunggu pra-uji (Pinsa/Bina Damping) juga dapat dibatalkan.
+  if exists (select 1 from public.sku_pra_uji where peserta_id = v_uid and sku_id = p_sku_id and status = 'menunggu') then
+    update public.sku_pra_uji set status = 'dibatalkan', diputuskan_pada = now() where peserta_id = v_uid and sku_id = p_sku_id and status = 'menunggu';
+    insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh) values (v_uid, p_sku_id, 'Pengajuan pra-uji dibatalkan peserta', v_uid);
+    return;
   end if;
   select status into v_status from public.sku_progress where peserta_id = v_uid and sku_id = p_sku_id;
   if v_status is distinct from 'diajukan' then
@@ -144,7 +155,7 @@ $$
 declare v_p public.profiles; v_kode text; v_cat text := btrim(coalesce(p_catatan, '')); v_lama public.sku_progress; v_ganti text := ''; v_luar text;
 begin
   if not sigarda.bisa_menguji(p_oleh) then
-    raise exception 'Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.';
+    raise exception '%', case when sigarda.pra_uji_aktif() then 'Hanya Pembina yang dapat mencatat hasil uji resmi.' else 'Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.' end;
   end if;
   if p_oleh = p_peserta_id then raise exception 'Anda tidak dapat menilai diri sendiri.'; end if;
   select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';
@@ -186,6 +197,12 @@ begin
     raise exception 'Peserta belum menyelesaikan seluruh butir Bantara.';
   end if;
   if char_length(v_cat) > 1000 then raise exception 'Catatan maksimal 1000 karakter.'; end if;
+
+  -- Pembina memulai atau menuntaskan butir yang masih menunggu pra-uji: pra-uji itu tidak diperlukan lagi.
+  if p_hasil in ('proses', 'lulus', 'ulang') then
+    update public.sku_pra_uji set status = 'dibatalkan', catatan = 'Dilanjutkan langsung oleh penguji resmi', diputuskan_pada = now()
+      where peserta_id = p_peserta_id and sku_id = p_sku_id and status = 'menunggu';
+  end if;
 
   if p_hasil = 'proses' then
     insert into public.sku_progress (peserta_id, sku_id, status, penguji_id, tanggal_uji)
@@ -238,7 +255,7 @@ declare
   v_p public.profiles; v_cat text := btrim(coalesce(p_catatan, '')); v_h record; v_diganti boolean; v_rinci jsonb; v_saran_iuran int; v_beda_iuran boolean := false;
 begin
   if not sigarda.bisa_menguji(p_oleh) then
-    raise exception 'Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.';
+    raise exception '%', case when sigarda.pra_uji_aktif() then 'Hanya Pembina yang dapat mencatat hasil uji resmi.' else 'Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.' end;
   end if;
   if p_oleh = p_peserta_id then raise exception 'Anda tidak dapat menilai diri sendiri.'; end if;
   select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';

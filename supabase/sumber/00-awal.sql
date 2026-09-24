@@ -19,7 +19,7 @@ set check_function_bodies = off;
 -- ---------------------------------------------------------------------------
 -- 0. Bersihkan versi lama
 -- ---------------------------------------------------------------------------
-drop table if exists public.pengukuhan_dewan, public.bina_damping, public.kepengurusan_log, public.penugasan_peserta, public.penugasan_log, public.penugasan_rombel, public.guru_agama,
+drop table if exists public.sku_pra_uji, public.pengukuhan_dewan, public.bina_damping, public.kepengurusan_log, public.penugasan_peserta, public.penugasan_log, public.penugasan_rombel, public.guru_agama,
   public.naik_kelas_log, public.naik_kelas_batch, public.notifikasi, public.push_langganan, public.push_konfigurasi, public.keepalive_konfigurasi,
   public.dokumen_terbit, public.dokumen_urut, public.iuran_kas, public.iuran_log, public.iuran, public.asisten_iuran,
   public.sesi_ujian_peserta, public.sesi_ujian_butir, public.sesi_ujian, public.sertifikat_tingkat, public.sku_penilaian, public.instrumen_panduan, public.instrumen_penguji, public.instrumen_kriteria, public.instrumen,

@@ -84,6 +84,32 @@ console.log('--- wajib_ganti_pin: server menolak semua hak; klien tidak pernah l
   await ubah(akun.penegak2, 'jabatan_dewan', null);
 }
 
+console.log('--- Sakelar pra-uji hidup: uji resmi hanya Pembina (bisaMenguji(u, true) = sigarda.bisa_menguji) ---');
+{
+  const sakelar = async (nilai) => {
+    await q("delete from public.pengaturan where kunci = 'pra_uji.aktif'");
+    if (nilai !== null) await q("insert into public.pengaturan (kunci, nilai) values ('pra_uji.aktif', $1::jsonb)", [JSON.stringify({ aktif: nilai })]);
+  };
+  const banding = async (nama, id, hidup) => {
+    const s = (await q('select sigarda.bisa_menguji($1) b', [id]))[0].b;
+    const u = petaProfil((await q('select * from public.profiles where id = $1', [id]))[0]);
+    ok(s === bisaMenguji(u, hidup), `${nama}, sakelar ${hidup ? 'hidup' : 'mati'}: server=${s} klien=${bisaMenguji(u, hidup)}`);
+    return s;
+  };
+  await ubah(akun.penegak, 'jabatan_dewan', 'Sekretaris');
+  for (const hidup of [false, true]) {
+    await sakelar(hidup);
+    const hasil = [];
+    for (const [nama, id] of [['Admin', akun.admin], ['Pembina', akun.pembina], ['akun Dewan lama', akun.dewanLama], ['Penegak berjabatan', akun.penegak], ['Penegak biasa', akun.penegak2]]) hasil.push(await banding(nama, id, hidup));
+    ok(hidup ? hasil.join() === 'false,true,false,false,false' : hasil.join() === 'false,true,true,true,false', `pola hak sakelar ${hidup ? 'hidup: hanya Pembina' : 'mati: Pembina, Dewan lama, Penegak berjabatan'}`);
+  }
+  await ubah(akun.pembina, 'status', 'nonaktif');
+  await banding('Pembina nonaktif', akun.pembina, true);
+  await ubah(akun.pembina, 'status', 'aktif');
+  await sakelar(null);
+  await ubah(akun.penegak, 'jabatan_dewan', null);
+}
+
 console.log('--- Tampilan Dewan tidak pernah memberi hak lebih dari akun ---');
 {
   // Sama dengan AppContext: dalam tampilan Dewan, Penegak berjabatan menjadi { role: 'penguji', jabatan: 'Dewan Ambalan' }.
