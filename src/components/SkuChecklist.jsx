@@ -3,10 +3,12 @@ import { hurufSub } from '../data/skuData';
 import { useApp } from '../context/AppContext';
 import { hitungMateriPerButir } from '../lib/materiLogic';
 import { butirPeserta, getEntry } from '../lib/skuLogic';
+import { jalurPraUji } from '../lib/praUjiLogic';
 import { fmtTanggal, fmtWaktu } from '../lib/format';
 import useInstrumen from '../hooks/useInstrumen';
 import { LencanaKriteria } from './InstrumenNilai';
 import RincianPenilaian from './RincianPenilaian';
+import JalurPraUji from './JalurPraUji';
 import { Badge, Icon } from './ui';
 
 const FILTER = [
@@ -22,9 +24,12 @@ const FILTER = [
  * renderAksi(poin, entry) mengembalikan tombol aksi per unit (ajukan, uji, dll).
  */
 export default function SkuChecklist({ tingkat, peserta, renderAksi, onBukaMateri }) {
-  const { progress, users, materi, pastikanRiwayat } = useApp();
+  const { progress, users, materi, pastikanRiwayat, praUjiAktif, pastikanPraUji, praUjiPeserta } = useApp();
   // Riwayat SKU tidak ikut dimuat saat masuk (tabel terbesar); dimuat malas saat rincian Penegak ini dibuka.
   useEffect(() => { pastikanRiwayat?.(peserta?.id); }, [peserta?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Baris pra-uji (jalur per butir) dimuat malas per Penegak selama pra-uji hidup; sesudahnya ikut penyegaran.
+  useEffect(() => { if (praUjiAktif) pastikanPraUji?.(peserta?.id); }, [peserta?.id, praUjiAktif]); // eslint-disable-line react-hooks/exhaustive-deps
+  const barisPraUji = praUjiPeserta?.(peserta?.id) ?? [];
   const [filter, setFilter] = useState('semua');
   const [terbuka, setTerbuka] = useState(null);
   const [kriteriaTerbuka, setKriteriaTerbuka] = useState(null);
@@ -73,6 +78,8 @@ export default function SkuChecklist({ tingkat, peserta, renderAksi, onBukaMater
             </span>
           )}
         </div>
+
+        {!lulusPoin && <JalurPraUji jalur={jalurPraUji(barisPraUji.filter((r) => r.skuId === poin.id), entry.status, poin.tingkat)} />}
 
         {lulusPoin && (
           <p className="mt-2 text-xs leading-relaxed text-pramuka-600">

@@ -377,6 +377,38 @@ export const susunNotifikasi = (baris = []) =>
 /** sg_pendampingan_saya -> { binaDamping: [rombel], pinsa } (rombel yang saya dampingi pada tahun ajaran berjalan, dan apakah saya Pinsa). */
 export const susunPendampingan = (d) => ({ binaDamping: Array.isArray(d?.bina_damping) ? d.bina_damping : [], pinsa: !!d?.pinsa });
 
+/** Baris sku_pra_uji -> { id, pesertaId, skuId, tahap, status, jadwal, catatanPeserta, penilaiId, penilaiNama, catatan, dibuat, diputuskanPada } (id = nomor urut). */
+export const petaPraUji = (r) => ({
+  id: Number(r.id),
+  pesertaId: r.peserta_id,
+  skuId: r.sku_id,
+  tahap: r.tahap,
+  status: r.status,
+  jadwal: r.jadwal ?? null,
+  catatanPeserta: r.catatan_peserta ?? '',
+  penilaiId: r.penilai_id ?? null,
+  penilaiNama: r.penilai_nama ?? null,
+  catatan: r.catatan ?? '',
+  dibuat: r.dibuat,
+  diputuskanPada: r.diputuskan_pada ?? null,
+});
+
+/**
+ * sg_pra_uji_antrian -> { aktif, menunggu: [{ id, pesertaId, pesertaNama, kelas, sangga, skuId, tahap, jadwal, catatanPeserta, dibuat }],
+ * selesai: [{ id, pesertaId, pesertaNama, kelas, sangga, skuId, tahap, status, catatan, diputuskanPada }] }.
+ */
+export const susunAntrianPraUji = (d) => ({
+  aktif: !!d?.aktif,
+  menunggu: (d?.menunggu ?? []).map((r) => ({
+    id: Number(r.id), pesertaId: r.peserta_id, pesertaNama: r.peserta_nama, kelas: r.kelas ?? '', sangga: r.sangga ?? '', skuId: r.sku_id,
+    tahap: r.tahap, jadwal: r.jadwal ?? null, catatanPeserta: r.catatan_peserta ?? '', dibuat: r.dibuat,
+  })),
+  selesai: (d?.selesai ?? []).map((r) => ({
+    id: Number(r.id), pesertaId: r.peserta_id, pesertaNama: r.peserta_nama, kelas: r.kelas ?? '', sangga: r.sangga ?? '', skuId: r.sku_id,
+    tahap: r.tahap, status: r.status, catatan: r.catatan ?? '', diputuskanPada: r.diputuskan_pada ?? null,
+  })),
+});
+
 /**
  * sg_sangga_rombel -> { rombel, tahunAjaran, bisaAtur, binaDamping: [{ id, nama, tingkat }], anggota: [{ id, nama, sangga, pinsa, tingkat, layakPinsa }],
  * peringatan: [{ sangga, teks }] }. tingkat = 'calon-bantara' | 'calon-laksana' | 'laksana' atau null (tidak boleh dilihat).

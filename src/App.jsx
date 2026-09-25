@@ -17,11 +17,13 @@ import { parameterVerifikasi } from './lib/verifikasiLogic';
 import { parameterBerkasGaruda } from './lib/garudaLogic';
 import { pembinaAtauAdmin } from './lib/hakLogic';
 import { menuSanggaTampil } from './lib/sanggaLogic';
+import { menuPraUjiTampil, ujiResmiTampil } from './lib/praUjiLogic';
 import { bolehKelolaMateri } from './lib/materiLogic';
 import LogoMark from './components/LogoMark';
 
 // Halaman selain beranda dimuat malas (berkasnya diunduh saat pertama dibuka); lihat BatasHalaman.
 const PesertaSku = lazy(() => import('./pages/PesertaSku'));
+const PraUji = lazy(() => import('./pages/PraUji'));
 const PesertaDetail = lazy(() => import('./pages/PesertaDetail'));
 const AdminAnggota = lazy(() => import('./pages/AdminAnggota'));
 const AbsensiPeserta = lazy(() => import('./pages/Absensi').then((m) => ({ default: m.AbsensiPeserta })));
@@ -60,7 +62,7 @@ const Bantuan = lazy(() => import('./pages/Bantuan'));
  * Dewan Ambalan = jabatan pada akun Penegak: pemegangnya memilih tampilan Penegak atau Dewan (user.role berubah menjadi 'penguji' pada tampilan Dewan).
  * Akun saya dan Reset PIN anggota (pengurus) tidak ada di daftar ini: keduanya di menu akun (nama pengguna di menu samping atau header).
  */
-function buatNav(user, peran, belumDibaca = 0, pendampingan = null) {
+function buatNav(user, peran, belumDibaca = 0, pendampingan = null, praUjiAktif = false) {
   const materi = { id: 'materi', label: 'Materi', ikon: 'buku' };
   const kelola = { id: 'kelolamateri', label: 'Kelola Materi', ikon: 'pustaka' };
   const raport = { id: 'raport', label: 'Raport', ikon: 'raport' };
@@ -79,6 +81,9 @@ function buatNav(user, peran, belumDibaca = 0, pendampingan = null) {
   const agenda = { id: 'agenda', label: 'Agenda', ikon: 'kalender' };
   const sangga = { id: 'sangga', label: 'Sangga', ikon: 'anggota' };
   const adaSangga = menuSanggaTampil(user, pendampingan);
+  const praUji = { id: 'pra-uji', label: 'Pra-uji', ikon: 'cek' };
+  const adaPraUji = menuPraUjiTampil(user, pendampingan, praUjiAktif);
+  const ujiResmi = ujiResmiTampil(user, praUjiAktif); // pra-uji hidup: uji resmi hanya Pembina, jadi Antrian dan Sesi ujian tidak untuk Dewan Ambalan
   const kelolaBoleh = bolehKelolaMateri(user);
   const notifikasi = { id: 'notifikasi', label: 'Notifikasi', ikon: 'lonceng', lencana: belumDibaca };
   const bantuan = { id: 'bantuan', label: 'Bantuan', ikon: 'tanya' };
@@ -86,7 +91,7 @@ function buatNav(user, peran, belumDibaca = 0, pendampingan = null) {
   if (user.role === 'peserta') {
     return [
       { judul: 'Utama', item: [peran === 'calon-garuda' ? { id: 'beranda', label: 'Garuda', ikon: 'bintang' } : { id: 'beranda', label: 'Beranda', ikon: 'beranda' }, notifikasi, bantuan] },
-      { judul: 'Pengujian SKU', item: [{ id: 'sku', label: 'Poin SKU', ikon: 'daftar' }, cetak] },
+      { judul: 'Pengujian SKU', item: [{ id: 'sku', label: 'Poin SKU', ikon: 'daftar' }, ...(adaPraUji ? [praUji] : []), cetak] },
       { judul: 'Kegiatan Ambalan', item: [absensi, iuran, agenda, ...(adaSangga ? [sangga] : [])] },
       { judul: 'Materi', item: [materi] },
     ];
@@ -94,14 +99,14 @@ function buatNav(user, peran, belumDibaca = 0, pendampingan = null) {
   if (user.role === 'penguji') {
     return [
       { judul: 'Utama', item: [{ id: 'dashboard', label: 'Dashboard', ikon: 'dashboard' }, notifikasi, bantuan] },
-      { judul: 'Pengujian SKU', item: [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }, { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, sesi, ...(kelolaBoleh ? [instrumen, penugasan, kepengurusan] : []), pemeriksaan, sidang, cetak] },
+      { judul: 'Pengujian SKU', item: [...(ujiResmi ? [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }] : []), ...(adaPraUji ? [praUji] : []), { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, ...(ujiResmi ? [sesi] : []), ...(kelolaBoleh ? [instrumen, penugasan, kepengurusan] : []), pemeriksaan, sidang, cetak] },
       { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, sangga, ...(kelolaBoleh ? [raport, laporan] : [])] },
       { judul: 'Materi', item: [materi, ...(kelolaBoleh ? [kelola] : [])] },
     ];
   }
   return [
     { judul: 'Utama', item: [{ id: 'rekap', label: 'Dashboard', ikon: 'dashboard' }, notifikasi, bantuan] },
-    { judul: 'Pengujian SKU', item: [sesi, instrumen, sidang, cetak] },
+    { judul: 'Pengujian SKU', item: [praUji, sesi, instrumen, sidang, cetak] },
     { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, sangga, raport, laporan] },
     { judul: 'Materi', item: [materi, kelola] },
     { judul: 'Pengelolaan', item: [{ id: 'anggota', label: 'Anggota', ikon: 'anggota' }, kepengurusan, { id: 'naikkelas', label: 'Naik Kelas', ikon: 'naikkelas' }, { id: 'gudep', label: 'Data Gudep', ikon: 'perisai' }, pemeriksaan] },
@@ -162,7 +167,7 @@ function LayarArsip() {
 }
 
 function Shell() {
-  const { user, peranUser, status, galatMuat, belumDibaca, segarkanNotifikasi, pendampingan } = useApp();
+  const { user, peranUser, status, galatMuat, belumDibaca, segarkanNotifikasi, pendampingan, praUjiAktif } = useApp();
   const [tab, setTab] = useState(null);
   const [fokusId, setFokusId] = useState(null); // peserta yang sedang dibuka penguji/admin
   const [jenisCetak, setJenisCetak] = useState('kartu'); // tab awal halaman Cetak (kartu | stl | surat)
@@ -216,7 +221,7 @@ function Shell() {
   // Akun Dewan Ambalan LAMA yang sudah diarsipkan: Dewan kini jabatan pada akun Penegak, jadi masuk memakai akun Penegak sendiri
   if (user.role === 'penguji' && (user.status ?? 'aktif') !== 'aktif') return <LayarArsip />;
 
-  const grup = buatNav(user, peranUser, belumDibaca, pendampingan);
+  const grup = buatNav(user, peranUser, belumDibaca, pendampingan, praUjiAktif);
   const nav = grup.flatMap((g) => g.item);
   // Bila menu yang dipilih tidak ada lagi (mis. peran berubah), kembali ke menu pertama. Akun saya dan Reset PIN dibuka dari menu akun.
   const halamanAkun = tab === 'akun' || (tab === 'resetpin' && user.role !== 'peserta');
@@ -285,6 +290,8 @@ function Shell() {
     isi = <Agenda />;
   } else if (tabAktif === 'sangga') {
     isi = <Sangga />;
+  } else if (tabAktif === 'pra-uji' && menuPraUjiTampil(user, pendampingan, praUjiAktif)) {
+    isi = <PraUji />;
   } else if (tabAktif === 'materi') {
     isi = <Materi key={materiButir ?? 'semua'} butirAwal={materiButir} onKelola={bukaKelola} />;
   } else if (tabAktif === 'kelolamateri') {

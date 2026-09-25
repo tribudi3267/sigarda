@@ -45,6 +45,8 @@ const PENEGAK = {
         'Melihat seluruh butir SKU dan statusnya (Belum, Menunggu uji, Sedang diuji, Perlu diulang, atau Lulus).',
         'Tombol pada tiap butir untuk MENGAJUKAN pengujian: pilih penguji (Pembina atau Dewan Ambalan yang berhak) dan tanggal.',
         'Butir Laksana baru bisa diajukan setelah SELURUH butir Bantara lulus.',
+        'Bila pra-uji dihidupkan Pembina: pengajuan tidak lagi memilih penguji. Butir Bantara diteruskan berjenjang ke Pinsa sangga Anda, lalu Bina Damping rombel Anda, lalu diuji resmi oleh Pembina; butir Laksana ke Bina Damping yang sudah Laksana, lalu Pembina. Tahap yang tidak punya penilai dilewati otomatis. Di bawah tiap butir tampil jalur dan posisinya; Anda juga diberi tahu lewat notifikasi di setiap tahap.',
+        'Pra-uji hanya rekomendasi. Bila belum lulus, catatan perbaikan penilai tampil di butir itu dan Anda boleh mengajukan lagi (mulai dari tahap pertama). Pengajuan yang masih menunggu penilai dapat dibatalkan.',
         'Butir agama (Butir 1) hanya dapat dinilai Pembina; bila belum ada Pembina seagama, sementara semua Pembina boleh, atau lewat surat pengantar ke guru agama sekolah.',
       ],
     },
@@ -59,6 +61,7 @@ const PENEGAK = {
       ],
     },
     { id: 'penegak-agenda', judul: 'Agenda', isi: ['Melihat jadwal kegiatan Ambalan setahun (Musyawarah, pelantikan, perkemahan, dan lain-lain), dengan pengingat H-30/H-7/H-1.'] },
+    { id: 'penegak-pra-uji', judul: 'Pra-uji (bila Anda Pinsa atau Bina Damping)', isi: ['Menu Pra-uji muncul bila pra-uji sedang hidup dan Anda Pinsa sebuah sangga atau Bina Damping sebuah rombel. Di sana ada pengajuan yang menunggu penilaian Anda. Tekan Nilai, lalu pilih Lulus (pengajuan diteruskan otomatis ke tahap berikutnya atau ke Pembina) atau Belum lulus (catatan perbaikan wajib, dikirim ke Penegak). Anda hanya dapat menilai butir yang sudah Anda lulus sendiri, dan Bina Damping hanya menilai butir Laksana bila sudah Laksana. Pra-uji tidak memakai PIN dan tidak pernah menjadikan sebuah butir lulus; hasil resmi tetap dari Pembina. Daftar yang sudah Anda putuskan ada di bawah antrian.'] },
     { id: 'penegak-sangga', judul: 'Sangga (bila Anda Bina Damping)', isi: ['Menu Sangga muncul bila Anda ditunjuk Dewan Ambalan sebagai Bina Damping sebuah rombel (2 orang per rombel, dipilih dari Penegak berjabatan Dewan Ambalan). Di sana Anda membagi sangga di rombel itu (4 sampai 8 Penegak per sangga, 4 sampai 5 sangga per rombel) dan menentukan Pinsa, yaitu Pimpinan Sangga: seorang Penegak yang sudah menyelesaikan SKU Bantara. Peringatan jumlah anggota hanya pengingat, tidak menghalangi penyimpanan. Bila Anda sendiri ditunjuk sebagai Pinsa, Bina Damping rombel Anda yang menetapkannya.'] },
     {
       id: 'penegak-cetak',
@@ -99,6 +102,7 @@ const DEWAN = {
         'Daftar pengajuan pengujian dari Penegak: yang ditujukan langsung kepada Anda, dan antrian rombel yang menjadi tugas Anda.',
         'Mencatat hasil ujian memerlukan PIN Anda sendiri untuk memastikan yang mencatat benar orangnya.',
         'Butir Laksana bagi yang BUKAN Pembina hanya dapat dinilai bila ada penugasan khusus dari Pembina atau Admin untuk Penegak itu.',
+        'Bila Pembina menghidupkan pra-uji: uji resmi hanya dilakukan Pembina. Menu Antrian dan Sesi ujian tidak tampil untuk Dewan Ambalan, dan peran Dewan Ambalan bergeser ke pra-uji (sebagai Pinsa atau Bina Damping).',
       ],
     },
     { id: 'dewan-peserta', judul: 'Peserta', isi: ['Mencari dan melihat detail satu Penegak: progres SKU, riwayat pengujian, dan portofolio (bila Calon Garuda).'] },
@@ -108,6 +112,7 @@ const DEWAN = {
     { id: 'dewan-sidang', judul: 'Sidang', isi: ['Bila ditugaskan: mencatat keputusan Layak/Tidak Lulus pada Sidang Dewan Kehormatan sebelum pelantikan, dan mencetak Berita Acara.', 'Ketua sidang pada Berita Acara adalah Pemangku Adat (ketua Dewan Kehormatan Penegak); bila jabatan itu belum diisi, dipakai Pradana.'] },
     { id: 'dewan-periksa', judul: 'Periksa Data', isi: ['Ikut membantu memeriksa data yang belum lengkap (NTA, jenis kelamin, rombel format lama, dan lainnya). Untuk akun yang belum pernah masuk dan anggota yang belum mengaktifkan notifikasi, tombol Buka WhatsApp mengirim pesan pengingat siap kirim ke Penegak dan sesama Dewan Ambalan.'] },
     { id: 'dewan-sesi', judul: 'Sesi ujian', isi: ['Jadwal ujian bersama (tanggal, tempat), butir yang diuji, dan daftar pesertanya. Papan sesi menampilkan keadaan tiap peserta dari hasil uji yang sudah dicatat. Dewan Ambalan, Pembina, dan Admin dapat membuat dan mengubah sesi.'] },
+    { id: 'dewan-pra-uji', judul: 'Pra-uji', isi: ['Bila Anda Pinsa atau Bina Damping dan pra-uji sedang hidup, menu Pra-uji berisi antrian pengajuan Penegak yang menunggu penilaian Anda (cara menilai sama dengan panduan Penegak). Pra-uji hanya rekomendasi; uji resmi tetap oleh Pembina.'] },
     { id: 'dewan-tindaklanjut', judul: 'Tindak Lanjut', isi: ['Daftar Penegak yang lama tidak bergerak (SKU, absensi, atau iuran); tombol untuk membuka WhatsApp dengan pesan pengingat siap kirim.'] },
     { id: 'dewan-bina-damping', judul: 'Sangga dan Bina Damping', isi: ['Di menu Sangga, tab Bina Damping: menunjuk 2 Bina Damping untuk tiap rombel pada tahun ajaran berjalan. Calon adalah Penegak berjabatan Dewan Ambalan yang minimal Calon Laksana; utamakan yang sudah Laksana (Calon Laksana baru dapat dipilih bila tidak ada lagi yang sudah Laksana dan belum bertugas). Satu orang hanya untuk satu rombel per tahun ajaran, dan penunjukan berakhir sendiri bila Penegaknya nonaktif atau tidak lagi berjabatan. Tab Sangga menampilkan susunan sangga dan Pinsa tiap rombel.'] },
     {
@@ -142,6 +147,7 @@ const PEMBINA = {
     { id: 'pembina-raport', judul: 'Raport', isi: ['Menilai raport ekstrakurikuler Pramuka tiap semester (skor dari kehadiran, capaian SKU, dan sikap), lalu mencetak atau mengunduh Excel per kelas.'] },
     { id: 'pembina-laporan', judul: 'Laporan', isi: ['Menyusun laporan tahunan gugus depan (Excel dan PDF) untuk diserahkan ke Kwartir Ranting, dengan tembusan Kwartir Cabang.'] },
     { id: 'pembina-agenda', judul: 'Agenda', isi: ['Menambah dan mengubah jadwal kegiatan Ambalan, serta meninjau (menyetujui atau menolak) usulan kegiatan dari Pradana/Pradani.'] },
+    { id: 'pembina-pra-uji', judul: 'Pra-uji', isi: ['Menu Pra-uji memuat sakelar Hidupkan atau Matikan pra-uji. Hidup: Penegak mengajukan butir lewat jalur Pinsa, Bina Damping, lalu Anda (uji resmi hanya Pembina; Dewan Ambalan tidak lagi menguji). Pengajuan lama yang ditujukan kepada penguji non-Pembina dikembalikan ke antrian rombel. Mati: pra-uji yang masih menunggu diteruskan langsung ke antrian uji resmi. Sebelum menghidupkan, pastikan Bina Damping tiap rombel sudah ditunjuk dan sangga sudah dibagi (menu Sangga). Di menu yang sama ada daftar pengajuan yang menunggu penilai; bila penilai berhalangan atau tidak ada, tekan Lewati tahap (alasan wajib, tercatat di riwayat butir). Pengajuan tidak pernah lolos sendiri; Anda diingatkan bila menunggu lebih dari 3 hari tanpa penilai. Pengajuan yang lulus semua tahap muncul di menu Antrian.'] },
     { id: 'pembina-sangga', judul: 'Sangga dan Bina Damping', isi: ['Menu Sangga: melihat dan mengatur susunan sangga tiap rombel (nama sangga, Pinsa) dan penunjukan Bina Damping (bersama Dewan Ambalan dan Admin). Pembina dapat membetulkan susunan sangga di rombel mana pun bila Bina Damping belum ada atau keliru.'] },
     { id: 'pembina-berkas-garuda', judul: 'Berkas Calon Garuda', isi: ['Dari menu Portofolio: mencetak berkas lengkap satu Calon Garuda, atau membuat tautan berbagi baca-saja untuk penilai Kwartir tanpa perlu akun SIGARDA.'] },
     { id: 'pembina-agama', judul: 'Butir agama', isi: ['Hanya Pembina yang SEAGAMA dengan Penegak yang dapat menilai Butir 1 (agama), kecuali belum ada Pembina beragama itu, atau ada surat pengantar resmi ke guru agama sekolah.'] },
@@ -161,6 +167,7 @@ const ADMIN = {
   bagian: [
     { id: 'admin-anggota', judul: 'Anggota', isi: ['Menambah anggota satu per satu, atau mengimpor banyak sekaligus lewat berkas Excel. Jenis kelamin wajib diisi untuk anggota baru.'] },
     { id: 'admin-naikkelas', judul: 'Naik Kelas', isi: ['Proses tahunan: memindahkan rombel (X ke XI, XI ke XII) atau meluluskan Penegak kelas XII menjadi alumni, sekaligus untuk semua anggota.'] },
+    { id: 'admin-pra-uji', judul: 'Pra-uji', isi: ['Sama dengan Pembina: menu Pra-uji untuk menghidupkan atau mematikan pra-uji dan melewati tahap yang macet. Admin tidak menguji resmi; uji resmi hanya Pembina.'] },
     { id: 'admin-sangga', judul: 'Sangga dan Bina Damping', isi: ['Sama dengan Pembina: menu Sangga untuk mengatur sangga, Pinsa, dan penunjukan Bina Damping tiap rombel. Setelah Naik Kelas, Pinsa otomatis terlepas karena rombel berubah; Bina Damping ditunjuk ulang untuk tahun ajaran baru.'] },
     { id: 'admin-gudep', judul: 'Data Gudep', isi: ['Mengisi identitas gugus depan (nama, nomor, Kwarran, Kwarcab, Pembina Gudep, Ka. Mabigus) -- dipakai sebagai kop pada SEMUA dokumen cetak aplikasi.'] },
     { id: 'admin-cadangan', judul: 'Cadangan data', isi: ['Tombol "Unduh cadangan" (di menu Data Gudep) mengunduh seluruh data isian aplikasi (tanpa akun login). Lakukan rutin, minimal sebulan sekali; aplikasi akan mengingatkan bila sudah lewat 30 hari.'] },

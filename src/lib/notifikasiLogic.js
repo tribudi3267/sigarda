@@ -28,6 +28,8 @@ export const KAPAN_NOTIFIKASI = {
   penegak: [
     'Penguji mulai menguji butir yang Anda ajukan.',
     'Hasil penilaian butir Anda sudah dicatat (isi tidak menyebut lulus atau ulang).',
+    'Pra-uji (bila hidup): pengajuan Anda diteruskan ke pra-uji selanjutnya atau ke pengujian resmi ke Pembina, atau belum lulus pra-uji (catatan perbaikan ada di aplikasi).',
+    'Bila Anda Pinsa atau Bina Damping: ada pengajuan baru untuk dinilai di pra-uji, atau pra-uji menunggu lebih dari 3 hari.',
     'Anda dimasukkan ke sesi ujian bersama.',
     'Surat pengantar guru agama untuk Anda terbit.',
     'Pengingat pukul 07.00 WIB sehari sebelum jadwal pengujian atau sesi ujian Anda.',
@@ -39,6 +41,7 @@ export const KAPAN_NOTIFIKASI = {
     'Penegak mengajukan pengujian kepada Anda, atau ke antrian rombel yang Anda tangani.',
     'Pengujian dialihkan kepada Anda, atau masuk antrian rombel.',
     'Pengajuan menunggu lebih dari 3 hari tanpa penguji yang mulai menguji (sekali per pengajuan).',
+    'Bila Anda Pembina: pra-uji yang menunggu lebih dari 3 hari tanpa penilai yang dapat menilai (buka menu Pra-uji untuk melewati tahap itu).',
     'Pengingat pukul 07.00 WIB sehari sebelum jadwal pengujian yang menjadi tugas Anda.',
     'Seorang Penegak sudah 8 hari lebih tidak bergerak (SKU, absensi, atau iuran) — juga muncul di menu Tindak Lanjut.',
     'Pengingat H-30/H-7/H-1 untuk setiap kegiatan agenda (Musyawarah Ambalan, Naik Kelas, Sidang, Pelantikan, dll).',
@@ -54,7 +57,8 @@ export const teksLencana = (n) => (n > 99 ? '99+' : n > 0 ? String(n) : '');
 
 /** Menu tujuan dari tautan notifikasi bila menu itu ada di daftar menu pengguna; selain itu null (tetap di Kotak Notifikasi). */
 export const tujuanNotifikasi = (notif, idMenu = []) => {
-  const tab = notif?.tautan?.tab;
+  // Pengingat "pra-uji tanpa penilai" ke Pembina bertautan 'antrian' (tulisan lama di server); tempat melewati tahapnya di menu Pra-uji.
+  const tab = notif?.jenis === 'pra_uji' && notif?.tautan?.tab === 'antrian' ? 'pra-uji' : notif?.tautan?.tab;
   return typeof tab === 'string' && idMenu.includes(tab) ? tab : null;
 };
 

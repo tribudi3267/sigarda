@@ -7,9 +7,10 @@ import TingkatTabs from '../components/TingkatTabs';
 import AjukanModal from '../components/AjukanModal';
 import { Icon, ProgressBar } from '../components/ui';
 import SumberPeraturan from '../components/SumberPeraturan';
+import { praUjiMenunggu } from '../lib/praUjiLogic';
 
 export default function PesertaSku({ tingkat, setTingkat, onBukaMateri }) {
-  const { user, progress, batalkanAjuan, hanyaLihatSaya } = useApp();
+  const { user, progress, batalkanAjuan, hanyaLihatSaya, praUjiPeserta } = useApp();
   const [ajukanPoin, setAjukanPoin] = useState(null);
 
   const terbuka = tingkat === 'Bantara' || laksanaTerbuka(progress, user);
@@ -17,7 +18,8 @@ export default function PesertaSku({ tingkat, setTingkat, onBukaMateri }) {
 
   const renderAksi = (poin, entry) => {
     if (hanyaLihatSaya) return null; // nonaktif dan alumni hanya dapat melihat
-    if (entry.status === 'diajukan') {
+    // Menunggu pra-uji (Pinsa atau Bina Damping) juga masih dapat dibatalkan; butirnya belum berstatus diajukan.
+    if (entry.status === 'diajukan' || praUjiMenunggu(praUjiPeserta(user.id).filter((r) => r.skuId === poin.id))) {
       return (
         <button className="btn btn-outline btn-sm" onClick={() => batalkanAjuan(poin.id)}>
           Batalkan pengajuan

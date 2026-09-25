@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
+import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 /** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
@@ -178,6 +178,22 @@ export function buatApi(klien) {
       if (!r.ok) return r;
       return { ok: true, data: r.data?.ditemukan ? susunBerkasGaruda(r.data) : null };
     },
+
+    /* ------------------- Pra-uji berjenjang (fase D) ------------------- */
+    /** Sakelar pra-uji (pengaturan 'pra_uji.aktif', dapat dibaca semua yang sudah masuk); false bila belum pernah diatur atau basis data belum dimigrasi. */
+    muatPraUjiAktif: () => muat(async () => !!(await ambilSemua('pengaturan', { filter: [['kunci', 'pra_uji.aktif']] }))[0]?.nilai?.aktif),
+    /** Baris pra-uji satu Penegak (RLS: pemilik dan pengurus), urut nomor. */
+    muatPraUjiPeserta: (pesertaId) => muat(async () => (await ambilSemua('sku_pra_uji', { filter: [['peserta_id', pesertaId]], urut: ['id'] })).map(petaPraUji)),
+    /** Seluruh pra-uji yang sedang menunggu (pengurus). */
+    muatPraUjiMenunggu: () => muat(async () => (await ambilSemua('sku_pra_uji', { filter: [['status', 'menunggu']], urut: ['id'] })).map(petaPraUji)),
+    /** Antrian penilai yang sedang masuk (Pinsa atau Bina Damping): { aktif, menunggu, selesai }. */
+    muatAntrianPraUji: async () => { const r = await rpc('sg_pra_uji_antrian'); return r.ok ? { ok: true, data: susunAntrianPraUji(r.data) } : r; },
+    /** Keputusan penilai: hasil 'lulus' atau 'belum' (catatan wajib). Hasil: { hasil, tujuan } (tujuan: 'pinsa' | 'bina_damping' | 'pembina' | null). */
+    catatPraUji: (id, hasil, catatan = '') => rpc('sg_pra_uji_catat', { p_id: id, p_hasil: hasil, p_catatan: catatan }),
+    /** Pembina atau Admin melewati tahap yang macet (alasan wajib). Mengembalikan tahap tujuan. */
+    lewatiPraUji: (id, alasan) => rpc('sg_pra_uji_lewati', { p_id: id, p_alasan: alasan }),
+    /** Menghidupkan atau mematikan pra-uji (Pembina dan Admin). Hasil: { aktif, dialihkan }. */
+    aturSakelarPraUji: (aktif) => rpc('sg_pra_uji_sakelar', { p_aktif: aktif }),
 
     /** Catatan sidang (hanya pengurus yang menerima baris) dan pengaturan aplikasi. Dimuat saat halaman Sidang dibuka. */
     muatSidang: () => muat(async () => (await ambilSemua('sidang_dk', { urut: ['id'] })).map(petaSidang)),
