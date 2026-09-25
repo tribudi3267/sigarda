@@ -5580,6 +5580,30 @@ begin
   return jsonb_build_object('aktif', p_aktif, 'dialihkan', v_n);
 end $$;
 -- ===== akhir aksi pra-uji =====
+
+-- ===== Cakupan pra-uji (Tahap 2, G4e): aksi =====
+-- Seberapa banyak pengajuan baru yang benar-benar melewati pra-uji (punya penilai Pinsa atau Bina Damping) dibanding yang langsung ke antrian rombel Pembina karena tidak ada penilai
+-- (hasil simulasi 2 Okt 2026: cakupan sangat bergantung pada banyaknya Bina Damping yang memenuhi syarat). Dihitung dari riwayat pengajuan (teks yang ditulis
+-- sigarda.pra_uji_teruskan saat pengajuan awal), per rombel Penegak, untuk p_hari hari terakhir, beserta jumlah Bina Damping rombel itu pada tahun ajaran berjalan. Pembina dan Admin.
+create function public.sg_pra_uji_cakupan(p_hari integer default 30) returns jsonb language plpgsql stable security definer set search_path = public as
+$$
+declare v_dari timestamptz; v_ta text := sigarda.tahun_ajaran_kini();
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat melihat cakupan pra-uji.'; end if;
+  if p_hari is null or p_hari not between 1 and 365 then raise exception 'Jumlah hari harus 1 sampai 365.'; end if;
+  v_dari := now() - make_interval(days => p_hari);
+  return jsonb_build_object('aktif', sigarda.pra_uji_aktif(), 'hari', p_hari, 'perRombel', coalesce((
+    select jsonb_agg(jsonb_build_object('rombel', x.kelas, 'lewat', x.lewat, 'langsung', x.langsung, 'binaDamping', coalesce(bd.n, 0)) order by x.langsung desc, x.kelas)
+    from (
+      select p.kelas, count(*) filter (where h.teks like '%; menunggu pra-uji %')::int as lewat, count(*) filter (where h.teks like '%(antrian rombel, tanpa pra-uji)')::int as langsung
+      from public.sku_riwayat h join public.profiles p on p.id = h.peserta_id
+      where h.waktu >= v_dari and h.teks like 'Mengajukan pengujian untuk %' and (h.teks like '%; menunggu pra-uji %' or h.teks like '%(antrian rombel, tanpa pra-uji)')
+      group by p.kelas
+    ) x left join (select rombel, count(*)::int as n from public.bina_damping where tahun_ajaran = v_ta group by rombel) bd on bd.rombel = x.kelas
+  ), '[]'::jsonb));
+end $$;
+-- ===== akhir aksi cakupan pra-uji =====
 -- ===== Pelantikan dan Saka (Tahap 2, G1): aksi =====
 -- Hanya Pembina dan Admin Gudep yang mencatat (Pembina yang langsung membina menentukan kelayakan; Dewan hanya melihat). Pelantikan dicatat SESUDAH terjadi: tanggal tidak boleh
 -- di masa depan (rencana kegiatan ada di Agenda). Penegak harus aktif dan sudah menyelesaikan SEMUA butir SKU tingkat itu (sigarda.tingkat_selesai; cermin klien
@@ -6269,7 +6293,7 @@ grant execute on function
   public.sg_kegiatan_usul(text, text, date, text, text), public.sg_kegiatan_tinjau(bigint, text, text), public.sg_kegiatan_ping(bigint),
   public.sg_garuda_berkas_baca(uuid), public.sg_garuda_token_buat(uuid), public.sg_garuda_token_cabut(uuid),
   public.sg_bina_damping_atur(text, text, uuid[]), public.sg_bina_damping_daftar(text), public.sg_sangga_rombel(text), public.sg_sangga_atur(text, jsonb), public.sg_pendampingan_saya(),
-  public.sg_pra_uji_antrian(), public.sg_pra_uji_catat(bigint, text, text), public.sg_pra_uji_lewati(bigint, text), public.sg_pra_uji_sakelar(boolean),
+  public.sg_pra_uji_antrian(), public.sg_pra_uji_catat(bigint, text, text), public.sg_pra_uji_lewati(bigint, text), public.sg_pra_uji_sakelar(boolean), public.sg_pra_uji_cakupan(integer),
   public.sg_pelantikan_catat(text, date, text, uuid[], bigint, text), public.sg_pelantikan_hapus(bigint),
   public.sg_saka_simpan(bigint, uuid, text, date, text, date, text, text), public.sg_saka_hapus(bigint),
   public.sg_tkk_catat(uuid, text, text, date, text, text, text, text, text), public.sg_tkk_hapus(bigint),

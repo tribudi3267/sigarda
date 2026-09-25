@@ -272,6 +272,8 @@ export function buatApi(klien) {
     lewatiPraUji: (id, alasan) => rpc('sg_pra_uji_lewati', { p_id: id, p_alasan: alasan }),
     /** Menghidupkan atau mematikan pra-uji (Pembina dan Admin). Hasil: { aktif, dialihkan }. */
     aturSakelarPraUji: (aktif) => rpc('sg_pra_uji_sakelar', { p_aktif: aktif }),
+    /** Cakupan pra-uji p_hari hari terakhir (Pembina dan Admin): { aktif, hari, perRombel: [{ rombel, lewat, langsung, binaDamping }] }. */
+    muatCakupanPraUji: (hari = 30) => rpc('sg_pra_uji_cakupan', { p_hari: hari }),
 
     /** Catatan sidang (hanya pengurus yang menerima baris) dan pengaturan aplikasi. Dimuat saat halaman Sidang dibuka. */
     muatSidang: () => muat(async () => (await ambilSemua('sidang_dk', { urut: ['id'] })).map(petaSidang)),

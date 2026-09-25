@@ -185,8 +185,8 @@ for (let putaran = 1; putaran <= 8; putaran += 1) {
     const [, ms] = await waktu(async () => {
       await sebagai('service', `select public.sg_sku_catat_internal($1::uuid, $2::uuid, $3, 'proses', $4::date, null, '')`, [pb, it.peserta_id, it.sku_id, hari]);
       const lulus = acak() < 0.9;
-      const r = await sebagai('service', `select public.sg_sku_catat_internal($1::uuid, $2::uuid, $3, $4, $5::date, null, $6)`, [pb, it.peserta_id, it.sku_id, lulus ? 'lulus' : 'ulang', hari, lulus ? '' : 'Diulang']);
-      if (!r.ok) temuan(`uji resmi gagal dicatat: ${r.pesan}`);
+      const r = await sebagai('service', `select public.sg_sku_catat_internal($1::uuid, $2::uuid, $3, $4, $5::date, $7, $6)`, [pb, it.peserta_id, it.sku_id, lulus ? 'lulus' : 'ulang', hari, lulus ? '' : 'Diulang', lulus ? 'Baik' : null]);
+      if (!r.ok) { const k = `uji resmi: ${String(r.pesan).slice(0, 80)}`; galatAjukan[k] = (galatAjukan[k] ?? 0) + 1; }
       else if (lulus) proses.ujiLulus += 1; else proses.ujiUlang += 1;
     });
     wPembina.push(ms);
@@ -222,7 +222,7 @@ laporan.jalur.urutanTahapDitempuh = hitungJalur;
 const totalPengajuan = (await q(`select count(distinct (peserta_id::text || sku_id)) n from public.sku_riwayat where teks ilike '%diajukan%'`))[0].n;
 laporan.jalur.pengajuanBerbedaTercatat = Number(totalPengajuan);
 const langsung = (await q(`select count(*)::int n from (select distinct s.peserta_id, s.sku_id from public.sku_progress s where s.status in ('lulus','diajukan','proses','ulang')
-  and exists (select 1 from public.sku_riwayat h where h.peserta_id = s.peserta_id and h.sku_id = s.sku_id and h.tanggal >= now() - interval '1 hour')
+  and exists (select 1 from public.sku_riwayat h where h.peserta_id = s.peserta_id and h.sku_id = s.sku_id and h.waktu >= now() - interval '1 hour')
   and not exists (select 1 from public.sku_pra_uji r where r.peserta_id = s.peserta_id and r.sku_id = s.sku_id)) x`))[0].n;
 laporan.jalur.pengajuanTanpaPraUjiSama = langsung;
 
@@ -232,7 +232,7 @@ const inv = async (nama, sql, args = []) => { const n = (await q(sql, args))[0].
 await inv('menunggu_padahal_sudah_lulus', `select count(*)::int n from public.sku_pra_uji r where r.status = 'menunggu' and exists (select 1 from public.sku_progress s where s.peserta_id = r.peserta_id and s.sku_id = r.sku_id and s.status = 'lulus')`);
 await inv('menunggu_ganda', `select count(*)::int n from (select peserta_id, sku_id from public.sku_pra_uji where status = 'menunggu' group by 1, 2 having count(*) > 1) x`);
 await inv('pra_uji_menunggu_tanpa_penilai_sah', `select count(*)::int n from public.sku_pra_uji r where r.status = 'menunggu' and not exists (select 1 from public.profiles p where p.status = 'aktif' and sigarda.pra_uji_penilai_ok(r.peserta_id, r.sku_id, r.tahap, p.id))`);
-await inv('lulus_resmi_dicatat_bukan_pembina', `select count(*)::int n from public.sku_riwayat h join public.profiles p on p.id = h.oleh where h.teks ilike 'Lulus%' and h.tanggal >= now() - interval '2 hours' and not (p.role = 'penguji' and p.jabatan = 'Pembina') and p.role <> 'admin'`);
+await inv('lulus_resmi_dicatat_bukan_pembina', `select count(*)::int n from public.sku_riwayat h join public.profiles p on p.id = h.oleh where h.teks ilike 'Dinyatakan lulus%' and h.waktu >= now() - interval '2 hours' and not (p.role = 'penguji' and p.jabatan = 'Pembina') and p.role <> 'admin'`);
 await inv('keputusan_pra_uji_tanpa_penilai', `select count(*)::int n from public.sku_pra_uji where status in ('lulus','belum') and penilai_id is null`);
 await inv('belum_tanpa_catatan', `select count(*)::int n from public.sku_pra_uji where status = 'belum' and btrim(catatan) = ''`);
 await inv('notif_hasil_resmi_membocorkan_hasil', `select count(*)::int n from public.notifikasi where jenis = 'hasil' and (judul || ' ' || isi) ~* '(lulus|ulang|tidak lulus)'`);
@@ -250,7 +250,7 @@ const hak = async (nama, r, harapGagal, polaPesan) => {
   if (!lolos) temuan(`hak "${nama}" menyimpang: ${r.ok ? 'berhasil dijalankan' : r.pesan}`);
 };
 if (contohPeserta) {
-  await hak('Dewan (Penegak berjabatan) tidak boleh mencatat hasil resmi', await sebagai('service', `select public.sg_sku_catat_internal($1::uuid, $2::uuid, $3, 'lulus', $4::date, null, '')`, [dewanId, contohPeserta.peserta_id, contohPeserta.sku_id, hari]), true);
+  await hak('Dewan (Penegak berjabatan) tidak boleh mencatat hasil resmi', await sebagai('service', `select public.sg_sku_catat_internal($1::uuid, $2::uuid, $3, 'lulus', $4::date, 'Baik', '')`, [dewanId, contohPeserta.peserta_id, contohPeserta.sku_id, hari]), true);
 }
 const rowMenunggu = (await q(`select id, peserta_id from public.sku_pra_uji where status = 'menunggu' limit 1`))[0];
 const penegakBiasa = (await q(`select id from public.profiles where role = 'peserta' and status = 'aktif' and pinsa = false and jabatan_dewan is null and id not in (select penegak_id from public.bina_damping) limit 1`))[0].id;
