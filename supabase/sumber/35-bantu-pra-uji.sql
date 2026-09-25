@@ -137,7 +137,7 @@ begin
       for v_x in select id from public.profiles where role = 'penguji' and jabatan = 'Pembina' and status = 'aktif' loop
         perform sigarda.notif_buat(v_x, 'pra_uji', 'Pra-uji tanpa penilai',
           r.nama || ', ' || sigarda.notif_label_butir(r.sku_id) || ': belum ada ' || sigarda.pra_uji_nama_tahap(r.tahap) || ' yang dapat menilai. Lewati tahap ini bila perlu.',
-          '{"tab":"antrian"}', 'pra-macet:' || r.id);
+          '{"tab":"pra-uji"}', 'pra-macet:' || r.id);
       end loop;
     end if;
   end loop;

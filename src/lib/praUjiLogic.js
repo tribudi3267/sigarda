@@ -91,3 +91,13 @@ export const ujiResmiTampil = (user, praUjiAktif) => !!user && (user.role === 'a
 
 /** Lama menunggu dalam hari bulat (0 = hari ini), dari stempel waktu ISO. */
 export const hariMenunggu = (dibuat, sekarang = Date.now()) => (dibuat ? Math.max(0, Math.floor((sekarang - Date.parse(dibuat)) / 86400000)) : 0);
+
+/**
+ * Butir milik satu Penegak yang masih menunggu penilai pra-uji (belum berstatus diajukan, sehingga tidak ada di daftar pengujian resmi), jadwal terdekat dulu.
+ * `entri` = [{ poin, entry }], `baris` = baris pra-uji Penegak itu. Mengembalikan [{ poin, entry, pra }].
+ */
+export const butirMenungguPra = (entri = [], baris = []) =>
+  entri
+    .map((x) => ({ ...x, pra: praUjiMenunggu(baris.filter((r) => r.skuId === x.poin.id)) }))
+    .filter((x) => x.pra && x.entry.status !== 'lulus' && x.entry.status !== 'diajukan' && x.entry.status !== 'proses')
+    .sort((a, b) => (a.pra.jadwal ?? '9999').localeCompare(b.pra.jadwal ?? '9999'));
