@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
+import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSpg, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 /** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
@@ -207,6 +207,14 @@ export function buatApi(klien) {
     catatTkk: ({ pesertaId, tkkId, tingkat, tanggal, penguji1, penguji2, melatih, buktiUrl = '', catatan = '' }) =>
       rpc('sg_tkk_catat', { p_peserta_id: pesertaId, p_tkk_id: tkkId, p_tingkat: tingkat, p_tanggal: tanggal || null, p_penguji1: penguji1, p_penguji2: penguji2, p_melatih: melatih, p_bukti_url: buktiUrl, p_catatan: catatan }),
     hapusTkk: (id) => rpc('sg_tkk_hapus', { p_id: id }),
+
+    /* ------------------- Syarat Pramuka Garuda / SPG (Tahap 2, G3) ------------------- */
+    /** Penetapan SPG yang boleh dilihat (Penegak: miliknya; pengurus: semua; dibatasi RLS). */
+    muatSpg: () => muat(async () => susunSpg(await ambilSemua('spg_penetapan', { urut: ['peserta_id', 'butir'] }))),
+    /** Menetapkan satu butir SPG (Pembina dan Admin): nilai 100 (lengkap) atau 0; `timpa` = berbeda dari hasil aplikasi (alasan wajib di catatan). */
+    catatSpg: ({ pesertaId, butir, nilai, tanggal, catatan = '', timpa = false }) =>
+      rpc('sg_spg_catat', { p_peserta_id: pesertaId, p_butir: butir, p_nilai: nilai, p_tanggal: tanggal || null, p_catatan: catatan, p_timpa: timpa }),
+    hapusSpg: (pesertaId, butir) => rpc('sg_spg_hapus', { p_peserta_id: pesertaId, p_butir: butir }),
     simpanKrida: ({ id = null, pesertaId, nama, saka = '', tanggal, buktiUrl = '', catatan = '' }) =>
       rpc('sg_tkk_krida_simpan', { p_id: id, p_peserta_id: pesertaId, p_nama: nama, p_saka: saka, p_tanggal: tanggal || null, p_bukti_url: buktiUrl, p_catatan: catatan }),
     hapusKrida: (id) => rpc('sg_tkk_krida_hapus', { p_id: id }),
