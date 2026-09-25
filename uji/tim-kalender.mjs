@@ -1,0 +1,157 @@
+// Tahap 2 (G4b dan G4c): tim penilai Calon Garuda dan kalender tahap Garuda di server (PGlite): hak, validasi, atomik, satu tim per (tahun ajaran, untuk), penggantian anggota,
+// hapus (kaskade), RLS baca pengurus, dan cadangan. Logika klien: uji/tim-kalender-klien.mjs. Migrasi: uji/migrasi-tim-kalender.mjs.
+import { PGlite } from '@electric-sql/pglite';
+import { readFileSync } from 'node:fs';
+import { siapkanPg, buatKlienFake, sqlSebagai } from '../src/lokal/klienFake.js';
+import { isiDataContoh } from '../src/lokal/seedLokal.js';
+import { PIN_DEMO } from '../src/lokal/pinDemo.js';
+import { buatApi } from '../src/lib/api.js';
+
+const P = process.cwd().replace(/\\/g, '/');
+let gagal = 0, lulus = 0;
+const ok = (c, m) => { if (c) { lulus++; console.log('ok   :', m); } else { gagal++; console.log('GAGAL:', m); } };
+const pg = new PGlite();
+await siapkanPg(pg, { sqlStub: readFileSync(`${P}/supabase/lokal/stub.sql`, 'utf8'), sqlSkema: readFileSync(`${P}/supabase/skema.sql`, 'utf8').replace(/^﻿/, '') });
+await isiDataContoh(pg);
+await pg.query('update public.profiles set wajib_ganti_pin = false');
+const q = async (sql, p = []) => (await pg.query(sql, p)).rows;
+const masuk = async (nama, pin) => { const k = buatKlienFake(pg); const a = buatApi(k); const r = await a.masuk(nama, pin); return { k, a, id: r.id }; };
+const K = { admin: await masuk('admin', PIN_DEMO.admin), pembina: await masuk('pembina', PIN_DEMO.pembina), dewan: await masuk('dewan', PIN_DEMO.dewan), siti: await masuk('10232', PIN_DEMO.penegak) };
+const sebagai = async (id, sql, args = []) => { try { return { ok: true, rows: (await sqlSebagai(pg, id, sql, args)).rows }; } catch (e) { return { ok: false, pesan: e.message }; } };
+const cocok = (r, re) => !r.ok && re.test(r.pesan ?? '');
+const hari = (await q('select sigarda.hari_ini()::text d'))[0].d;
+const geser = async (n) => (await q(`select (sigarda.hari_ini() + $1::int)::text d`, [n]))[0].d;
+const TA = '2026/2027';
+const A5 = [
+  { nama: 'Ibu Ketua', unsur: 'ketua_gudep', jabatan: 'ketua' }, { nama: 'Pak Pembina', unsur: 'pembina' }, { nama: 'Bu Andalan', unsur: 'andalan_ranting' },
+  { nama: 'Pak Tokoh', unsur: 'tokoh_masyarakat' }, { nama: 'Ibu Wali', unsur: 'orang_tua', keterangan: 'ibu dari Calon' },
+];
+const simpan = (id, o = {}) => sebagai(id, 'select public.sg_tim_penilai_simpan($1::bigint, $2, $3, $4, $5::date, $6, $7, $8::jsonb) as id',
+  [o.id ?? null, o.ta ?? TA, o.untuk ?? 'putri', o.nomor ?? '123/KWARCAB/2026', o.tgl === undefined ? '2026-09-10' : o.tgl, o.url ?? '', o.cat ?? '', JSON.stringify(o.anggota ?? A5)]);
+const tim = () => q('select id, tahun_ajaran, untuk, nomor_sk, tanggal_sk::text tgl from public.tim_penilai order by id');
+const anggota = (id) => q('select urut, nama, unsur, jabatan, keterangan from public.tim_penilai_anggota where tim_id = $1 order by urut', [id]);
+
+console.log('--- Tim penilai: hak dan validasi ---');
+let r = await simpan(K.siti.id);
+ok(cocok(r, /Hanya Pembina dan Admin Gudep/), 'Penegak tidak dapat mencatat tim penilai');
+r = await simpan(K.dewan.id);
+ok(cocok(r, /Hanya Pembina dan Admin Gudep/), 'akun Dewan lama tidak dapat mencatat tim penilai');
+r = await simpan(K.pembina.id, { ta: '2026' });
+ok(cocok(r, /Tahun ajaran tidak sah/), 'tahun ajaran harus berbentuk TTTT/TTTT');
+r = await simpan(K.pembina.id, { untuk: 'campur' });
+ok(cocok(r, /putra atau putri/), 'untuk harus putra atau putri');
+r = await simpan(K.pembina.id, { nomor: 'SK<1>' });
+ok(cocok(r, /Nomor SK maksimal 80/), 'nomor SK tanpa tanda < atau >');
+r = await simpan(K.pembina.id, { nomor: '' });
+ok(cocok(r, /diisi berpasangan/), 'nomor SK tanpa tanggal ditolak (berpasangan)');
+r = await simpan(K.pembina.id, { tgl: null });
+ok(cocok(r, /diisi berpasangan/), 'tanggal SK tanpa nomor ditolak (berpasangan)');
+r = await simpan(K.pembina.id, { tgl: await geser(2) });
+ok(cocok(r, /masa depan/), 'tanggal SK di masa depan ditolak');
+r = await simpan(K.pembina.id, { url: 'ftp://x' });
+ok(cocok(r, /http:\/\/ atau https:\/\//), 'tautan SK harus http(s)');
+r = await simpan(K.pembina.id, { anggota: [] });
+ok(cocok(r, /1 sampai 15 anggota/), 'anggota tidak boleh kosong');
+r = await simpan(K.pembina.id, { anggota: Array.from({ length: 16 }, (_, i) => ({ nama: `Orang ${i}`, unsur: 'lainnya' })) });
+ok(cocok(r, /1 sampai 15 anggota/), 'maksimal 15 anggota');
+r = await simpan(K.pembina.id, { anggota: [{ nama: '  ', unsur: 'pembina' }] });
+ok(cocok(r, /Nama anggota tim nomor 1 wajib/), 'nama anggota wajib (nomor baris disebut)');
+r = await simpan(K.pembina.id, { anggota: [{ nama: 'A', unsur: 'pembina' }, { nama: 'B', unsur: 'kepala desa' }] });
+ok(cocok(r, /Unsur anggota tim nomor 2 tidak dikenal/), 'unsur harus dari daftar');
+r = await simpan(K.pembina.id, { anggota: [{ nama: 'A', unsur: 'pembina', jabatan: 'wakil' }] });
+ok(cocok(r, /Jabatan anggota tim nomor 1/), 'jabatan harus ketua atau anggota');
+r = await simpan(K.pembina.id, { anggota: [{ nama: 'A', unsur: 'pembina', jabatan: 'ketua' }, { nama: 'B', unsur: 'pembina', jabatan: 'ketua' }] });
+ok(cocok(r, /satu ketua/), 'paling banyak satu ketua');
+r = await simpan(K.pembina.id, { anggota: [{ nama: 'A', unsur: 'pembina', keterangan: 'x'.repeat(121) }] });
+ok(cocok(r, /Keterangan anggota tim nomor 1/), 'keterangan maksimal 120 karakter');
+ok((await tim()).length === 0, 'tidak ada tim tercatat oleh isian yang ditolak');
+
+console.log('\n--- Menyimpan, satu tim per (tahun ajaran, untuk), mengganti anggota ---');
+r = await simpan(K.pembina.id, { url: 'https://drive.example/sk', cat: 'diambil 12 Sep' });
+ok(r.ok && Number(r.rows[0].id) > 0, 'Pembina mencatat tim putri ' + (r.pesan ?? ''));
+const idPutri = Number(r.rows[0].id);
+let a = await anggota(idPutri);
+ok(a.length === 5 && a[0].nama === 'Ibu Ketua' && a[0].jabatan === 'ketua' && a[0].urut === 1 && a[4].keterangan === 'ibu dari Calon' && a[1].jabatan === 'anggota', 'anggota tersimpan berurutan dengan jabatan bawaan anggota');
+r = await simpan(K.pembina.id);
+ok(cocok(r, /sudah ada; ubah yang sudah ada/), 'tim putri yang sama pada tahun ajaran yang sama tidak digandakan');
+r = await simpan(K.admin.id, { untuk: 'putra', nomor: '', tgl: null, anggota: [{ nama: '  Pak   Ketua ', unsur: 'ketua_gudep', jabatan: 'ketua' }] });
+ok(r.ok, 'Admin mencatat tim putra tanpa SK (nomor dan tanggal kosong keduanya sah)');
+const idPutra = Number(r.rows[0].id);
+ok((await anggota(idPutra))[0].nama === 'Pak Ketua', 'nama dirapikan (spasi ganda dan pinggir)');
+r = await simpan(K.pembina.id, { id: idPutri, anggota: [{ nama: 'Bu Baru', unsur: 'pembina' }, { nama: 'Ibu Wali', unsur: 'orang_tua' }, { nama: 'Bu Ketua Baru', unsur: 'ketua_gudep', jabatan: 'ketua' }], nomor: '124/KWARCAB/2026' });
+ok(r.ok && Number(r.rows[0].id) === idPutri, 'mengubah tim: anggota lama diganti seluruhnya');
+a = await anggota(idPutri);
+ok(a.length === 3 && a.map((x) => x.nama).join() === 'Bu Baru,Ibu Wali,Bu Ketua Baru' && a.map((x) => x.urut).join() === '1,2,3', 'anggota baru berurutan 1..3 sesuai isian');
+ok((await tim()).find((t) => t.id === String(idPutri) || Number(t.id) === idPutri).nomor_sk === '124/KWARCAB/2026', 'atribut tim ikut diperbarui');
+r = await simpan(K.pembina.id, { id: idPutri, untuk: 'putra' });
+ok(cocok(r, /sudah ada/), 'mengubah untuk menjadi putra saat tim putra sudah ada ditolak');
+r = await simpan(K.pembina.id, { id: 999999 });
+ok(cocok(r, /tidak ditemukan/), 'mengubah tim yang tidak ada: pesan jelas');
+r = await simpan(K.pembina.id, { id: idPutri, anggota: [{ nama: 'A', unsur: 'pembina', jabatan: 'ketua' }, { nama: 'B', unsur: 'kepala desa' }] });
+ok(!r.ok && (await anggota(idPutri)).length === 3, 'isian keliru saat mengubah: anggota lama tidak hilang (atomik)');
+r = await simpan(K.pembina.id, { ta: '2027/2028' });
+ok(r.ok, 'tahun ajaran lain boleh punya tim putri sendiri');
+
+console.log('\n--- RLS baca ---');
+r = await sebagai(K.dewan.id, 'select 1 from public.tim_penilai');
+ok(r.ok && r.rows.length === 3, 'Dewan (pengurus) membaca semua tim');
+r = await sebagai(K.siti.id, 'select 1 from public.tim_penilai');
+ok(r.ok && r.rows.length === 0, 'Penegak tidak melihat tim penilai');
+r = await sebagai(K.siti.id, 'select 1 from public.tim_penilai_anggota');
+ok(r.ok && r.rows.length === 0, 'Penegak tidak melihat anggota tim');
+r = await sebagai(K.pembina.id, `update public.tim_penilai set catatan = 'x'`);
+ok(!r.ok || r.rows.length === 0, 'Pembina pun tidak dapat menulis langsung (hanya lewat fungsi)');
+r = await K.pembina.a.muatTimKalender();
+ok(r.ok && r.data.tim.length === 3 && r.data.tim[0].tahunAjaran === '2027/2028' && r.data.tim.find((t) => t.id === idPutri).anggota.length === 3 && r.data.tim.find((t) => t.id === idPutra).untuk === 'putra', 'api().muatTimKalender memetakan tim dengan anggotanya (terbaru dulu)');
+
+console.log('\n--- Menghapus tim ---');
+r = await sebagai(K.siti.id, 'select public.sg_tim_penilai_hapus($1)', [idPutra]);
+ok(cocok(r, /Hanya Pembina dan Admin Gudep/), 'Penegak tidak dapat menghapus tim');
+r = await sebagai(K.pembina.id, 'select public.sg_tim_penilai_hapus($1)', [idPutra]);
+ok(r.ok && (await tim()).length === 2 && (await anggota(idPutra)).length === 0, 'Pembina menghapus tim; anggotanya ikut terhapus (kaskade)');
+r = await sebagai(K.pembina.id, 'select public.sg_tim_penilai_hapus($1)', [idPutra]);
+ok(cocok(r, /tidak ditemukan/), 'menghapus yang sudah tidak ada: pesan jelas');
+
+console.log('\n--- Kalender tahap Garuda ---');
+const tahap = (id, t = 'pelantikan', mulai = '2026-10-28', akhir = null, cat = '', ta = TA) => sebagai(id, 'select public.sg_garuda_tahap_simpan($1, $2, $3::date, $4::date, $5) as id', [ta, t, mulai, akhir, cat]);
+r = await tahap(K.siti.id);
+ok(cocok(r, /Hanya Pembina dan Admin Gudep/), 'Penegak tidak dapat mengisi kalender');
+r = await tahap(K.dewan.id);
+ok(cocok(r, /Hanya Pembina dan Admin Gudep/), 'akun Dewan lama tidak dapat mengisi kalender');
+r = await tahap(K.pembina.id, 'pelantikan', '2026-10-28', null, '', 'abc');
+ok(cocok(r, /Tahun ajaran tidak sah/), 'tahun ajaran harus berbentuk TTTT/TTTT');
+r = await tahap(K.pembina.id, 'rapat');
+ok(cocok(r, /Tahap tidak dikenal/), 'tahap harus dari daftar');
+r = await tahap(K.pembina.id, 'pelantikan', null);
+ok(cocok(r, /Tanggal mulai wajib/), 'tanggal mulai wajib');
+r = await tahap(K.pembina.id, 'pelantikan', '1999-01-01');
+ok(cocok(r, /Tanggal mulai tidak sah/), 'tanggal mulai sebelum tahun 2000 ditolak');
+r = await tahap(K.pembina.id, 'pelantikan', '2026-10-28', '2026-10-01');
+ok(cocok(r, /Tanggal akhir tidak boleh sebelum/), 'tanggal akhir sebelum mulai ditolak');
+r = await tahap(K.pembina.id, 'pelantikan', '2026-10-28', null, 'a<b');
+ok(cocok(r, /Catatan maksimal 200/), 'catatan tanpa tanda < atau >');
+r = await tahap(K.pembina.id, 'ajukan_tim', '2026-09-12', '2026-09-16', 'melalui Kwarran');
+ok(r.ok, 'Pembina mengisi tahap dengan rentang ' + (r.pesan ?? ''));
+const idT = Number(r.rows[0].id);
+r = await tahap(K.admin.id, 'ajukan_tim', '2026-09-13', '2026-09-17', 'digeser');
+ok(r.ok && Number(r.rows[0].id) === idT && (await q('select count(*)::int n from public.garuda_tahap'))[0].n === 1, 'mengisi ulang tahap yang sama = koreksi (satu baris per tahun ajaran dan tahap)');
+r = await tahap(K.pembina.id, 'pelantikan', '2026-10-28');
+ok(r.ok && (await q('select count(*)::int n from public.garuda_tahap'))[0].n === 2, 'tahap lain menambah baris');
+r = await K.dewan.a.muatTimKalender();
+ok(r.ok && r.data.tahap.length === 2 && r.data.tahap.find((t) => t.tahap === 'ajukan_tim').akhir === '2026-09-17' && r.data.tahap.find((t) => t.tahap === 'pelantikan').akhir === null, 'api().muatTimKalender memetakan kalender (akhir kosong = null)');
+r = await K.siti.a.muatTimKalender();
+ok(r.ok && r.data.tahap.length === 0, 'Penegak tidak melihat kalender (RLS)');
+r = await sebagai(K.siti.id, 'select public.sg_garuda_tahap_hapus($1)', [idT]);
+ok(cocok(r, /Hanya Pembina dan Admin Gudep/), 'Penegak tidak dapat menghapus tahap');
+r = await sebagai(K.pembina.id, 'select public.sg_garuda_tahap_hapus($1)', [idT]);
+ok(r.ok && (await q('select count(*)::int n from public.garuda_tahap'))[0].n === 1, 'Pembina menghapus tahap');
+r = await sebagai(K.pembina.id, 'select public.sg_garuda_tahap_hapus($1)', [idT]);
+ok(cocok(r, /tidak ditemukan/), 'menghapus yang sudah tidak ada: pesan jelas');
+
+console.log('\n--- Cadangan ---');
+r = await sebagai(K.admin.id, 'select public.sg_cadangan_admin() as d');
+const t = r.rows?.[0]?.d?.tabel ?? {};
+ok(r.ok && t.tim_penilai?.length === 2 && t.tim_penilai_anggota?.length === 8 && t.garuda_tahap?.length === 1 && Array.isArray(t.tanggal_lahir) && Array.isArray(t.spg_penetapan) && Array.isArray(t.agenda), 'cadangan data memuat tabel baru (dan tetap memuat tabel lain; batas 100 argumen tidak terlampaui)');
+
+console.log(`\nRINGKASAN TIM-KALENDER: ${lulus} lulus, ${gagal} gagal`);
+process.exit(gagal ? 1 : 0);

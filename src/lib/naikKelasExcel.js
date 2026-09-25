@@ -7,7 +7,7 @@
  */
 import { SEMUA_ROMBEL, PESAN_ROMBEL } from './rombelLogic';
 import { LABEL_AKSI, LABEL_STATUS } from './naikKelasLogic';
-import { teksSel, unduhBlob } from './importAnggota';
+import { teksSel, unduhBlob } from './importAnggotaExcel';
 
 export const NAMA_LEMBAR_NAIK_KELAS = 'Naik Kelas';
 export const MAKS_BARIS_NAIK_KELAS = 2500;

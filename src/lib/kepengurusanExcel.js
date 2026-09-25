@@ -6,7 +6,7 @@
  * (yang tidak ada di berkas dicabut). Penilaian isi ada di server (sg_kepengurusan_terapkan); di sini hanya membaca dan menulis berkas.
  * ExcelJS dimuat saat dipakai.
  */
-import { teksSel, unduhBlob } from './importAnggota';
+import { teksSel, unduhBlob } from './importAnggotaExcel';
 import { JABATAN_DEWAN } from './dewanLogic';
 
 export const NAMA_LEMBAR_KEPENGURUSAN = 'Kepengurusan';

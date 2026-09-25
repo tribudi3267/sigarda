@@ -1,6 +1,7 @@
 ﻿import { useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { bacaExcelAnggota, kelompokDari, periksaBaris, unduhTemplateAnggota, MAKS_BARIS } from '../lib/importAnggota';
+import { kelompokDari, periksaBaris, MAKS_BARIS } from '../lib/importAnggota';
+import { bacaExcelAnggota, unduhTemplateAnggota } from '../lib/importAnggotaExcel';
 import { unduhXlsx } from '../lib/exportXlsx';
 import { labelJenisKelamin } from '../lib/jenisKelaminLogic';
 import { fmtTanggal, hariIni } from '../lib/format';
@@ -159,6 +160,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
                       <th className="px-3 py-2 font-semibold">Rombel</th>
                       <th className="px-3 py-2 font-semibold">Sangga</th>
                       <th className="px-3 py-2 font-semibold">Agama</th>
+                      <th className="px-3 py-2 font-semibold">Tgl lahir</th>
                     </>
                   )}
                   <th className="px-3 py-2 font-semibold">Status</th>
@@ -177,6 +179,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
                         <td className="px-3 py-2">{r.data.kelas || '-'}</td>
                         <td className="px-3 py-2">{r.data.sangga || '-'}</td>
                         <td className="px-3 py-2">{r.data.agama || r.data.agamaAsli || '-'}</td>
+                        <td className="px-3 py-2">{r.data.lahir || r.data.lahirAsli || '-'}</td>
                       </>
                     )}
                     <td className="px-3 py-2">

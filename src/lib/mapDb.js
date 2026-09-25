@@ -309,6 +309,21 @@ export const susunSaka = (baris = []) =>
     suratUrl: r.surat_url ?? '', catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada,
   })).sort((a, b) => a.saka.localeCompare(b.saka, 'id') || a.tanggalMasuk.localeCompare(b.tanggalMasuk));
 
+/**
+ * Baris tim_penilai dan tim_penilai_anggota -> [{ id, tahunAjaran, untuk ('putra'|'putri'), nomorSk, tanggalSk, skUrl, catatan, dicatatPada,
+ * anggota: [{ id, urut, nama, unsur, jabatan, keterangan }] }], tahun ajaran terbaru lalu putra dahulu.
+ */
+export const susunTimPenilai = (tim = [], anggota = []) =>
+  tim.map((t) => ({
+    id: Number(t.id), tahunAjaran: t.tahun_ajaran, untuk: t.untuk, nomorSk: t.nomor_sk ?? '', tanggalSk: t.tanggal_sk ? tgl(t.tanggal_sk) : null, skUrl: t.sk_url ?? '', catatan: t.catatan ?? '',
+    dicatatPada: t.dicatat_pada,
+    anggota: anggota.filter((a) => Number(a.tim_id) === Number(t.id)).map((a) => ({ id: Number(a.id), urut: Number(a.urut), nama: a.nama, unsur: a.unsur, jabatan: a.jabatan, keterangan: a.keterangan ?? '' })).sort((a, b) => a.urut - b.urut),
+  })).sort((a, b) => b.tahunAjaran.localeCompare(a.tahunAjaran) || (a.untuk === b.untuk ? 0 : a.untuk === 'putra' ? -1 : 1));
+
+/** Baris garuda_tahap -> [{ id, tahunAjaran, tahap, mulai, akhir (atau null), catatan, dicatatPada }]. */
+export const susunGarudaTahap = (baris = []) =>
+  baris.map((r) => ({ id: Number(r.id), tahunAjaran: r.tahun_ajaran, tahap: r.tahap, mulai: tgl(r.mulai), akhir: r.akhir ? tgl(r.akhir) : null, catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada }));
+
 /** Baris tanggal_lahir -> [{ pesertaId, tanggal (YYYY-MM-DD), dicatatPada }]. */
 export const susunTanggalLahir = (baris = []) => baris.map((r) => ({ pesertaId: r.peserta_id, tanggal: tgl(r.tanggal), dicatatPada: r.dicatat_pada }));
 

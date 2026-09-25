@@ -12,7 +12,8 @@ import {
   pembinaTanpaAgama, pesertaRombelLama, ringkasRombel, rombelSah, tahunAjaranSah, jumlahPesertaPerRombel,
 } from '../src/lib/rombelLogic.js';
 import { bacaExcelRombel, buatBerkasRombel, daftarRombelLama, periksaRombelMassal } from '../src/lib/rombelExcel.js';
-import { bacaExcelAnggota, buatTemplateAnggota, kolomTemplate, periksaBaris } from '../src/lib/importAnggota.js';
+import { kolomTemplate, periksaBaris } from '../src/lib/importAnggota.js';
+import { bacaExcelAnggota, buatTemplateAnggota } from '../src/lib/importAnggotaExcel.js';
 
 const P = process.cwd().replace(/\\/g, '/');
 let gagal = 0, lulus = 0;

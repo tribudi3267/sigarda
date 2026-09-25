@@ -1,5 +1,5 @@
-// Migrasi gerbang calon Garuda (Tahap 2, G4): kesetaraan dengan skema baru (fungsi, tabel, kebijakan, pemicu, hak), data utuh, idempoten, perilaku baru,
-// dan gagal jelas bila prasyarat (migrasi SPG) belum ada.
+// Migrasi impor tanggal lahir (Tahap 2, G4b): kesetaraan dengan skema baru (fungsi, tabel, kebijakan, pemicu, hak), data utuh, idempoten, perilaku baru,
+// dan gagal jelas bila prasyarat (migrasi gerbang) belum ada.
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import { skemaLama } from '../scripts/skema-lama.mjs';
@@ -13,7 +13,7 @@ let g = 0, l = 0;
 const ok = (c, m) => { if (c) { l++; console.log('ok   :', m); } else { g++; console.log('GAGAL:', m); } };
 const stub = readFileSync(`${P}/supabase/lokal/stub.sql`, 'utf8');
 const bersih = (s) => s.replace(/^﻿/, '').replace(/\r\n/g, '\n');
-const MP = bersih(readFileSync(`${P}/supabase/migrasi/2026-09-gerbang.sql`, 'utf8'));
+const MP = bersih(readFileSync(`${P}/supabase/migrasi/2026-09-tanggal-lahir-impor.sql`, 'utf8'));
 
 const skemaDari = (ref) => (ref.startsWith('git:') ? skemaLama(ref.slice(4), P) : readFileSync(ref, 'utf8'));
 const baru = async (skemaFile) => { const db = new PGlite(); await siapkanPg(db, { sqlStub: stub, sqlSkema: bersih(skemaDari(skemaFile)) }); return db; };
@@ -25,9 +25,9 @@ const potret = async (db) => {
   const q = async (sql) => (await db.query(sql)).rows;
   return {
     fungsi: await q(`select n.nspname, p.proname, pg_get_function_identity_arguments(p.oid) args, p.prosecdef, p.provolatile, pg_get_function_result(p.oid) hasil, md5(p.prosrc) badan
-      from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('public', 'sigarda') and p.prokind = 'f' order by 1, 2, 3`),
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('public', 'sigarda') and p.prokind = 'f' and p.proname = 'sg_tanggal_lahir_impor' order by 1, 2, 3`),
     hakFungsi: await q(`select routine_schema, routine_name, grantee, privilege_type from information_schema.role_routine_grants
-      where routine_schema in ('public', 'sigarda') and grantee in ('anon','authenticated','service_role') order by 1, 2, 3, 4`),
+      where routine_schema in ('public', 'sigarda') and routine_name = 'sg_tanggal_lahir_impor' and grantee in ('anon','authenticated','service_role') order by 1, 2, 3, 4`),
     hakTabel: await q(`select table_name, grantee, privilege_type from information_schema.role_table_grants where table_schema = 'public' and table_name in ${TABEL} and grantee in ('anon','authenticated') order by 1, 2, 3`),
     rls: await q(`select relname, relrowsecurity from pg_class where oid in ('public.tanggal_lahir'::regclass) order by 1`),
     kebijakan: await q(`select tablename, policyname, qual from pg_policies where schemaname = 'public' and tablename in ${TABEL} order by 1, 2`),
@@ -38,22 +38,21 @@ const potret = async (db) => {
   };
 };
 
-const A = await baru('git:118681e'); // skema TEPAT sesudah migrasi ini (G4a); skema.sql terbaru memuat tahap sesudahnya (impor tanggal lahir menambah fungsi)
+const A = await baru(`${P}/supabase/skema.sql`); // migrasi ini yang paling baru: skema.sql terbaru = keadaan sesudahnya
 const pa = await potret(A);
 
 console.log('--- Database berisi data: kesetaraan, data utuh, idempoten ---');
-const B1 = await baru('git:91338f6'); // commit TEPAT sebelum migrasi ini (main sesudah G3)
+const B1 = await baru('git:118681e'); // commit TEPAT sebelum migrasi ini (G4a)
 await isiDataContoh(B1);
 await B1.query('update public.profiles set wajib_ganti_pin = false');
 const sebelum = await cacah(B1);
 const md5Fungsi = async (db, nama) => (await db.query(`select md5(p.prosrc) m from pg_proc p where p.proname = $1`, [nama])).rows[0].m;
-ok((await B1.query(`select to_regclass('public.tanggal_lahir') as t`)).rows[0].t === null, 'prasyarat: skema lama belum punya tabel tanggal_lahir');
-const lamaCad = await md5Fungsi(B1, 'sg_cadangan_admin');
+ok((await B1.query(`select to_regprocedure('public.sg_tanggal_lahir_impor(jsonb)') as f`)).rows[0].f === null, 'prasyarat: skema lama belum punya sg_tanggal_lahir_impor');
 await B1.exec(MP);
 ok(JSON.stringify(await cacah(B1)) === JSON.stringify(sebelum), 'jumlah data tidak berubah oleh migrasi: ' + JSON.stringify(sebelum));
-ok(await md5Fungsi(B1, 'sg_cadangan_admin') !== lamaCad, 'sg_cadangan_admin ditulis ulang oleh migrasi');
 await B1.exec(MP); await B1.exec(MP);
 ok(JSON.stringify(await cacah(B1)) === JSON.stringify(sebelum), 'menjalankan migrasi tiga kali: data tetap sama');
+ok(pa.fungsi.length === 1 && pa.hakFungsi.length >= 1, 'skema baru memuat tepat satu fungsi sg_tanggal_lahir_impor dengan hak akses');
 const pb = await potret(B1);
 for (const k of Object.keys(pa)) {
   const sama = JSON.stringify(pa[k]) === JSON.stringify(pb[k]);
@@ -67,34 +66,24 @@ for (const k of Object.keys(pa)) {
 console.log('\n--- Sesudah migrasi: perilaku baru ---');
 {
   const masuk = async (username) => { const k = buatKlienFake(B1); const a = buatApi(k); const r = await a.masuk(username, PIN_DEMO[username] ?? PIN_DEMO.penegak); return { k, a, id: r.id }; };
-  const pembina = await masuk('pembina');
-  const siti = await masuk('10232');
-  const ahmad = await masuk('10231');
   const admin = await masuk('admin');
-  let r = await siti.a.aturTanggalLahir(siti.id, '2008-04-02');
-  ok(!r.ok && /Hanya Pembina dan Admin Gudep/.test(r.pesan), 'Penegak ditolak mengisi tanggal lahir');
-  r = await pembina.a.aturTanggalLahir(siti.id, '2008-04-02');
-  ok(r.ok, 'Pembina mengisi tanggal lahir sesudah migrasi ' + (r.pesan ?? ''));
-  await pembina.a.aturTanggalLahir(ahmad.id, '2007-12-15');
-  r = await siti.a.muatGerbang({ kelasMin: 'XI', lahirDari: '2007-11-01', lahirSampai: '2009-05-01', kuotaPersen: 5 });
-  ok(r.ok && r.data.lahir.length === 1 && r.data.lahir[0].pesertaId === siti.id && r.data.aturan.kuotaPersen === 5 && r.data.aturan.kelasMin === 'XI', 'Penegak membaca tanggal lahir miliknya (bukan milik Penegak lain) dan aturan bawaan');
-  r = await pembina.a.simpanGerbang({ kelasMin: 'XII', lahirDari: '2007-01-01', lahirSampai: '2009-12-31', kuotaPersen: 8 });
-  ok(r.ok, 'Pembina mengubah aturan gerbang');
-  r = await admin.a.muatGerbang({});
-  ok(r.ok && r.data.aturan.kelasMin === 'XII' && r.data.aturan.kuotaPersen === 8 && r.data.lahir.length === 2, 'aturan yang diubah terbaca; Admin melihat semua tanggal lahir');
-  r = await admin.k.rpc('sg_cadangan_admin');
-  ok(!r.error && Array.isArray(r.data.tabel.tanggal_lahir) && r.data.tabel.tanggal_lahir.length === 2 && Array.isArray(r.data.tabel.spg_penetapan) && Array.isArray(r.data.tabel.tkk_pengajuan), 'cadangan data memuat tabel baru tanpa kehilangan tabel lain');
-  let tulis = null;
-  try { await B1.query("update public.profiles set status = 'nonaktif' where id = $1", [siti.id]); await B1.query("update public.tanggal_lahir set tanggal = '2008-01-01' where peserta_id = $1", [siti.id]); } catch (e) { tulis = e.message; }
-  ok(/tidak aktif|nonaktif|alumni/i.test(tulis ?? ''), 'pemicu tolak_peserta_tak_aktif aktif pada tabel hasil migrasi');
+  const siti = await masuk('10232');
+  let r = await siti.a.imporTanggalLahir([{ username: '10232', tanggal: '2008-04-02' }]);
+  ok(!r.ok && /Hanya Pembina dan Admin Gudep/.test(r.pesan), 'Penegak ditolak mengimpor tanggal lahir');
+  r = await admin.a.imporTanggalLahir([{ username: '10232', tanggal: '2008-04-02' }, { username: '10231', tanggal: '2008-05-03' }]);
+  ok(r.ok && r.data === 2, 'Admin mengimpor tanggal lahir sesudah migrasi ' + (r.pesan ?? ''));
+  r = await admin.a.imporTanggalLahir([{ username: '10232', tanggal: '2008-13-01' }]);
+  ok(!r.ok && /tidak sah/.test(r.pesan), 'tanggal tidak sah ditolak');
+  r = await siti.a.muatGerbang({});
+  ok(r.ok && r.data.lahir.length === 1 && r.data.lahir[0].tanggal === '2008-04-02', 'Penegak membaca tanggal lahir miliknya saja');
 }
 
 console.log('\n--- Tanpa migrasi sebelumnya: gagal jelas ---');
-const B3 = await baru('git:71a2f19'); // sebelum G3 (tanpa tabel spg_penetapan)
+const B3 = await baru('git:91338f6'); // sebelum G4a (tanpa tabel tanggal_lahir)
 let galat = null;
 try { await B3.exec(MP); } catch (e) { galat = e.message; await B3.exec('rollback'); }
 ok(/Jalankan lebih dulu skema dan migrasi/.test(galat ?? ''), 'pesan yang menuntun: ' + (galat ?? 'TIDAK GAGAL').slice(0, 100));
-ok((await B3.query(`select to_regclass('public.tanggal_lahir') as t`)).rows[0].t === null, 'kegagalan membatalkan seluruh migrasi (tabel tidak dibuat)');
+ok((await B3.query(`select to_regprocedure('public.sg_tanggal_lahir_impor(jsonb)') as f`)).rows[0].f === null, 'kegagalan membatalkan seluruh migrasi (fungsi tidak dibuat)');
 
-console.log(`\nRINGKASAN MIGRASI GERBANG: ${l} lulus, ${g} GAGAL`);
+console.log(`\nRINGKASAN MIGRASI TANGGAL-LAHIR-IMPOR: ${l} lulus, ${g} GAGAL`);
 process.exit(g ? 1 : 0);

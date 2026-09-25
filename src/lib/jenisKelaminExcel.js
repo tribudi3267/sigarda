@@ -5,7 +5,7 @@
  * daftar pilihan) -> isi -> unggah -> pratinjau -> simpan (sg_anggota_jk_atur). Pembaca dan pembuat berkas memuat ExcelJS saat dipakai.
  */
 import { JENIS_KELAMIN, PESAN_JK, anggotaTanpaJk, labelPeranAnggota, urutAnggotaJk } from './jenisKelaminLogic';
-import { teksSel, unduhBlob } from './importAnggota';
+import { teksSel, unduhBlob } from './importAnggotaExcel';
 
 export const NAMA_LEMBAR_JK = 'Jenis Kelamin';
 export const MAKS_BARIS_BERKAS_JK = 2000;

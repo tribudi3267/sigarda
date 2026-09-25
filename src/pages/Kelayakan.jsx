@@ -4,11 +4,16 @@ import useGerbang from '../hooks/useGerbang';
 import useSpg from '../hooks/useSpg';
 import usePelantikanSaka from '../hooks/usePelantikanSaka';
 import useTkk from '../hooks/useTkk';
+import useTimKalender from '../hooks/useTimKalender';
 import { fmtTanggal, hariIni } from '../lib/format';
 import { pembinaAtauAdmin } from '../lib/hakLogic';
 import { STATUS_GERBANG, hitungGerbang, kuotaCalon, periksaGerbang, periksaTanggalLahir, tanggalLahirPeserta } from '../lib/gerbangLogic';
 import { hitungSpg, ringkasSpg } from '../lib/spgLogic';
 import { layakGaruda } from '../lib/skuLogic';
+import { tahunAjaranKini } from '../lib/rombelLogic';
+import { labelUntuk, timUntukCalon } from '../lib/timLogic';
+import TimPenilaiPanel from '../components/TimPenilaiPanel';
+import KalenderGarudaPanel from '../components/KalenderGarudaPanel';
 import SumberPeraturan from '../components/SumberPeraturan';
 import { Avatar, Field, Kosong, Modal } from '../components/ui';
 
@@ -95,11 +100,8 @@ function PanelAturan({ data, boleh }) {
   );
 }
 
-/**
- * Kelayakan Calon Garuda (Tahap 2, G4). Gerbang hanya PERINGATAN: kelas minimal, usia (dari tanggal lahir), SKU selesai, dan kuota calon dihitung dan ditampilkan; tidak ada
- * yang diblokir. Pembina dan Admin mengisi tanggal lahir dan mengubah aturan; Dewan hanya melihat.
- */
-export default function Kelayakan() {
+/** Daftar Calon Garuda dengan syarat gerbang, kuota, dan aturan. `tim` = tim penilai pada tahun ajaran terpilih (untuk menampilkan tim yang menilai tiap calon). */
+function PanelCalon({ tim, tahunAjaran }) {
   const { user, daftarPeserta, progress, portofolio } = useApp();
   const gerbang = useGerbang();
   const spg = useSpg();
@@ -127,10 +129,7 @@ export default function Kelayakan() {
   }, [daftarPeserta, progress, gerbang.lahir, gerbang.aturan, pel.pelantikan, pel.saka, tkk.capaian, tkk.ambang, portofolio, spg.penetapan, cari, semua]);
 
   return (
-    <div className="animasi-naik">
-      <h1 className="mb-1 text-2xl font-bold">Kelayakan Calon Garuda</h1>
-      <p className="mb-2 text-sm text-pramuka-600">Syarat gerbang calon (kelas, usia, SKU), kuota calon, dan kemajuan SPG tiap Penegak. Semua berupa peringatan; keputusan akhir tetap pada Pembina dan Kwarcab.</p>
-      <SumberPeraturan className="mb-4" rujukan={[{ id: 'garuda-038-2017', bagian: 'Bab II butir 1c (syarat Penegak Garuda)' }]} />
+    <div>
       {galat && <p role="alert" className="mb-4 text-sm font-medium text-red-700">{galat}</p>}
       {memuat && <p className="mb-4 text-sm text-pramuka-600" role="status">Memuat...</p>}
 
@@ -153,6 +152,7 @@ export default function Kelayakan() {
         <ul className="panel divide-y divide-pramuka-100">
           {baris.map(({ u, g, s }) => {
             const lahir = tanggalLahirPeserta(gerbang.lahir, u.id);
+            const t = timUntukCalon(tim, tahunAjaran, u.jenisKelamin);
             return (
               <li key={u.id} className="px-4 py-3">
                 <div className="flex flex-wrap items-start gap-3">
@@ -161,6 +161,7 @@ export default function Kelayakan() {
                     <p className="font-medium">{u.nama} <span className="text-xs font-normal text-pramuka-500">{u.kelas || '-'}</span>{u.calonGaruda && <span className="ml-2 rounded bg-pramuka-800 px-1.5 py-0.5 text-xs font-semibold text-pramuka-50">Calon Garuda</span>}</p>
                     <p className="mt-1 flex flex-wrap gap-1">{g.syarat.map((x) => <Chip key={x.id} syarat={x} />)}</p>
                     <p className="mt-1 text-xs text-pramuka-600">SPG {s.terpenuhi} dari {s.total} butir{s.menunggu > 0 ? `, ${s.menunggu} menunggu ditetapkan` : ''}. {lahir ? `Lahir ${fmtTanggal(lahir)}.` : ''}</p>
+                    <p className="text-xs text-pramuka-600">{!u.jenisKelamin ? 'Tim penilai: jenis kelamin belum diisi.' : t ? `Tim penilai ${labelUntuk(t.untuk).toLowerCase()}: ${t.anggota.length} anggota${t.nomorSk ? `, SK ${t.nomorSk}` : ', SK belum dicatat'}.` : 'Tim penilai: belum dicatat.'}</p>
                   </div>
                   {kelola && <button className="btn btn-outline btn-sm shrink-0" onClick={() => setModal({ u, lahir })}>{lahir ? 'Ubah tanggal lahir' : 'Isi tanggal lahir'}</button>}
                 </div>
@@ -170,6 +171,49 @@ export default function Kelayakan() {
         </ul>
       )}
       {modal && <ModalLahir peserta={modal.u} awal={modal.lahir} onTutup={() => setModal(null)} onSelesai={() => { setModal(null); gerbang.muat(); }} />}
+    </div>
+  );
+}
+
+const TAB = [{ id: 'calon', label: 'Calon' }, { id: 'tim', label: 'Tim penilai' }, { id: 'kalender', label: 'Kalender' }];
+const geserTa = (ta, n) => { const y = Number(ta.slice(0, 4)) + n; return `${y}/${y + 1}`; };
+
+/**
+ * Kelayakan Calon Garuda (Tahap 2, G4). Gerbang hanya PERINGATAN: kelas minimal, usia (dari tanggal lahir), SKU selesai, dan kuota calon dihitung dan ditampilkan; tidak ada
+ * yang diblokir. Tab Tim penilai (G4b) mencatat SK dan anggota tim putra dan putri; tab Kalender (G4c) mencatat tahap seleksi dari Kwarcab. Pembina dan Admin mengisi dan mengubah;
+ * Dewan hanya melihat.
+ */
+export default function Kelayakan() {
+  const { user } = useApp();
+  const tk = useTimKalender();
+  const kelola = pembinaAtauAdmin(user);
+  const [tab, setTab] = useState('calon');
+  const kini = tahunAjaranKini();
+  const [ta, setTa] = useState(kini);
+  return (
+    <div className="animasi-naik">
+      <h1 className="mb-1 text-2xl font-bold">Kelayakan Calon Garuda</h1>
+      <p className="mb-2 text-sm text-pramuka-600">Syarat gerbang calon (kelas, usia, SKU), kuota calon, kemajuan SPG, tim penilai, dan kalender seleksi Kwarcab. Semua berupa peringatan atau pencatatan; keputusan akhir tetap pada Pembina dan Kwarcab.</p>
+      <SumberPeraturan className="mb-4" rujukan={[{ id: 'garuda-038-2017', bagian: 'Bab II butir 1c (syarat Penegak Garuda), Bab IV (tim penilai)' }]} />
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div role="tablist" aria-label="Kelayakan" className="inline-flex flex-wrap rounded-lg bg-pramuka-100 p-1">
+          {TAB.map((t) => (
+            <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
+              className={`rounded-md px-4 py-2 text-sm font-semibold ${tab === t.id ? 'bg-pramuka-800 text-pramuka-50' : 'text-pramuka-700 hover:bg-pramuka-200'}`}>{t.label}</button>
+          ))}
+        </div>
+        {tab !== 'calon' && (
+          <label className="inline-flex items-center gap-2 text-sm">Tahun ajaran
+            <select className="input w-auto" value={ta} onChange={(e) => setTa(e.target.value)}>
+              {[-1, 0, 1].map((n) => { const v = geserTa(kini, n); return <option key={v} value={v}>{v}</option>; })}
+            </select>
+          </label>
+        )}
+      </div>
+      {tk.galat && <p role="alert" className="mb-4 text-sm font-medium text-red-700">{tk.galat}</p>}
+      {tab === 'calon' && <PanelCalon tim={tk.tim} tahunAjaran={kini} />}
+      {tab === 'tim' && <TimPenilaiPanel data={tk} tahunAjaran={ta} boleh={kelola} />}
+      {tab === 'kalender' && <KalenderGarudaPanel data={tk} tahunAjaran={ta} boleh={kelola} />}
     </div>
   );
 }

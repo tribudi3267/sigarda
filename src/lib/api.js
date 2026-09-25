@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSpg, susunTanggalLahir, susunGerbang, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
+import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSpg, susunTanggalLahir, susunGerbang, susunTimPenilai, susunGarudaTahap, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 /** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
@@ -225,6 +225,23 @@ export function buatApi(klien) {
     /** Mengisi tanggal lahir satu Penegak (Pembina dan Admin); tanggal kosong = menghapus catatan. */
     aturTanggalLahir: (pesertaId, tanggal) => rpc('sg_tanggal_lahir_atur', { p_peserta_id: pesertaId, p_tanggal: tanggal || null }),
     simpanGerbang: (nilai) => rpc('sg_gerbang_simpan', { p_nilai: nilai }),
+    /** Mengisi tanggal lahir banyak Penegak sesudah impor (Pembina dan Admin). `daftar` = [{ username, tanggal 'YYYY-MM-DD' }]; semua atau tidak sama sekali. Mengembalikan jumlah yang diperbarui. */
+    imporTanggalLahir: (daftar) => rpc('sg_tanggal_lahir_impor', { p_data: daftar }),
+
+    /* ------------------- Tim penilai dan kalender Garuda (Tahap 2, G4b dan G4c) ------------------- */
+    /** Tim penilai (dengan anggotanya) dan kalender tahap Garuda; hanya pengurus yang dapat membaca (dibatasi RLS). */
+    muatTimKalender: () => muat(async () => {
+      const [t, a, k] = await Promise.all([ambilSemua('tim_penilai', { urut: ['id'] }), ambilSemua('tim_penilai_anggota', { urut: ['tim_id', 'urut'] }), ambilSemua('garuda_tahap', { urut: ['id'] })]);
+      return { tim: susunTimPenilai(t, a), tahap: susunGarudaTahap(k) };
+    }),
+    /** Menyimpan satu tim penilai beserta seluruh anggotanya (Pembina dan Admin; atomik). `id` kosong = tim baru. Mengembalikan id tim. */
+    simpanTimPenilai: ({ id = null, tahunAjaran, untuk, nomorSk = '', tanggalSk = null, skUrl = '', catatan = '', anggota }) =>
+      rpc('sg_tim_penilai_simpan', { p_id: id, p_tahun_ajaran: tahunAjaran, p_untuk: untuk, p_nomor_sk: nomorSk, p_tanggal_sk: tanggalSk || null, p_sk_url: skUrl, p_catatan: catatan, p_anggota: anggota }),
+    hapusTimPenilai: (id) => rpc('sg_tim_penilai_hapus', { p_id: id }),
+    /** Mengisi atau mengoreksi satu tahap kalender Garuda (Pembina dan Admin). Mengembalikan id. */
+    simpanTahapGaruda: ({ tahunAjaran, tahap, mulai, akhir = null, catatan = '' }) =>
+      rpc('sg_garuda_tahap_simpan', { p_tahun_ajaran: tahunAjaran, p_tahap: tahap, p_mulai: mulai || null, p_akhir: akhir || null, p_catatan: catatan }),
+    hapusTahapGaruda: (id) => rpc('sg_garuda_tahap_hapus', { p_id: id }),
     simpanKrida: ({ id = null, pesertaId, nama, saka = '', tanggal, buktiUrl = '', catatan = '' }) =>
       rpc('sg_tkk_krida_simpan', { p_id: id, p_peserta_id: pesertaId, p_nama: nama, p_saka: saka, p_tanggal: tanggal || null, p_bukti_url: buktiUrl, p_catatan: catatan }),
     hapusKrida: (id) => rpc('sg_tkk_krida_hapus', { p_id: id }),

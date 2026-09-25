@@ -6,7 +6,7 @@
  * memuat ExcelJS saat dipakai. Server memeriksa ulang semua baris (sg_rombel_perbarui).
  */
 import { SEMUA_ROMBEL, PESAN_ROMBEL, normalisasiRombel, pesertaRombelLama } from './rombelLogic';
-import { teksSel, unduhBlob } from './importAnggota';
+import { teksSel, unduhBlob } from './importAnggotaExcel';
 import { urutAlami } from './format';
 
 export const NAMA_LEMBAR_ROMBEL = 'Rombel';
