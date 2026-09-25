@@ -322,6 +322,17 @@ export const susunTkkKrida = (baris = []) =>
     id: Number(r.id), pesertaId: r.peserta_id, nama: r.nama, saka: r.saka ?? '', tanggal: tgl(r.tanggal), buktiUrl: r.bukti_url ?? '', catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada,
   })).sort((a, b) => b.tanggal.localeCompare(a.tanggal) || a.id - b.id);
 
+/**
+ * Baris tkk_pengajuan -> [{ id, pesertaId, tkkId, tingkat, tanggal, penguji1, penguji2, melatih, buktiUrl, catatan, status ('menunggu'|'disetujui'|'ditolak'|'dibatalkan'),
+ * diajukanPada, ditinjauNama, ditinjauPada, catatanTinjauan, capaianId }], yang menunggu dan terbaru lebih dulu.
+ */
+export const susunTkkPengajuan = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), pesertaId: r.peserta_id, tkkId: r.tkk_id, tingkat: r.tingkat, tanggal: tgl(r.tanggal), penguji1: r.penguji1, penguji2: r.penguji2, melatih: r.melatih,
+    buktiUrl: r.bukti_url ?? '', catatan: r.catatan ?? '', status: r.status, diajukanPada: r.diajukan_pada, ditinjauNama: r.ditinjau_nama ?? null, ditinjauPada: r.ditinjau_pada ?? null,
+    catatanTinjauan: r.catatan_tinjauan ?? '', capaianId: r.capaian_id == null ? null : Number(r.capaian_id),
+  })).sort((a, b) => Number(b.status === 'menunggu') - Number(a.status === 'menunggu') || b.id - a.id);
+
 /** Nilai pengaturan 'tkk.ambang' -> { total, madya, utamaWajib } yang aman (bentuk rusak atau belum ada = `bawaan`). */
 export const susunAmbangTkk = (nilai, bawaan) =>
   nilai && Number.isInteger(nilai.total) && Number.isInteger(nilai.madya) && Array.isArray(nilai.utamaWajib) && nilai.utamaWajib.every((x) => typeof x === 'string')

@@ -5,7 +5,7 @@ import { fmtTanggal, hariIni } from '../lib/format';
 import { pembinaAtauAdmin } from '../lib/hakLogic';
 import {
   AMBANG_TKK_BAWAAN, BIDANG_TKK, KATALOG_TKK, TINGKAT_TKK, capaianPeserta, hitungKemajuan, labelTingkatTkk, periksaAmbang, periksaCapaian, periksaKrida, pilihanTkk, teksKemajuan,
-  tingkatBerikut, tingkatTertinggi,
+  tingkatBerikut, tingkatTertinggi, STATUS_PENGAJUAN, pengajuanMenunggu, pengajuanPeserta, periksaTinjau,
 } from '../lib/tkkLogic';
 import SumberPeraturan from '../components/SumberPeraturan';
 import { Avatar, Field, Kosong, Modal, ProgressBar } from '../components/ui';
@@ -17,8 +17,9 @@ const WARNA_TINGKAT = { purwa: 'bg-pramuka-100 text-pramuka-800', madya: 'bg-sky
 const LencanaTingkat = ({ tingkat }) => <span className={`rounded px-1.5 py-0.5 text-xs font-bold ${WARNA_TINGKAT[tingkat]}`}>{labelTingkatTkk(tingkat)}</span>;
 
 /** Catat atau koreksi satu capaian TKK (Pembina dan Admin). `awal` = { tkkId, tingkat, ...baris } untuk koreksi, atau { tkkId?, tingkat? } untuk baru. */
-function ModalCapaian({ peserta, awal, capaianSaya, onTutup, onSelesai }) {
+function ModalCapaian({ peserta, awal, capaianSaya, onTutup, onSelesai, mode = 'catat' }) {
   const { api, notify } = useApp();
+  const ajukan = mode === 'ajukan'; // Penegak mengajukan untuk ditinjau Pembina; selain itu Pembina/Admin mencatat langsung
   const baru = !awal?.id;
   const [tkkId, setTkkId] = useState(awal?.tkkId ?? '');
   const [tingkat, setTingkat] = useState(awal?.tingkat ?? 'purwa');
@@ -41,10 +42,12 @@ function ModalCapaian({ peserta, awal, capaianSaya, onTutup, onSelesai }) {
     if (pesan) { setGalat(pesan); return; }
     setSibuk(true);
     setGalat('');
-    const r = await api().catatTkk({ pesertaId: peserta.id, tkkId, tingkat, tanggal, penguji1, penguji2, melatih, buktiUrl, catatan });
+    const r = ajukan
+      ? await api().ajukanTkk({ tkkId, tingkat, tanggal, penguji1, penguji2, melatih, buktiUrl, catatan })
+      : await api().catatTkk({ pesertaId: peserta.id, tkkId, tingkat, tanggal, penguji1, penguji2, melatih, buktiUrl, catatan });
     setSibuk(false);
     if (!r.ok) { setGalat(r.pesan); return; }
-    notify(`TKK ${NAMA_TKK[tkkId]} ${labelTingkatTkk(tingkat)} dicatat.`);
+    notify(ajukan ? `Pengajuan TKK ${NAMA_TKK[tkkId]} ${labelTingkatTkk(tingkat)} terkirim ke Pembina.` : `TKK ${NAMA_TKK[tkkId]} ${labelTingkatTkk(tingkat)} dicatat.`);
     onSelesai();
   };
 
@@ -52,15 +55,16 @@ function ModalCapaian({ peserta, awal, capaianSaya, onTutup, onSelesai }) {
     <Modal
       buka
       tutup={onTutup}
-      judul={baru ? 'Catat TKK' : 'Ubah catatan TKK'}
+      judul={ajukan ? 'Ajukan TKK' : baru ? 'Catat TKK' : 'Ubah catatan TKK'}
       aksi={
         <>
           <button className="btn btn-outline" onClick={onTutup} disabled={sibuk}>Batal</button>
-          <button className="btn btn-primary" onClick={simpan} disabled={sibuk}>{sibuk ? 'Menyimpan...' : 'Simpan'}</button>
+          <button className="btn btn-primary" onClick={simpan} disabled={sibuk}>{sibuk ? 'Menyimpan...' : ajukan ? 'Kirim pengajuan' : 'Simpan'}</button>
         </>
       }
     >
       <p className="mb-4 text-sm font-semibold">{peserta.nama} <span className="font-normal text-pramuka-500">{peserta.kelas}</span></p>
+      {ajukan && <p className="mb-4 rounded-md bg-pramuka-50 px-3 py-2 text-xs text-pramuka-700">Isi sesudah kamu lulus uji tim penguji. Pembina meninjau pengajuan ini: bila disetujui, TKK-mu tercatat resmi; bila ditolak, ada catatan alasannya dan kamu boleh mengajukan lagi.</p>}
       <Field label="TKK" htmlFor="tk-tkk" bantuan="Yang tampil hanya TKK untuk Penegak; yang khusus satu agama hanya untuk agama itu.">
         <select id="tk-tkk" className="input" value={tkkId} onChange={(e) => pilihTkk(e.target.value)} disabled={!baru}>
           <option value="">Pilih TKK</option>
@@ -191,7 +195,7 @@ function KartuKemajuan({ k, ambang }) {
 }
 
 /** Semua TKK, TKK Krida, dan kemajuan satu Penegak. `boleh` = Pembina atau Admin (dapat mencatat, mengubah, menghapus). */
-function PanelPenegak({ peserta, data, boleh }) {
+function PanelPenegak({ peserta, data, boleh, bisaAjukan = false }) {
   const { api, notify } = useApp();
   const milik = useMemo(() => capaianPeserta(data.capaian, peserta.id), [data.capaian, peserta.id]);
   const kemajuan = useMemo(() => hitungKemajuan(milik, data.ambang), [milik, data.ambang]);
@@ -229,7 +233,7 @@ function PanelPenegak({ peserta, data, boleh }) {
           {boleh && <button className="btn btn-primary btn-sm" onClick={() => setModal({ jenis: 'capaian', awal: null })}>Catat TKK</button>}
         </div>
         {perTkk.length === 0 ? (
-          <Kosong judul="Belum ada TKK tercatat" teks={boleh ? 'Catat TKK pertama lewat tombol di atas. TKK dapat dikenakan sesudah Penegak Bantara.' : 'Pembina mencatat TKK yang sudah kamu lulus.'} />
+          <Kosong judul="Belum ada TKK tercatat" teks={boleh ? 'Catat TKK pertama lewat tombol di atas. TKK dapat dikenakan sesudah Penegak Bantara.' : bisaAjukan ? 'Sudah lulus uji TKK? Ajukan lewat tombol Ajukan TKK di bawah; Pembina meninjau dan mencatatnya resmi.' : 'Belum ada catatan TKK.'} />
         ) : (
           <ul className="panel divide-y divide-pramuka-100">
             {perTkk.map(([id, baris]) => {
@@ -267,6 +271,8 @@ function PanelPenegak({ peserta, data, boleh }) {
           </ul>
         )}
       </section>
+
+      {bisaAjukan && <PengajuanSaya peserta={peserta} data={data} capaianSaya={milik} />}
 
       <section className="mb-4" aria-label="TKK Krida">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -310,6 +316,164 @@ function PanelPenegak({ peserta, data, boleh }) {
         <p className="text-sm text-pramuka-800">Catatan <b>{hapus?.teks}</b> untuk <b>{peserta.nama}</b> dihapus. Gunakan ini bila salah mencatat; untuk koreksi cukup catat ulang. Tingkat yang masih ditopang tingkat di atasnya tidak dapat dihapus lebih dulu.</p>
         {galat && <p role="alert" className="mt-2 text-sm font-medium text-red-700">{galat}</p>}
       </Modal>
+    </div>
+  );
+}
+
+const WARNA_STATUS = { menunggu: 'bg-amber-50 text-amber-900 ring-amber-300', disetujui: 'bg-emerald-50 text-emerald-900 ring-emerald-300', ditolak: 'bg-red-50 text-red-900 ring-red-300', dibatalkan: 'bg-pramuka-100 text-pramuka-700 ring-pramuka-300' };
+const LencanaStatus = ({ status }) => <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${WARNA_STATUS[status]}`}>{STATUS_PENGAJUAN[status]}</span>;
+
+/** Isi satu pengajuan (dipakai daftar Penegak dan daftar peninjau). */
+function IsiPengajuan({ p }) {
+  return (
+    <>
+      <p className="text-sm text-pramuka-700">
+        <LencanaTingkat tingkat={p.tingkat} /> lulus {fmtTanggal(p.tanggal)}, penguji {p.penguji1} dan {p.penguji2}. Melatih: {p.melatih}.
+        {p.buktiUrl && <> <a href={p.buktiUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-pramuka-700 underline underline-offset-2">bukti</a></>}
+        {p.catatan && <span className="text-pramuka-500"> ({p.catatan})</span>}
+      </p>
+      {p.status !== 'menunggu' && p.status !== 'dibatalkan' && (
+        <p className="mt-1 text-xs text-pramuka-600">
+          Ditinjau {p.ditinjauNama ? `oleh ${p.ditinjauNama}` : ''}{p.ditinjauPada ? `, ${fmtTanggal(String(p.ditinjauPada).slice(0, 10))}` : ''}.
+          {p.catatanTinjauan && <> <b>Catatan:</b> {p.catatanTinjauan}</>}
+        </p>
+      )}
+    </>
+  );
+}
+
+/** Pengajuan TKK milik Penegak yang sedang masuk: ajukan, batalkan yang menunggu, dan ajukan lagi (dari yang ditolak atau dibatalkan). */
+function PengajuanSaya({ peserta, data, capaianSaya }) {
+  const { api, notify } = useApp();
+  const daftar = pengajuanPeserta(data.pengajuan, peserta.id);
+  const [modal, setModal] = useState(null); // { awal }
+  const [sibuk, setSibuk] = useState(null);
+  const [galat, setGalat] = useState('');
+  const batal = async (id) => {
+    setSibuk(id);
+    const r = await api().batalkanPengajuanTkk(id);
+    setSibuk(null);
+    if (!r.ok) { setGalat(r.pesan); return; }
+    notify('Pengajuan dibatalkan.');
+    setGalat('');
+    data.muat();
+  };
+  return (
+    <section className="mb-4" aria-label="Pengajuan TKK saya">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-bold">Pengajuan saya ({daftar.length})</h2>
+        <button className="btn btn-primary btn-sm" onClick={() => setModal({ awal: null })}>Ajukan TKK</button>
+      </div>
+      <p className="mb-2 text-xs text-pramuka-600">Sudah lulus uji TKK? Ajukan di sini agar Pembina mencatatnya resmi. Kamu diberi tahu lewat notifikasi saat pengajuan ditinjau.</p>
+      {galat && <p role="alert" className="mb-2 text-sm font-medium text-red-700">{galat}</p>}
+      {daftar.length > 0 && (
+        <ul className="panel divide-y divide-pramuka-100">
+          {daftar.map((p) => (
+            <li key={p.id} className="p-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="font-semibold">{NAMA_TKK[p.tkkId] ?? p.tkkId} <LencanaTingkat tingkat={p.tingkat} /></p>
+                <LencanaStatus status={p.status} />
+              </div>
+              <IsiPengajuan p={p} />
+              {p.status === 'menunggu' && <button className="btn btn-outline btn-sm mt-2" onClick={() => batal(p.id)} disabled={sibuk === p.id}>{sibuk === p.id ? 'Membatalkan...' : 'Batalkan pengajuan'}</button>}
+              {(p.status === 'ditolak' || p.status === 'dibatalkan') && (
+                <button className="btn btn-outline btn-sm mt-2" onClick={() => setModal({ awal: { tkkId: p.tkkId, tingkat: p.tingkat, tanggal: p.tanggal, penguji1: p.penguji1, penguji2: p.penguji2, melatih: p.melatih, buktiUrl: p.buktiUrl, catatan: p.catatan } })}>Ajukan lagi</button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {modal && <ModalCapaian mode="ajukan" peserta={peserta} awal={modal.awal} capaianSaya={capaianSaya} onTutup={() => setModal(null)} onSelesai={() => { setModal(null); data.muat(); }} />}
+    </section>
+  );
+}
+
+/** Keputusan atas satu pengajuan (Pembina/Admin): disetujui (catatan opsional) atau ditolak (catatan wajib). */
+function ModalTinjau({ pengajuan, peserta, keputusan, onTutup, onSelesai }) {
+  const { api, notify } = useApp();
+  const [catatan, setCatatan] = useState('');
+  const [galat, setGalat] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const setuju = keputusan === 'disetujui';
+  const kirim = async () => {
+    if (sibuk) return;
+    const pesan = periksaTinjau({ keputusan, catatan });
+    if (pesan) { setGalat(pesan); return; }
+    setSibuk(true);
+    setGalat('');
+    const r = await api().tinjauTkk(pengajuan.id, keputusan, catatan);
+    setSibuk(false);
+    if (!r.ok) { setGalat(r.pesan); return; }
+    notify(setuju ? 'Pengajuan disetujui dan dicatat resmi.' : 'Pengajuan ditolak; catatan dikirim ke Penegak.');
+    onSelesai();
+  };
+  return (
+    <Modal
+      buka
+      tutup={onTutup}
+      judul={setuju ? 'Setujui pengajuan TKK?' : 'Tolak pengajuan TKK?'}
+      aksi={
+        <>
+          <button className="btn btn-outline" onClick={onTutup} disabled={sibuk}>Batal</button>
+          <button className="btn btn-primary" onClick={kirim} disabled={sibuk}>{sibuk ? 'Menyimpan...' : setuju ? 'Setujui' : 'Tolak'}</button>
+        </>
+      }
+    >
+      <p className="mb-2 text-sm font-semibold">{peserta?.nama ?? 'Penegak'} <span className="font-normal text-pramuka-500">{peserta?.kelas}</span></p>
+      <p className="mb-3 text-sm text-pramuka-800">{NAMA_TKK[pengajuan.tkkId]} <LencanaTingkat tingkat={pengajuan.tingkat} /></p>
+      <p className="mb-4 text-xs text-pramuka-600">{setuju ? 'Disetujui: tercatat sebagai capaian resmi dengan data pengajuan. Keadaan diperiksa ulang saat ini (mis. tingkat di bawahnya harus sudah tercatat).' : 'Ditolak: Penegak membaca catatanmu dan boleh mengajukan lagi.'}</p>
+      <Field label={setuju ? 'Catatan (opsional)' : 'Alasan penolakan (wajib)'} htmlFor="tj-catatan">
+        <input id="tj-catatan" className="input" maxLength={200} value={catatan} onChange={(e) => setCatatan(e.target.value)} />
+      </Field>
+      {galat && <p role="alert" className="text-sm font-medium text-red-700">{galat}</p>}
+    </Modal>
+  );
+}
+
+/** Pengajuan yang menunggu ditinjau (Pembina dan Admin), ditambah yang baru selesai ditinjau. */
+function PanelPengajuan({ data }) {
+  const { daftarPesertaSemua } = useApp();
+  const [tinjau, setTinjau] = useState(null); // { pengajuan, keputusan }
+  const menunggu = pengajuanMenunggu(data.pengajuan);
+  const selesai = data.pengajuan.filter((p) => p.status === 'disetujui' || p.status === 'ditolak').slice(0, 15);
+  const orang = (id) => daftarPesertaSemua.find((u) => u.id === id);
+  const Baris = ({ p, aksi }) => (
+    <li className="p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="font-semibold">{orang(p.pesertaId)?.nama ?? 'Penegak'} <span className="text-xs font-normal text-pramuka-500">{orang(p.pesertaId)?.kelas}</span></p>
+        <LencanaStatus status={p.status} />
+      </div>
+      <p className="mb-1 text-sm font-medium">{NAMA_TKK[p.tkkId] ?? p.tkkId}</p>
+      <IsiPengajuan p={p} />
+      {aksi}
+    </li>
+  );
+  return (
+    <div>
+      <section className="mb-5" aria-label="Pengajuan menunggu">
+        <h2 className="mb-2 text-lg font-bold">Menunggu ditinjau ({menunggu.length})</h2>
+        {menunggu.length === 0 ? (
+          <Kosong judul="Tidak ada pengajuan yang menunggu" teks="Penegak mengajukan TKK lewat menu TKK di akunnya; kamu diberi tahu lewat notifikasi." />
+        ) : (
+          <ul className="panel divide-y divide-pramuka-100">
+            {menunggu.map((p) => (
+              <Baris key={p.id} p={p} aksi={
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button className="btn btn-primary btn-sm" onClick={() => setTinjau({ pengajuan: p, keputusan: 'disetujui' })}>Setujui</button>
+                  <button className="btn btn-outline btn-sm" onClick={() => setTinjau({ pengajuan: p, keputusan: 'ditolak' })}>Tolak</button>
+                </div>
+              } />
+            ))}
+          </ul>
+        )}
+      </section>
+      {selesai.length > 0 && (
+        <section aria-label="Pengajuan yang sudah ditinjau">
+          <h2 className="mb-2 text-lg font-bold">Sudah ditinjau ({selesai.length} terbaru)</h2>
+          <ul className="panel divide-y divide-pramuka-100">{selesai.map((p) => <Baris key={p.id} p={p} />)}</ul>
+        </section>
+      )}
+      {tinjau && <ModalTinjau pengajuan={tinjau.pengajuan} peserta={orang(tinjau.pengajuan.pesertaId)} keputusan={tinjau.keputusan} onTutup={() => setTinjau(null)} onSelesai={() => { setTinjau(null); data.muat(); }} />}
     </div>
   );
 }
@@ -408,7 +572,7 @@ function DaftarPenegak({ data, onPilih }) {
   );
 }
 
-const TAB = [{ id: 'penegak', label: 'Penegak' }, { id: 'ambang', label: 'Ambang Garuda' }];
+const TAB = [{ id: 'penegak', label: 'Penegak' }, { id: 'pengajuan', label: 'Pengajuan' }, { id: 'ambang', label: 'Ambang Garuda' }];
 
 /**
  * Tanda Kecakapan Khusus (Tahap 2, G2). Penegak melihat kemajuan dan capaian miliknya; Pembina dan Admin mencatat capaian bertingkat (Purwa, Madya, Utama), TKK Krida, dan mengatur
@@ -441,12 +605,13 @@ export default function Tkk() {
           {TAB.map((t) => (
             <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
               className={`rounded-md px-4 py-2 text-sm font-semibold ${tab === t.id ? 'bg-pramuka-800 text-pramuka-50' : 'text-pramuka-700 hover:bg-pramuka-200'}`}>
-              {t.label}
+              {t.label}{t.id === 'pengajuan' && pengajuanMenunggu(data.pengajuan).length > 0 ? ` (${pengajuanMenunggu(data.pengajuan).length})` : ''}
             </button>
           ))}
         </div>
       )}
 
+      {pengurus && tab === 'pengajuan' && <PanelPengajuan data={data} />}
       {pengurus && tab === 'ambang' && <PanelAmbang key={JSON.stringify(data.ambang)} data={data} boleh={kelola} />}
       {(!pengurus || tab === 'penegak') && (
         pengurus && !peserta ? (
@@ -457,7 +622,7 @@ export default function Tkk() {
               <button className="mb-3 text-sm font-semibold text-pramuka-700 underline underline-offset-2" onClick={() => setPilih(null)}>Kembali ke daftar Penegak</button>
             )}
             {pengurus && peserta && <p className="mb-3 text-lg font-bold">{peserta.nama} <span className="text-sm font-normal text-pramuka-500">{peserta.kelas}</span></p>}
-            <PanelPenegak peserta={peserta} data={data} boleh={kelola && (peserta.status ?? 'aktif') === 'aktif'} />
+            <PanelPenegak peserta={peserta} data={data} boleh={kelola && (peserta.status ?? 'aktif') === 'aktif'} bisaAjukan={!pengurus && (peserta.status ?? 'aktif') === 'aktif'} />
           </>
         )
       )}

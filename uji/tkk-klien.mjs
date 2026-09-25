@@ -183,7 +183,7 @@ console.log('\n--- Tampilan (render tanpa peramban) ---');
   ok(pengurus.includes('Tanda Kecakapan Khusus') && pengurus.includes('data-sumber-peraturan') && pengurus.includes('role="tablist"') && pengurus.includes('Cari nama atau kelas Penegak'), 'pengurus: judul, rujukan peraturan, tab, dan pencarian Penegak');
   const penegak = tampil(users[1]);
   ok(penegak.includes('Kemajuan menuju syarat Garuda') && penegak.includes('0 dari 45') && !penegak.includes('role="tablist"') && !penegak.includes('Catat TKK'), 'Penegak: kemajuan miliknya, tanpa tab dan tanpa tombol catat');
-  ok(penegak.includes('Belum ada TKK tercatat') && penegak.includes('Pembina mencatat TKK'), 'Penegak tanpa capaian: pesan kosong yang ramah');
+  ok(penegak.includes('Belum ada TKK tercatat') && penegak.includes('Sudah lulus uji TKK?'), 'Penegak tanpa capaian: pesan kosong yang ramah');
 }
 
 console.log(`\nRINGKASAN TKK-KLIEN: ${lulus} lulus, ${gagal} gagal`);

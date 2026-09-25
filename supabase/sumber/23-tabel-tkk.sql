@@ -47,3 +47,31 @@ insert into public.pengaturan (kunci, nilai) values ('tkk.ambang',
   '{"total": 45, "madya": 3, "utamaWajib": ["berkemah","gerak-jalan","pppk","pengatur-rumah","pengamat","juru-masak","penabung","menjahit","juru-kebun","pengamanan-kampung"]}'::jsonb)
 on conflict (kunci) do nothing;
 -- ===== akhir tabel tkk =====
+
+-- ===== TKK pengajuan (Tahap 2, G2b): tabel =====
+-- Penegak mengajukan capaian TKK sendiri (data sama dengan tkk_capaian); Pembina atau Admin meninjau: disetujui = menjadi capaian resmi, ditolak = catatan wajib.
+-- Satu pengajuan yang menunggu per (Penegak, TKK, tingkat). Baris lama disimpan sebagai riwayat. Tulis hanya lewat fungsi sg_tkk_ajukan/_batal/sg_tkk_tinjau.
+create table public.tkk_pengajuan (
+  id bigint generated always as identity primary key,
+  peserta_id uuid not null references public.profiles(id) on delete cascade,
+  tkk_id text not null references public.tkk_katalog(id),
+  tingkat text not null check (tingkat in ('purwa','madya','utama')),
+  tanggal date not null check (tanggal >= date '2000-01-01'),
+  penguji1 text not null check (char_length(btrim(penguji1)) between 1 and 80),
+  penguji2 text not null check (char_length(btrim(penguji2)) between 1 and 80),
+  melatih text not null check (char_length(btrim(melatih)) between 1 and 200),
+  bukti_url text not null default '' check (bukti_url = '' or (bukti_url ~* '^https?://' and char_length(bukti_url) <= 500)),
+  catatan text not null default '' check (char_length(catatan) <= 200),
+  status text not null default 'menunggu' check (status in ('menunggu','disetujui','ditolak','dibatalkan')),
+  diajukan_pada timestamptz not null default now(),
+  ditinjau_oleh uuid references public.profiles(id) on delete set null,
+  ditinjau_nama text,                                                                   -- nama peninjau saat meninjau (Penegak tidak dapat membaca profil Pembina)
+  ditinjau_pada timestamptz,
+  catatan_tinjauan text not null default '' check (char_length(catatan_tinjauan) <= 200),
+  capaian_id bigint references public.tkk_capaian(id) on delete set null,               -- capaian resmi hasil persetujuan
+  constraint tkk_pengajuan_tolak_wajib_catatan check (status <> 'ditolak' or btrim(catatan_tinjauan) <> '')
+);
+create unique index tkk_pengajuan_menunggu_unik on public.tkk_pengajuan (peserta_id, tkk_id, tingkat) where status = 'menunggu';
+create index tkk_pengajuan_tkk_idx on public.tkk_pengajuan (tkk_id);
+create index tkk_pengajuan_capaian_idx on public.tkk_pengajuan (capaian_id);
+-- ===== akhir tabel tkk pengajuan =====

@@ -113,6 +113,20 @@ export function periksaAmbang(nilai) {
   return '';
 }
 
+/** Status pengajuan TKK oleh Penegak (Tahap 2, G2b). */
+export const STATUS_PENGAJUAN = { menunggu: 'Menunggu ditinjau', disetujui: 'Disetujui', ditolak: 'Ditolak', dibatalkan: 'Dibatalkan' };
+export const pengajuanPeserta = (pengajuan = [], pesertaId) => pengajuan.filter((p) => p.pesertaId === pesertaId);
+export const pengajuanMenunggu = (pengajuan = []) => pengajuan.filter((p) => p.status === 'menunggu');
+
+/** Cermin validasi sg_tkk_tinjau pada keputusan dan catatan (sebelum memeriksa pengajuannya). Mengembalikan pesan galat atau ''. */
+export function periksaTinjau({ keputusan, catatan = '' }) {
+  if (keputusan !== 'disetujui' && keputusan !== 'ditolak') return 'Keputusan harus disetujui atau ditolak.';
+  const c = rapikan(catatan);
+  if (c.length > 200 || TANDA_TERLARANG.test(c)) return 'Catatan maksimal 200 karakter, tanpa tanda < atau >.';
+  if (keputusan === 'ditolak' && c === '') return 'Isi catatan agar Penegak tahu alasan penolakan.';
+  return '';
+}
+
 /** Ringkasan singkat untuk daftar: "12 dari 45 TKK, 2 dari 10 wajib Utama". */
 export const teksKemajuan = (k, ambang = AMBANG_TKK_BAWAAN) => `${k.total} dari ${ambang.total} TKK, ${ambang.utamaWajib.length - k.kurang.wajib} dari ${ambang.utamaWajib.length} wajib Utama`;
 
