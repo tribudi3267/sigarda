@@ -32,6 +32,10 @@ create trigger tak_aktif_sesi_peserta before insert or update on public.sesi_uji
 create trigger tak_aktif_pelantikan before insert or update on public.pelantikan for each row execute function sigarda.tolak_peserta_tak_aktif();
 create trigger tak_aktif_saka_anggota before insert or update on public.saka_anggota for each row execute function sigarda.tolak_peserta_tak_aktif();
 -- ===== akhir pemicu pelantikan dan saka =====
+-- ===== TKK (Tahap 2, G2): pemicu =====
+create trigger tak_aktif_tkk_capaian before insert or update on public.tkk_capaian for each row execute function sigarda.tolak_peserta_tak_aktif();
+create trigger tak_aktif_tkk_krida before insert or update on public.tkk_krida for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu tkk =====
 
 -- Status Calon Garuda hanya untuk Penegak yang aktif (diberikan sendiri lewat sg_calon_garuda_daftar atau oleh Admin lewat sg_anggota_ubah).
 create function sigarda.tolak_calon_garuda_tak_aktif() returns trigger language plpgsql as

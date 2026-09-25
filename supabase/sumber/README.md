@@ -8,10 +8,10 @@ Penanda blok (`-- ===== ... =====`) dapat melintasi berkas.
 | Nomor | Isi |
 |---|---|
 | 00 | kepala, pembersih versi lama, skema `sigarda`, `hari_ini` |
-| 10-22 | tabel: inti (profil, SKU, absensi), iuran, penugasan+dewan, dokumen, notifikasi, naik kelas, agenda+usulan, portofolio/sidang/raport/instrumen, berkas Garuda+indeks FK, keep-alive, sesi ujian+login, pra-uji, pelantikan+Saka |
+| 10-23 | tabel: inti (profil, SKU, absensi), iuran, penugasan+dewan, dokumen, notifikasi, naik kelas, agenda+usulan, portofolio/sidang/raport/instrumen, berkas Garuda+indeks FK, keep-alive, sesi ujian+login, pra-uji, pelantikan+Saka, TKK |
 | 30-35 | fungsi bantu (skema `sigarda`): dasar, iuran, raport+instrumen, penugasan+penegakan+dokumen, notifikasi (pemicu, pengingat berlapis), pra-uji |
 | 40 | Row Level Security (baca saja) |
-| 50-65 | fungsi aksi `sg_*`: SKU+penegakan, garuda/jurnal/absensi, iuran, penugasan, naik kelas, anggota+jenis kelamin+jabatan dewan, materi/sidang/raport, instrumen+verifikasi, berkas Garuda+gudep, dokumen, notifikasi+pemeriksaan data, cadangan+eskalasi, agenda+usulan, sesi ujian+fungsi Edge Function |
+| 50-66 | fungsi aksi `sg_*`: SKU+penegakan, garuda/jurnal/absensi, iuran, penugasan, naik kelas, anggota+jenis kelamin+jabatan dewan, materi/sidang/raport, instrumen+verifikasi, berkas Garuda+gudep, dokumen, notifikasi+pemeriksaan data, cadangan+eskalasi, agenda+usulan, sesi ujian+fungsi Edge Function |
 | 70 | hak akses dan penanda katalog |
 
 Pemeriksaan: `npm run uji -- sumber-skema` (nomor unik, `skema.sql` tidak usang).

@@ -11,6 +11,7 @@ import { dirname, resolve } from 'node:path';
 import { bacaInti } from './sumber.mjs';
 import { INDEKS_POIN, TINGKAT } from '../src/data/skuData.js';
 import { ITEM_PORTOFOLIO } from '../src/data/portofolioData.js';
+import { KATALOG_TKK } from '../src/data/tkkData.js';
 
 const akar = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const q = (teks) => `'${String(teks).replace(/'/g, "''")}'`;
@@ -38,9 +39,12 @@ baris.push('');
 baris.push('insert into public.pf_item (id) values');
 baris.push(ITEM_PORTOFOLIO.map((i) => `  (${q(i.id)})`).join(',\n') + ';');
 baris.push('');
+baris.push('insert into public.tkk_katalog (id, nama, bidang, golongan, agama, sumber, urut) values');
+baris.push(KATALOG_TKK.map((t) => `  (${q(t.id)}, ${q(t.nama)}, ${t.bidang}, ${q(t.golongan)}, ${t.agama ? q(t.agama) : 'null'}, ${q(t.sumber)}, ${t.urut})`).join(',\n') + ';');
+baris.push('');
 baris.push("notify pgrst, 'reload schema';");
 baris.push('');
 
 const inti = bacaInti(akar);
 writeFileSync(resolve(akar, 'supabase/skema.sql'), inti.trimEnd() + '\n' + baris.join('\n'), 'utf8');
-console.log(`skema.sql dibuat: ${butir.length} butir, ${unit.length} unit, ${ITEM_PORTOFOLIO.length} dokumen portofolio.`);
+console.log(`skema.sql dibuat: ${butir.length} butir, ${unit.length} unit, ${ITEM_PORTOFOLIO.length} dokumen portofolio, ${KATALOG_TKK.length} TKK.`);
