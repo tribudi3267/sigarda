@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import useTkk from '../hooks/useTkk';
 import { fmtTanggal, hariIni } from '../lib/format';
 import { pembinaAtauAdmin } from '../lib/hakLogic';
 import {
-  AMBANG_TKK_BAWAAN, BIDANG_TKK, KATALOG_TKK, TINGKAT_TKK, capaianPeserta, hitungKemajuan, labelTingkatTkk, periksaAmbang, periksaCapaian, periksaKrida, pilihanTkk, teksKemajuan,
+  AMBANG_TKK_BAWAAN, BIDANG_TKK, KATALOG_TKK, TINGKAT_TKK, capaianPeserta, hitungKemajuan, labelTingkatTkk, periksaAmbang, periksaCapaian, periksaKrida, pengujiBerubah, pilihanTkk, teksKemajuan,
   tingkatBerikut, tingkatTertinggi, STATUS_PENGAJUAN, pengajuanMenunggu, pengajuanPeserta, periksaTinjau,
 } from '../lib/tkkLogic';
 import SumberPeraturan from '../components/SumberPeraturan';
@@ -25,6 +25,8 @@ function ModalCapaian({ peserta, awal, capaianSaya, onTutup, onSelesai, mode = '
   const [tingkat, setTingkat] = useState(awal?.tingkat ?? 'purwa');
   const [tanggal, setTanggal] = useState(awal?.tanggal ?? hariIni());
   const [penguji1, setPenguji1] = useState(awal?.penguji1 ?? '');
+  const [pilihanPenguji, setPilihanPenguji] = useState(null); // mode ajukan: Pembina yang ditugaskan untuk kelas Penegak (null = memuat)
+  const [penguji1Id, setPenguji1Id] = useState('');
   const [penguji2, setPenguji2] = useState(awal?.penguji2 ?? '');
   const [melatih, setMelatih] = useState(awal?.melatih ?? '');
   const [buktiUrl, setBuktiUrl] = useState(awal?.buktiUrl ?? '');
@@ -33,17 +35,32 @@ function ModalCapaian({ peserta, awal, capaianSaya, onTutup, onSelesai, mode = '
   const [sibuk, setSibuk] = useState(false);
   const pilihan = useMemo(() => pilihanTkk(peserta.agama), [peserta.agama]);
 
+  useEffect(() => {
+    if (!ajukan) return undefined;
+    let batal = false;
+    api().pilihanPengujiTkk().then((r) => {
+      if (batal) return;
+      const daftar = r.ok && Array.isArray(r.data) ? r.data : [];
+      setPilihanPenguji(daftar);
+      if (daftar.length === 1) setPenguji1Id(daftar[0].id);
+    });
+    return () => { batal = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ajukan]);
+
   const pilihTkk = (id) => { setTkkId(id); if (baru && id) setTingkat(tingkatBerikut(capaianSaya, id) ?? 'utama'); };
 
   const simpan = async () => {
     if (sibuk) return;
     if (!tkkId) { setGalat('Pilih TKK.'); return; }
-    const pesan = periksaCapaian({ tkkId, tingkat, tanggal, penguji1, penguji2, melatih, buktiUrl, catatan, agama: peserta.agama });
+    if (ajukan && !penguji1Id) { setGalat('Pilih Penguji 1 (Pembina yang ditugaskan untuk kelasmu).'); return; }
+    const namaPenguji1 = ajukan ? (pilihanPenguji ?? []).find((x) => x.id === penguji1Id)?.nama ?? '' : penguji1;
+    const pesan = periksaCapaian({ tkkId, tingkat, tanggal, penguji1: namaPenguji1, penguji2, melatih, buktiUrl, catatan, agama: peserta.agama });
     if (pesan) { setGalat(pesan); return; }
     setSibuk(true);
     setGalat('');
     const r = ajukan
-      ? await api().ajukanTkk({ tkkId, tingkat, tanggal, penguji1, penguji2, melatih, buktiUrl, catatan })
+      ? await api().ajukanTkk({ tkkId, tingkat, tanggal, penguji1Id, penguji2, melatih, buktiUrl, catatan })
       : await api().catatTkk({ pesertaId: peserta.id, tkkId, tingkat, tanggal, penguji1, penguji2, melatih, buktiUrl, catatan });
     setSibuk(false);
     if (!r.ok) { setGalat(r.pesan); return; }
@@ -84,10 +101,20 @@ function ModalCapaian({ peserta, awal, capaianSaya, onTutup, onSelesai, mode = '
         <Field label="Tanggal lulus" htmlFor="tk-tanggal">
           <input id="tk-tanggal" type="date" className="input" max={hariIni()} value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
         </Field>
-        <Field label="Penguji 1" htmlFor="tk-p1" bantuan="Tim penguji 2 orang: Pembina, pembantu Pembina, atau ahli (cukup nama).">
-          <input id="tk-p1" className="input" maxLength={80} value={penguji1} onChange={(e) => setPenguji1(e.target.value)} />
-        </Field>
-        <Field label="Penguji 2" htmlFor="tk-p2">
+        {ajukan ? (
+          <Field label="Penguji 1 (Pembina)" htmlFor="tk-p1" bantuan={pilihanPenguji && pilihanPenguji.length === 0 ? 'Belum ada Pembina yang dapat dipilih. Hubungi Admin Gudep.' : 'Pembina yang ditugaskan untuk kelasmu; bila belum ada penugasan, semua Pembina.'}>
+            <select id="tk-p1" className="input" value={penguji1Id} onChange={(e) => setPenguji1Id(e.target.value)} disabled={!pilihanPenguji || pilihanPenguji.length <= 1}>
+              {!pilihanPenguji && <option value="">Memuat...</option>}
+              {pilihanPenguji && pilihanPenguji.length > 1 && <option value="">Pilih Pembina</option>}
+              {(pilihanPenguji ?? []).map((x) => <option key={x.id} value={x.id}>{x.nama}</option>)}
+            </select>
+          </Field>
+        ) : (
+          <Field label="Penguji 1" htmlFor="tk-p1" bantuan="Tim penguji 2 orang: Pembina, pembantu Pembina, atau ahli (cukup nama).">
+            <input id="tk-p1" className="input" maxLength={80} value={penguji1} onChange={(e) => setPenguji1(e.target.value)} />
+          </Field>
+        )}
+        <Field label="Penguji 2" htmlFor="tk-p2" bantuan={ajukan ? 'Diisi olehmu: Pembina lain, pembantu Pembina, atau ahli yang menguji (cukup nama).' : undefined}>
           <input id="tk-p2" className="input" maxLength={80} value={penguji2} onChange={(e) => setPenguji2(e.target.value)} />
         </Field>
       </div>
@@ -332,6 +359,7 @@ function IsiPengajuan({ p }) {
         {p.buktiUrl && <> <a href={p.buktiUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-pramuka-700 underline underline-offset-2">bukti</a></>}
         {p.catatan && <span className="text-pramuka-500"> ({p.catatan})</span>}
       </p>
+      {p.pengujiAwal && <p className="mt-1 text-xs text-amber-900">Penguji diganti Pembina; semula: {p.pengujiAwal}.</p>}
       {p.status !== 'menunggu' && p.status !== 'dibatalkan' && (
         <p className="mt-1 text-xs text-pramuka-600">
           Ditinjau {p.ditinjauNama ? `oleh ${p.ditinjauNama}` : ''}{p.ditinjauPada ? `, ${fmtTanggal(String(p.ditinjauPada).slice(0, 10))}` : ''}.
@@ -392,16 +420,19 @@ function PengajuanSaya({ peserta, data, capaianSaya }) {
 function ModalTinjau({ pengajuan, peserta, keputusan, onTutup, onSelesai }) {
   const { api, notify } = useApp();
   const [catatan, setCatatan] = useState('');
+  const [p1, setP1] = useState(pengajuan.penguji1);
+  const [p2, setP2] = useState(pengajuan.penguji2);
   const [galat, setGalat] = useState('');
   const [sibuk, setSibuk] = useState(false);
   const setuju = keputusan === 'disetujui';
+  const berubah = setuju && pengujiBerubah({ penguji1: p1, penguji2: p2, penguji1Awal: pengajuan.penguji1, penguji2Awal: pengajuan.penguji2 });
   const kirim = async () => {
     if (sibuk) return;
-    const pesan = periksaTinjau({ keputusan, catatan });
+    const pesan = periksaTinjau({ keputusan, catatan, penguji1: setuju ? p1 : null, penguji2: setuju ? p2 : null, penguji1Awal: pengajuan.penguji1, penguji2Awal: pengajuan.penguji2 });
     if (pesan) { setGalat(pesan); return; }
     setSibuk(true);
     setGalat('');
-    const r = await api().tinjauTkk(pengajuan.id, keputusan, catatan);
+    const r = await api().tinjauTkk(pengajuan.id, keputusan, catatan, setuju ? p1 : null, setuju ? p2 : null);
     setSibuk(false);
     if (!r.ok) { setGalat(r.pesan); return; }
     notify(setuju ? 'Pengajuan disetujui dan dicatat resmi.' : 'Pengajuan ditolak; catatan dikirim ke Penegak.');
@@ -422,7 +453,16 @@ function ModalTinjau({ pengajuan, peserta, keputusan, onTutup, onSelesai }) {
       <p className="mb-2 text-sm font-semibold">{peserta?.nama ?? 'Penegak'} <span className="font-normal text-pramuka-500">{peserta?.kelas}</span></p>
       <p className="mb-3 text-sm text-pramuka-800">{NAMA_TKK[pengajuan.tkkId]} <LencanaTingkat tingkat={pengajuan.tingkat} /></p>
       <p className="mb-4 text-xs text-pramuka-600">{setuju ? 'Disetujui: tercatat sebagai capaian resmi dengan data pengajuan. Keadaan diperiksa ulang saat ini (mis. tingkat di bawahnya harus sudah tercatat).' : 'Ditolak: Penegak membaca catatanmu dan boleh mengajukan lagi.'}</p>
-      <Field label={setuju ? 'Catatan (opsional)' : 'Alasan penolakan (wajib)'} htmlFor="tj-catatan">
+      {setuju && (
+        <>
+          <p className="mb-2 text-xs text-pramuka-600">Penguji tercatat resmi seperti di bawah. Ganti hanya bila penguji sebenarnya berbeda (mis. Pembina 1 dan 2 berhalangan hadir); alasannya wajib di catatan dan nama semula tersimpan sebagai jejak.</p>
+          <div className="grid gap-x-4 sm:grid-cols-2">
+            <Field label="Penguji 1" htmlFor="tj-p1"><input id="tj-p1" className="input" maxLength={80} value={p1} onChange={(e) => setP1(e.target.value)} /></Field>
+            <Field label="Penguji 2" htmlFor="tj-p2"><input id="tj-p2" className="input" maxLength={80} value={p2} onChange={(e) => setP2(e.target.value)} /></Field>
+          </div>
+        </>
+      )}
+      <Field label={berubah ? 'Alasan penggantian penguji (wajib)' : setuju ? 'Catatan (opsional)' : 'Alasan penolakan (wajib)'} htmlFor="tj-catatan">
         <input id="tj-catatan" className="input" maxLength={200} value={catatan} onChange={(e) => setCatatan(e.target.value)} />
       </Field>
       {galat && <p role="alert" className="text-sm font-medium text-red-700">{galat}</p>}

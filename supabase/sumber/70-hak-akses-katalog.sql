@@ -56,7 +56,8 @@ grant execute on function
   public.sg_saka_simpan(bigint, uuid, text, date, text, date, text, text), public.sg_saka_hapus(bigint),
   public.sg_tkk_catat(uuid, text, text, date, text, text, text, text, text), public.sg_tkk_hapus(bigint),
   public.sg_tkk_krida_simpan(bigint, uuid, text, text, date, text, text), public.sg_tkk_krida_hapus(bigint), public.sg_tkk_ambang_simpan(jsonb),
-  public.sg_tkk_ajukan(text, text, date, text, text, text, text, text), public.sg_tkk_ajukan_batal(bigint), public.sg_tkk_tinjau(bigint, text, text)
+  public.sg_tkk_ajukan(text, text, date, uuid, text, text, text, text), public.sg_tkk_ajukan_batal(bigint), public.sg_tkk_tinjau(bigint, text, text, text, text),
+  public.sg_tkk_penguji_pilihan()
   to authenticated;
 -- Fungsi yang boleh dipanggil tanpa login (hanya membaca): verifikasi keaslian dokumen, identitas gudep di halaman masuk, dan
 -- tautan berbagi baca-saja Berkas Calon Garuda (tahap L7)

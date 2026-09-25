@@ -7,6 +7,7 @@ import { siapkanPg, buatKlienFake, sqlSebagai } from '../src/lokal/klienFake.js'
 import { isiDataContoh } from '../src/lokal/seedLokal.js';
 import { PIN_DEMO } from '../src/lokal/pinDemo.js';
 import { buatApi } from '../src/lib/api.js';
+import { tahunAjaranKini } from '../src/lib/rombelLogic.js';
 
 const P = process.cwd().replace(/\\/g, '/');
 let gagal = 0, lulus = 0;
@@ -25,9 +26,10 @@ const sebagai = async (id, sql, args = []) => { try { return { ok: true, rows: (
 const cocok = (r, re) => !r.ok && re.test(r.pesan ?? '');
 const geser = async (n) => (await q(`select (sigarda.hari_ini() + $1::int)::text d`, [n]))[0].d;
 const [t60, t30, t10, tDepan] = [await geser(-60), await geser(-30), await geser(-10), await geser(3)];
-const ajukan = (id, tkk, tk, tgl, p1 = 'Pak Budi', p2 = 'Bu Sari', mel = 'Andi, Siaga', url = '', cat = '') =>
-  sebagai(id, 'select public.sg_tkk_ajukan($1, $2, $3::date, $4, $5, $6, $7, $8) as id', [tkk, tk, tgl, p1, p2, mel, url, cat]);
-const tinjau = (id, pid, keputusan, cat = '') => sebagai(id, 'select public.sg_tkk_tinjau($1::bigint, $2, $3)', [pid, keputusan, cat]);
+const ajukan = (id, tkk, tk, tgl, p2 = 'Bu Sari', mel = 'Andi, Siaga', url = '', cat = '', p1id = K.pembina.id) =>
+  sebagai(id, 'select public.sg_tkk_ajukan($1, $2, $3::date, $4::uuid, $5, $6, $7, $8) as id', [tkk, tk, tgl, p1id, p2, mel, url, cat]);
+const ta = tahunAjaranKini();
+const tinjau = (id, pid, keputusan, cat = '', p1 = null, p2 = null) => sebagai(id, 'select public.sg_tkk_tinjau($1::bigint, $2, $3, $4, $5)', [pid, keputusan, cat, p1, p2]);
 const pengajuan = (pid) => q('select id, tkk_id, tingkat, status, ditinjau_nama, catatan_tinjauan, capaian_id from public.tkk_pengajuan where peserta_id = $1 order by id', [pid]);
 const notif = (pid) => q(`select judul, isi, tautan from public.notifikasi where penerima_id = $1 and jenis = 'tkk' order by id`, [pid]);
 const tulisSku = (pid) => q(
@@ -39,6 +41,10 @@ await q('delete from public.sku_progress where peserta_id = any($1::uuid[])', [[
 await q(`update public.profiles set agama = 'Islam' where id = $1`, [siti]);
 await q(`update public.profiles set agama = 'Hindu' where id = $1`, [dimas]);
 for (const id of [siti, dimas]) await tulisSku(id);
+await q('delete from public.penugasan_rombel'); await q('delete from public.penugasan_peserta');
+await q(`update public.profiles set kelas = 'X-01' where id = any($1::uuid[])`, [[ahmad, siti, dimas]]);
+await q(`insert into public.penugasan_rombel (tahun_ajaran, rombel, penguji_id) values ($1, 'X-01', $2)`, [ta, K.pembina.id]);
+const namaPembina = (await q('select nama from public.profiles where id = $1', [K.pembina.id]))[0].nama;
 
 console.log('\n--- Hak dan validasi pengajuan (pemeriksa bersama dengan pencatatan langsung) ---');
 let r = await ajukan(K.pembina.id, 'juru-masak', 'purwa', t30);
@@ -53,16 +59,16 @@ r = await ajukan(siti, 'pengatur-ruangan', 'purwa', t30);
 ok(cocok(r, /khusus golongan Siaga/), 'TKK khusus Siaga ditolak');
 r = await ajukan(siti, 'juru-masak', 'purwa', tDepan);
 ok(cocok(r, /masa depan/), 'tanggal masa depan ditolak');
-r = await ajukan(siti, 'juru-masak', 'purwa', t30, 'Pak Budi', ' pak  BUDI ');
+r = await ajukan(siti, 'juru-masak', 'purwa', t30, ' ' + namaPembina.toUpperCase().replace(/ /g, '  ') + ' ');
 ok(cocok(r, /dua orang yang berbeda/), 'penguji kembar ditolak');
-r = await ajukan(siti, 'juru-masak', 'purwa', t30, 'Pak Budi', 'Bu Sari', '');
+r = await ajukan(siti, 'juru-masak', 'purwa', t30, 'Bu Sari', '');
 ok(cocok(r, /bukti melatih/), 'bukti melatih wajib');
 r = await ajukan(siti, 'juru-masak', 'madya', t30);
 ok(cocok(r, /Utama butuh Madya, dan Madya butuh Purwa/), 'Madya tanpa Purwa resmi ditolak');
 ok((await pengajuan(siti)).length === 0, 'percobaan yang ditolak tidak meninggalkan baris');
 
 console.log('\n--- Mengajukan, duplikat, batal ---');
-r = await ajukan(siti, 'juru-masak', 'purwa', t30, 'Pak Budi', 'Bu Sari', 'Andi, Siaga', 'https://drive.example/p', 'lulus uji');
+r = await ajukan(siti, 'juru-masak', 'purwa', t30, 'Bu Sari', 'Andi, Siaga', 'https://drive.example/p', 'lulus uji');
 ok(r.ok && Number(r.rows[0].id) > 0, 'Siti mengajukan Purwa Juru Masak ' + (r.pesan ?? ''));
 const id1 = Number(r.rows[0].id);
 let p = await pengajuan(siti);
@@ -75,7 +81,7 @@ r = await sebagai(siti, 'select public.sg_tkk_ajukan_batal($1)', [id1]);
 ok(r.ok && (await pengajuan(siti))[0].status === 'dibatalkan', 'Siti membatalkan pengajuannya');
 r = await sebagai(siti, 'select public.sg_tkk_ajukan_batal($1)', [id1]);
 ok(cocok(r, /tidak ditemukan atau sudah ditinjau/), 'membatalkan dua kali: pesan jelas');
-r = await ajukan(siti, 'juru-masak', 'purwa', t30, 'Pak Budi', 'Bu Sari', 'Andi, Siaga', 'https://drive.example/p', 'lulus uji');
+r = await ajukan(siti, 'juru-masak', 'purwa', t30, 'Bu Sari', 'Andi, Siaga', 'https://drive.example/p', 'lulus uji');
 ok(r.ok, 'sesudah dibatalkan Siti dapat mengajukan lagi');
 const id2 = Number(r.rows[0].id);
 
@@ -109,7 +115,7 @@ ok(p.find((x) => x.id === id2).status === 'ditolak' && p.find((x) => x.id === id
 }
 r = await tinjau(K.pembina.id, id2, 'disetujui');
 ok(cocok(r, /sudah tidak menunggu/), 'pengajuan yang sudah ditinjau tidak dapat ditinjau lagi');
-r = await ajukan(siti, 'juru-masak', 'purwa', t30, 'Pak Budi', 'Bu Sari', 'Andi dan Budi, Siaga Gugus Depan 02');
+r = await ajukan(siti, 'juru-masak', 'purwa', t30, 'Bu Sari', 'Andi dan Budi, Siaga Gugus Depan 02');
 ok(r.ok, 'sesudah ditolak Siti mengajukan lagi (pengajuan baru)');
 const id3 = Number(r.rows[0].id);
 r = await tinjau(K.admin.id, id3, 'disetujui');
@@ -121,7 +127,7 @@ r = await ajukan(siti, 'juru-masak', 'purwa', t10);
 ok(cocok(r, /sudah tercatat resmi/), 'tingkat yang sudah tercatat resmi tidak diajukan lagi');
 
 console.log('\n--- Tingkat berikutnya dan keadaan berubah saat ditinjau ---');
-r = await ajukan(siti, 'juru-masak', 'madya', t10, 'Pak Budi', 'Bu Dewi', 'Budi, Purwa');
+r = await ajukan(siti, 'juru-masak', 'madya', t10, 'Bu Dewi', 'Budi, Purwa');
 ok(r.ok, 'Madya dapat diajukan sesudah Purwa resmi');
 const idM = Number(r.rows[0].id);
 r = await ajukan(siti, 'juru-masak', 'utama', t10);
@@ -134,6 +140,64 @@ r = await sebagai(K.pembina.id, `select public.sg_tkk_catat($1::uuid, 'juru-masa
 r = await tinjau(K.pembina.id, idM, 'disetujui');
 ok(r.ok && (await baris('juru-masak')).map((x) => x.tingkat).sort().join() === 'madya,purwa', 'Purwa dicatat ulang: Madya kini dapat disetujui');
 async function baris(tkk) { return q('select tingkat from public.tkk_capaian where peserta_id = $1 and tkk_id = $2', [siti, tkk]); }
+
+console.log('\n--- Penguji 1 = Pembina yang ditugaskan, Penguji 2 diisi Penegak (G2c) ---');
+{
+  const pilihan = async (id) => (await sebagai(id, 'select public.sg_tkk_penguji_pilihan() as d')).rows?.[0]?.d;
+  let d = await pilihan(siti);
+  ok(Array.isArray(d) && d.length === 1 && d[0].id === K.pembina.id && d[0].nama === namaPembina, 'pilihan Penguji 1 Siti (X-01): hanya Pembina yang ditugaskan untuk rombelnya');
+  ok((await pilihan(K.pembina.id)).length === 0, 'Pembina (bukan Penegak) tidak punya pilihan Penguji 1');
+  // Pembina kedua: akun Dewan lama dijadikan Pembina
+  await q("update public.profiles set jabatan = 'Pembina', jabatan_dewan = null, agama = 'Islam' where id = $1", [K.dewan.id]);
+  d = await pilihan(siti);
+  ok(d.length === 1 && d[0].id === K.pembina.id, 'Pembina kedua yang tidak ditugaskan tidak muncul selama rombelnya sudah punya Pembina');
+  await q("update public.profiles set kelas = 'X-02' where id = $1", [ahmad]);
+  d = await pilihan(ahmad);
+  ok(d.length === 2, 'rombel tanpa Pembina yang ditugaskan (X-02): semua Pembina aktif menjadi pilihan');
+  await q("update public.profiles set kelas = 'X-01' where id = $1", [ahmad]);
+  await q('insert into public.penugasan_peserta (tahun_ajaran, peserta_id, penguji_id) values ($1, $2, $3)', [ta, siti, K.dewan.id]);
+  d = await pilihan(siti);
+  ok(d.length === 1 && d[0].id === K.dewan.id, 'penugasan khusus Penegak mengalahkan penugasan rombel');
+  r = await ajukan(siti, 'juru-kebun', 'purwa', t30, 'Bu Sari', 'Andi, Siaga', '', '', K.pembina.id);
+  ok(cocok(r, /Penguji 1 harus Pembina yang ditugaskan/), 'Pembina di luar penugasan khusus ditolak sebagai Penguji 1');
+  await q('delete from public.penugasan_peserta');
+  r = await ajukan(siti, 'juru-kebun', 'purwa', t30, 'Bu Sari', 'Andi, Siaga', '', '', K.dewan.id);
+  ok(cocok(r, /Penguji 1 harus Pembina yang ditugaskan/), 'Pembina kedua ditolak sebagai Penguji 1 sesudah penugasan khusus dihapus (rombel memuat Pembina lain)');
+  r = await ajukan(siti, 'juru-kebun', 'purwa', t30, 'Bu Sari', 'Andi, Siaga', '', '', null);
+  ok(cocok(r, /Penguji 1 harus Pembina yang ditugaskan/), 'Penguji 1 kosong ditolak');
+  r = await ajukan(siti, 'juru-kebun', 'purwa', t30, 'Bu Sari', 'Andi, Siaga', '', '', dimas);
+  ok(cocok(r, /Penguji 1 harus Pembina yang ditugaskan/), 'Penegak tidak dapat menjadi Penguji 1');
+  const n0 = (await notif(K.pembina.id)).length, nDewan0 = (await notif(K.dewan.id)).length;
+  r = await ajukan(siti, 'juru-kebun', 'purwa', t30, 'Bu Sari', 'Andi, Siaga');
+  ok(r.ok, 'pengajuan dengan Penguji 1 yang ditugaskan diterima ' + (r.pesan ?? ''));
+  const idA = Number(r.rows[0].id);
+  const baris1 = (await q('select penguji1, penguji1_id, penguji2, penguji_awal from public.tkk_pengajuan where id = $1', [idA]))[0];
+  ok(baris1.penguji1 === namaPembina && baris1.penguji1_id === K.pembina.id && baris1.penguji2 === 'Bu Sari' && baris1.penguji_awal === '', 'nama Penguji 1 disalin server dari profil Pembina; Penguji 2 dari Penegak');
+  ok((await notif(K.pembina.id)).length === n0 + 1 && (await notif(K.dewan.id)).length === nDewan0, 'notifikasi pengajuan baru hanya ke Pembina Penguji 1');
+
+  // Pembina mengganti penguji saat meninjau (Pembina 1 dan 2 berhalangan)
+  r = await tinjau(K.pembina.id, idA, 'disetujui', '', 'Pak Pengganti', 'Bu Pengganti');
+  ok(cocok(r, /Nama penguji diganti: isi alasannya/), 'mengganti penguji tanpa alasan ditolak');
+  r = await tinjau(K.pembina.id, idA, 'disetujui', 'Pembina 1 dan 2 berhalangan hadir', 'Pak Pengganti', 'pak  pengganti');
+  ok(cocok(r, /dua orang yang berbeda/) && (await pengajuan(siti)).find((x) => x.id === idA).status === 'menunggu', 'nama pengganti yang kembar ditolak dan pengajuan tetap menunggu');
+  r = await tinjau(K.pembina.id, idA, 'disetujui', 'Pembina 1 dan 2 berhalangan hadir', 'Pak Pengganti', 'Bu Pengganti');
+  ok(r.ok, 'Pembina menyetujui dengan mengganti kedua penguji dan menyebut alasan');
+  const cap = (await q("select penguji1, penguji2 from public.tkk_capaian where peserta_id = $1 and tkk_id = 'juru-kebun'", [siti]))[0];
+  const aj = (await q('select penguji1, penguji2, penguji_awal, catatan_tinjauan, status from public.tkk_pengajuan where id = $1', [idA]))[0];
+  ok(cap.penguji1 === 'Pak Pengganti' && cap.penguji2 === 'Bu Pengganti' && aj.penguji_awal === namaPembina + ' dan Bu Sari' && aj.penguji1 === 'Pak Pengganti' && aj.catatan_tinjauan === 'Pembina 1 dan 2 berhalangan hadir' && aj.status === 'disetujui',
+    'capaian resmi memuat penguji pengganti; nama semula dan alasan tersimpan pada pengajuan');
+  r = await ajukan(siti, 'pengamat', 'purwa', t30, 'Bu Sari', 'Andi, Siaga');
+  const idB = Number(r.rows[0].id);
+  r = await tinjau(K.pembina.id, idB, 'disetujui', '', namaPembina, 'Bu Sari');
+  ok(r.ok && (await q('select penguji_awal from public.tkk_pengajuan where id = $1', [idB]))[0].penguji_awal === '', 'nama yang sama dengan pengajuan bukan penggantian: tanpa alasan, penguji_awal kosong');
+  r = await ajukan(siti, 'gerak-jalan', 'purwa', t30, 'Bu Sari', 'Andi, Siaga');
+  const idC = Number(r.rows[0].id);
+  r = await tinjau(K.pembina.id, idC, 'disetujui', '', null, 'Bu Lain');
+  ok(cocok(r, /Nama penguji diganti/), 'mengganti hanya Penguji 2 juga dihitung penggantian (alasan wajib)');
+  r = await tinjau(K.pembina.id, idC, 'ditolak', 'Bukti kurang', 'Pak Lain', 'Bu Lain');
+  const aC = (await q('select penguji1, penguji2, penguji_awal, status from public.tkk_pengajuan where id = $1', [idC]))[0];
+  ok(r.ok && aC.status === 'ditolak' && aC.penguji1 === namaPembina && aC.penguji2 === 'Bu Sari' && aC.penguji_awal === '', 'saat menolak, penggantian penguji diabaikan');
+}
 
 console.log('\n--- Batas 20 menunggu ---');
 {

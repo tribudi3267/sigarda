@@ -11,7 +11,8 @@ import { buatApi } from '../src/lib/api.js';
 import { KonteksApp } from '../src/context/AppContext.jsx';
 import Tkk from '../src/pages/Tkk.jsx';
 import { AMBANG_TKK_BAWAAN } from '../src/data/tkkData.js';
-import { STATUS_PENGAJUAN, pengajuanMenunggu, pengajuanPeserta, periksaTinjau } from '../src/lib/tkkLogic.js';
+import { STATUS_PENGAJUAN, pengajuanMenunggu, pengajuanPeserta, pengujiBerubah, periksaTinjau } from '../src/lib/tkkLogic.js';
+import { tahunAjaranKini } from '../src/lib/rombelLogic.js';
 import { susunTkkPengajuan } from '../src/lib/mapDb.js';
 import { LABEL_JENIS } from '../src/lib/notifikasiLogic.js';
 
@@ -29,6 +30,10 @@ console.log('--- Logika murni dan pemetaan ---');
     { id: '2', peserta_id: 'a', tkk_id: 'penabung', tingkat: 'madya', tanggal: '2026-09-02', penguji1: 'x', penguji2: 'y', melatih: 'z', bukti_url: 'https://a', catatan: 'c', status: 'menunggu', diajukan_pada: 't', capaian_id: '7' },
     { id: '3', peserta_id: 'a', tkk_id: 'pppk', tingkat: 'utama', tanggal: '2026-09-03', penguji1: 'x', penguji2: 'y', melatih: 'z', status: 'disetujui', diajukan_pada: 't' },
   ]);
+  ok(susunTkkPengajuan([{ id: '1', peserta_id: 'a', tkk_id: 'x', tingkat: 'purwa', tanggal: '2026-09-01', penguji1: 'P', penguji1_id: 'idP', penguji2: 'Q', penguji_awal: 'R dan S', melatih: 'z', status: 'disetujui' }])[0].penguji1Id === 'idP' && susunTkkPengajuan([{ id: '1', peserta_id: 'a', tkk_id: 'x', tingkat: 'purwa', tanggal: '2026-09-01', penguji1: 'P', penguji2: 'Q', melatih: 'z', status: 'menunggu' }])[0].pengujiAwal === '', 'susunTkkPengajuan: penguji1Id dan pengujiAwal (kosong bila tidak ada)');
+  const dasar = { penguji1: 'Pak Budi', penguji2: 'Bu Sari', penguji1Awal: 'Pak Budi', penguji2Awal: 'Bu Sari' };
+  ok(!pengujiBerubah(dasar) && !pengujiBerubah({ ...dasar, penguji1: '  pak budi  '.replace('pak', 'Pak').replace('budi', 'Budi') }) && !pengujiBerubah({ ...dasar, penguji1: '', penguji2: null }) && pengujiBerubah({ ...dasar, penguji2: 'Bu Lain' }) && pengujiBerubah({ ...dasar, penguji1: 'Pak Lain' }), 'pengujiBerubah: kosong dan nama sama (spasi dirapikan) bukan penggantian');
+  ok(periksaTinjau({ keputusan: 'disetujui', catatan: '', ...dasar, penguji2: 'Bu Lain' }).startsWith('Nama penguji diganti') && periksaTinjau({ keputusan: 'disetujui', catatan: 'Pembina 2 berhalangan', ...dasar, penguji2: 'Bu Lain' }) === '' && periksaTinjau({ keputusan: 'disetujui', catatan: '', ...dasar }) === '' && periksaTinjau({ keputusan: 'ditolak', catatan: 'x', ...dasar, penguji2: 'Bu Lain' }) === '', 'periksaTinjau: mengganti penguji wajib beralasan saat menyetujui; tanpa penggantian tidak; saat menolak diabaikan');
   ok(peta.map((p) => p.id).join() === '2,3,1' && peta[0].capaianId === 7 && peta[2].tanggal === '2026-09-01' && peta[0].ditinjauNama === null && peta[2].catatanTinjauan === 'kurang' && peta[1].buktiUrl === '', 'susunTkkPengajuan: menunggu dulu lalu terbaru, tanggal teks, id angka, nilai kosong aman');
 }
 
@@ -46,6 +51,10 @@ const geser = async (n) => (await q(`select (sigarda.hari_ini() + $1::int)::text
 await q('delete from public.sku_progress where peserta_id = any($1::uuid[])', [[siti.id, dimas.id]]);
 for (const id of [siti.id, dimas.id]) await q(`insert into public.sku_progress (peserta_id, sku_id, status) select p.id, u.id, 'lulus' from public.profiles p join public.sku_unit u on u.tingkat = 'Bantara' and (u.agama is null or u.agama = p.agama) where p.id = $1`, [id]);
 const t30 = await geser(-30);
+await q('delete from public.penugasan_rombel'); await q('delete from public.penugasan_peserta');
+await q("update public.profiles set kelas = 'X-01' where id = any($1::uuid[])", [[siti.id, dimas.id]]);
+await q('insert into public.penugasan_rombel (tahun_ajaran, rombel, penguji_id) values ($1, \'X-01\', $2)', [tahunAjaranKini(), pembina.id]);
+const namaPembina = (await q('select nama from public.profiles where id = $1', [pembina.id]))[0].nama;
 
 console.log('\n--- Cermin validasi peninjauan = sg_tkk_tinjau (kisi masukan) ---');
 {
@@ -63,10 +72,10 @@ console.log('\n--- Cermin validasi peninjauan = sg_tkk_tinjau (kisi masukan) ---
 
 console.log('\n--- Lapisan api ---');
 {
-  let r = await siti.a.ajukanTkk({ tkkId: 'juru-masak', tingkat: 'purwa', tanggal: t30, penguji1: 'Pak Budi', penguji2: 'Bu Sari', melatih: 'Andi, Siaga', buktiUrl: 'https://drive.example/p' });
+  let r = await siti.a.ajukanTkk({ tkkId: 'juru-masak', tingkat: 'purwa', tanggal: t30, penguji1Id: pembina.id, penguji2: 'Bu Sari', melatih: 'Andi, Siaga', buktiUrl: 'https://drive.example/p' });
   ok(r.ok && typeof r.data === 'number' || r.ok, 'ajukanTkk ' + (r.pesan ?? ''));
   const id1 = r.data;
-  r = await pembina.a.ajukanTkk({ tkkId: 'juru-masak', tingkat: 'purwa', tanggal: t30, penguji1: 'a', penguji2: 'b', melatih: 'c' });
+  r = await pembina.a.ajukanTkk({ tkkId: 'juru-masak', tingkat: 'purwa', tanggal: t30, penguji1Id: pembina.id, penguji2: 'b', melatih: 'c' });
   ok(!r.ok && /Hanya Penegak yang dapat mengajukan/.test(r.pesan), 'Pembina ditolak mengajukan lewat api');
   r = await siti.a.muatTkk(AMBANG_TKK_BAWAAN);
   ok(r.ok && r.data.pengajuan.length === 1 && r.data.pengajuan[0].status === 'menunggu' && r.data.pengajuan[0].tkkId === 'juru-masak' && r.data.pengajuan[0].buktiUrl === 'https://drive.example/p' && /^\d{4}-\d{2}-\d{2}$/.test(r.data.pengajuan[0].tanggal), 'muatTkk memuat pengajuan milik sendiri (dipetakan)');
@@ -84,17 +93,32 @@ console.log('\n--- Lapisan api ---');
   ok(r.ok, 'tinjauTkk ditolak');
   r = await siti.a.muatTkk(AMBANG_TKK_BAWAAN);
   ok(r.data.pengajuan[0].status === 'ditolak' && r.data.pengajuan[0].catatanTinjauan === 'Lengkapi bukti melatih' && r.data.pengajuan[0].ditinjauNama.length > 0 && r.data.capaian.length === 0, 'Penegak membaca hasil tinjauan (ditolak, catatan, nama peninjau) tanpa capaian');
-  r = await siti.a.ajukanTkk({ tkkId: 'juru-masak', tingkat: 'purwa', tanggal: t30, penguji1: 'Pak Budi', penguji2: 'Bu Sari', melatih: 'Andi dan Budi, Siaga' });
+  r = await siti.a.ajukanTkk({ tkkId: 'juru-masak', tingkat: 'purwa', tanggal: t30, penguji1Id: pembina.id, penguji2: 'Bu Sari', melatih: 'Andi dan Budi, Siaga' });
   const id2 = r.data;
   ok(r.ok, 'mengajukan lagi sesudah ditolak');
   r = await siti.a.batalkanPengajuanTkk(id2);
   ok(r.ok, 'batalkanPengajuanTkk');
-  r = await siti.a.ajukanTkk({ tkkId: 'juru-masak', tingkat: 'purwa', tanggal: t30, penguji1: 'Pak Budi', penguji2: 'Bu Sari', melatih: 'Andi dan Budi, Siaga' });
+  r = await siti.a.ajukanTkk({ tkkId: 'juru-masak', tingkat: 'purwa', tanggal: t30, penguji1Id: pembina.id, penguji2: 'Bu Sari', melatih: 'Andi dan Budi, Siaga' });
   const id3 = r.data;
   r = await pembina.a.tinjauTkk(id3, 'disetujui');
   ok(r.ok, 'tinjauTkk disetujui');
   r = await siti.a.muatTkk(AMBANG_TKK_BAWAAN);
-  ok(r.data.capaian.length === 1 && r.data.capaian[0].tkkId === 'juru-masak' && r.data.pengajuan.find((p) => p.id === id3).status === 'disetujui' && r.data.pengajuan.find((p) => p.id === id3).capaianId === r.data.capaian[0].id, 'disetujui: capaian resmi tampil dan tertaut ke pengajuan');
+  ok(r.data.pengajuan.find((p) => p.id === id3).penguji1 === namaPembina && r.data.pengajuan.find((p) => p.id === id3).penguji1Id === pembina.id, 'pengajuan memuat Penguji 1 (nama dan id Pembina) dari server');
+  r = await siti.a.pilihanPengujiTkk();
+  ok(r.ok && r.data.length === 1 && r.data[0].id === pembina.id && r.data[0].nama === namaPembina, 'pilihanPengujiTkk: Pembina yang ditugaskan untuk kelas Penegak');
+  r = await pembina.a.pilihanPengujiTkk();
+  ok(r.ok && r.data.length === 0, 'pilihanPengujiTkk untuk Pembina: kosong');
+  r = await siti.a.ajukanTkk({ tkkId: 'penabung', tingkat: 'purwa', tanggal: t30, penguji1Id: null, penguji2: 'Bu Sari', melatih: 'Andi' });
+  ok(!r.ok && /Penguji 1 harus Pembina yang ditugaskan/.test(r.pesan), 'ajukanTkk tanpa Penguji 1 ditolak');
+  r = await siti.a.ajukanTkk({ tkkId: 'penabung', tingkat: 'purwa', tanggal: t30, penguji1Id: pembina.id, penguji2: 'Bu Sari', melatih: 'Andi' });
+  const idG = r.data;
+  r = await pembina.a.tinjauTkk(idG, 'disetujui', '', 'Pak Pengganti', 'Bu Sari');
+  ok(!r.ok && /Nama penguji diganti: isi alasannya/.test(r.pesan), 'tinjauTkk: mengganti penguji tanpa alasan ditolak');
+  r = await pembina.a.tinjauTkk(idG, 'disetujui', 'Pembina 1 berhalangan hadir', 'Pak Pengganti', 'Bu Sari');
+  ok(r.ok, 'tinjauTkk: menyetujui dengan mengganti Penguji 1 dan alasan');
+  r = await siti.a.muatTkk(AMBANG_TKK_BAWAAN);
+  ok(r.data.pengajuan.find((p) => p.id === idG).pengujiAwal === namaPembina + ' dan Bu Sari' && r.data.capaian.find((c) => c.tkkId === 'penabung').penguji1 === 'Pak Pengganti', 'jejak penggantian (pengujiAwal) dan capaian dengan penguji pengganti terbaca Penegak');
+  ok(r.data.capaian.length === 2 && r.data.capaian.some((c) => c.tkkId === 'juru-masak') && r.data.pengajuan.find((p) => p.id === id3).status === 'disetujui' && r.data.pengajuan.find((p) => p.id === id3).capaianId === r.data.capaian.find((c) => c.tkkId === 'juru-masak').id, 'disetujui: capaian resmi tampil dan tertaut ke pengajuan');
 }
 
 console.log('\n--- Tampilan (render tanpa peramban) ---');

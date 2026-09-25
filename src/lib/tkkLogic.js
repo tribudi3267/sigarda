@@ -113,17 +113,27 @@ export function periksaAmbang(nilai) {
   return '';
 }
 
+/** Apakah nama penguji yang diisi peninjau berbeda dari pengajuan (kosong = tetap). Perbandingan setelah merapikan spasi, sama dengan server. */
+export const pengujiBerubah = ({ penguji1, penguji2, penguji1Awal, penguji2Awal }) => {
+  const beda = (baru, awal) => rapikan(baru) !== '' && rapikan(baru) !== rapikan(awal);
+  return beda(penguji1, penguji1Awal) || beda(penguji2, penguji2Awal);
+};
+
 /** Status pengajuan TKK oleh Penegak (Tahap 2, G2b). */
 export const STATUS_PENGAJUAN = { menunggu: 'Menunggu ditinjau', disetujui: 'Disetujui', ditolak: 'Ditolak', dibatalkan: 'Dibatalkan' };
 export const pengajuanPeserta = (pengajuan = [], pesertaId) => pengajuan.filter((p) => p.pesertaId === pesertaId);
 export const pengajuanMenunggu = (pengajuan = []) => pengajuan.filter((p) => p.status === 'menunggu');
 
-/** Cermin validasi sg_tkk_tinjau pada keputusan dan catatan (sebelum memeriksa pengajuannya). Mengembalikan pesan galat atau ''. */
-export function periksaTinjau({ keputusan, catatan = '' }) {
+/**
+ * Cermin validasi sg_tkk_tinjau pada keputusan dan catatan (sebelum memeriksa pengajuannya). Bila nama penguji diberikan (`penguji1`/`penguji2` beserta `*Awal`), menyetujui dengan
+ * nama yang berbeda dari pengajuan wajib beralasan di catatan (penggantian penguji, mis. Pembina 1 dan 2 berhalangan). Mengembalikan pesan galat atau ''.
+ */
+export function periksaTinjau({ keputusan, catatan = '', penguji1 = null, penguji2 = null, penguji1Awal = null, penguji2Awal = null }) {
   if (keputusan !== 'disetujui' && keputusan !== 'ditolak') return 'Keputusan harus disetujui atau ditolak.';
   const c = rapikan(catatan);
   if (c.length > 200 || TANDA_TERLARANG.test(c)) return 'Catatan maksimal 200 karakter, tanpa tanda < atau >.';
   if (keputusan === 'ditolak' && c === '') return 'Isi catatan agar Penegak tahu alasan penolakan.';
+  if (keputusan === 'disetujui' && c === '' && pengujiBerubah({ penguji1, penguji2, penguji1Awal, penguji2Awal })) return 'Nama penguji diganti: isi alasannya di catatan (mis. Pembina 1 dan 2 berhalangan hadir).';
   return '';
 }
 

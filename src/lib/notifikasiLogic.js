@@ -42,7 +42,7 @@ export const KAPAN_NOTIFIKASI = {
     'Penegak mengajukan pengujian kepada Anda, atau ke antrian rombel yang Anda tangani.',
     'Pengujian dialihkan kepada Anda, atau masuk antrian rombel.',
     'Pengajuan menunggu lebih dari 3 hari tanpa penguji yang mulai menguji (sekali per pengajuan).',
-    'Bila Anda Pembina: seorang Penegak mengajukan TKK untuk Anda tinjau (menu TKK, tab Pengajuan).',
+    'Bila Anda Pembina: seorang Penegak mengajukan TKK dengan Anda sebagai Penguji 1 (menu TKK, tab Pengajuan).',
     'Bila Anda Pembina: pra-uji yang menunggu lebih dari 3 hari tanpa penilai yang dapat menilai (buka menu Pra-uji untuk melewati tahap itu).',
     'Pengingat pukul 07.00 WIB sehari sebelum jadwal pengujian yang menjadi tugas Anda.',
     'Seorang Penegak sudah 8 hari lebih tidak bergerak (SKU, absensi, atau iuran) — juga muncul di menu Tindak Lanjut.',

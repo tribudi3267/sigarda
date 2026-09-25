@@ -59,6 +59,8 @@ create table public.tkk_pengajuan (
   tanggal date not null check (tanggal >= date '2000-01-01'),
   penguji1 text not null check (char_length(btrim(penguji1)) between 1 and 80),
   penguji2 text not null check (char_length(btrim(penguji2)) between 1 and 80),
+  penguji1_id uuid references public.profiles(id) on delete set null,                   -- Pembina Penguji 1 yang dipilih Penegak dari yang ditugaskan untuk kelasnya (G2c); Pembina ini yang diberi tahu
+  penguji_awal text not null default '' check (char_length(penguji_awal) <= 200),        -- nama penguji SEBELUM diganti Pembina saat meninjau (kosong bila tidak diganti)
   melatih text not null check (char_length(btrim(melatih)) between 1 and 200),
   bukti_url text not null default '' check (bukti_url = '' or (bukti_url ~* '^https?://' and char_length(bukti_url) <= 500)),
   catatan text not null default '' check (char_length(catatan) <= 200),
@@ -74,4 +76,5 @@ create table public.tkk_pengajuan (
 create unique index tkk_pengajuan_menunggu_unik on public.tkk_pengajuan (peserta_id, tkk_id, tingkat) where status = 'menunggu';
 create index tkk_pengajuan_tkk_idx on public.tkk_pengajuan (tkk_id);
 create index tkk_pengajuan_capaian_idx on public.tkk_pengajuan (capaian_id);
+create index tkk_pengajuan_penguji1_idx on public.tkk_pengajuan (penguji1_id);
 -- ===== akhir tabel tkk pengajuan =====

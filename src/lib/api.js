@@ -211,11 +211,14 @@ export function buatApi(klien) {
       rpc('sg_tkk_krida_simpan', { p_id: id, p_peserta_id: pesertaId, p_nama: nama, p_saka: saka, p_tanggal: tanggal || null, p_bukti_url: buktiUrl, p_catatan: catatan }),
     hapusKrida: (id) => rpc('sg_tkk_krida_hapus', { p_id: id }),
     /** Penegak mengajukan capaian TKK-nya sendiri (menunggu ditinjau Pembina). Mengembalikan id pengajuan. */
-    ajukanTkk: ({ tkkId, tingkat, tanggal, penguji1, penguji2, melatih, buktiUrl = '', catatan = '' }) =>
-      rpc('sg_tkk_ajukan', { p_tkk_id: tkkId, p_tingkat: tingkat, p_tanggal: tanggal || null, p_penguji1: penguji1, p_penguji2: penguji2, p_melatih: melatih, p_bukti_url: buktiUrl, p_catatan: catatan }),
+    ajukanTkk: ({ tkkId, tingkat, tanggal, penguji1Id, penguji2, melatih, buktiUrl = '', catatan = '' }) =>
+      rpc('sg_tkk_ajukan', { p_tkk_id: tkkId, p_tingkat: tingkat, p_tanggal: tanggal || null, p_penguji1_id: penguji1Id || null, p_penguji2: penguji2, p_melatih: melatih, p_bukti_url: buktiUrl, p_catatan: catatan }),
+    /** Pilihan Penguji 1 bagi Penegak yang masuk: [{ id, nama }] Pembina yang ditugaskan untuk kelasnya (semua Pembina aktif bila belum ada penugasan). */
+    pilihanPengujiTkk: () => rpc('sg_tkk_penguji_pilihan'),
     batalkanPengajuanTkk: (id) => rpc('sg_tkk_ajukan_batal', { p_id: id }),
-    /** Pembina atau Admin meninjau pengajuan: keputusan 'disetujui' (menjadi capaian resmi) atau 'ditolak' (catatan wajib). */
-    tinjauTkk: (id, keputusan, catatan = '') => rpc('sg_tkk_tinjau', { p_id: id, p_keputusan: keputusan, p_catatan: catatan }),
+    /** Pembina atau Admin meninjau pengajuan: keputusan 'disetujui' (menjadi capaian resmi; boleh mengganti nama penguji dengan alasan di catatan) atau 'ditolak' (catatan wajib). */
+    tinjauTkk: (id, keputusan, catatan = '', penguji1 = null, penguji2 = null) =>
+      rpc('sg_tkk_tinjau', { p_id: id, p_keputusan: keputusan, p_catatan: catatan, p_penguji1: penguji1 || null, p_penguji2: penguji2 || null }),
     /** Mengubah ambang kesiapan Garuda: { total, madya, utamaWajib: [id TKK] } (Pembina dan Admin). */
     simpanAmbangTkk: (nilai) => rpc('sg_tkk_ambang_simpan', { p_nilai: nilai }),
 
