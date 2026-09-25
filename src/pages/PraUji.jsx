@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { cariPoin } from '../lib/skuLogic';
 import { fmtTanggal, fmtWaktu } from '../lib/format';
 import { pembinaAtauAdmin } from '../lib/hakLogic';
-import { hariMenunggu, namaTahap, penilaiPraUji } from '../lib/praUjiLogic';
+import { hariMenunggu, namaTahap, penilaiPraUji, ringkasCakupan } from '../lib/praUjiLogic';
 import SumberPeraturan from '../components/SumberPeraturan';
 import { Avatar, Field, Kosong, Modal, TeksPoin } from '../components/ui';
 
@@ -227,6 +227,57 @@ function PanelPenilai() {
   );
 }
 
+/** Cakupan pra-uji (Pembina dan Admin): berapa persen pengajuan baru yang punya penilai, dan rombel mana yang paling sering langsung ke Pembina (kurang Bina Damping atau Pinsa). */
+function PanelCakupan() {
+  const { api } = useApp();
+  const [hari, setHari] = useState(30);
+  const [data, setData] = useState(null);
+  const [galat, setGalat] = useState('');
+  useEffect(() => {
+    let batal = false;
+    setData(null);
+    api().muatCakupanPraUji(hari).then((r) => { if (batal) return; if (r.ok) { setData(r.data); setGalat(''); } else setGalat(r.pesan ?? 'Cakupan pra-uji tidak dapat dimuat.'); });
+    return () => { batal = true; };
+  }, [api, hari]);
+  if (galat) return <p role="alert" className="mb-5 text-sm font-medium text-red-700">{galat}</p>;
+  if (!data) return <p role="status" className="mb-5 text-sm text-pramuka-600">Memuat cakupan pra-uji...</p>;
+  const r = ringkasCakupan(data.perRombel);
+  return (
+    <section className="panel mb-5 p-4" aria-label="Cakupan pra-uji">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h2 className="text-lg font-bold">Cakupan pra-uji</h2>
+        <label className="inline-flex items-center gap-2 text-sm">Periode
+          <select className="input w-auto py-1" value={hari} onChange={(e) => setHari(Number(e.target.value))}>
+            {[7, 30, 90].map((n) => <option key={n} value={n}>{n} hari terakhir</option>)}
+          </select>
+        </label>
+      </div>
+      {r.total === 0 ? (
+        <p className="mt-2 text-sm text-pramuka-600">Belum ada pengajuan baru pada periode ini.</p>
+      ) : (
+        <>
+          <p className="mt-2 font-display text-3xl font-bold text-pramuka-800">{r.persenLewat}%<span className="text-base font-normal text-pramuka-600"> pengajuan melewati pra-uji</span></p>
+          <p className="text-sm text-pramuka-700">{r.lewat} punya penilai (Pinsa atau Bina Damping); {r.langsung} tidak punya penilai sehingga langsung ke antrian Pembina.</p>
+          {r.rombelKurang.length > 0 && (
+            <div className="mt-3">
+              <p className="text-sm font-semibold">Rombel yang paling sering langsung ke Pembina</p>
+              <ul className="mt-1 divide-y divide-pramuka-100 rounded-md border border-pramuka-200 text-sm">
+                {r.rombelKurang.slice(0, 10).map((x) => (
+                  <li key={x.rombel} className="flex flex-wrap items-baseline justify-between gap-x-3 px-3 py-1.5">
+                    <span className="font-medium">{x.rombel}</span>
+                    <span className="text-xs text-pramuka-600">{x.langsung} langsung, {x.lewat} lewat pra-uji, {x.binaDamping} Bina Damping</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-pramuka-600">Tambah Bina Damping (menu Sangga) atau Pinsa pada rombel itu agar lebih banyak pengajuan disaring sebelum ke Pembina. Butir Bantara baru dapat disaring bila ada penilai yang sudah lulus butir yang sama.</p>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 /** Semua pengajuan yang menunggu penilai (Pembina dan Admin), dengan tombol melewati tahap yang macet. */
 function PanelPengelola() {
   const { muatPraUjiMenunggu, users, praUjiAktif } = useApp();
@@ -290,6 +341,7 @@ export default function PraUji() {
       <SumberPeraturan className="mb-4" rujukan={RUJUKAN} />
       {kelola && <PanelSakelar />}
       {penilai && <PanelPenilai />}
+      {kelola && praUjiAktif && <PanelCakupan />}
       {kelola && praUjiAktif && <PanelPengelola />}
       {!kelola && !penilai && <Kosong judul="Belum ada tugas pra-uji" teks="Menu ini muncul bila kamu Pinsa atau Bina Damping dan pra-uji sedang hidup." />}
     </div>

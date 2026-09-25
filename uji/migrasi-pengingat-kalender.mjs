@@ -16,6 +16,7 @@ const bersih = (s) => s.replace(/^﻿/, '').replace(/\r\n/g, '\n');
 const MI = bersih(readFileSync(`${P}/supabase/migrasi/2026-09-tanggal-lahir-impor.sql`, 'utf8'));
 const MT = bersih(readFileSync(`${P}/supabase/migrasi/2026-09-tim-kalender.sql`, 'utf8'));
 const MP = bersih(readFileSync(`${P}/supabase/migrasi/2026-09-pengingat-kalender.sql`, 'utf8'));
+const MC = bersih(readFileSync(`${P}/supabase/migrasi/2026-09-cakupan-pra-uji.sql`, 'utf8')); // migrasi sesudahnya; skema.sql terbaru sudah memuatnya
 
 const skemaDari = (ref) => (ref.startsWith('git:') ? skemaLama(ref.slice(4), P) : readFileSync(ref, 'utf8'));
 const baru = async (skemaFile) => { const db = new PGlite(); await siapkanPg(db, { sqlStub: stub, sqlSkema: bersih(skemaDari(skemaFile)) }); return db; };
@@ -58,6 +59,7 @@ ok(JSON.stringify(await cacah(B1)) === JSON.stringify(sebelum), 'jumlah data tid
 ok(await md5Fungsi(B1, 'notif_pengingat') !== lamaPengingat, 'notif_pengingat ditulis ulang oleh migrasi');
 await B1.exec(MP); await B1.exec(MP);
 ok(JSON.stringify(await cacah(B1)) === JSON.stringify(sebelum), 'menjalankan migrasi tiga kali: data tetap sama');
+await B1.exec(MC);
 const pb = await potret(B1);
 for (const k of Object.keys(pa)) {
   const sama = JSON.stringify(pa[k]) === JSON.stringify(pb[k]);

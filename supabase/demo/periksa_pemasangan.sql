@@ -1244,6 +1244,7 @@ h_fungsi(skema, nama, args, isi, au, an, sv) as (values
     ('public', 'sg_pf_catat_penguji', 'p_peserta_id uuid, p_item_id text, p_catatan text', '9e19fd9bfe0b75340d41664044714d7b', true, false, true),
     ('public', 'sg_pf_ubah', 'p_item_id text, p_status text, p_catatan text, p_tautan text', '2d0086521c8db8f32f7239edada8cdc9', true, false, true),
     ('public', 'sg_pra_uji_antrian', '', '2e28adbfee25f43052a58e843713f151', true, false, true),
+    ('public', 'sg_pra_uji_cakupan', 'p_hari integer', 'f6eb0abd59c16ba04e77c52f77a7ef9c', true, false, true),
     ('public', 'sg_pra_uji_catat', 'p_id bigint, p_hasil text, p_catatan text', '9d82bc1555f9d07bf00053e38356ea36', true, false, true),
     ('public', 'sg_pra_uji_lewati', 'p_id bigint, p_alasan text', 'e343c55bb7681f65576d946ed546437a', true, false, true),
     ('public', 'sg_pra_uji_sakelar', 'p_aktif boolean', '305dd698c326024c572f6c61810ce6f0', true, false, true),

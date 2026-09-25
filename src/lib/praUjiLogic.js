@@ -101,3 +101,18 @@ export const butirMenungguPra = (entri = [], baris = []) =>
     .map((x) => ({ ...x, pra: praUjiMenunggu(baris.filter((r) => r.skuId === x.poin.id)) }))
     .filter((x) => x.pra && x.entry.status !== 'lulus' && x.entry.status !== 'diajukan' && x.entry.status !== 'proses')
     .sort((a, b) => (a.pra.jadwal ?? '9999').localeCompare(b.pra.jadwal ?? '9999'));
+
+/**
+ * Cakupan pra-uji (hasil simulasi pra-uji): dari baris per rombel sg_pra_uji_cakupan ({ rombel, lewat, langsung, binaDamping }) menjadi ringkasan
+ * { lewat, langsung, total, persenLewat (null bila belum ada pengajuan), rombelKurang: rombel yang pengajuannya tanpa penilai lebih banyak daripada yang lewat, urut terbanyak }.
+ * "langsung" = pengajuan baru yang tidak punya penilai sehingga langsung ke antrian Pembina.
+ */
+export function ringkasCakupan(perRombel = []) {
+  const lewat = perRombel.reduce((n, r) => n + r.lewat, 0);
+  const langsung = perRombel.reduce((n, r) => n + r.langsung, 0);
+  const total = lewat + langsung;
+  return {
+    lewat, langsung, total, persenLewat: total ? Math.round((lewat / total) * 100) : null,
+    rombelKurang: perRombel.filter((r) => r.langsung > r.lewat).sort((a, b) => b.langsung - a.langsung || a.rombel.localeCompare(b.rombel, 'id')),
+  };
+}
