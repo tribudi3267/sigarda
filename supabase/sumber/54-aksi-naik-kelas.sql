@@ -42,6 +42,9 @@ create trigger tak_aktif_tkk_pengajuan before insert or update on public.tkk_pen
 -- ===== SPG (Tahap 2, G3): pemicu =====
 create trigger tak_aktif_spg_penetapan before insert or update on public.spg_penetapan for each row execute function sigarda.tolak_peserta_tak_aktif();
 -- ===== akhir pemicu spg =====
+-- ===== Gerbang calon Garuda (Tahap 2, G4): pemicu =====
+create trigger tak_aktif_tanggal_lahir before insert or update on public.tanggal_lahir for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu gerbang =====
 
 -- Status Calon Garuda hanya untuk Penegak yang aktif (diberikan sendiri lewat sg_calon_garuda_daftar atau oleh Admin lewat sg_anggota_ubah).
 create function sigarda.tolak_calon_garuda_tak_aktif() returns trigger language plpgsql as

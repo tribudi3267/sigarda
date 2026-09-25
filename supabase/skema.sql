@@ -978,6 +978,22 @@ create table public.spg_penetapan (
   constraint spg_timpa_beralasan check (not timpa or char_length(btrim(catatan)) >= 5)
 );
 -- ===== akhir tabel spg =====
+-- ===== Gerbang calon Garuda (Tahap 2, G4): tabel =====
+-- Tanggal lahir Penegak untuk memeriksa syarat usia Calon Garuda (pedoman Kwarcab Purbalingga 2026: usia 16-20 tahun). Sengaja TABEL TERPISAH, bukan kolom profiles: RLS profil
+-- memperlihatkan Penegak berjabatan Dewan kepada semua Penegak, sedangkan tanggal lahir hanya boleh dibaca pemilik dan pengurus. Dicatat Pembina atau Admin (sg_tanggal_lahir_atur).
+create table public.tanggal_lahir (
+  peserta_id uuid primary key references public.profiles(id) on delete cascade,
+  tanggal date not null check (tanggal >= date '1990-01-01'),
+  dicatat_oleh uuid references public.profiles(id) on delete set null,
+  dicatat_pada timestamptz not null default now()
+);
+
+-- Aturan gerbang calon (pengaturan 'garuda.gerbang'; diperbarui tiap tahun oleh Pembina atau Admin): kelas minimal, rentang tanggal lahir yang sah, dan kuota calon
+-- sebagai persen dari Penegak aktif. Bawaan sama dengan GERBANG_BAWAAN di src/lib/gerbangLogic.js (dijaga uji/gerbang-klien.mjs).
+insert into public.pengaturan (kunci, nilai) values ('garuda.gerbang',
+  '{"kelasMin": "XI", "lahirDari": "2007-11-01", "lahirSampai": "2009-05-01", "kuotaPersen": 5}'::jsonb)
+on conflict (kunci) do nothing;
+-- ===== akhir tabel gerbang =====
 -- ---------------------------------------------------------------------------
 -- 2. Fungsi bantu (tidak diekspos lewat API)
 -- ---------------------------------------------------------------------------
@@ -1899,6 +1915,7 @@ alter table public.pelantikan enable row level security;   -- baca: pemilik dan 
 alter table public.tkk_katalog enable row level security;   -- baca: semua pengguna aktif (katalog); tulis: hanya skema/migrasi
 alter table public.tkk_capaian enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_*
 alter table public.tkk_pengajuan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_ajukan/_batal dan sg_tkk_tinjau
+alter table public.tanggal_lahir enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tanggal_lahir_atur
 alter table public.spg_penetapan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_spg_*
 alter table public.tkk_krida enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_krida_*
 alter table public.saka_anggota enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_saka_*
@@ -2035,6 +2052,12 @@ create policy baca_tkk_pengajuan on public.tkk_pengajuan for select to authentic
 create policy baca_spg_penetapan on public.spg_penetapan for select to authenticated
   using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
 -- ===== akhir kebijakan spg =====
+
+-- ===== Gerbang calon Garuda (Tahap 2, G4): kebijakan =====
+-- Tanggal lahir: Penegak melihat miliknya sendiri, pengurus semua (tabel terpisah dari profiles agar tidak terbaca Penegak lain).
+create policy baca_tanggal_lahir on public.tanggal_lahir for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan gerbang =====
 
 -- Sesi ujian: pengurus melihat semua; Penegak hanya sesi yang mencantumkan dirinya.
 create policy baca_sesi_ujian on public.sesi_ujian for select to authenticated
@@ -3121,6 +3144,9 @@ create trigger tak_aktif_tkk_pengajuan before insert or update on public.tkk_pen
 -- ===== SPG (Tahap 2, G3): pemicu =====
 create trigger tak_aktif_spg_penetapan before insert or update on public.spg_penetapan for each row execute function sigarda.tolak_peserta_tak_aktif();
 -- ===== akhir pemicu spg =====
+-- ===== Gerbang calon Garuda (Tahap 2, G4): pemicu =====
+create trigger tak_aktif_tanggal_lahir before insert or update on public.tanggal_lahir for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu gerbang =====
 
 -- Status Calon Garuda hanya untuk Penegak yang aktif (diberikan sendiri lewat sg_calon_garuda_daftar atau oleh Admin lewat sg_anggota_ubah).
 create function sigarda.tolak_calon_garuda_tak_aktif() returns trigger language plpgsql as
@@ -4793,7 +4819,8 @@ begin
       'tkk_capaian', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tkk_capaian t),
       'tkk_krida', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tkk_krida t),
       'tkk_pengajuan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tkk_pengajuan t),
-      'spg_penetapan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.spg_penetapan t)
+      'spg_penetapan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.spg_penetapan t),
+      'tanggal_lahir', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tanggal_lahir t)
     )
   ) into v_hasil;
   insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada)
@@ -5908,6 +5935,56 @@ begin
   if not found then raise exception 'Penetapan SPG tidak ditemukan.'; end if;
 end $$;
 -- ===== akhir aksi spg =====
+-- ===== Gerbang calon Garuda (Tahap 2, G4): aksi =====
+-- Gerbang calon hanya PERINGATAN (keputusan pemilik 25 Sep 2026): kelas, usia, dan kuota dihitung dan ditampilkan di klien; server tidak memblokir pendaftaran Calon Garuda.
+-- Server hanya menyimpan tanggal lahir dan aturan gerbang. Keduanya oleh Pembina atau Admin Gudep.
+
+-- Mengisi (atau mengoreksi) tanggal lahir satu Penegak aktif; tanggal kosong = menghapus catatan.
+create function public.sg_tanggal_lahir_atur(p_peserta_id uuid, p_tanggal date) returns void language plpgsql security definer set search_path = public as
+$$
+declare v_p public.profiles;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mengisi tanggal lahir.'; end if;
+  select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';
+  if not found then raise exception 'Pilih Penegak.'; end if;
+  if v_p.status <> 'aktif' then raise exception '% tidak aktif; tanggal lahir hanya diisi untuk Penegak aktif.', v_p.nama; end if;
+  if p_tanggal is null then
+    delete from public.tanggal_lahir where peserta_id = p_peserta_id;
+    return;
+  end if;
+  if p_tanggal < date '1990-01-01' or p_tanggal > sigarda.hari_ini() then raise exception 'Tanggal lahir tidak boleh sebelum tahun 1990 atau di masa depan.'; end if;
+  insert into public.tanggal_lahir (peserta_id, tanggal, dicatat_oleh, dicatat_pada) values (p_peserta_id, p_tanggal, auth.uid(), now())
+  on conflict (peserta_id) do update set tanggal = excluded.tanggal, dicatat_oleh = excluded.dicatat_oleh, dicatat_pada = excluded.dicatat_pada;
+end $$;
+
+-- Aturan gerbang calon (pengaturan 'garuda.gerbang'): { kelasMin: 'X'|'XI'|'XII', lahirDari, lahirSampai ('YYYY-MM-DD', dari <= sampai), kuotaPersen: bilangan bulat 0-100 }.
+create function public.sg_gerbang_simpan(p_nilai jsonb) returns void language plpgsql security definer set search_path = public as
+$$
+declare v_dari date; v_sampai date; v_kuota int;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mengubah aturan gerbang calon.'; end if;
+  if p_nilai is null or jsonb_typeof(p_nilai) <> 'object' or p_nilai - 'kelasMin' - 'lahirDari' - 'lahirSampai' - 'kuotaPersen' <> '{}'::jsonb then raise exception 'Bentuk aturan gerbang tidak sah.'; end if;
+  -- coalesce: kunci yang hilang menghasilkan NULL, dan perbandingan dengan NULL tidak akan memicu galat
+  if coalesce(jsonb_typeof(p_nilai -> 'kelasMin'), '') <> 'string' or coalesce(jsonb_typeof(p_nilai -> 'lahirDari'), '') <> 'string'
+     or coalesce(jsonb_typeof(p_nilai -> 'lahirSampai'), '') <> 'string' or coalesce(jsonb_typeof(p_nilai -> 'kuotaPersen'), '') <> 'number' then raise exception 'Bentuk aturan gerbang tidak sah.'; end if;
+  if (p_nilai ->> 'kelasMin') not in ('X', 'XI', 'XII') then raise exception 'Kelas minimal harus X, XI, atau XII.'; end if;
+  if (p_nilai ->> 'lahirDari') !~ '^\d{4}-\d{2}-\d{2}$' or (p_nilai ->> 'lahirSampai') !~ '^\d{4}-\d{2}-\d{2}$' then raise exception 'Tanggal lahir harus berbentuk TTTT-BB-HH.'; end if;
+  begin
+    v_dari := (p_nilai ->> 'lahirDari')::date; v_sampai := (p_nilai ->> 'lahirSampai')::date;
+  exception when others then raise exception 'Tanggal lahir tidak sah.';
+  end;
+  if v_dari < date '1990-01-01' or v_sampai > date '2030-12-31' then raise exception 'Rentang tanggal lahir harus antara tahun 1990 dan 2030.'; end if;
+  if v_dari > v_sampai then raise exception 'Tanggal lahir awal tidak boleh sesudah tanggal akhir.'; end if;
+  if (p_nilai ->> 'kuotaPersen') !~ '^[0-9]+$' then raise exception 'Kuota harus bilangan bulat 0 sampai 100 persen.'; end if;
+  v_kuota := (p_nilai ->> 'kuotaPersen')::int;
+  if v_kuota > 100 then raise exception 'Kuota harus bilangan bulat 0 sampai 100 persen.'; end if;
+  insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada)
+  values ('garuda.gerbang', jsonb_build_object('kelasMin', p_nilai ->> 'kelasMin', 'lahirDari', to_char(v_dari, 'YYYY-MM-DD'), 'lahirSampai', to_char(v_sampai, 'YYYY-MM-DD'), 'kuotaPersen', v_kuota), auth.uid(), now())
+  on conflict (kunci) do update set nilai = excluded.nilai, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
+end $$;
+-- ===== akhir aksi gerbang =====
 -- ---------------------------------------------------------------------------
 -- 5. Hak akses: baca saja untuk pengguna; fungsi aksi hanya untuk pengguna masuk
 -- ---------------------------------------------------------------------------
@@ -5919,7 +5996,7 @@ grant select on public.profiles, public.sku_butir, public.sku_unit, public.pf_it
   public.sesi_ujian, public.sesi_ujian_butir, public.sesi_ujian_peserta,
   public.iuran, public.iuran_log, public.iuran_kas, public.asisten_iuran,
   public.penugasan_rombel, public.penugasan_log, public.guru_agama, public.dokumen_terbit, public.dokumen_urut, public.notifikasi,
-  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda, public.kegiatan_usulan, public.pengukuhan_dewan, public.sku_pra_uji, public.pelantikan, public.saka_anggota, public.tkk_katalog, public.tkk_capaian, public.tkk_krida, public.tkk_pengajuan, public.spg_penetapan to authenticated;
+  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda, public.kegiatan_usulan, public.pengukuhan_dewan, public.sku_pra_uji, public.pelantikan, public.saka_anggota, public.tkk_katalog, public.tkk_capaian, public.tkk_krida, public.tkk_pengajuan, public.spg_penetapan, public.tanggal_lahir to authenticated;
 
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function
@@ -5968,7 +6045,8 @@ grant execute on function
   public.sg_tkk_krida_simpan(bigint, uuid, text, text, date, text, text), public.sg_tkk_krida_hapus(bigint), public.sg_tkk_ambang_simpan(jsonb),
   public.sg_tkk_ajukan(text, text, date, uuid, text, text, text, text), public.sg_tkk_ajukan_batal(bigint), public.sg_tkk_tinjau(bigint, text, text, text, text),
   public.sg_tkk_penguji_pilihan(),
-  public.sg_spg_catat(uuid, integer, integer, date, text, boolean), public.sg_spg_hapus(uuid, integer)
+  public.sg_spg_catat(uuid, integer, integer, date, text, boolean), public.sg_spg_hapus(uuid, integer),
+  public.sg_tanggal_lahir_atur(uuid, date), public.sg_gerbang_simpan(jsonb)
   to authenticated;
 -- Fungsi yang boleh dipanggil tanpa login (hanya membaca): verifikasi keaslian dokumen, identitas gudep di halaman masuk, dan
 -- tautan berbagi baca-saja Berkas Calon Garuda (tahap L7)

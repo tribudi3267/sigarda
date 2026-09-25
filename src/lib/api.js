@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSpg, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
+import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSpg, susunTanggalLahir, susunGerbang, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 /** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
@@ -215,6 +215,16 @@ export function buatApi(klien) {
     catatSpg: ({ pesertaId, butir, nilai, tanggal, catatan = '', timpa = false }) =>
       rpc('sg_spg_catat', { p_peserta_id: pesertaId, p_butir: butir, p_nilai: nilai, p_tanggal: tanggal || null, p_catatan: catatan, p_timpa: timpa }),
     hapusSpg: (pesertaId, butir) => rpc('sg_spg_hapus', { p_peserta_id: pesertaId, p_butir: butir }),
+
+    /* ------------------- Gerbang calon Garuda (Tahap 2, G4) ------------------- */
+    /** Tanggal lahir yang boleh dilihat (Penegak: miliknya; pengurus: semua; dibatasi RLS) dan aturan gerbang calon. `bawaan` = aturan bila belum ada. */
+    muatGerbang: (bawaan) => muat(async () => {
+      const [l, a] = await Promise.all([ambilSemua('tanggal_lahir', { urut: ['peserta_id'] }), ambilSemua('pengaturan', { filter: [['kunci', 'garuda.gerbang']] })]);
+      return { lahir: susunTanggalLahir(l), aturan: susunGerbang(a[0]?.nilai, bawaan) };
+    }),
+    /** Mengisi tanggal lahir satu Penegak (Pembina dan Admin); tanggal kosong = menghapus catatan. */
+    aturTanggalLahir: (pesertaId, tanggal) => rpc('sg_tanggal_lahir_atur', { p_peserta_id: pesertaId, p_tanggal: tanggal || null }),
+    simpanGerbang: (nilai) => rpc('sg_gerbang_simpan', { p_nilai: nilai }),
     simpanKrida: ({ id = null, pesertaId, nama, saka = '', tanggal, buktiUrl = '', catatan = '' }) =>
       rpc('sg_tkk_krida_simpan', { p_id: id, p_peserta_id: pesertaId, p_nama: nama, p_saka: saka, p_tanggal: tanggal || null, p_bukti_url: buktiUrl, p_catatan: catatan }),
     hapusKrida: (id) => rpc('sg_tkk_krida_hapus', { p_id: id }),

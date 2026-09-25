@@ -309,6 +309,15 @@ export const susunSaka = (baris = []) =>
     suratUrl: r.surat_url ?? '', catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada,
   })).sort((a, b) => a.saka.localeCompare(b.saka, 'id') || a.tanggalMasuk.localeCompare(b.tanggalMasuk));
 
+/** Baris tanggal_lahir -> [{ pesertaId, tanggal (YYYY-MM-DD), dicatatPada }]. */
+export const susunTanggalLahir = (baris = []) => baris.map((r) => ({ pesertaId: r.peserta_id, tanggal: tgl(r.tanggal), dicatatPada: r.dicatat_pada }));
+
+/** Nilai pengaturan 'garuda.gerbang' -> { kelasMin, lahirDari, lahirSampai, kuotaPersen } yang aman (bentuk rusak atau belum ada = `bawaan`). */
+export const susunGerbang = (nilai, bawaan) =>
+  nilai && ['X', 'XI', 'XII'].includes(nilai.kelasMin) && /^\d{4}-\d{2}-\d{2}$/.test(nilai.lahirDari ?? '') && /^\d{4}-\d{2}-\d{2}$/.test(nilai.lahirSampai ?? '') && Number.isInteger(nilai.kuotaPersen)
+    ? { kelasMin: nilai.kelasMin, lahirDari: nilai.lahirDari, lahirSampai: nilai.lahirSampai, kuotaPersen: nilai.kuotaPersen }
+    : bawaan;
+
 /** Baris spg_penetapan -> [{ pesertaId, butir, nilai (100|0), tanggal, catatan, timpa, dicatatPada }], urut Penegak lalu butir. */
 export const susunSpg = (baris = []) =>
   baris.map((r) => ({
