@@ -66,7 +66,8 @@ h_tabel(nama, rls, sel) as (values
     ('sku_unit', true, true),
     ('tkk_capaian', true, true),
     ('tkk_katalog', true, true),
-    ('tkk_krida', true, true)
+    ('tkk_krida', true, true),
+    ('tkk_pengajuan', true, true)
 ),
 h_kolom(tabel, kolom, tipe) as (values
     ('absensi_hadir', 'oleh', 'uuid'),
@@ -498,7 +499,24 @@ h_kolom(tabel, kolom, tipe) as (values
     ('tkk_krida', 'nama', 'text'),
     ('tkk_krida', 'peserta_id', 'uuid'),
     ('tkk_krida', 'saka', 'text'),
-    ('tkk_krida', 'tanggal', 'date')
+    ('tkk_krida', 'tanggal', 'date'),
+    ('tkk_pengajuan', 'bukti_url', 'text'),
+    ('tkk_pengajuan', 'capaian_id', 'bigint'),
+    ('tkk_pengajuan', 'catatan', 'text'),
+    ('tkk_pengajuan', 'catatan_tinjauan', 'text'),
+    ('tkk_pengajuan', 'diajukan_pada', 'timestamp with time zone'),
+    ('tkk_pengajuan', 'ditinjau_nama', 'text'),
+    ('tkk_pengajuan', 'ditinjau_oleh', 'uuid'),
+    ('tkk_pengajuan', 'ditinjau_pada', 'timestamp with time zone'),
+    ('tkk_pengajuan', 'id', 'bigint'),
+    ('tkk_pengajuan', 'melatih', 'text'),
+    ('tkk_pengajuan', 'penguji1', 'text'),
+    ('tkk_pengajuan', 'penguji2', 'text'),
+    ('tkk_pengajuan', 'peserta_id', 'uuid'),
+    ('tkk_pengajuan', 'status', 'text'),
+    ('tkk_pengajuan', 'tanggal', 'date'),
+    ('tkk_pengajuan', 'tingkat', 'text'),
+    ('tkk_pengajuan', 'tkk_id', 'text')
 ),
 h_batasan(tabel, nama, potongan) as (values
     ('absensi_hadir', 'absensi_hadir_oleh_fkey', null::text),
@@ -828,7 +846,22 @@ h_batasan(tabel, nama, potongan) as (values
     ('tkk_krida', 'tkk_krida_peserta_id_fkey', null::text),
     ('tkk_krida', 'tkk_krida_pkey', null::text),
     ('tkk_krida', 'tkk_krida_saka_check', null::text),
-    ('tkk_krida', 'tkk_krida_tanggal_check', null::text)
+    ('tkk_krida', 'tkk_krida_tanggal_check', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_bukti_url_check', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_capaian_id_fkey', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_catatan_check', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_catatan_tinjauan_check', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_ditinjau_oleh_fkey', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_melatih_check', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_penguji1_check', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_penguji2_check', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_peserta_id_fkey', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_pkey', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_status_check', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_tanggal_check', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_tingkat_check', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_tkk_id_fkey', null::text),
+    ('tkk_pengajuan', 'tkk_pengajuan_tolak_wajib_catatan', null::text)
 ),
 h_indeks(tabel, nama) as (values
     ('absensi_hadir', 'absensi_hadir_oleh_idx'),
@@ -953,7 +986,11 @@ h_indeks(tabel, nama) as (values
     ('tkk_capaian', 'tkk_capaian_tkk_idx'),
     ('tkk_katalog', 'tkk_katalog_pkey'),
     ('tkk_krida', 'tkk_krida_pkey'),
-    ('tkk_krida', 'tkk_krida_unik')
+    ('tkk_krida', 'tkk_krida_unik'),
+    ('tkk_pengajuan', 'tkk_pengajuan_capaian_idx'),
+    ('tkk_pengajuan', 'tkk_pengajuan_menunggu_unik'),
+    ('tkk_pengajuan', 'tkk_pengajuan_pkey'),
+    ('tkk_pengajuan', 'tkk_pengajuan_tkk_idx')
 ),
 h_kebijakan(tabel, nama, potongan) as (values
     ('absensi_hadir', 'baca_absensi', null::text),
@@ -1001,7 +1038,8 @@ h_kebijakan(tabel, nama, potongan) as (values
     ('sku_unit', 'baca_katalog_unit', null::text),
     ('tkk_capaian', 'baca_tkk_capaian', null::text),
     ('tkk_katalog', 'baca_tkk_katalog', null::text),
-    ('tkk_krida', 'baca_tkk_krida', null::text)
+    ('tkk_krida', 'baca_tkk_krida', null::text),
+    ('tkk_pengajuan', 'baca_tkk_pengajuan', null::text)
 ),
 h_pemicu(tabel, nama) as (values
     ('absensi_hadir', 'tak_aktif_absensi_hadir'),
@@ -1027,7 +1065,10 @@ h_pemicu(tabel, nama) as (values
     ('sku_progress', 'tak_aktif_sku_progress'),
     ('sku_riwayat', 'tak_aktif_sku_riwayat'),
     ('tkk_capaian', 'tak_aktif_tkk_capaian'),
-    ('tkk_krida', 'tak_aktif_tkk_krida')
+    ('tkk_krida', 'tak_aktif_tkk_krida'),
+    ('tkk_pengajuan', 'notif_tkk_pengajuan_baru'),
+    ('tkk_pengajuan', 'notif_tkk_pengajuan_tinjau'),
+    ('tkk_pengajuan', 'tak_aktif_tkk_pengajuan')
 ),
 h_fungsi(skema, nama, args, isi, au, an, sv) as (values
     ('public', 'sg_absen_buat_sesi', 'p_tanggal date', '692dd6864ff620207afac56ec70686d4', true, false, true),
@@ -1045,7 +1086,7 @@ h_fungsi(skema, nama, args, isi, au, an, sv) as (values
     ('public', 'sg_asisten_iuran_atur', 'p_peserta_id uuid, p_aktif boolean', 'b1d2078fe7e40b647c437c8506b692a2', true, false, true),
     ('public', 'sg_bina_damping_atur', 'p_tahun_ajaran text, p_rombel text, p_penegak_ids uuid[]', '9fcf9b1d2bfb6a30f93d473d025b6362', true, false, true),
     ('public', 'sg_bina_damping_daftar', 'p_tahun_ajaran text', '6192bec6d1045e09354c74b1b55e56ea', true, false, true),
-    ('public', 'sg_cadangan_admin', '', '8b1367705657de1813f8b53b6a5f3960', true, false, true),
+    ('public', 'sg_cadangan_admin', '', '23233a2379a1abe7bda9af11a4f9d0d7', true, false, true),
     ('public', 'sg_cadangan_status', '', 'e34e4d8aa7c91e88de94cae963be5e12', true, false, true),
     ('public', 'sg_calon_garuda_daftar', '', '822a69512deba1421e075ec8851b3c69', true, false, true),
     ('public', 'sg_dewan_lama_arsipkan', 'p_ids uuid[], p_aktifkan boolean', 'efe4c91e1283dfd3cae39618ec01f0e1', true, false, true),
@@ -1132,11 +1173,14 @@ h_fungsi(skema, nama, args, isi, au, an, sv) as (values
     ('public', 'sg_sku_batal', 'p_sku_id text', 'bf7ff364b88b55795e5ee46b71b94ef6', true, false, true),
     ('public', 'sg_sku_catat_internal', 'p_oleh uuid, p_peserta_id uuid, p_sku_id text, p_hasil text, p_tanggal_uji date, p_nilai text, p_catatan text', 'b6461d85e0c32db50f5cdbb711f29cc3', false, false, true),
     ('public', 'sg_sku_catat_rubrik_internal', 'p_oleh uuid, p_peserta_id uuid, p_sku_id text, p_tanggal_uji date, p_rincian jsonb, p_hasil text, p_catatan text', 'c6d5ffe67336373377686c3dff7018fb', false, false, true),
+    ('public', 'sg_tkk_ajukan', 'p_tkk_id text, p_tingkat text, p_tanggal date, p_penguji1 text, p_penguji2 text, p_melatih text, p_bukti_url text, p_catatan text', 'b78a22ceb0ca265a5b5b975d81430ef5', true, false, true),
+    ('public', 'sg_tkk_ajukan_batal', 'p_id bigint', '7b66c44d9720e6970391b6d72092045c', true, false, true),
     ('public', 'sg_tkk_ambang_simpan', 'p_nilai jsonb', 'cee4f0c9e6897092b615de80807b33f8', true, false, true),
-    ('public', 'sg_tkk_catat', 'p_peserta_id uuid, p_tkk_id text, p_tingkat text, p_tanggal date, p_penguji1 text, p_penguji2 text, p_melatih text, p_bukti_url text, p_catatan text', '32094815d5c9a4acc519f5d2782296dd', true, false, true),
+    ('public', 'sg_tkk_catat', 'p_peserta_id uuid, p_tkk_id text, p_tingkat text, p_tanggal date, p_penguji1 text, p_penguji2 text, p_melatih text, p_bukti_url text, p_catatan text', '42dd1ca6c8e8c966f1fa40641313d2bf', true, false, true),
     ('public', 'sg_tkk_hapus', 'p_id bigint', '53d4e36ca52d310a755621cbbfed3304', true, false, true),
     ('public', 'sg_tkk_krida_hapus', 'p_id bigint', '8e0c48552cec33b5b0d2911a1fbea734', true, false, true),
     ('public', 'sg_tkk_krida_simpan', 'p_id bigint, p_peserta_id uuid, p_nama text, p_saka text, p_tanggal date, p_bukti_url text, p_catatan text', '49a42800639fcbb2d3d2d7523a4e27d8', true, false, true),
+    ('public', 'sg_tkk_tinjau', 'p_id bigint, p_keputusan text, p_catatan text', '9e0961d9361c15a4d6f14446857145d9', true, false, true),
     ('public', 'sg_verifikasi_kode', 'p_kode text', 'd5b9ea7378969f40c9f30224b0b55701', true, true, true),
     ('public', 'sg_verifikasi_token', 'p_token text', '9a1280fc48f4fae7b633231675208c9f', true, true, true),
     ('sigarda', 'agenda_batas_musyawarah', 'p_tahun_ajaran text', 'a8ed6c9655b2939648ea389eb7446bfc', true, false, true),
@@ -1190,6 +1234,7 @@ h_fungsi(skema, nama, args, isi, au, an, sv) as (values
     ('sigarda', 'notif_pra_uji', '', '33ddda520e00be7f42960e85a2d11921', true, false, true),
     ('sigarda', 'notif_sesi_peserta', '', '2909b9eace71da48f15c5d2f60ca8132', true, false, true),
     ('sigarda', 'notif_sku_progress', '', '611aff08b14d968c8884d204cd951cff', true, false, true),
+    ('sigarda', 'notif_tkk_pengajuan', '', '3c8e7331c4279d675839cad2a25e5873', true, false, true),
     ('sigarda', 'pad_nomor', 'p_no integer, p_lebar integer', '77ef115939c7cf9938625cf80002395d', true, false, true),
     ('sigarda', 'pembina_atau_admin', '', '22746b2e8e2c713ffc3b62e58ca0ada0', true, false, true),
     ('sigarda', 'pembina_saja', '', '73bb98bb30d6159c60aa96459f866311', true, false, true),
@@ -1228,6 +1273,7 @@ h_fungsi(skema, nama, args, isi, au, an, sv) as (values
     ('sigarda', 'tingkat_penegak', 'p_id uuid', 'c05b472bbf73e0ff92e9e006ae406e46', true, false, true),
     ('sigarda', 'tingkat_rombel', 'p_rombel text', '3e2bc03e09633c86a0cd605915b451ee', true, false, true),
     ('sigarda', 'tingkat_selesai', 'p_peserta uuid, p_tingkat text', 'a06ae41b8394bdcbf3c10cdd7376d675', true, false, true),
+    ('sigarda', 'tkk_periksa', 'p_peserta_id uuid, p_tkk_id text, p_tingkat text, p_tanggal date, p_penguji1 text, p_penguji2 text, p_melatih text, p_bukti_url text, p_catatan text', '2c40d86146df228eee9c809495a80942', true, false, true),
     ('sigarda', 'token_acak', '', '32c1b75699fb4018bdd152d2d997939a', true, false, true),
     ('sigarda', 'tolak_calon_garuda_tak_aktif', '', 'e026efe17e19bf46212234375dcdfab4', true, false, true),
     ('sigarda', 'tolak_peserta_tak_aktif', '', 'c9142172fb11ed04291a060c0bc2924b', true, false, true),

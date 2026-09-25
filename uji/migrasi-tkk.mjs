@@ -36,7 +36,7 @@ const potret = async (db) => {
   };
 };
 
-const A = await baru(`${P}/supabase/skema.sql`); // migrasi ini yang paling baru: skema.sql terbaru = keadaan sesudahnya
+const A = await baru('git:30070fa'); // skema TEPAT sesudah migrasi ini (main sesudah G2); skema.sql terbaru memuat tahap sesudahnya (pengajuan TKK menulis ulang sg_tkk_catat dan sg_cadangan_admin)
 const pa = await potret(A);
 
 console.log('--- Database berisi data: kesetaraan, data utuh, idempoten ---');

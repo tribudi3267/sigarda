@@ -8,7 +8,7 @@ import { AMBANG_TKK_BAWAAN } from '../data/tkkData';
  */
 export default function useTkk() {
   const { api } = useApp();
-  const [data, setData] = useState({ capaian: [], krida: [], ambang: AMBANG_TKK_BAWAAN });
+  const [data, setData] = useState({ capaian: [], krida: [], ambang: AMBANG_TKK_BAWAAN, pengajuan: [] });
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState('');
   const muat = useCallback(async () => {

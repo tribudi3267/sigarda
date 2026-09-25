@@ -5,7 +5,7 @@
 import { fmtTanggal, hariIni } from './format';
 
 export const LABEL_JENIS = {
-  ajukan: 'Pengajuan', alih: 'Dialihkan', mulai: 'Pengujian', hasil: 'Hasil', pengingat: 'Pengingat', lama: 'Menunggu lama', sesi: 'Sesi ujian', surat: 'Surat', tes: 'Uji', eskalasi: 'Eskalasi', agenda: 'Agenda', musyawarah: 'Musyawarah Ambalan', kegiatan: 'Usulan Kegiatan', pra_uji: 'Pra-uji',
+  ajukan: 'Pengajuan', alih: 'Dialihkan', mulai: 'Pengujian', hasil: 'Hasil', pengingat: 'Pengingat', lama: 'Menunggu lama', sesi: 'Sesi ujian', surat: 'Surat', tes: 'Uji', eskalasi: 'Eskalasi', agenda: 'Agenda', musyawarah: 'Musyawarah Ambalan', kegiatan: 'Usulan Kegiatan', tkk: 'TKK', pra_uji: 'Pra-uji',
 };
 
 /**
@@ -33,6 +33,7 @@ export const KAPAN_NOTIFIKASI = {
     'Anda dimasukkan ke sesi ujian bersama.',
     'Surat pengantar guru agama untuk Anda terbit.',
     'Pengingat pukul 07.00 WIB sehari sebelum jadwal pengujian atau sesi ujian Anda.',
+    'Pembina sudah meninjau pengajuan TKK Anda (hasilnya dilihat di menu TKK).',
     'Pengingat pukul 07.00 WIB bila SKU, absensi, atau iuran Anda sudah beberapa hari tidak bergerak (nadanya makin sering bila terus tidak bergerak).',
     'Pengingat H-30/H-7/H-1 untuk kegiatan agenda yang menandai Anda sebagai Penegak terkait (mis. calon sidang atau pelantikan).',
     'Bila Anda Pradana/Pradani: keputusan Pembina (disetujui/ditolak) atas usulan kegiatan (Musyawarah Ambalan, pelantikan, dll) yang Anda ajukan.',
@@ -41,6 +42,7 @@ export const KAPAN_NOTIFIKASI = {
     'Penegak mengajukan pengujian kepada Anda, atau ke antrian rombel yang Anda tangani.',
     'Pengujian dialihkan kepada Anda, atau masuk antrian rombel.',
     'Pengajuan menunggu lebih dari 3 hari tanpa penguji yang mulai menguji (sekali per pengajuan).',
+    'Bila Anda Pembina: seorang Penegak mengajukan TKK untuk Anda tinjau (menu TKK, tab Pengajuan).',
     'Bila Anda Pembina: pra-uji yang menunggu lebih dari 3 hari tanpa penilai yang dapat menilai (buka menu Pra-uji untuk melewati tahap itu).',
     'Pengingat pukul 07.00 WIB sehari sebelum jadwal pengujian yang menjadi tugas Anda.',
     'Seorang Penegak sudah 8 hari lebih tidak bergerak (SKU, absensi, atau iuran) — juga muncul di menu Tindak Lanjut.',

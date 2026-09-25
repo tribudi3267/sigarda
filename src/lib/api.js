@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunAmbangTkk, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
+import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 /** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
@@ -197,10 +197,11 @@ export function buatApi(klien) {
     /* ------------------- TKK (Tahap 2, G2) ------------------- */
     /** Capaian TKK, TKK Krida, dan ambang kesiapan Garuda yang boleh dilihat (Penegak: miliknya; pengurus: semua; dibatasi RLS). `bawaan` = ambang bila belum ada. */
     muatTkk: (bawaan) => muat(async () => {
-      const [c, k, a] = await Promise.all([
+      const [c, k, a, pj] = await Promise.all([
         ambilSemua('tkk_capaian', { urut: ['id'] }), ambilSemua('tkk_krida', { urut: ['id'] }), ambilSemua('pengaturan', { filter: [['kunci', 'tkk.ambang']] }),
+        ambilSemua('tkk_pengajuan', { urut: ['id'] }).catch(() => []), // pengajuan (G2b): basis data yang belum dimigrasi tetap menampilkan halaman TKK
       ]);
-      return { capaian: susunTkkCapaian(c), krida: susunTkkKrida(k), ambang: susunAmbangTkk(a[0]?.nilai, bawaan) };
+      return { capaian: susunTkkCapaian(c), krida: susunTkkKrida(k), ambang: susunAmbangTkk(a[0]?.nilai, bawaan), pengajuan: susunTkkPengajuan(pj) };
     }),
     /** Mencatat atau mengoreksi satu capaian TKK (Pembina dan Admin). Mengembalikan id catatan. */
     catatTkk: ({ pesertaId, tkkId, tingkat, tanggal, penguji1, penguji2, melatih, buktiUrl = '', catatan = '' }) =>
@@ -209,6 +210,12 @@ export function buatApi(klien) {
     simpanKrida: ({ id = null, pesertaId, nama, saka = '', tanggal, buktiUrl = '', catatan = '' }) =>
       rpc('sg_tkk_krida_simpan', { p_id: id, p_peserta_id: pesertaId, p_nama: nama, p_saka: saka, p_tanggal: tanggal || null, p_bukti_url: buktiUrl, p_catatan: catatan }),
     hapusKrida: (id) => rpc('sg_tkk_krida_hapus', { p_id: id }),
+    /** Penegak mengajukan capaian TKK-nya sendiri (menunggu ditinjau Pembina). Mengembalikan id pengajuan. */
+    ajukanTkk: ({ tkkId, tingkat, tanggal, penguji1, penguji2, melatih, buktiUrl = '', catatan = '' }) =>
+      rpc('sg_tkk_ajukan', { p_tkk_id: tkkId, p_tingkat: tingkat, p_tanggal: tanggal || null, p_penguji1: penguji1, p_penguji2: penguji2, p_melatih: melatih, p_bukti_url: buktiUrl, p_catatan: catatan }),
+    batalkanPengajuanTkk: (id) => rpc('sg_tkk_ajukan_batal', { p_id: id }),
+    /** Pembina atau Admin meninjau pengajuan: keputusan 'disetujui' (menjadi capaian resmi) atau 'ditolak' (catatan wajib). */
+    tinjauTkk: (id, keputusan, catatan = '') => rpc('sg_tkk_tinjau', { p_id: id, p_keputusan: keputusan, p_catatan: catatan }),
     /** Mengubah ambang kesiapan Garuda: { total, madya, utamaWajib: [id TKK] } (Pembina dan Admin). */
     simpanAmbangTkk: (nilai) => rpc('sg_tkk_ambang_simpan', { p_nilai: nilai }),
 
