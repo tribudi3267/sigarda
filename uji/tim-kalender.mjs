@@ -148,6 +148,44 @@ ok(r.ok && (await q('select count(*)::int n from public.garuda_tahap'))[0].n ===
 r = await sebagai(K.pembina.id, 'select public.sg_garuda_tahap_hapus($1)', [idT]);
 ok(cocok(r, /tidak ditemukan/), 'menghapus yang sudah tidak ada: pesan jelas');
 
+console.log('\n--- Pengingat kalender (sigarda.notif_pengingat) ---');
+{
+  await q('delete from public.garuda_tahap');
+  await q('delete from public.notifikasi');
+  const sk = async (t, m, a = null, cat = '') => tahap(K.pembina.id, t, await geser(m), a === null ? null : await geser(a), cat);
+  await sk('ajukan_tim', 7, null, 'melalui Kwarran');
+  await sk('ambil_sk', 3, 4);
+  await sk('penilaian_gudep', 1);
+  await sk('serah_kwarran', 0);
+  await sk('kirim_kwarcab', 5);
+  await sk('nilai_kwarran', -3, 1);
+  await sk('verifikasi_visitasi', -5, -2);
+  await sk('iuran', 2);
+  await q("update public.profiles set jabatan_dewan = 'Sekretaris' where username = '10008'"); // Penegak berjabatan Dewan
+  await q('select sigarda.notif_pengingat()');
+  const daftar = (id) => q(`select judul, isi, jenis, tautan ->> 'tab' as tab from public.notifikasi where penerima_id = $1 and tautan ->> 'tab' = 'kelayakan' order by judul`, [id]);
+  const p = await daftar(K.pembina.id);
+  const judul = p.map((x) => x.judul);
+  ok(p.length === 5 && judul.includes('H-7: Pengajuan SK tim penilai') && judul.includes('H-3: Pengambilan SK tim penilai') && judul.includes('H-1: Penilaian tim penilai gugus depan')
+    && judul.includes('Hari ini: Penyerahan portofolio ke Kwarran') && judul.includes('Berakhir besok: Penilaian portofolio oleh Kwarran'), 'Pembina menerima H-7, H-3, H-1, hari-H, dan berakhir besok; H-5, H-2, dan tahap yang sudah lewat tidak ' + JSON.stringify(judul));
+  ok(p.every((x) => x.jenis === 'agenda' && x.tab === 'kelayakan'), 'jenis agenda, tertaut ke menu Kelayakan');
+  ok(p.find((x) => /H-7/.test(x.judul)).isi.includes('melalui Kwarran') && /s\.d\./.test(p.find((x) => /H-3/.test(x.judul)).isi), 'isi memuat catatan dan rentang tanggal bila berentang');
+  ok((await daftar(K.admin.id)).length === 5 && (await daftar(K.dewan.id)).length === 5, 'Admin dan akun Dewan lama juga menerima');
+  const sekretaris = (await q(`select id from public.profiles where username = '10008'`))[0]?.id;
+  ok(!!sekretaris && (await daftar(sekretaris)).length === 5, 'Penegak berjabatan Dewan menerima');
+  ok((await daftar(K.siti.id)).length === 0, 'Penegak biasa tidak menerima');
+  await q('select sigarda.notif_pengingat()');
+  ok((await daftar(K.pembina.id)).length === 5, 'dijalankan lagi pada hari yang sama: tidak ada notifikasi ganda');
+  await q(`update public.profiles set status = 'nonaktif' where id = $1`, [K.dewan.id]);
+  await q(`delete from public.notifikasi where penerima_id = $1`, [K.dewan.id]);
+  await q('select sigarda.notif_pengingat()');
+  ok((await daftar(K.dewan.id)).length === 0, 'akun nonaktif tidak menerima');
+  await q(`update public.profiles set status = 'aktif' where id = $1`, [K.dewan.id]);
+  await q('delete from public.garuda_tahap'); await q('delete from public.notifikasi');
+  await tahap(K.pembina.id, 'pelantikan', '2026-10-28');
+}
+
+
 console.log('\n--- Cadangan ---');
 r = await sebagai(K.admin.id, 'select public.sg_cadangan_admin() as d');
 const t = r.rows?.[0]?.d?.tabel ?? {};

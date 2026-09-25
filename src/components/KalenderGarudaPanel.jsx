@@ -49,7 +49,7 @@ function ModalTahap({ tahap, tahunAjaran, onTutup, onSelesai }) {
 
 const teksTanggal = (b) => (b.akhir && b.akhir !== b.mulai ? `${fmtTanggal(b.mulai)} s.d. ${fmtTanggal(b.akhir)}` : fmtTanggal(b.mulai));
 
-/** Kalender tahap Garuda dari Kwarcab pada satu tahun ajaran. Hanya tampilan (tanpa pengingat otomatis). */
+/** Kalender tahap Garuda dari Kwarcab pada satu tahun ajaran. Pengingatnya dikirim server (sigarda.garuda_kalender_pengingat, lewat pengingat harian 07.00 WIB). */
 export default function KalenderGarudaPanel({ data, tahunAjaran, boleh }) {
   const { api, notify } = useApp();
   const [modal, setModal] = useState(null);
@@ -63,7 +63,7 @@ export default function KalenderGarudaPanel({ data, tahunAjaran, boleh }) {
   };
   return (
     <section aria-label="Kalender Garuda">
-      <p className="mb-3 text-sm text-pramuka-600">Tahap seleksi Garuda dari Kwarcab. Isi tanggalnya dari jadwal Kwarcab tahun ini; aplikasi hanya menampilkan status dan sisa hari (belum mengirim pengingat).</p>
+      <p className="mb-3 text-sm text-pramuka-600">Tahap seleksi Garuda dari Kwarcab. Isi tanggalnya dari jadwal Kwarcab tahun ini; aplikasi menampilkan status dan sisa hari, dan mengirim pengingat ke semua pengurus pada H-7, H-3, H-1, hari-H mulai, serta sehari sebelum tahap berentang berakhir.</p>
       {berikut && (
         <p className="jahitan mb-3 rounded-lg bg-white px-4 py-3 text-sm text-pramuka-800">
           <span className="font-semibold">{berikut.status === 'berjalan' ? 'Sedang berjalan' : 'Berikutnya'}:</span> {berikut.label}, {teksTanggal(berikut.baris)}{berikut.sisaHari != null ? ` (${berikut.sisaHari} hari lagi)` : ''}.

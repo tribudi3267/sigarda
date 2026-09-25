@@ -92,6 +92,8 @@ console.log('\n--- Daftar tahap klien = daftar tahap di tabel ---');
   const unsur = (await q(`select pg_get_constraintdef(c.oid) d from pg_constraint c where conrelid = 'public.tim_penilai_anggota'::regclass and contype = 'c' and pg_get_constraintdef(c.oid) like '%ketua_gudep%'`))[0]?.d ?? '';
   ok(UNSUR_TIM.every((u) => unsur.includes(`'${u.id}'`)) && (unsur.match(/'[a-z_]+'::text/g) ?? []).length === UNSUR_TIM.length, 'unsur tim di klien = batasan check pada tabel');
   await q('delete from public.garuda_tahap');
+  const labelSql = (await q("select sigarda.garuda_tahap_label(x) l, x from unnest($1::text[]) x", [TAHAP_GARUDA.map((t) => t.id)]));
+  ok(labelSql.every((r) => r.l === TAHAP_GARUDA.find((t) => t.id === r.x).label), 'nama tahap untuk notifikasi (SQL) = label di klien untuk semua tahap');
 }
 
 console.log('\n--- Cermin validasi tim = sg_tim_penilai_simpan (kisi masukan) ---');

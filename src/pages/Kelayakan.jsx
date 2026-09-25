@@ -14,6 +14,7 @@ import { tahunAjaranKini } from '../lib/rombelLogic';
 import { labelUntuk, timUntukCalon } from '../lib/timLogic';
 import TimPenilaiPanel from '../components/TimPenilaiPanel';
 import KalenderGarudaPanel from '../components/KalenderGarudaPanel';
+import LengkapiTanggalLahirModal from '../components/LengkapiTanggalLahirModal';
 import SumberPeraturan from '../components/SumberPeraturan';
 import { Avatar, Field, Kosong, Modal } from '../components/ui';
 
@@ -111,6 +112,7 @@ function PanelCalon({ tim, tahunAjaran }) {
   const [cari, setCari] = useState('');
   const [semua, setSemua] = useState(false);
   const [modal, setModal] = useState(null);
+  const [lengkapi, setLengkapi] = useState(false);
   const galat = gerbang.galat || spg.galat || pel.galat || tkk.galat;
   const memuat = gerbang.memuat || spg.memuat || pel.memuat || tkk.memuat;
 
@@ -143,6 +145,7 @@ function PanelCalon({ tim, tahunAjaran }) {
 
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <input className="input max-w-xs flex-1" aria-label="Cari Penegak" placeholder="Cari nama atau kelas Penegak" value={cari} onChange={(e) => setCari(e.target.value)} />
+        {kelola && <button className="btn btn-outline btn-sm" onClick={() => setLengkapi(true)}>Lengkapi tanggal lahir (Excel)</button>}
         <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={semua} onChange={(e) => setSemua(e.target.checked)} /> Tampilkan semua Penegak aktif</label>
       </div>
 
@@ -170,6 +173,7 @@ function PanelCalon({ tim, tahunAjaran }) {
           })}
         </ul>
       )}
+      {lengkapi && <LengkapiTanggalLahirModal lahir={gerbang.lahir} onTutup={() => setLengkapi(false)} onSelesai={() => { setLengkapi(false); gerbang.muat(); }} />}
       {modal && <ModalLahir peserta={modal.u} awal={modal.lahir} onTutup={() => setModal(null)} onSelesai={() => { setModal(null); gerbang.muat(); }} />}
     </div>
   );

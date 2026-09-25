@@ -92,3 +92,47 @@ begin
   if not found then raise exception 'Tahap kalender tidak ditemukan.'; end if;
 end $$;
 -- ===== akhir aksi tim kalender =====
+
+-- ===== Pengingat kalender Garuda (Tahap 2, G4d): fungsi =====
+-- Nama tahap kalender Garuda untuk isi notifikasi; sama dengan TAHAP_GARUDA di src/lib/kalenderGarudaLogic.js (dijaga uji/tim-kalender-klien.mjs).
+create function sigarda.garuda_tahap_label(p_tahap text) returns text language sql immutable as
+$$
+  select case p_tahap
+    when 'uji_spg' then 'Pengujian SPG oleh Pembina'
+    when 'ajukan_tim' then 'Pengajuan SK tim penilai'
+    when 'ambil_sk' then 'Pengambilan SK tim penilai'
+    when 'penilaian_gudep' then 'Penilaian tim penilai gugus depan'
+    when 'serah_kwarran' then 'Penyerahan portofolio ke Kwarran'
+    when 'nilai_kwarran' then 'Penilaian portofolio oleh Kwarran'
+    when 'kirim_kwarcab' then 'Pengiriman berkas ke Kwarcab'
+    when 'verifikasi_visitasi' then 'Verifikasi dan visitasi Kwarcab'
+    when 'iuran' then 'Iuran gotong royong'
+    when 'pelantikan' then 'Pelantikan Pramuka Garuda'
+    else p_tahap
+  end
+$$;
+
+-- Pengingat pukul 07.00 WIB (dari notif_pengingat) untuk tahap kalender Garuda yang sudah diisi: H-7, H-3, H-1, dan hari-H mulainya, serta "berakhir besok" untuk tahap
+-- berentang yang sedang berjalan. Penerima: semua pengurus aktif (Pembina, Admin, akun Dewan lama, Penegak berjabatan Dewan), jenis 'agenda'. Sekali per tahap per hari (kunci).
+create function sigarda.garuda_kalender_pengingat() returns void language plpgsql security definer set search_path = public as
+$$
+declare v_hari date := sigarda.hari_ini(); r record; v_x uuid; v_n int; v_judul text; v_isi text; v_rentang text;
+begin
+  for r in select id, tahap, mulai, akhir, catatan from public.garuda_tahap where mulai - v_hari in (7, 3, 1, 0) loop
+    v_n := r.mulai - v_hari;
+    v_rentang := case when r.akhir is not null and r.akhir <> r.mulai then to_char(r.mulai, 'DD-MM-YYYY') || ' s.d. ' || to_char(r.akhir, 'DD-MM-YYYY') else to_char(r.mulai, 'DD-MM-YYYY') end;
+    v_judul := case when v_n = 0 then 'Hari ini: ' else 'H-' || v_n::text || ': ' end || sigarda.garuda_tahap_label(r.tahap);
+    v_isi := 'Tahap seleksi Garuda dari Kwarcab, ' || v_rentang || '.' || case when r.catatan <> '' then ' ' || r.catatan else '' end;
+    for v_x in select id from public.profiles where status = 'aktif' and (role in ('penguji', 'admin') or (role = 'peserta' and jabatan_dewan is not null)) loop
+      perform sigarda.notif_buat(v_x, 'agenda', v_judul, v_isi, '{"tab":"kelayakan"}', 'garuda:' || r.id || ':' || v_hari);
+    end loop;
+  end loop;
+  for r in select id, tahap, mulai, akhir from public.garuda_tahap where akhir is not null and akhir > mulai and mulai <= v_hari and akhir - v_hari = 1 loop
+    v_judul := 'Berakhir besok: ' || sigarda.garuda_tahap_label(r.tahap);
+    v_isi := 'Tahap seleksi Garuda dari Kwarcab berakhir ' || to_char(r.akhir, 'DD-MM-YYYY') || '.';
+    for v_x in select id from public.profiles where status = 'aktif' and (role in ('penguji', 'admin') or (role = 'peserta' and jabatan_dewan is not null)) loop
+      perform sigarda.notif_buat(v_x, 'agenda', v_judul, v_isi, '{"tab":"kelayakan"}', 'garuda-akhir:' || r.id || ':' || v_hari);
+    end loop;
+  end loop;
+end $$;
+-- ===== akhir fungsi pengingat kalender garuda =====

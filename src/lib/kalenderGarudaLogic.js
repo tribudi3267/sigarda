@@ -2,7 +2,8 @@
  * KALENDER TAHAP GARUDA DARI KWARCAB (Tahap 2, G4c; murni tanpa React). Alur mengikuti pedoman Kwarcab Purbalingga 2026: Pembina menguji SPG, Ketua Gudep mengajukan SK tim penilai
  * melalui Kwarran, penilaian dan rekomendasi, portofolio ke Kwarran, penilaian Kwarran, pengiriman ke Kwarcab, verifikasi dan visitasi, iuran gotong royong, pelantikan bersama.
  * Tanggal tiap tahap diisi Pembina atau Admin dari jadwal Kwarcab (server: sg_garuda_tahap_simpan); daftar tahap DIPEGANG BERSAMA dengan SQL (dibandingkan di
- * uji/tim-kalender-klien.mjs). Hanya tampilan: tidak ada pengingat otomatis. Tanggal memakai WIB (`hariIni`).
+ * uji/tim-kalender-klien.mjs; nama tahap juga ada di sigarda.garuda_tahap_label untuk notifikasi). Pengingat (H-7, H-3, H-1, hari-H, berakhir besok) dikirim server, bukan di sini.
+ * Tanggal memakai WIB (`hariIni`).
  */
 import { hariIni } from './format';
 
