@@ -11,7 +11,8 @@ import { susunInstrumenXlsx, namaFileInstrumen } from '../src/lib/exportLaporan.
 import { buatBufferXlsx } from '../src/lib/exportXlsx.js';
 import { daftarUnitInstrumen } from '../src/lib/instrumenLogic.js';
 import { INDEKS_POIN, hurufSub } from '../src/data/skuData.js';
-import { periksaBaris, bacaExcelAnggota, buatTemplateAnggota, POLA_NTA } from '../src/lib/importAnggota.js';
+import { periksaBaris, POLA_NTA } from '../src/lib/importAnggota.js';
+import { bacaExcelAnggota, buatTemplateAnggota } from '../src/lib/importAnggotaExcel.js';
 import ExcelJS from 'exceljs';
 
 const P = process.cwd().replace(/\\/g, '/');

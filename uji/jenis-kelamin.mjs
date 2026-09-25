@@ -10,7 +10,8 @@ import { siapkanPg, buatKlienFake, sqlSebagai } from '../src/lokal/klienFake.js'
 import { isiDataContoh } from '../src/lokal/seedLokal.js';
 import { PIN_DEMO } from '../src/lokal/pinDemo.js';
 import { buatApi } from '../src/lib/api.js';
-import { bacaExcelAnggota, buatTemplateAnggota, kolomTemplate, periksaBaris } from '../src/lib/importAnggota.js';
+import { kolomTemplate, periksaBaris } from '../src/lib/importAnggota.js';
+import { bacaExcelAnggota, buatTemplateAnggota } from '../src/lib/importAnggotaExcel.js';
 import { JK_BELUM_DIISI, anggotaTanpaJk, hitungJenisKelamin, labelJenisKelamin, labelPeranAnggota, normalisasiJenisKelamin, periksaJkMassal, urutAnggotaJk } from '../src/lib/jenisKelaminLogic.js';
 import { bacaExcelJk, buatBerkasJk } from '../src/lib/jenisKelaminExcel.js';
 

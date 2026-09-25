@@ -981,6 +981,14 @@ export function AppProvider({ children }) {
         if (!n.ok) peringatan = `${peringatan ? `${peringatan} ` : ''}NTA ${daftarNta.length} anggota belum tersimpan: ${n.pesan}`;
       }
     }
+    if (kelompok === 'peserta' && daftar.length) {
+      const lahirPerBaris = new Map(siap.map(({ no, data }) => [no, data.lahir ?? '']));
+      const daftarLahir = daftar.map((h) => ({ username: h.username, tanggal: lahirPerBaris.get(h.no) ?? '' })).filter((x) => x.tanggal);
+      if (daftarLahir.length) {
+        const l = await api().imporTanggalLahir(daftarLahir);
+        if (!l.ok) peringatan = `${peringatan ? `${peringatan} ` : ''}Tanggal lahir ${daftarLahir.length} Penegak belum tersimpan (isi lewat menu Kelayakan): ${l.pesan}`;
+      }
+    }
     if (daftar.length) await segarkan.users();
     if (!daftar.length) return ditolak(notify, galatBerhenti ?? ditolakServer[0]?.pesan ?? 'Tidak ada akun yang berhasil dibuat.');
     notify(`${daftar.length} anggota berhasil diimpor.`);
