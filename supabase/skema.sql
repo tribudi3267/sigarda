@@ -961,6 +961,23 @@ create index tkk_pengajuan_tkk_idx on public.tkk_pengajuan (tkk_id);
 create index tkk_pengajuan_capaian_idx on public.tkk_pengajuan (capaian_id);
 create index tkk_pengajuan_penguji1_idx on public.tkk_pengajuan (penguji1_id);
 -- ===== akhir tabel tkk pengajuan =====
+-- ===== SPG (Tahap 2, G3): tabel =====
+-- Penetapan Syarat Pramuka Garuda (SPG, 13 butir SK Kwarnas 038/2017) oleh Pembina: satu baris per Penegak per butir. Butir yang dapat dihitung dari data aplikasi (SKU Laksana
+-- dan 3 bulan sesudah dilantik, TKK, Saka, Penabung) dihitung di klien; baris ini mencatat PENETAPAN Pembina: butir berbasis dokumen (lengkap = 100, belum = 0) dan penimpaan
+-- hasil hitung otomatis (timpa = true, alasan di catatan). Tanggal = tanggal pengujian pada lembar SPG. Isi rubrik pengujian TIDAK disimpan di sini.
+create table public.spg_penetapan (
+  peserta_id uuid not null references public.profiles(id) on delete cascade,
+  butir smallint not null check (butir between 1 and 13),
+  nilai smallint not null check (nilai in (0, 100)),
+  tanggal date not null check (tanggal >= date '2000-01-01'),
+  catatan text not null default '' check (char_length(catatan) <= 200),
+  timpa boolean not null default false,
+  dicatat_oleh uuid references public.profiles(id) on delete set null,
+  dicatat_pada timestamptz not null default now(),
+  primary key (peserta_id, butir),
+  constraint spg_timpa_beralasan check (not timpa or char_length(btrim(catatan)) >= 5)
+);
+-- ===== akhir tabel spg =====
 -- ---------------------------------------------------------------------------
 -- 2. Fungsi bantu (tidak diekspos lewat API)
 -- ---------------------------------------------------------------------------
@@ -1882,6 +1899,7 @@ alter table public.pelantikan enable row level security;   -- baca: pemilik dan 
 alter table public.tkk_katalog enable row level security;   -- baca: semua pengguna aktif (katalog); tulis: hanya skema/migrasi
 alter table public.tkk_capaian enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_*
 alter table public.tkk_pengajuan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_ajukan/_batal dan sg_tkk_tinjau
+alter table public.spg_penetapan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_spg_*
 alter table public.tkk_krida enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_krida_*
 alter table public.saka_anggota enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_saka_*
 alter table public.penugasan_peserta enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_penugasan_peserta_atur
@@ -2011,6 +2029,12 @@ create policy baca_tkk_krida on public.tkk_krida for select to authenticated
 create policy baca_tkk_pengajuan on public.tkk_pengajuan for select to authenticated
   using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
 -- ===== akhir kebijakan tkk pengajuan =====
+
+-- ===== SPG (Tahap 2, G3): kebijakan =====
+-- Penetapan SPG: Penegak melihat miliknya sendiri, pengurus semua.
+create policy baca_spg_penetapan on public.spg_penetapan for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan spg =====
 
 -- Sesi ujian: pengurus melihat semua; Penegak hanya sesi yang mencantumkan dirinya.
 create policy baca_sesi_ujian on public.sesi_ujian for select to authenticated
@@ -3094,6 +3118,9 @@ create trigger tak_aktif_tkk_krida before insert or update on public.tkk_krida f
 -- ===== TKK pengajuan (Tahap 2, G2b): pemicu tak aktif =====
 create trigger tak_aktif_tkk_pengajuan before insert or update on public.tkk_pengajuan for each row execute function sigarda.tolak_peserta_tak_aktif();
 -- ===== akhir pemicu tak aktif tkk pengajuan =====
+-- ===== SPG (Tahap 2, G3): pemicu =====
+create trigger tak_aktif_spg_penetapan before insert or update on public.spg_penetapan for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu spg =====
 
 -- Status Calon Garuda hanya untuk Penegak yang aktif (diberikan sendiri lewat sg_calon_garuda_daftar atau oleh Admin lewat sg_anggota_ubah).
 create function sigarda.tolak_calon_garuda_tak_aktif() returns trigger language plpgsql as
@@ -4765,7 +4792,8 @@ begin
       'saka_anggota', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.saka_anggota t),
       'tkk_capaian', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tkk_capaian t),
       'tkk_krida', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tkk_krida t),
-      'tkk_pengajuan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tkk_pengajuan t)
+      'tkk_pengajuan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tkk_pengajuan t),
+      'spg_penetapan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.spg_penetapan t)
     )
   ) into v_hasil;
   insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada)
@@ -5841,6 +5869,45 @@ end $$;
 create trigger notif_tkk_pengajuan_baru after insert on public.tkk_pengajuan for each row execute function sigarda.notif_tkk_pengajuan();
 create trigger notif_tkk_pengajuan_tinjau after update of status on public.tkk_pengajuan for each row execute function sigarda.notif_tkk_pengajuan();
 -- ===== akhir aksi tkk pengajuan =====
+-- ===== SPG (Tahap 2, G3): aksi =====
+-- Hanya Pembina dan Admin Gudep yang menetapkan (Pembina menguji SPG; Dewan hanya membaca). Penegak harus aktif dan sudah menyelesaikan seluruh SKU Bantara dan Laksana
+-- (sigarda.layak_garuda). Menetapkan ulang butir yang sama = koreksi. Penetapan yang berbeda dari hasil hitung aplikasi (p_timpa) wajib beralasan di catatan; server tidak
+-- menghitung ulang hasil aplikasi (dihitung di klien), jadi p_timpa dipercaya sebatas tanda dan alasan.
+
+create function public.sg_spg_catat(
+  p_peserta_id uuid, p_butir integer, p_nilai integer, p_tanggal date, p_catatan text default '', p_timpa boolean default false
+) returns void language plpgsql security definer set search_path = public as
+$$
+declare v_p public.profiles; v_cat text := sigarda.rapikan(p_catatan);
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menetapkan Syarat Pramuka Garuda.'; end if;
+  select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';
+  if not found then raise exception 'Pilih Penegak.'; end if;
+  if v_p.status <> 'aktif' then raise exception '% tidak aktif; Syarat Pramuka Garuda hanya untuk Penegak aktif.', v_p.nama; end if;
+  if not sigarda.layak_garuda(p_peserta_id) then raise exception '% belum menyelesaikan seluruh SKU Bantara dan Laksana.', v_p.nama; end if;
+  if p_butir is null or p_butir not between 1 and 13 then raise exception 'Butir SPG harus 1 sampai 13.'; end if;
+  if p_nilai is null or p_nilai not in (0, 100) then raise exception 'Nilai harus 100 (lengkap dan memenuhi) atau 0 (belum).'; end if;
+  if p_tanggal is null then raise exception 'Tanggal pengujian wajib diisi.'; end if;
+  if p_tanggal < date '2000-01-01' or p_tanggal > sigarda.hari_ini() then raise exception 'Tanggal pengujian tidak boleh sebelum tahun 2000 atau di masa depan.'; end if;
+  if char_length(v_cat) > 200 or v_cat ~ '[[:cntrl:]<>]' then raise exception 'Catatan maksimal 200 karakter, tanpa tanda < atau >.'; end if;
+  if coalesce(p_timpa, false) and char_length(v_cat) < 5 then raise exception 'Penetapan berbeda dari hasil aplikasi: tulis alasannya di catatan (sedikitnya 5 karakter).'; end if;
+  insert into public.spg_penetapan (peserta_id, butir, nilai, tanggal, catatan, timpa, dicatat_oleh, dicatat_pada)
+  values (p_peserta_id, p_butir, p_nilai, p_tanggal, v_cat, coalesce(p_timpa, false), auth.uid(), now())
+  on conflict (peserta_id, butir) do update
+    set nilai = excluded.nilai, tanggal = excluded.tanggal, catatan = excluded.catatan, timpa = excluded.timpa, dicatat_oleh = excluded.dicatat_oleh, dicatat_pada = excluded.dicatat_pada;
+end $$;
+
+-- Menghapus penetapan satu butir (kembali ke hasil hitung aplikasi atau "menunggu ditetapkan").
+create function public.sg_spg_hapus(p_peserta_id uuid, p_butir integer) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus penetapan SPG.'; end if;
+  delete from public.spg_penetapan where peserta_id = p_peserta_id and butir = p_butir;
+  if not found then raise exception 'Penetapan SPG tidak ditemukan.'; end if;
+end $$;
+-- ===== akhir aksi spg =====
 -- ---------------------------------------------------------------------------
 -- 5. Hak akses: baca saja untuk pengguna; fungsi aksi hanya untuk pengguna masuk
 -- ---------------------------------------------------------------------------
@@ -5852,7 +5919,7 @@ grant select on public.profiles, public.sku_butir, public.sku_unit, public.pf_it
   public.sesi_ujian, public.sesi_ujian_butir, public.sesi_ujian_peserta,
   public.iuran, public.iuran_log, public.iuran_kas, public.asisten_iuran,
   public.penugasan_rombel, public.penugasan_log, public.guru_agama, public.dokumen_terbit, public.dokumen_urut, public.notifikasi,
-  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda, public.kegiatan_usulan, public.pengukuhan_dewan, public.sku_pra_uji, public.pelantikan, public.saka_anggota, public.tkk_katalog, public.tkk_capaian, public.tkk_krida, public.tkk_pengajuan to authenticated;
+  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda, public.kegiatan_usulan, public.pengukuhan_dewan, public.sku_pra_uji, public.pelantikan, public.saka_anggota, public.tkk_katalog, public.tkk_capaian, public.tkk_krida, public.tkk_pengajuan, public.spg_penetapan to authenticated;
 
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function
@@ -5900,7 +5967,8 @@ grant execute on function
   public.sg_tkk_catat(uuid, text, text, date, text, text, text, text, text), public.sg_tkk_hapus(bigint),
   public.sg_tkk_krida_simpan(bigint, uuid, text, text, date, text, text), public.sg_tkk_krida_hapus(bigint), public.sg_tkk_ambang_simpan(jsonb),
   public.sg_tkk_ajukan(text, text, date, uuid, text, text, text, text), public.sg_tkk_ajukan_batal(bigint), public.sg_tkk_tinjau(bigint, text, text, text, text),
-  public.sg_tkk_penguji_pilihan()
+  public.sg_tkk_penguji_pilihan(),
+  public.sg_spg_catat(uuid, integer, integer, date, text, boolean), public.sg_spg_hapus(uuid, integer)
   to authenticated;
 -- Fungsi yang boleh dipanggil tanpa login (hanya membaca): verifikasi keaslian dokumen, identitas gudep di halaman masuk, dan
 -- tautan berbagi baca-saja Berkas Calon Garuda (tahap L7)

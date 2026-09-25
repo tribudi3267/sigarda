@@ -309,6 +309,12 @@ export const susunSaka = (baris = []) =>
     suratUrl: r.surat_url ?? '', catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada,
   })).sort((a, b) => a.saka.localeCompare(b.saka, 'id') || a.tanggalMasuk.localeCompare(b.tanggalMasuk));
 
+/** Baris spg_penetapan -> [{ pesertaId, butir, nilai (100|0), tanggal, catatan, timpa, dicatatPada }], urut Penegak lalu butir. */
+export const susunSpg = (baris = []) =>
+  baris.map((r) => ({
+    pesertaId: r.peserta_id, butir: Number(r.butir), nilai: Number(r.nilai), tanggal: tgl(r.tanggal), catatan: r.catatan ?? '', timpa: !!r.timpa, dicatatPada: r.dicatat_pada,
+  })).sort((a, b) => a.pesertaId.localeCompare(b.pesertaId) || a.butir - b.butir);
+
 /** Baris tkk_capaian -> [{ id, pesertaId, tkkId, tingkat ('purwa'|'madya'|'utama'), tanggal, penguji1, penguji2, melatih, buktiUrl, catatan, dicatatPada }], tanggal terbaru dulu. */
 export const susunTkkCapaian = (baris = []) =>
   baris.map((r) => ({
