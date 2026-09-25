@@ -22,6 +22,9 @@ const anon = buatKlienFake(pg);
 const rpc = async (k, nama, args) => { const { data, error } = await k.rpc(nama, args); return { data, err: error?.message ?? null }; };
 const ahmad = (await q(`select id from public.profiles where username = '10231'`))[0].id;
 const calon = (await q(`select id, username from public.profiles where role = 'peserta' and sigarda.tingkat_selesai(id, 'Bantara') and not sigarda.tingkat_selesai(id, 'Laksana') order by username`))[0];
+// Sepuluh Jumat tetap (17 Juli s.d. 18 September 2026): data contoh membuat sesi relatif terhadap HARI INI, sehingga jumlah dan tanggalnya bergeser tiap hari (uji ini gagal pada hari Sabtu 26 September 2026).
+await q(`delete from public.absensi_sesi where tanggal between '2026-07-01' and '2026-09-20'`);
+await q(`insert into public.absensi_sesi (tanggal) select d::date from generate_series('2026-07-17'::date, '2026-09-18'::date, '7 days') d`);
 const sesiSem = (await q(`select tanggal::text t from public.absensi_sesi where tanggal between '2026-07-01' and '2026-09-20' order by tanggal`)).map((x) => x.t);
 const UJI = '2026-09-20'; // sesiSem hanya sampai tanggal uji: data contoh memuat semua Jumat sampai HARI INI, jadi pada hari Jumat ada sesi tambahan sesudah tanggal uji
 console.log(`   (${sesiSem.length} pertemuan Semester Ganjil 2026/2027 sampai tanggal uji: ${sesiSem[0]} s.d. ${sesiSem.at(-1)})`);
