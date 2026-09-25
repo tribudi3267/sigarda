@@ -328,7 +328,7 @@ export const susunTkkKrida = (baris = []) =>
  */
 export const susunTkkPengajuan = (baris = []) =>
   baris.map((r) => ({
-    id: Number(r.id), pesertaId: r.peserta_id, tkkId: r.tkk_id, tingkat: r.tingkat, tanggal: tgl(r.tanggal), penguji1: r.penguji1, penguji2: r.penguji2, melatih: r.melatih,
+    id: Number(r.id), pesertaId: r.peserta_id, tkkId: r.tkk_id, tingkat: r.tingkat, tanggal: tgl(r.tanggal), penguji1: r.penguji1, penguji1Id: r.penguji1_id ?? null, penguji2: r.penguji2, pengujiAwal: r.penguji_awal ?? '', melatih: r.melatih,
     buktiUrl: r.bukti_url ?? '', catatan: r.catatan ?? '', status: r.status, diajukanPada: r.diajukan_pada, ditinjauNama: r.ditinjau_nama ?? null, ditinjauPada: r.ditinjau_pada ?? null,
     catatanTinjauan: r.catatan_tinjauan ?? '', capaianId: r.capaian_id == null ? null : Number(r.capaian_id),
   })).sort((a, b) => Number(b.status === 'menunggu') - Number(a.status === 'menunggu') || b.id - a.id);
