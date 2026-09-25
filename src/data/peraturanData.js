@@ -63,6 +63,23 @@ export const PERATURAN = {
     judul: 'Keputusan Kwarnas Nomor 050 Tahun 2003 tentang Petunjuk Penyelenggaraan Sistem Penomoran Kwartir dan Gugusdepan',
     url: 'https://pramuka.or.id/files/document/Salinan-SK-050-2003-Jukran-Sistem-Penomoran-Kwartir-dan-Gudep.pdf',
   },
+  'tkk-134-1976': {
+    nama: 'SK Kwarnas 134/1976',
+    judul: 'Keputusan Kwarnas Nomor 134/KN/76 Tahun 1976 tentang Petunjuk Penyelenggaraan Kecakapan Khusus',
+    url: 'https://pramuka.or.id/files/document/Kecapakan-Khusus-TKK-SKK-1976-dan-1979.pdf#page=18',
+    catatan: 'Satu berkas dengan SK Kwarnas 132/1979 (terbitan Kwarnas 2007; tautan membuka halaman awal masing-masing keputusan). Bagian SKK Penabung di dalamnya diganti Jukran Kwarnas 01/2024.',
+  },
+  'skk-132-1979': {
+    nama: 'SK Kwarnas 132/1979',
+    judul: 'Keputusan Kwarnas Nomor 132 Tahun 1979 tentang Syarat-syarat dan Gambar-gambar Tanda Kecakapan Khusus (TKK)',
+    url: 'https://pramuka.or.id/files/document/Kecapakan-Khusus-TKK-SKK-1976-dan-1979.pdf#page=36',
+  },
+  'penabung-01-2024': {
+    nama: 'Jukran Kwarnas 01/2024',
+    judul: 'Petunjuk Penyelenggaraan Kwarnas Nomor 01 Tahun 2024 tentang Panduan, Syarat, dan Gambar TKK Penabung dan Cakap Keuangan',
+    url: 'https://drive.usercontent.google.com/u/0/uc?id=1ywhYvcAZcXcBzWGcvUh5T31-4QpP76mB&export=download',
+    catatan: 'Belum dimuat di halaman peraturan Kwarnas; berkas dari Google Drive yang ditautkan Kwarda DIY. Menggantikan SKK Penabung pada SK 134/1976 dan memuat SKK Cakap Keuangan (bidang tidak disebut; aplikasi mengikuti Penabung).',
+  },
   'perlindungan-004-2021': {
     nama: 'Jukran Kwarnas 004/2021',
     judul: 'Petunjuk Penyelenggaraan Kwarnas Nomor 04 Tahun 2021 tentang Peraturan Perlindungan bagi Anggota Gerakan Pramuka (Safe From Harm)',

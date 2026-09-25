@@ -309,6 +309,25 @@ export const susunSaka = (baris = []) =>
     suratUrl: r.surat_url ?? '', catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada,
   })).sort((a, b) => a.saka.localeCompare(b.saka, 'id') || a.tanggalMasuk.localeCompare(b.tanggalMasuk));
 
+/** Baris tkk_capaian -> [{ id, pesertaId, tkkId, tingkat ('purwa'|'madya'|'utama'), tanggal, penguji1, penguji2, melatih, buktiUrl, catatan, dicatatPada }], tanggal terbaru dulu. */
+export const susunTkkCapaian = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), pesertaId: r.peserta_id, tkkId: r.tkk_id, tingkat: r.tingkat, tanggal: tgl(r.tanggal), penguji1: r.penguji1, penguji2: r.penguji2, melatih: r.melatih,
+    buktiUrl: r.bukti_url ?? '', catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada,
+  })).sort((a, b) => b.tanggal.localeCompare(a.tanggal) || a.id - b.id);
+
+/** Baris tkk_krida -> [{ id, pesertaId, nama, saka, tanggal, buktiUrl, catatan, dicatatPada }], tanggal terbaru dulu. */
+export const susunTkkKrida = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), pesertaId: r.peserta_id, nama: r.nama, saka: r.saka ?? '', tanggal: tgl(r.tanggal), buktiUrl: r.bukti_url ?? '', catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada,
+  })).sort((a, b) => b.tanggal.localeCompare(a.tanggal) || a.id - b.id);
+
+/** Nilai pengaturan 'tkk.ambang' -> { total, madya, utamaWajib } yang aman (bentuk rusak atau belum ada = `bawaan`). */
+export const susunAmbangTkk = (nilai, bawaan) =>
+  nilai && Number.isInteger(nilai.total) && Number.isInteger(nilai.madya) && Array.isArray(nilai.utamaWajib) && nilai.utamaWajib.every((x) => typeof x === 'string')
+    ? { total: nilai.total, madya: nilai.madya, utamaWajib: nilai.utamaWajib }
+    : bawaan;
+
 /** Baris raport satu semester -> { [pesertaId]: baris } */
 export const susunRaport = (baris = []) => Object.fromEntries(baris.map((r) => [r.peserta_id, petaRaport(r)]));
 
