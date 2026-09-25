@@ -295,6 +295,20 @@ export const susunAgenda = (baris = []) =>
     pesertaTerkait: r.peserta_terkait ?? [], lewatiBatas: !!r.lewati_batas, dibuatOleh: r.dibuat_oleh ?? null, dibuatPada: r.dibuat_pada,
   })).sort((a, b) => a.tanggal.localeCompare(b.tanggal));
 
+/** Baris pelantikan -> [{ id, pesertaId, tingkat ('bantara'|'laksana'), tanggal, tempat, agendaId, catatan, dicatatOleh, dicatatPada }], tanggal terbaru dulu. */
+export const susunPelantikan = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), pesertaId: r.peserta_id, tingkat: r.tingkat, tanggal: tgl(r.tanggal), tempat: r.tempat, agendaId: r.agenda_id == null ? null : Number(r.agenda_id),
+    catatan: r.catatan ?? '', dicatatOleh: r.dicatat_oleh ?? null, dicatatPada: r.dicatat_pada,
+  })).sort((a, b) => b.tanggal.localeCompare(a.tanggal) || a.id - b.id);
+
+/** Baris saka_anggota -> [{ id, pesertaId, saka, tanggalMasuk, status ('aktif'|'selesai'), tanggalSelesai, suratUrl, catatan, dicatatPada }], nama Saka lalu tanggal masuk. */
+export const susunSaka = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), pesertaId: r.peserta_id, saka: r.saka, tanggalMasuk: tgl(r.tanggal_masuk), status: r.status, tanggalSelesai: r.tanggal_selesai ? tgl(r.tanggal_selesai) : null,
+    suratUrl: r.surat_url ?? '', catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada,
+  })).sort((a, b) => a.saka.localeCompare(b.saka, 'id') || a.tanggalMasuk.localeCompare(b.tanggalMasuk));
+
 /** Baris raport satu semester -> { [pesertaId]: baris } */
 export const susunRaport = (baris = []) => Object.fromEntries(baris.map((r) => [r.peserta_id, petaRaport(r)]));
 

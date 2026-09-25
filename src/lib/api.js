@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
+import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 /** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
@@ -178,6 +178,21 @@ export function buatApi(klien) {
       if (!r.ok) return r;
       return { ok: true, data: r.data?.ditemukan ? susunBerkasGaruda(r.data) : null };
     },
+
+    /* ------------------- Pelantikan dan Saka (Tahap 2, G1) ------------------- */
+    /** Pelantikan dan keanggotaan Saka yang boleh dilihat (Penegak: miliknya; pengurus: semua; dibatasi RLS). */
+    muatPelantikanSaka: () => muat(async () => {
+      const [p, s] = await Promise.all([ambilSemua('pelantikan', { urut: ['id'] }), ambilSemua('saka_anggota', { urut: ['id'] })]);
+      return { pelantikan: susunPelantikan(p), saka: susunSaka(s) };
+    }),
+    /** Mencatat pelantikan banyak Penegak sekaligus (Pembina dan Admin; semua atau tidak sama sekali). Mengembalikan jumlah yang dicatat. */
+    catatPelantikan: ({ tingkat, tanggal, tempat, pesertaIds, agendaId = null, catatan = '' }) =>
+      rpc('sg_pelantikan_catat', { p_tingkat: tingkat, p_tanggal: tanggal || null, p_tempat: tempat, p_peserta_ids: pesertaIds, p_agenda_id: agendaId, p_catatan: catatan }),
+    hapusPelantikan: (id) => rpc('sg_pelantikan_hapus', { p_id: id }),
+    /** Tambah (id kosong) atau ubah keanggotaan Saka. Mengembalikan id catatan. */
+    simpanSaka: ({ id = null, pesertaId, saka, tanggalMasuk, status = 'aktif', tanggalSelesai = null, suratUrl = '', catatan = '' }) =>
+      rpc('sg_saka_simpan', { p_id: id, p_peserta_id: pesertaId, p_saka: saka, p_tanggal_masuk: tanggalMasuk || null, p_status: status, p_tanggal_selesai: tanggalSelesai || null, p_surat_url: suratUrl, p_catatan: catatan }),
+    hapusSaka: (id) => rpc('sg_saka_hapus', { p_id: id }),
 
     /* ------------------- Pra-uji berjenjang (fase D) ------------------- */
     /** Sakelar pra-uji (pengaturan 'pra_uji.aktif', dapat dibaca semua yang sudah masuk); false bila belum pernah diatur atau basis data belum dimigrasi. */

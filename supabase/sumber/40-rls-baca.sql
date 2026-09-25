@@ -35,6 +35,8 @@ alter table public.penugasan_log enable row level security;
 alter table public.guru_agama enable row level security;
 alter table public.bina_damping enable row level security;   -- tanpa kebijakan: hanya lewat fungsi sg_bina_damping_* dan sg_sangga_*
 alter table public.sku_pra_uji enable row level security;   -- baca: pemilik, penilai, dan pengurus; tulis: hanya fungsi sg_pra_uji_* dan sg_sku_ajukan/batal
+alter table public.pelantikan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_pelantikan_*
+alter table public.saka_anggota enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_saka_*
 alter table public.penugasan_peserta enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_penugasan_peserta_atur
 alter table public.kepengurusan_log enable row level security;    -- baca: pengurus; tulis: hanya fungsi kepengurusan
 alter table public.pengukuhan_dewan enable row level security;    -- baca: pengurus; tulis: hanya fungsi sg_pengukuhan_dewan_*
@@ -139,6 +141,14 @@ create policy baca_penilaian on public.sku_penilaian for select to authenticated
 create policy baca_pra_uji on public.sku_pra_uji for select to authenticated
   using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or penilai_id = (select auth.uid()) or (select sigarda.pengurus())));
 -- ===== akhir kebijakan pra-uji =====
+
+-- ===== Pelantikan dan Saka (Tahap 2, G1): kebijakan =====
+-- Pelantikan dan keanggotaan Saka: Penegak melihat miliknya sendiri, pengurus (Pembina, Dewan, Admin) semua.
+create policy baca_pelantikan on public.pelantikan for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+create policy baca_saka_anggota on public.saka_anggota for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan pelantikan dan saka =====
 
 -- Sesi ujian: pengurus melihat semua; Penegak hanya sesi yang mencantumkan dirinya.
 create policy baca_sesi_ujian on public.sesi_ujian for select to authenticated
