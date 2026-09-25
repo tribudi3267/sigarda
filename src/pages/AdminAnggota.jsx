@@ -21,7 +21,7 @@ import { LOKAL } from '../lib/supabaseClient';
 import { Avatar, BadgePeran, BadgeStatus, Field, Icon, Kosong, Modal } from '../components/ui';
 import SumberPeraturan from '../components/SumberPeraturan';
 
-const BARU = { role: 'peserta', nama: '', jenisKelamin: '', nis: '', username: '', kelas: '', sangga: '', agama: AGAMA[0], jabatan: '', jabatanDewan: '', pin: '', nta: '' };
+const BARU = { role: 'peserta', nama: '', jenisKelamin: '', nis: '', username: '', kelas: '', sangga: '', agama: '', jabatan: '', jabatanDewan: '', pin: '', nta: '' };
 const TAB_PENUGASAN = 'penugasan';
 
 /** Teks jenis kelamin pada daftar; yang belum diisi diberi warna agar mudah terlihat. */
@@ -66,8 +66,8 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
   const kelompokAktif = KELOMPOK_PENGGUNA.find((k) => cocokKelompok(k, f)) ?? KELOMPOK_PENGGUNA[0];
   const pilihKelompok = (e) => {
     const k = KELOMPOK_PENGGUNA.find((x) => x.id === e.target.value);
-    // Penegak wajib beragama (bawaan Islam); Pembina opsional (kosong); Dewan dan Admin tidak berAgama.
-    setF({ ...f, role: k.role, jabatan: k.jabatan ?? '', jabatanDewan: '', agama: k.role === 'peserta' ? f.agama || AGAMA[0] : k.jabatan === 'Pembina' ? f.agama ?? '' : '' });
+    // Agama Penegak dan Pembina opsional (Penegak mengisi sendiri di Akun saya); Dewan dan Admin tidak berAgama.
+    setF({ ...f, role: k.role, jabatan: k.jabatan ?? '', jabatanDewan: '', agama: k.role === 'peserta' || k.jabatan === 'Pembina' ? f.agama ?? '' : '' });
   };
 
   // Saran isian: gabungan data yang sudah ada dan saran bawaan
@@ -79,7 +79,7 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
   }, [users]);
 
   const layak = !baru && f.role === 'peserta' && layakGaruda(progress, f);
-  const agamaBerubah = !baru && f.role === 'peserta' && users.find((u) => u.id === f.id)?.agama !== f.agama;
+  const agamaBerubah = !baru && f.role === 'peserta' && !!f.agama && users.find((u) => u.id === f.id)?.agama !== f.agama;
   // Pradana/Pradani hanya satu orang: pemegang lama kehilangan jabatannya (kembali menjadi Penegak biasa) bila jabatan ini dipilih
   const menggantikan = f.role === 'peserta' && f.jabatanDewan
     ? rencanaJabatanDewan(users, { id: f.id ?? '', username: (f.nis ?? f.username ?? '').trim().toLowerCase() }, f.jabatanDewan).menggantikan
@@ -124,16 +124,22 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
           <p className="input bg-pramuka-50">{kelompokAktif.label}</p>
         )}
       </Field>
+      {baru && f.role === 'peserta' && (
+        <p className="mb-4 rounded-md bg-pramuka-50 px-3 py-2 text-xs leading-relaxed text-pramuka-700">
+          Data awal Penegak cukup <strong>nama lengkap, NIS, dan rombel</strong>. Semua isian lain bersifat opsional: tempat dan tanggal lahir, alamat, keluarga, agama,
+          pendidikan, dan seterusnya diisi Penegak sendiri di menu Akun saya (ajakan tampil sesudah masuk) untuk melengkapi dokumen portofolio Garuda.
+        </p>
+      )}
       <Field label="Nama lengkap" htmlFor="f-nama">
         <input id="f-nama" className="input" value={f.nama} onChange={set('nama')} />
       </Field>
       <Field
-        label="Jenis kelamin"
+        label={baru && f.role === 'peserta' ? 'Jenis kelamin (opsional)' : 'Jenis kelamin'}
         htmlFor="f-jk"
-        bantuan={baru ? 'Wajib.' : f.jenisKelamin ? undefined : 'Belum diisi. Anggota lama boleh dilengkapi kemudian, atau sekaligus lewat tombol "Lengkapi jenis kelamin".'}
+        bantuan={baru ? (f.role === 'peserta' ? 'Boleh dikosongkan: Penegak mengisinya sendiri di menu Akun saya.' : 'Wajib.') : f.jenisKelamin ? undefined : 'Belum diisi. Anggota lama boleh dilengkapi kemudian, atau sekaligus lewat tombol "Lengkapi jenis kelamin".'}
       >
         <select id="f-jk" className="input" value={f.jenisKelamin ?? ''} onChange={set('jenisKelamin')}>
-          <option value="">{baru ? 'Pilih...' : 'Belum diisi'}</option>
+          <option value="">{baru && f.role !== 'peserta' ? 'Pilih...' : 'Belum diisi'}</option>
           {JENIS_KELAMIN.map((j) => <option key={j.kode} value={j.kode}>{j.label}</option>)}
         </select>
       </Field>
@@ -155,7 +161,7 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
                 ))}
               </select>
             </Field>
-            <Field label="Sangga" htmlFor="f-sangga" bantuan="Pilih dari saran atau ketik baru.">
+            <Field label="Sangga (opsional)" htmlFor="f-sangga" bantuan="Boleh dikosongkan: dibagi Pembina atau Bina Damping di menu Sangga. Bila diisi, pilih dari saran atau ketik baru.">
               <input id="f-sangga" className="input" list="saran-sangga" placeholder="Contoh: Sangga Elang" value={f.sangga ?? ''} onChange={set('sangga')} />
               <datalist id="saran-sangga">{saran.sangga.map((s) => <option key={s} value={s} />)}</datalist>
             </Field>
@@ -181,11 +187,12 @@ function FormAnggota({ awal, onTutup, onAkunBaru }) {
             </>
           )}
           <Field
-            label="Agama"
+            label="Agama (opsional)"
             htmlFor="f-agama"
-            bantuan="Butir 1 SKU (sub-butir ketakwaan) menyesuaikan agama. Panduan SKU Penegak hanya merinci lima agama; untuk Khonghucu, materi butir 1 ditetapkan Pembina."
+            bantuan="Boleh dikosongkan: Penegak mengisinya sendiri di Akun saya, dan sebelum itu belum dapat mengajukan SKU. Butir 1 SKU (sub-butir ketakwaan) menyesuaikan agama. Panduan SKU Penegak hanya merinci lima agama; untuk Khonghucu, materi butir 1 ditetapkan Pembina."
           >
             <select id="f-agama" className="input" value={f.agama ?? ''} onChange={set('agama')}>
+              <option value="">Belum diisi (Penegak mengisi sendiri)</option>
               {AGAMA.map((a) => <option key={a}>{a}</option>)}
             </select>
           </Field>
@@ -322,7 +329,7 @@ export default function AdminAnggota() {
           )}
           <button
             className="btn btn-primary btn-sm"
-            onClick={() => setForm({ ...BARU, role: aktif.role, jabatan: aktif.jabatan ?? '', agama: aktif.id === 'peserta' ? AGAMA[0] : '', pin: buatPinAcak() })}
+            onClick={() => setForm({ ...BARU, role: aktif.role, jabatan: aktif.jabatan ?? '', agama: '', pin: buatPinAcak() })}
           >
             <Icon nama="tambah" className="h-4 w-4" /> Tambah anggota
           </button>

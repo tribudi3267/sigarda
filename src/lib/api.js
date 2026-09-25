@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSpg, susunTanggalLahir, susunGerbang, susunTimPenilai, susunGarudaTahap, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
+import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSpg, susunTanggalLahir, susunIsian, susunTemplatDokumen, susunGerbang, susunTimPenilai, susunGarudaTahap, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 /** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
@@ -227,6 +227,20 @@ export function buatApi(klien) {
     simpanGerbang: (nilai) => rpc('sg_gerbang_simpan', { p_nilai: nilai }),
     /** Mengisi tanggal lahir banyak Penegak sesudah impor (Pembina dan Admin). `daftar` = [{ username, tanggal 'YYYY-MM-DD' }]; semua atau tidak sama sekali. Mengembalikan jumlah yang diperbarui. */
     imporTanggalLahir: (daftar) => rpc('sg_tanggal_lahir_impor', { p_data: daftar }),
+
+    /* ------------------- Isian data diri Penegak dan templat dokumen (Tahap 3, H1) ------------------- */
+    /** Isian data diri dan tanggal lahir satu Penegak: { isian: { kunci: nilai }, lahir }. Tanpa id = milik sendiri (RLS: Penegak hanya melihat miliknya; Pembina dan Admin semua). */
+    muatIsian: (pesertaId = null) => muat(async () => {
+      const filter = pesertaId ? [['peserta_id', pesertaId]] : [];
+      const [i, l] = await Promise.all([ambilSemua('penegak_isian', { filter, urut: ['kunci'] }), ambilSemua('tanggal_lahir', { filter })]);
+      return susunIsian(i, l);
+    }),
+    /** Penegak menyimpan isian data dirinya sendiri: objek datar { kunci: teks }, kunci profil (jk, agama, lahir, nta) hanya bila belum tercatat. Mengembalikan jumlah yang berubah. */
+    simpanIsianSaya: (data) => rpc('sg_isian_saya_simpan', { p_data: data }),
+    /** Templat isi dokumen (rubrik surat keterangan guru) per tahun ajaran; hanya Pembina dan Admin dapat membaca. */
+    muatTemplatDokumen: () => muat(async () => susunTemplatDokumen(await ambilSemua('dokumen_templat', { urut: ['tahun_ajaran', 'jenis'] }))),
+    simpanTemplatDokumen: ({ tahunAjaran, jenis, isi }) => rpc('sg_dokumen_templat_simpan', { p_tahun_ajaran: tahunAjaran, p_jenis: jenis, p_isi: isi }),
+    hapusTemplatDokumen: (id) => rpc('sg_dokumen_templat_hapus', { p_id: id }),
 
     /* ------------------- Tim penilai dan kalender Garuda (Tahap 2, G4b dan G4c) ------------------- */
     /** Tim penilai (dengan anggotanya) dan kalender tahap Garuda; hanya pengurus yang dapat membaca (dibatasi RLS). */

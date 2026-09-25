@@ -310,7 +310,7 @@ begin
       v_s := sigarda.rapikan(v_e ->> 'sangga');
       if v_s = '' or char_length(v_s) > 40 then raise exception 'Nama sangga wajib diisi (maksimal 40 karakter).'; end if;
       v_s := coalesce((select sangga from public.profiles where role = 'peserta' and lower(sangga) = lower(v_s) limit 1), v_s);
-      if v_s <> v_t.sangga then
+      if v_s is distinct from v_t.sangga then
         update public.profiles set sangga = v_s where id = v_id;
         v_n := v_n + 1;
       end if;
@@ -327,6 +327,7 @@ begin
       select * into v_t from public.profiles where id = v_id;
       if v_pinsa is not distinct from v_t.pinsa then continue; end if;
       if v_pinsa then
+        if btrim(coalesce(v_t.sangga, '')) = '' then raise exception '% belum punya sangga. Bagi sangga lebih dulu, baru pilih Pinsa.', v_t.nama; end if;
         if not sigarda.tingkat_selesai(v_id, 'Bantara') then
           raise exception '% belum menyelesaikan SKU Bantara. Pinsa dipilih dari Penegak Calon Laksana.', v_t.nama;
         end if;

@@ -9,7 +9,7 @@ import { JENIS_KELAMIN, PESAN_JK } from './jenisKelaminLogic';
 import { MAKS_BARIS, NAMA_LEMBAR, hurufSaja, kelompokDari, kolomTemplate } from './importAnggota';
 
 function petaHeader(teks) {
-  const k = hurufSaja(teks);
+  const k = hurufSaja(teks).replace(/opsional$/, '');
   if (k.startsWith('namapengguna') || k === 'username') return 'username';
   if (k === 'nama' || k === 'namalengkap' || k === 'namasiswa') return 'nama';
   if (k === 'jeniskelamin' || k === 'jk' || k === 'kelamin' || k === 'lp') return 'jk';
@@ -64,7 +64,7 @@ export async function bacaExcelAnggota(buffer, kelompok = 'peserta') {
       const k = petaHeader(teksSel(c.value));
       if (k && !cur[k]) cur[k] = n;
     });
-    const lengkap = penegak ? cur.nama && cur.kelas && cur.sangga && cur.agama : cur.nama;
+    const lengkap = penegak ? cur.nama && cur.nis && cur.kelas : cur.nama;
     if (lengkap) {
       barisJudul = r;
       kolom = cur;
@@ -106,10 +106,10 @@ const PETUNJUK_PENEGAK = (label) => [
   [`Petunjuk pengisian template import ${label} SIGARDA`, ''],
   ['', ''],
   ['1. Isi data pada lembar "Anggota"', 'Satu baris satu penegak, mulai baris 2 (di bawah judul kolom). Jangan mengubah atau menghapus judul kolom.'],
-  ['2. Kolom wajib', 'Nama Lengkap, Jenis Kelamin, NIS, Rombel, Sangga, Agama. NIS WAJIB dan tidak boleh sama dengan anggota lain: NIS menjadi nama pengguna untuk masuk ke aplikasi.'],
-  ['3. Jenis Kelamin', 'Pilih Laki-laki atau Perempuan dari daftar (L atau P juga dikenali). Wajib.'],
-  ['4. Agama', `Pilih dari daftar: ${AGAMA.join(', ')}. Agama menentukan sub-butir pada butir 1 SKU.`],
-  ['5. Rombel dan Sangga', `Rombel wajib salah satu dari ${SEMUA_ROMBEL.length} rombel baku: X-01 sampai X-10, XI-01 sampai XI-10, XII-01 sampai XII-10 (dua angka; pilih dari daftar). Sangga bebas diketik (mis. Sangga Elang); penulisannya disamakan dengan data yang sudah ada.`],
+  ['2. Kolom wajib', 'HANYA tiga: Nama Lengkap, NIS, dan Rombel. NIS tidak boleh sama dengan anggota lain: NIS menjadi nama pengguna untuk masuk ke aplikasi. Kolom lain bertanda (opsional) boleh dikosongkan; data diri selebihnya (tempat dan tanggal lahir, alamat, keluarga, pendidikan, dan seterusnya) diisi Penegak sendiri di menu Akun saya untuk melengkapi dokumen portofolio Garuda.'],
+  ['3. Jenis Kelamin (opsional)', 'Pilih Laki-laki atau Perempuan dari daftar (L atau P juga dikenali). Bila dikosongkan, Penegak mengisinya sendiri.'],
+  ['4. Agama (opsional)', `Pilih dari daftar: ${AGAMA.join(', ')}. Agama menentukan sub-butir pada butir 1 SKU. Bila dikosongkan, Penegak mengisinya sendiri dan SEBELUM ITU belum dapat mengajukan SKU.`],
+  ['5. Rombel dan Sangga (opsional)', `Rombel wajib salah satu dari ${SEMUA_ROMBEL.length} rombel baku: X-01 sampai X-10, XI-01 sampai XI-10, XII-01 sampai XII-10 (dua angka; pilih dari daftar). Sangga boleh dikosongkan (dibagi kemudian oleh Pembina atau Bina Damping di menu Sangga); bila diisi, bebas diketik (mis. Sangga Elang) dan penulisannya disamakan dengan data yang sudah ada.`],
   ['6. NTA (opsional)', 'Nomor Tanda Anggota Pramuka, mis. 11.03.10.701.00123. Boleh dikosongkan dan diisi kemudian (di lembar sidang atau ubah anggota). Maksimal 40 karakter.'],
   ['7. PIN Awal (opsional)', 'Isi tepat 6 angka (tidak boleh sama semua atau berurutan). Jika dikosongkan, aplikasi membuat PIN acak. Setiap anggota WAJIB mengganti PIN saat login pertama.'],
   ['8. Tanggal Lahir (opsional)', 'Dipakai untuk memeriksa syarat usia Calon Garuda. Tulis tanggal/bulan/tahun, mis. 15/03/2008 (atau 15 Maret 2008, atau 2008-03-15). Boleh dikosongkan dan diisi kemudian di menu Kelayakan. Hanya pemilik dan pengurus yang dapat membacanya.'],
@@ -117,8 +117,9 @@ const PETUNJUK_PENEGAK = (label) => [
   ['10. Setelah impor', 'Daftar NIS dan PIN awal tampil satu kali dan dapat diunduh. Bagikan ke masing-masing anggota secara langsung.'],
   ['', ''],
   ['Contoh isian', ''],
-  ['Nama Lengkap | Jenis Kelamin | NIS | Rombel | Sangga | Agama | NTA | Tanggal Lahir', 'Andi Pratama | Laki-laki | 10301 | X-03 | Sangga Elang | Islam | 11.03.10.701.00123 | 15/03/2009'],
-  ['', 'Made Sari | Perempuan | 10302 | XI-07 | Sangga Merak | Hindu | (kosong) | 02/11/2008'],
+  ['Nama Lengkap | NIS | Rombel (cukup tiga ini)', 'Andi Pratama | 10301 | X-03'],
+  ['', 'Made Sari | 10302 | XI-07'],
+  ['Bila ingin sekaligus mengisi kolom opsional', 'Andi Pratama | Laki-laki | 10301 | X-03 | Sangga Elang | Islam | 11.03.10.701.00123 | 15/03/2009'],
 ];
 
 const PETUNJUK_PENGURUS = (label, kelompok) => {

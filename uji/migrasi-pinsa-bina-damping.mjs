@@ -48,7 +48,7 @@ const bandingkan = (nama, pa, pb) => {
 };
 
 // Skema "sesudah" = skema.sql terbaru (migrasi ini adalah yang paling baru; belum ada migrasi lagi sesudahnya).
-const A = await baru(`${P}/supabase/skema.sql`);
+const A = await baru("git:fe86d84"); // skema tepat sebelum migrasi isian-penegak (= skema.sql lama)
 const pa = await potret(A);
 // sg_cadangan_admin tidak ikut dibandingkan isinya: migrasi Fase A (pengukuhan-dewan) menulisnya ulang dengan tabel tambahan; perilakunya dicek di bawah.
 ok(pa.fungsi.length === 11, `skema baru memuat semua fungsi Pinsa/Bina Damping (5 public + 6 sigarda): ${pa.fungsi.length}`);

@@ -119,7 +119,7 @@ console.log('\n--- Klien: pemeriksaan import (kolom wajib) ---');
     { ...dasar, no: 4, nama: 'C', nis: '60003', jk: 'Campur' }, { ...dasar, no: 5, nama: 'D', nis: '60004' }, { ...dasar, no: 6, nama: 'E', nis: '60005', jk: 'wanita' },
   ], users);
   ok(p[0].siap && p[0].data.jk === 'L' && p[4].siap && p[4].data.jk === 'P', 'Penegak: jenis kelamin sah dibakukan (Laki-laki = L, wanita = P)');
-  ok(!p[1].siap && /Jenis kelamin kosong/.test(p[1].galat.join()) && !p[3].siap && /Jenis kelamin kosong/.test(p[3].galat.join()), 'Penegak: kosong atau tanpa kolom = tidak siap');
+  ok(p[1].siap && p[1].data.jk === '' && p[3].siap && p[3].data.jk === '', 'Penegak: jenis kelamin kosong atau tanpa kolom = tetap siap (opsional; Penegak mengisi sendiri, Tahap 3 H1)');
   ok(!p[2].siap && /Jenis kelamin "Campur" tidak dikenal/.test(p[2].galat.join()), 'Penegak: isian tidak dikenal ditolak dengan pesan');
   const kp = { nis: '', kelas: '', sangga: '', agama: '', pin: '', username: '' };
   for (const kel of ['dewan', 'pembina']) {
@@ -139,7 +139,7 @@ console.log('\n--- Template dan pembacaan Excel ---');
     const dv = ws.getCell(2, kJk).dataValidation;
     ok(dv?.type === 'list' && String(dv.formulae[0]).includes('Laki-laki') && String(dv.formulae[0]).includes('Perempuan') && ws.getCell(500, kJk).dataValidation?.type === 'list', `template ${kel}: kolom berdaftar pilihan Laki-laki, Perempuan (sampai baris 500)`);
     let petunjuk = ''; wb.getWorksheet('Petunjuk').eachRow((r) => r.eachCell((c) => { petunjuk += c.value + ' '; }));
-    ok(/Jenis Kelamin/.test(petunjuk) && /Laki-laki/.test(petunjuk) && /Wajib/.test(petunjuk), `template ${kel}: petunjuk menerangkan jenis kelamin (wajib)`);
+    ok(/Jenis Kelamin/.test(petunjuk) && /Laki-laki/.test(petunjuk) && (kel === 'peserta' ? /opsional/.test(petunjuk) : /Wajib/.test(petunjuk)), `template ${kel}: petunjuk menerangkan jenis kelamin (${kel === 'peserta' ? 'opsional' : 'wajib'})`);
     ws.getCell(2, 1).value = `Uji ${kel}`; ws.getCell(2, kJk).value = 'Perempuan';
     ws.getCell(3, 1).value = `Uji dua ${kel}`; ws.getCell(3, kJk).value = 'L';
     ws.getCell(4, 1).value = `Uji tiga ${kel}`;
@@ -147,14 +147,14 @@ console.log('\n--- Template dan pembacaan Excel ---');
     const b = await bacaExcelAnggota(await wb.xlsx.writeBuffer(), kel);
     ok(b.length === 3 && b[0].jk === 'Perempuan' && b[1].jk === 'L' && b[2].jk === '', `template ${kel}: kolom jenis kelamin terbaca (teks apa adanya)`);
     const per = periksaBaris(b, (await K.admin.a.muatProfil()).data, kel);
-    ok(per[0].siap && per[0].data.jk === 'P' && per[1].siap && per[1].data.jk === 'L' && !per[2].siap && /Jenis kelamin kosong/.test(per[2].galat.join()), `template ${kel}: baris terisi siap, baris tanpa jenis kelamin ditolak`);
+    ok(per[0].siap && per[0].data.jk === 'P' && per[1].siap && per[1].data.jk === 'L' && (kel === 'peserta' ? per[2].siap : !per[2].siap && /Jenis kelamin kosong/.test(per[2].galat.join())), `template ${kel}: baris terisi siap, baris tanpa jenis kelamin ${kel === 'peserta' ? 'tetap siap (opsional untuk Penegak)' : 'ditolak'}`);
   }
   // berkas lama tanpa kolom jenis kelamin: tetap terbaca tetapi setiap baris ditolak dengan pesan yang jelas
   const lama = new ExcelJS.Workbook(); const wl = lama.addWorksheet('Anggota');
   wl.addRow(['Nama Lengkap', 'NIS', 'Rombel', 'Sangga', 'Agama']); wl.addRow(['Lama', '60111', 'X-03', 'Elang', 'Islam']);
   const bl = await bacaExcelAnggota(await lama.xlsx.writeBuffer(), 'peserta');
   const pl = periksaBaris(bl, (await K.admin.a.muatProfil()).data, 'peserta');
-  ok(bl.length === 1 && !pl[0].siap && /Jenis kelamin kosong/.test(pl[0].galat.join()), 'berkas template lama (tanpa kolom): terbaca, baris ditolak "Jenis kelamin kosong" (unduh template terbaru)');
+  ok(bl.length === 1 && pl[0].siap && pl[0].data.jk === '', 'berkas template lama (tanpa kolom jenis kelamin): terbaca dan tetap siap untuk Penegak (jenis kelamin opsional)');
   const alias = new ExcelJS.Workbook(); const wa = alias.addWorksheet('Anggota');
   wa.addRow(['Nama', 'JK', 'Nama Pengguna']); wa.addRow(['Alias Satu', 'P', 'alias.satu']);
   const ba = await bacaExcelAnggota(await alias.xlsx.writeBuffer(), 'pembina');

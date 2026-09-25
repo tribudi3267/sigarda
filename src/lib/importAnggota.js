@@ -33,11 +33,11 @@ export const kelompokDari = (id) => KELOMPOK_PENGGUNA.find((k) => k.id === id);
 
 const KOLOM_PENEGAK = [
   { header: 'Nama Lengkap', key: 'nama', lebar: 32 },
-  { header: 'Jenis Kelamin', key: 'jk', lebar: 16 },
+  { header: 'Jenis Kelamin (opsional)', key: 'jk', lebar: 22 },
   { header: 'NIS', key: 'nis', lebar: 14 },
   { header: 'Rombel', key: 'kelas', lebar: 10 },
-  { header: 'Sangga', key: 'sangga', lebar: 20 },
-  { header: 'Agama', key: 'agama', lebar: 14 },
+  { header: 'Sangga (opsional)', key: 'sangga', lebar: 20 },
+  { header: 'Agama (opsional)', key: 'agama', lebar: 18 },
   { header: 'NTA (opsional)', key: 'nta', lebar: 22 },
   { header: 'PIN Awal (opsional)', key: 'pin', lebar: 20 },
   { header: 'Tanggal Lahir (opsional)', key: 'lahir', lebar: 22 },
@@ -133,18 +133,16 @@ export function periksaBaris(baris, users, kelompok = 'peserta') {
     const agama = normalisasiAgama(b.agama);
     const nis = String(b.nis ?? '').trim().toLowerCase();
     if (!b.nama) galat.push('Nama kosong');
+    // Data awal Penegak hanya nama, NIS, dan rombel (Tahap 3, H1). Jenis kelamin, sangga, agama, NTA, dan tanggal lahir opsional: sisanya diisi Penegak sendiri di Akun saya.
     const jk = normalisasiJenisKelamin(b.jk);
-    if (!b.jk) galat.push('Jenis kelamin kosong');
-    else if (!jk) galat.push(`Jenis kelamin "${b.jk}" tidak dikenal. ${PESAN_JK}`);
+    if (b.jk && !jk) galat.push(`Jenis kelamin "${b.jk}" tidak dikenal. ${PESAN_JK}`);
     if (!nis) galat.push('NIS kosong (NIS dipakai untuk masuk)');
     else if (!POLA_USERNAME.test(nis)) galat.push('NIS harus 3 sampai 32 karakter huruf atau angka');
     else if (dipakai.has(nis)) galat.push('NIS sudah terdaftar');
     const kelas = normalisasiRombel(b.kelas);
     if (!b.kelas) galat.push('Rombel kosong');
     else if (!kelas) galat.push(`Rombel "${b.kelas}" tidak sah. ${PESAN_ROMBEL}`);
-    if (!b.sangga) galat.push('Sangga kosong');
-    if (!b.agama) galat.push('Agama kosong');
-    else if (!agama) galat.push(`Agama "${b.agama}" tidak dikenal (pilih: ${AGAMA.join(', ')})`);
+    if (b.agama && !agama) galat.push(`Agama "${b.agama}" tidak dikenal (pilih: ${AGAMA.join(', ')})`);
     if (b.nta && !POLA_NTA.test(b.nta)) galat.push('NTA tidak valid (maksimal 40 karakter: huruf, angka, titik, garis miring, strip, spasi)');
     const lahir = b.lahir ? normalisasiTanggalLahir(b.lahir) : '';
     if (b.lahir) {

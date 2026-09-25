@@ -23,10 +23,11 @@ class Batas extends Component {
   }
 }
 
-export default function BatasHalaman({ children }) {
+// `senyap`: untuk potongan yang bukan halaman (mis. ajakan mengisi data diri): tanpa penanda memuat.
+export default function BatasHalaman({ children, senyap = false }) {
   return (
     <Batas>
-      <Suspense fallback={<p role="status" className="py-10 text-center text-sm text-pramuka-600">Memuat halaman...</p>}>{children}</Suspense>
+      <Suspense fallback={senyap ? null : <p role="status" className="py-10 text-center text-sm text-pramuka-600">Memuat halaman...</p>}>{children}</Suspense>
     </Batas>
   );
 }
