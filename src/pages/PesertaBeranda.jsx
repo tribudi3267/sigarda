@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { Suspense, lazy, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { AMBANG_HADIR } from '../config';
 import { cariPoin, hitungProgres, laksanaTerbuka, layakGaruda, PERAN, tingkatSelesai } from '../lib/skuLogic';
@@ -8,6 +8,8 @@ import useAbsensiPeriode from '../hooks/useAbsensiPeriode';
 import { butirMenungguPra, jalurPraUji, teksPosisiPraUji } from '../lib/praUjiLogic';
 import JadwalUjianBersama from '../components/JadwalUjianBersama';
 import KartuIuran from '../components/KartuIuran';
+// Dimuat malas: kartu kecil di bawah lipatan, menjaga JS awal tetap di bawah anggaran (npm run profil)
+const KartuPelantikanSaya = lazy(() => import('../components/KartuPelantikanSaya'));
 import { Badge, Icon, Kosong, Lencana, ProgressBar, TeksPoin } from '../components/ui';
 
 export default function PesertaBeranda({ setTab, setTingkat }) {
@@ -138,6 +140,8 @@ export default function PesertaBeranda({ setTab, setTingkat }) {
       </section>
 
       <KartuIuran onBuka={() => setTab('iuran')} />
+
+      <Suspense fallback={null}><KartuPelantikanSaya /></Suspense>
 
       <JadwalUjianBersama />
 

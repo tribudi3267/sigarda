@@ -24,6 +24,7 @@ import LogoMark from './components/LogoMark';
 // Halaman selain beranda dimuat malas (berkasnya diunduh saat pertama dibuka); lihat BatasHalaman.
 const PesertaSku = lazy(() => import('./pages/PesertaSku'));
 const PraUji = lazy(() => import('./pages/PraUji'));
+const Pelantikan = lazy(() => import('./pages/Pelantikan'));
 const PesertaDetail = lazy(() => import('./pages/PesertaDetail'));
 const AdminAnggota = lazy(() => import('./pages/AdminAnggota'));
 const AbsensiPeserta = lazy(() => import('./pages/Absensi').then((m) => ({ default: m.AbsensiPeserta })));
@@ -82,6 +83,7 @@ function buatNav(user, peran, belumDibaca = 0, pendampingan = null, praUjiAktif 
   const sangga = { id: 'sangga', label: 'Sangga', ikon: 'anggota' };
   const adaSangga = menuSanggaTampil(user, pendampingan);
   const praUji = { id: 'pra-uji', label: 'Pra-uji', ikon: 'cek' };
+  const pelantikan = { id: 'pelantikan', label: 'Pelantikan', ikon: 'lencana' };
   const adaPraUji = menuPraUjiTampil(user, pendampingan, praUjiAktif);
   const ujiResmi = ujiResmiTampil(user, praUjiAktif); // pra-uji hidup: uji resmi hanya Pembina, jadi Antrian dan Sesi ujian tidak untuk Dewan Ambalan
   const kelolaBoleh = bolehKelolaMateri(user);
@@ -99,14 +101,14 @@ function buatNav(user, peran, belumDibaca = 0, pendampingan = null, praUjiAktif 
   if (user.role === 'penguji') {
     return [
       { judul: 'Utama', item: [{ id: 'dashboard', label: 'Dashboard', ikon: 'dashboard' }, notifikasi, bantuan] },
-      { judul: 'Pengujian SKU', item: [...(ujiResmi ? [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }] : []), ...(adaPraUji ? [praUji] : []), { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, ...(ujiResmi ? [sesi] : []), ...(kelolaBoleh ? [instrumen, penugasan, kepengurusan] : []), pemeriksaan, sidang, cetak] },
+      { judul: 'Pengujian SKU', item: [...(ujiResmi ? [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }] : []), ...(adaPraUji ? [praUji] : []), { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, ...(ujiResmi ? [sesi] : []), ...(kelolaBoleh ? [instrumen, penugasan, kepengurusan, pelantikan] : []), pemeriksaan, sidang, cetak] },
       { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, sangga, ...(kelolaBoleh ? [raport, laporan] : [])] },
       { judul: 'Materi', item: [materi, ...(kelolaBoleh ? [kelola] : [])] },
     ];
   }
   return [
     { judul: 'Utama', item: [{ id: 'rekap', label: 'Dashboard', ikon: 'dashboard' }, notifikasi, bantuan] },
-    { judul: 'Pengujian SKU', item: [praUji, sesi, instrumen, sidang, cetak] },
+    { judul: 'Pengujian SKU', item: [praUji, sesi, instrumen, pelantikan, sidang, cetak] },
     { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, sangga, raport, laporan] },
     { judul: 'Materi', item: [materi, kelola] },
     { judul: 'Pengelolaan', item: [{ id: 'anggota', label: 'Anggota', ikon: 'anggota' }, kepengurusan, { id: 'naikkelas', label: 'Naik Kelas', ikon: 'naikkelas' }, { id: 'gudep', label: 'Data Gudep', ikon: 'perisai' }, pemeriksaan] },
@@ -290,6 +292,8 @@ function Shell() {
     isi = <Agenda />;
   } else if (tabAktif === 'sangga') {
     isi = <Sangga />;
+  } else if (tabAktif === 'pelantikan' && bolehKelolaMateri(user)) {
+    isi = <Pelantikan />;
   } else if (tabAktif === 'pra-uji' && menuPraUjiTampil(user, pendampingan, praUjiAktif)) {
     isi = <PraUji />;
   } else if (tabAktif === 'materi') {
