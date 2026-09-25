@@ -41,7 +41,7 @@ const potret = async (db) => {
   };
 };
 
-const A = await baru(`${P}/supabase/skema.sql`); // migrasi ini yang paling baru: skema.sql terbaru = keadaan sesudahnya
+const A = await baru("git:fe86d84"); // skema tepat sebelum migrasi isian-penegak (= skema.sql lama) // migrasi ini yang paling baru: skema.sql terbaru = keadaan sesudahnya
 const pa = await potret(A);
 
 console.log('--- Database berisi data: kesetaraan, data utuh, idempoten ---');

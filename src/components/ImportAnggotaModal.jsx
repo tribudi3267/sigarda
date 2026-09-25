@@ -110,7 +110,7 @@ export default function ImportAnggotaModal({ kelompok = 'peserta', onTutup }) {
           <ol className="list-decimal space-y-1 pl-5 text-sm text-pramuka-700">
             <li>Unduh template Excel {label}, lalu isi datanya (satu baris satu orang).</li>
             <li>{penegak
-              ? 'Kolom wajib: Nama Lengkap, Jenis Kelamin, NIS, Rombel (X-01 sampai XII-10), Sangga, Agama. NIS menjadi nama pengguna untuk masuk. NTA dan PIN Awal boleh dikosongkan.'
+              ? 'Kolom wajib hanya tiga: Nama Lengkap, NIS, dan Rombel (X-01 sampai XII-10). NIS menjadi nama pengguna untuk masuk. Kolom lain (jenis kelamin, sangga, agama, NTA, PIN Awal, tanggal lahir) opsional; data diri selebihnya diisi Penegak sendiri di menu Akun saya untuk portofolio Garuda.'
               : kelompok === 'pembina'
                 ? 'Kolom wajib: Nama Lengkap dan Jenis Kelamin. Agama (sebaiknya diisi, untuk butir agama), Nama Pengguna, dan PIN Awal boleh dikosongkan.'
                 : kelompok === 'dewan'

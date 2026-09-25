@@ -166,7 +166,7 @@ const wsT = wbT.getWorksheet('Anggota'); const kepala = []; wsT.getRow(1).eachCe
 ok(kepala.includes('NTA (opsional)') && kepala.indexOf('NTA (opsional)') < kepala.indexOf('PIN Awal (opsional)'), 'template Penegak memuat kolom NTA (opsional) sebelum PIN: ' + kepala.join(' | '));
 const kNta = kepala.indexOf('NTA (opsional)') + 1;
 ok(wsT.getCell(2, kNta).numFmt === '@', 'kolom NTA berformat teks');
-const bar = (no, nama, nis, ntaTeks) => { const rr = wsT.getRow(no); rr.getCell(kepala.indexOf('Nama Lengkap') + 1).value = nama; rr.getCell(kepala.indexOf('Jenis Kelamin') + 1).value = 'Laki-laki'; rr.getCell(kepala.indexOf('NIS') + 1).value = nis; rr.getCell(kepala.indexOf('Rombel') + 1).value = 'X-01'; rr.getCell(kepala.indexOf('Sangga') + 1).value = 'Sangga Elang'; rr.getCell(kepala.indexOf('Agama') + 1).value = 'Islam'; if (ntaTeks !== null) rr.getCell(kNta).value = ntaTeks; };
+const bar = (no, nama, nis, ntaTeks) => { const rr = wsT.getRow(no); rr.getCell(kepala.indexOf('Nama Lengkap') + 1).value = nama; rr.getCell(kepala.indexOf('Jenis Kelamin (opsional)') + 1).value = 'Laki-laki'; rr.getCell(kepala.indexOf('NIS') + 1).value = nis; rr.getCell(kepala.indexOf('Rombel') + 1).value = 'X-01'; rr.getCell(kepala.indexOf('Sangga (opsional)') + 1).value = 'Sangga Elang'; rr.getCell(kepala.indexOf('Agama (opsional)') + 1).value = 'Islam'; if (ntaTeks !== null) rr.getCell(kNta).value = ntaTeks; };
 bar(2, 'Ada Nta', '88001', '11.03.10.701.00500'); bar(3, 'Tanpa Nta', '88002', null); bar(4, 'Nta Angka', '88003', 12345); bar(5, 'Nta Rusak', '88004', 'a;b');
 const bufIsi = await wbT.xlsx.writeBuffer();
 const dibaca = await bacaExcelAnggota(bufIsi, 'peserta');

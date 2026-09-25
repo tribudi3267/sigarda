@@ -27,6 +27,7 @@ const PraUji = lazy(() => import('./pages/PraUji'));
 const Pelantikan = lazy(() => import('./pages/Pelantikan'));
 const Tkk = lazy(() => import('./pages/Tkk'));
 const Spg = lazy(() => import('./pages/Spg'));
+const AjakanIsian = lazy(() => import('./components/AjakanIsian')); // ajakan mengisi data diri Penegak sesudah masuk (Tahap 3, H1)
 const Kelayakan = lazy(() => import('./pages/Kelayakan'));
 const PesertaDetail = lazy(() => import('./pages/PesertaDetail'));
 const AdminAnggota = lazy(() => import('./pages/AdminAnggota'));
@@ -175,13 +176,14 @@ function LayarArsip() {
 }
 
 function Shell() {
-  const { user, peranUser, status, galatMuat, belumDibaca, segarkanNotifikasi, pendampingan, praUjiAktif } = useApp();
+  const { user, akun, peranUser, status, galatMuat, belumDibaca, segarkanNotifikasi, pendampingan, praUjiAktif } = useApp();
   const [tab, setTab] = useState(null);
   const [fokusId, setFokusId] = useState(null); // peserta yang sedang dibuka penguji/admin
   const [jenisCetak, setJenisCetak] = useState('kartu'); // tab awal halaman Cetak (kartu | stl | surat)
   const [tingkat, setTingkat] = useState('Bantara');
   const [materiButir, setMateriButir] = useState(null); // butir SKU yang dituju tombol "Materi"
   const [kelolaId, setKelolaId] = useState(null); // materi yang langsung dibuka di Kelola Materi ('baru' = tambah)
+  const ajakData = akun?.role === 'peserta' && (akun.status ?? 'aktif') === 'aktif'; // Penegak aktif: ajakan data diri (memuat nomor WhatsApp); peran lain: hanya nomor WhatsApp
   const [waTutup, setWaTutup] = useState(false); // ajakan isi nomor WhatsApp ditutup/dilewati untuk sesi masuk ini (tahap L5)
 
   useEffect(() => {
@@ -358,8 +360,12 @@ function Shell() {
       <Layout nav={nav} grup={grup} tab={tabAktif} setTab={pilihTab}>
         <BatasHalaman>{isi}</BatasHalaman>
       </Layout>
-      {/* Ajakan isi nomor WhatsApp (tahap L5): satu kali per masuk, dapat dilewati, tampil lagi pada masuk berikutnya bila masih kosong. */}
-      <Modal buka={!user.whatsapp && !waTutup} tutup={() => setWaTutup(true)} judul="Isi nomor WhatsApp">
+      {/* Ajakan melengkapi data diri Penegak (Tahap 3, H1; termasuk nomor WhatsApp): satu kali per masuk, dapat dilewati, tampil lagi pada masuk berikutnya bila isian pokok belum lengkap. */}
+      {ajakData && (
+        <BatasHalaman senyap><AjakanIsian tutup={waTutup} onTutup={() => setWaTutup(true)} /></BatasHalaman>
+      )}
+      {/* Ajakan isi nomor WhatsApp (tahap L5) untuk peran selain Penegak: satu kali per masuk, dapat dilewati, tampil lagi pada masuk berikutnya bila masih kosong. */}
+      <Modal buka={!ajakData && !user.whatsapp && !waTutup} tutup={() => setWaTutup(true)} judul="Isi nomor WhatsApp">
         <p className="mb-4 text-sm text-pramuka-600">
           Supaya Pembina atau Dewan Ambalan dapat menghubungi Anda bila diperlukan (mis. SKU sudah lama tidak bergerak). Boleh dilewati; akan
           ditanyakan lagi lain kali sampai diisi.

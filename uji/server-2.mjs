@@ -240,9 +240,9 @@ ok(a2.nama === 'Siti N.' && a2.kelas === 'X-01' && a2.sangga === 'Sangga Elang' 
 ok(cocok(await ub(kDewan, p2), /Hanya Admin/), 'Dewan tidak bisa mengubah anggota');
 ok(cocok(await ub(kP2, p2), /Hanya Admin/), 'Penegak tidak bisa mengubah dirinya lewat fungsi ini');
 ok(cocok(await ub(kAdmin, p2, { p_nama: '  ' }), /Nama wajib/), 'nama kosong ditolak');
-ok(cocok(await ub(kAdmin, p2, { p_kelas: '' }), /Kelas dan sangga/), 'kelas kosong ditolak');
+ok(cocok(await ub(kAdmin, p2, { p_kelas: '' }), /Kelas \(rombel\) peserta wajib/), 'kelas kosong ditolak');
 ok(cocok(await ub(kAdmin, p2, { p_agama: 'Zoroaster' }), /Agama tidak dikenal/), 'agama tidak dikenal ditolak');
-ok(cocok(await ub(kAdmin, p2, { p_agama: '' }), /Agama wajib/), 'agama wajib');
+ok(!cocok(await ub(kAdmin, p2, { p_agama: '' }), /./), 'agama kosong = tidak diubah (agama tidak wajib lagi di jalur admin; Tahap 3 H1)');
 ok(cocok(await ub(kAdmin, p2, { p_calon_garuda: true }), /hanya untuk peserta yang seluruh SKU/), 'menetapkan Calon Garuda untuk yang belum lulus ditolak');
 ok((await satu('select agama from public.profiles where id=$1', [p2])).agama === 'Islam', 'penolakan membatalkan seluruh perubahan (atomik)');
 ok(!galat(await ub(kAdmin, p1, { p_nama: 'Ahmad Fauzi', p_kelas: 'X-01', p_sangga: 'Sangga Elang', p_calon_garuda: true })), 'peserta yang layak dapat ditetapkan Calon Garuda oleh admin');

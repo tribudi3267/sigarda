@@ -217,8 +217,8 @@ async function aksiBuatAkun(b: any, me: any, d: any) {
       if (!username) { tolak('NIS wajib diisi (NIS menjadi nama pengguna untuk masuk)'); continue; }
       if (!POLA_USERNAME.test(username)) { tolak('NIS harus 3 sampai 32 karakter huruf/angka'); continue; }
       if (!rapikan(r.kelas)) { tolak('Kelas kosong'); continue; }
-      if (!rapikan(r.sangga)) { tolak('Sangga kosong'); continue; }
-      if (!AGAMA.includes(r.agama)) { tolak('Agama tidak dikenal'); continue; }
+      // Hanya NIS dan rombel yang wajib. Sangga dan agama boleh kosong (Tahap 3, H1): sangga dibagi Pembina/Bina Damping, agama diisi Penegak sendiri; bila agama diisi harus dikenal.
+      if (rapikan(r.agama) && !AGAMA.includes(r.agama)) { tolak('Agama tidak dikenal'); continue; }
       if (terpakai.has(username)) { tolak('NIS sudah terdaftar'); continue; }
     } else if (rencana[i].tetap) {
       if (!POLA_USERNAME.test(username)) { tolak('Nama pengguna harus 3 sampai 32 karakter: huruf kecil, angka, titik, garis bawah, atau strip'); continue; }
@@ -239,7 +239,7 @@ async function aksiBuatAkun(b: any, me: any, d: any) {
     const { error } = await d.db.rpc('sg_profil_buat_internal', {
       p_id: akun.id, p_username: username, p_role: k.role, p_nama: nama,
       p_nis: k.role === 'peserta' ? username : '', p_kelas: rapikan(r.kelas), p_sangga: rapikan(r.sangga),
-      p_agama: k.role === 'peserta' ? r.agama : '', p_jabatan: k.jabatan ?? '',
+      p_agama: k.role === 'peserta' ? rapikan(r.agama) : '', p_jabatan: k.jabatan ?? '',
     });
     if (error) {
       await d.admin.hapusAkun(akun.id); // batalkan agar tidak ada akun tanpa profil
@@ -247,7 +247,7 @@ async function aksiBuatAkun(b: any, me: any, d: any) {
       continue;
     }
     terpakai.add(username);
-    hasil.push({ no, ok: true, id: akun.id, nama, username, pin, kelas: rapikan(r.kelas), sangga: rapikan(r.sangga), agama: r.agama ?? '' });
+    hasil.push({ no, ok: true, id: akun.id, nama, username, pin, kelas: rapikan(r.kelas), sangga: rapikan(r.sangga), agama: rapikan(r.agama) });
   }
   return { ok: true, hasil };
 }

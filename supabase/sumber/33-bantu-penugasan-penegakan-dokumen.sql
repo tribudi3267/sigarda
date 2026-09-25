@@ -187,7 +187,7 @@ $$ select sigarda.pembina_atau_admin() or sigarda.bina_damping_rombel(p_rombel) 
 -- per rombel, 4-8 Penegak per sangga, dan tiap sangga punya Pinsa. Rombel tanpa anggota aktif tidak diperingatkan soal sangga.
 create function sigarda.sangga_peringatan(p_rombel text) returns jsonb language plpgsql stable security definer set search_path = public as
 $$
-declare v_p jsonb := '[]'::jsonb; v_r record; v_sangga int := 0; v_bd int;
+declare v_p jsonb := '[]'::jsonb; v_r record; v_sangga int := 0; v_bd int; v_tanpa int;
 begin
   select count(*) into v_bd from public.bina_damping where tahun_ajaran = sigarda.tahun_ajaran_kini() and rombel = p_rombel;
   if v_bd < 2 then
@@ -195,7 +195,7 @@ begin
   end if;
   for v_r in
     select min(sangga) as nama, count(*)::int as n, bool_or(pinsa) as ada_pinsa from public.profiles
-    where role = 'peserta' and status = 'aktif' and kelas = p_rombel group by lower(sangga) order by lower(sangga)
+    where role = 'peserta' and status = 'aktif' and kelas = p_rombel and btrim(coalesce(sangga, '')) <> '' group by lower(sangga) order by lower(sangga)
   loop
     v_sangga := v_sangga + 1;
     if v_r.n < 4 or v_r.n > 8 then
@@ -205,6 +205,11 @@ begin
       v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', v_r.nama, 'teks', format('Sangga %s belum punya Pinsa.', v_r.nama)));
     end if;
   end loop;
+  -- Penegak baru dibuat tanpa sangga (Tahap 3, H1): Pembina atau Bina Damping membaginya.
+  select count(*)::int into v_tanpa from public.profiles where role = 'peserta' and status = 'aktif' and kelas = p_rombel and btrim(coalesce(sangga, '')) = '';
+  if v_tanpa > 0 then
+    v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', null, 'teks', format('%s Penegak rombel ini belum punya sangga.', v_tanpa)));
+  end if;
   if v_sangga > 0 and (v_sangga < 4 or v_sangga > 5) then
     v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', null, 'teks', format('Rombel ini punya %s sangga (seharusnya 4 sampai 5).', v_sangga)));
   end if;

@@ -48,7 +48,7 @@ export default function PesertaSku({ tingkat, setTingkat, onBukaMateri }) {
         <div>
           <h1 className="text-2xl font-bold">{TINGKAT[tingkat].judul}</h1>
           <p className="text-sm text-pramuka-600">
-            {TINGKAT[tingkat].butir.length} butir resmi Kwarnas. Butir 1 menyesuaikan agama kamu ({user.agama}).
+            {TINGKAT[tingkat].butir.length} butir resmi Kwarnas. Butir 1 menyesuaikan agama kamu ({user.agama || 'belum diisi'}).
           </p>
           <SumberPeraturan
             className="mt-1"
@@ -65,6 +65,12 @@ export default function PesertaSku({ tingkat, setTingkat, onBukaMateri }) {
         </div>
         <ProgressBar persen={h.persen} tinggi="h-3" label={`Progres ${tingkat}`} />
       </div>
+
+      {!user.agama && !hanyaLihatSaya && (
+        <p role="alert" className="mb-5 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          Agama kamu belum diisi, jadi butir agama belum tampil dan SKU belum dapat diajukan. Isi di menu <strong>Akun saya</strong>, bagian Data diri.
+        </p>
+      )}
 
       {!terbuka && (
         <p className="jahitan mb-5 flex items-center gap-2 rounded-lg bg-white px-4 py-3 text-sm text-pramuka-700">

@@ -66,7 +66,7 @@ ok(kolomTemplate('peserta').map((c) => c.key).join() === 'nama,jk,nis,kelas,sang
   const b = await bacaExcelAnggota(await wb.xlsx.writeBuffer(), 'peserta');
   ok(b.length === 1 && b[0].nis === '10301' && b[0].username === '', 'baca file Penegak');
   let petunjuk = ''; wb.getWorksheet('Petunjuk').eachRow((r) => r.eachCell((c) => { petunjuk += c.value + ' '; }));
-  ok(/NIS WAJIB/.test(petunjuk), 'petunjuk Penegak: NIS wajib');
+  ok(/HANYA tiga: Nama Lengkap, NIS, dan Rombel/.test(petunjuk) && /NIS tidak boleh sama/.test(petunjuk), 'petunjuk Penegak: hanya nama, NIS, rombel yang wajib; NIS unik');
 }
 
 // PIN: klien dan server sepakat

@@ -822,9 +822,9 @@ export function AppProvider({ children }) {
       if (!baku && !(kelas && kelas.toLowerCase() === String(kelasLama ?? '').toLowerCase())) return { ok: false, pesan: PESAN_ROMBEL };
       data = { ...data, kelas: baku || kelas };
     }
-    // Jenis kelamin (semua peran): wajib untuk anggota baru; anggota lama boleh kosong sampai dilengkapi
+    // Jenis kelamin: wajib untuk anggota baru selain Penegak (Penegak baru hanya nama, NIS, rombel; sisanya diisi Penegak sendiri); anggota lama boleh kosong sampai dilengkapi
     const jk = normalisasiJenisKelamin(data.jenisKelamin);
-    if (!data.id && !jk) return { ok: false, pesan: `Jenis kelamin wajib dipilih. ${PESAN_JK}` };
+    if (!data.id && !jk && data.role !== 'peserta') return { ok: false, pesan: `Jenis kelamin wajib dipilih. ${PESAN_JK}` };
     if (data.jenisKelamin && !jk) return { ok: false, pesan: `Jenis kelamin tidak valid. ${PESAN_JK}` };
     // NTA (Penegak dan Dewan Ambalan) diperiksa sebelum apa pun disimpan, agar data lain tidak tersimpan sebagian
     const anggotaDewan = data.role === 'penguji' && data.jabatan === 'Dewan Ambalan';
@@ -1232,6 +1232,10 @@ export function AppProvider({ children }) {
       sesudah: async () => { setDb((d) => ({ ...d, users: d.users.map((u) => (u.id === sesiId ? { ...u, whatsapp: nomor || undefined } : u)) })); },
     });
 
+  /* ---------------- Isian data diri Penegak (Tahap 3, H1) ---------------- */
+  // Penegak menyimpan data dirinya sendiri; jenis kelamin, agama, dan NTA (bila baru terisi) ikut memperbarui profil di aplikasi.
+  const simpanIsianSaya = (data) => aksi(api().simpanIsianSaya(data), { sesudah: () => segarkan.users() });
+
   /* ---------------- Eskalasi: daftar Tindak Lanjut (Pembina, Dewan Ambalan, Admin) ---------------- */
   const muatEskalasi = async () => {
     const r = await api().muatEskalasi();
@@ -1339,7 +1343,7 @@ export function AppProvider({ children }) {
     buatSesiAbsen, setStatusAbsen, tandaiBanyakAbsen, hapusSesiAbsen, semesterSiap, pastikanAbsensi,
     gantiPin, resetPin,
     simpanAnggota, imporAnggota, hapusAnggota, perbaruiRombel, lengkapiJenisKelamin,
-    simpanGudep, simpanWhatsapp, muatEskalasi,
+    simpanGudep, simpanWhatsapp, simpanIsianSaya, muatEskalasi,
     dokumen: db.dokumen, muatDokumen, terbitkanSuratAgama, cabutDokumen, bolehSurat,
     penugasan: db.penugasan, penugasanPeserta: db.penugasanPeserta, guruAgama: db.guruAgama, muatPenugasan, muatLogPenugasan, aturPenugasan, aturPenugasanPeserta, salinPenugasan, simpanGuruAgama, hapusGuruAgama, bolehAturPenugasan,
     praUjiAktif, pastikanPraUji, praUjiPeserta, muatAntrianPraUji, muatPraUjiMenunggu, catatPraUji, lewatiPraUji, aturSakelarPraUji,

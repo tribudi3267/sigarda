@@ -327,6 +327,19 @@ export const susunGarudaTahap = (baris = []) =>
 /** Baris tanggal_lahir -> [{ pesertaId, tanggal (YYYY-MM-DD), dicatatPada }]. */
 export const susunTanggalLahir = (baris = []) => baris.map((r) => ({ pesertaId: r.peserta_id, tanggal: tgl(r.tanggal), dicatatPada: r.dicatat_pada }));
 
+/** Baris penegak_isian dan tanggal_lahir (satu Penegak) -> { isian: { kunci: nilai }, lahir: 'YYYY-MM-DD' atau null }. */
+export const susunIsian = (baris = [], lahir = []) => ({
+  isian: Object.fromEntries(baris.map((r) => [r.kunci, r.nilai])),
+  lahir: lahir[0]?.tanggal ? tgl(lahir[0].tanggal) : null,
+});
+
+/** Baris dokumen_templat -> [{ id, tahunAjaran, jenis, isi: { uji, baris, pita } }], tahun ajaran terbaru dulu. */
+export const susunTemplatDokumen = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), tahunAjaran: r.tahun_ajaran, jenis: r.jenis,
+    isi: { uji: r.isi?.uji ?? '', baris: Array.isArray(r.isi?.baris) ? r.isi.baris : [], pita: Array.isArray(r.isi?.pita) ? r.isi.pita : null },
+  })).sort((a, b) => b.tahunAjaran.localeCompare(a.tahunAjaran) || a.jenis.localeCompare(b.jenis));
+
 /** Nilai pengaturan 'garuda.gerbang' -> { kelasMin, lahirDari, lahirSampai, kuotaPersen } yang aman (bentuk rusak atau belum ada = `bawaan`). */
 export const susunGerbang = (nilai, bawaan) =>
   nilai && ['X', 'XI', 'XII'].includes(nilai.kelasMin) && /^\d{4}-\d{2}-\d{2}$/.test(nilai.lahirDari ?? '') && /^\d{4}-\d{2}-\d{2}$/.test(nilai.lahirSampai ?? '') && Number.isInteger(nilai.kuotaPersen)

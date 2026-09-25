@@ -42,6 +42,8 @@ alter table public.tkk_pengajuan enable row level security;   -- baca: pemilik d
 alter table public.tim_penilai enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_tim_penilai_*
 alter table public.tim_penilai_anggota enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_tim_penilai_*
 alter table public.garuda_tahap enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_garuda_tahap_*
+alter table public.penegak_isian enable row level security;   -- baca: pemilik, Pembina, dan Admin; tulis: hanya fungsi sg_isian_saya_simpan
+alter table public.dokumen_templat enable row level security;   -- baca: Pembina dan Admin; tulis: hanya fungsi sg_dokumen_templat_*
 alter table public.tanggal_lahir enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tanggal_lahir_atur
 alter table public.spg_penetapan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_spg_*
 alter table public.tkk_krida enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_krida_*
@@ -185,6 +187,13 @@ create policy baca_spg_penetapan on public.spg_penetapan for select to authentic
 create policy baca_tanggal_lahir on public.tanggal_lahir for select to authenticated
   using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
 -- ===== akhir kebijakan gerbang =====
+
+-- ===== Isian Penegak dan templat dokumen (Tahap 3, H1): kebijakan =====
+-- Isian data diri: pemilik, Pembina, dan Admin (BUKAN Dewan Ambalan: alamat dan riwayat kesehatan pribadi). Templat dokumen: Pembina dan Admin.
+create policy baca_penegak_isian on public.penegak_isian for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pembina_atau_admin())));
+create policy baca_dokumen_templat on public.dokumen_templat for select to authenticated using ((select sigarda.pembina_atau_admin()));
+-- ===== akhir kebijakan isian penegak =====
 
 -- ===== Tim penilai dan kalender Garuda (Tahap 2, G4b dan G4c): kebijakan =====
 -- Tim penilai dan kalender tahap Garuda dibaca pengurus (Pembina, Dewan, Admin); ditulis hanya lewat fungsi.

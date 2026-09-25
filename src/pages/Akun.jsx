@@ -4,21 +4,27 @@ import { siapaBisaReset } from '../lib/pinLogic';
 import { fmtWaktu } from '../lib/format';
 import FormGantiPin from '../components/FormGantiPin';
 import FormWhatsapp from '../components/FormWhatsapp';
+import FormDataDiri from '../components/FormDataDiri';
+import useIsianSaya from '../hooks/useIsianSaya';
+import { pokokKurang } from '../lib/isianLogic';
 import { Avatar, BadgePeran, Icon } from '../components/ui';
 
 /** Akun saya: profil singkat dan penggantian PIN oleh pemilik akun. */
 export default function Akun() {
-  const { user, users, peranUser } = useApp();
+  const { user, akun, users, peranUser } = useApp();
+  const penegakAktif = akun?.role === 'peserta' && (akun.status ?? 'aktif') === 'aktif'; // data diri untuk portofolio Garuda (Tahap 3, H1): Penegak aktif, juga saat dalam tampilan Dewan
+  const data = useIsianSaya(penegakAktif);
+  const kurang = penegakAktif && data.siap && !data.galat ? pokokKurang({ akun, isian: data.isian, lahir: data.lahir }) : [];
   const pereset = user.pinDireset ? users.find((u) => u.id === user.pinDireset.oleh) : null;
   const bantuan = siapaBisaReset(user);
 
   const info = [
     ['Nama pengguna (untuk masuk)', user.username],
-    ['Jenis kelamin', labelJenisKelamin(user.jenisKelamin) || 'Belum diisi (hubungi Admin Gudep)'],
+    ['Jenis kelamin', labelJenisKelamin(user.jenisKelamin) || (penegakAktif ? 'Belum diisi (isi di Data diri di bawah)' : 'Belum diisi (hubungi Admin Gudep)')],
     user.role === 'peserta' && ['NIS', user.nis || '-'],
     user.role === 'peserta' && ['Kelas', user.kelas],
-    user.role === 'peserta' && ['Sangga', user.sangga],
-    user.role === 'peserta' && ['Agama', user.agama],
+    user.role === 'peserta' && ['Sangga', user.sangga || 'Belum ada sangga'],
+    user.role === 'peserta' && ['Agama', user.agama || 'Belum diisi (isi di Data diri di bawah)'],
     user.role === 'penguji' && ['Jabatan', user.jabatan],
     user.role === 'admin' && ['Peran', 'Admin Gudep'],
   ].filter(Boolean);
@@ -70,7 +76,19 @@ export default function Akun() {
           <FormGantiPin />
         </section>
 
-        <section className="panel p-5 lg:col-span-2">
+        {penegakAktif && (
+          <section className="panel p-5 lg:col-span-2">
+            <h2 className="text-lg font-bold">Data diri (untuk portofolio Garuda)</h2>
+            <p className="mb-4 mt-1 text-sm text-pramuka-600">
+              {kurang.length ? `Belum lengkap: ${kurang.join(', ')}.` : 'Isian pokok sudah lengkap. Isian lain boleh dilengkapi kapan saja.'}
+            </p>
+            {!data.siap && <p role="status" className="text-sm text-pramuka-600">Memuat data diri...</p>}
+            {data.siap && data.galat && <p role="alert" className="text-sm text-red-700">{data.galat}</p>}
+            {data.siap && !data.galat && <FormDataDiri data={data} />}
+          </section>
+        )}
+
+        {!penegakAktif && <section className="panel p-5 lg:col-span-2">
           <h2 className="text-lg font-bold">Nomor WhatsApp</h2>
           <p className="mb-4 mt-1 text-sm text-pramuka-600">
             {user.whatsapp
@@ -78,7 +96,7 @@ export default function Akun() {
               : 'Belum diisi. Isi supaya Pembina atau Dewan Ambalan dapat menghubungi Anda bila diperlukan.'}
           </p>
           <FormWhatsapp />
-        </section>
+        </section>}
       </div>
     </div>
   );

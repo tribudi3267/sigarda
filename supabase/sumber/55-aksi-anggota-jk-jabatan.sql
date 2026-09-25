@@ -27,9 +27,9 @@ begin
 
   v_kelas := sigarda.rapikan(p_kelas);
   v_sangga := sigarda.rapikan(p_sangga);
-  if v_kelas = '' or v_sangga = '' then raise exception 'Kelas dan sangga peserta wajib diisi.'; end if;
-  if p_agama is null or p_agama = '' then raise exception 'Agama wajib diisi. Butir 1 SKU menyesuaikan agama peserta.'; end if;
-  if p_agama not in ('Islam','Katolik','Protestan','Hindu','Buddha','Khonghucu') then raise exception 'Agama tidak dikenal.'; end if;
+  -- Hanya rombel yang wajib. Sangga boleh kosong (dibagi Pembina/Bina Damping). Agama: kosong = tidak diubah (Penegak mengisinya sendiri; agama yang sudah ada tidak dapat dikosongkan).
+  if v_kelas = '' then raise exception 'Kelas (rombel) peserta wajib diisi.'; end if;
+  if coalesce(p_agama, '') <> '' and p_agama not in ('Islam','Katolik','Protestan','Hindu','Buddha','Khonghucu') then raise exception 'Agama tidak dikenal.'; end if;
   -- Kelas berupa rombel baku (X-01..XII-10). Nilai lama yang tidak diubah (mis. "X") dibiarkan agar data lain tetap dapat diubah;
   -- rapikan massal lewat sg_rombel_perbarui.
   if lower(v_kelas) = lower(coalesce(v_t.kelas, '')) then
@@ -38,9 +38,9 @@ begin
     v_kelas := sigarda.rombel_baku(v_kelas);
     if not sigarda.rombel_sah(v_kelas) then raise exception 'Kelas harus berupa rombel: X-01 sampai X-10, XI-01 sampai XI-10, atau XII-01 sampai XII-10.'; end if;
   end if;
-  v_sangga := coalesce((select sangga from public.profiles where role = 'peserta' and lower(sangga) = lower(v_sangga) limit 1), v_sangga);
+  if v_sangga <> '' then v_sangga := coalesce((select sangga from public.profiles where role = 'peserta' and lower(sangga) = lower(v_sangga) limit 1), v_sangga); end if;
 
-  update public.profiles set nama = v_nama, kelas = v_kelas, sangga = v_sangga, agama = p_agama where id = p_id;
+  update public.profiles set nama = v_nama, kelas = v_kelas, sangga = nullif(v_sangga, ''), agama = coalesce(nullif(p_agama, ''), agama) where id = p_id;
 
   if p_calon_garuda is true then
     if v_t.calon_garuda is null then

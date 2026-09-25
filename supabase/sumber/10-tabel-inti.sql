@@ -23,7 +23,8 @@ create table public.profiles (
   pin_direset_pada timestamptz,
   pin_diubah timestamptz,
   dibuat date not null default sigarda.hari_ini(),
-  constraint profil_peserta check (role <> 'peserta' or (nis is not null and kelas is not null and sangga is not null and agama is not null and jabatan is null)),
+  -- Penegak: hanya NIS dan rombel yang wajib sejak akun dibuat; sangga (dibagi Pembina/Bina Damping) dan agama (diisi Penegak sendiri, dijaga pemicu tolak_peserta_tak_aktif: tanpa agama tidak ada progres SKU) boleh kosong.
+  constraint profil_peserta check (role <> 'peserta' or (nis is not null and kelas is not null and jabatan is null)),
   constraint profil_penguji check (role <> 'penguji' or jabatan in ('Dewan Ambalan','Pembina')),
   constraint profil_admin check (role <> 'admin' or jabatan = 'Admin Gudep'),
   constraint profil_nta check (nta is null or nta ~ '^[0-9A-Za-z./ -]{1,40}$'),
