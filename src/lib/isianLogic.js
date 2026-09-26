@@ -97,6 +97,9 @@ export const POKOK = [
   { id: 'ortu', label: 'Nama ayah, ibu, atau wali' },
 ];
 
+/** Label isian pokok menurut kodenya (kode sama dengan yang dikembalikan sg_pemeriksaan_data pada dataDiriBelum). */
+export const labelPokok = (kode) => POKOK.find((p) => p.id === kode)?.label ?? kode;
+
 /**
  * Isian pokok yang belum lengkap: [label]. `akun` = { whatsapp, jenisKelamin, agama }, `isian` = { kunci: nilai }, `lahir` = 'YYYY-MM-DD' atau null.
  */

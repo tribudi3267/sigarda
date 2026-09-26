@@ -17,8 +17,8 @@ const P = process.cwd().replace(/\\/g, '/');
 
 console.log('--- pemeriksaanLogic.js (murni) ---');
 {
-  ok(KATEGORI_PEMERIKSAAN.length === 10, `10 kategori terdaftar (7 data + 3 pra-uji Fase E: ${KATEGORI_PEMERIKSAAN.length})`);
-  ok(new Set(KATEGORI_PEMERIKSAAN.map((k) => k.kunci)).size === 10, 'kunci kategori unik');
+  ok(KATEGORI_PEMERIKSAAN.length === 11, `11 kategori terdaftar (8 data termasuk data diri + 3 pra-uji Fase E: ${KATEGORI_PEMERIKSAAN.length})`);
+  ok(new Set(KATEGORI_PEMERIKSAAN.map((k) => k.kunci)).size === 11, 'kunci kategori unik');
   const admin = { role: 'admin' };
   const pembina = { role: 'penguji', jabatan: 'Pembina' };
   const dewan = { role: 'penguji', jabatan: 'Dewan Ambalan' };
@@ -76,7 +76,7 @@ console.log('\n--- sg_pemeriksaan_data (server, PGlite + data contoh) ---');
   ok(!rPeserta.ok && /Hanya pengurus/.test(rPeserta.pesan), 'Penegak biasa DITOLAK memanggil sg_pemeriksaan_data');
 
   const d = rAdmin.data;
-  ok(Object.keys(d).sort().join(',') === ['belumPernahMasuk', 'kelasLama', 'pembinaTanpaAgama', 'praUjiAktif', 'praUjiMacet', 'rombelTanpaBinaDamping', 'rombelTanpaPenguji', 'sanggaTanpaPinsa', 'tanpaJk', 'tanpaNta'].sort().join(','), 'hasil memuat 6 kategori data + 3 daftar pra-uji + praUjiAktif (tanpaPerangkat terpisah lewat sg_push_ringkasan)');
+  ok(Object.keys(d).sort().join(',') === ['belumPernahMasuk', 'dataDiriBelum', 'kelasLama', 'pembinaTanpaAgama', 'praUjiAktif', 'praUjiMacet', 'rombelTanpaBinaDamping', 'rombelTanpaPenguji', 'sanggaTanpaPinsa', 'tanpaJk', 'tanpaNta'].sort().join(','), 'hasil memuat 7 kategori data (termasuk dataDiriBelum) + 3 daftar pra-uji + praUjiAktif (tanpaPerangkat terpisah lewat sg_push_ringkasan)');
 
   ok(d.kelasLama.some((x) => x.id === p10231 && x.kelas === 'X'), `kelasLama memuat akun berkelas format lama: ${JSON.stringify(d.kelasLama.find((x) => x.id === p10231))}`);
   ok(!d.kelasLama.some((x) => x.kelas && /^(X|XI|XII)-(0[1-9]|10)$/.test(x.kelas)), 'kelasLama TIDAK memuat akun berkelas rombel baku');

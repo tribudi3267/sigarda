@@ -1,5 +1,5 @@
-// Migrasi salinan beku portofolio (Tahap 3, H3): kesetaraan dengan skema baru (fungsi, tabel, indeks, kebijakan, hak), data utuh, idempoten, perilaku baru, dan gagal jelas bila
-// prasyarat (migrasi isian-penegak) belum ada.
+// Migrasi Pemeriksaan Data untuk data diri (Tahap 3, H1 lanjutan): kesetaraan dengan skema baru (fungsi dan hak), data utuh, idempoten, perilaku baru, dan gagal jelas bila
+// prasyarat (migrasi snapshot-portofolio) belum ada.
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import { skemaLama } from '../scripts/skema-lama.mjs';
@@ -13,7 +13,7 @@ let g = 0, l = 0;
 const ok = (c, m) => { if (c) { l++; console.log('ok   :', m); } else { g++; console.log('GAGAL:', m); } };
 const stub = readFileSync(`${P}/supabase/lokal/stub.sql`, 'utf8');
 const bersih = (s) => s.replace(/^﻿/, '').replace(/\r\n/g, '\n');
-const MP = bersih(readFileSync(`${P}/supabase/migrasi/2026-09-snapshot-portofolio.sql`, 'utf8'));
+const MP = bersih(readFileSync(`${P}/supabase/migrasi/2026-09-periksa-data-diri.sql`, 'utf8'));
 
 const skemaDari = (ref) => (ref.startsWith('git:') ? skemaLama(ref.slice(4), P) : readFileSync(ref, 'utf8'));
 const baru = async (skemaFile) => { const db = new PGlite(); await siapkanPg(db, { sqlStub: stub, sqlSkema: bersih(skemaDari(skemaFile)) }); return db; };
@@ -41,20 +41,20 @@ const potret = async (db) => {
   };
 };
 
-const A = await baru('git:dd64739'); // skema tepat sesudah migrasi ini (main sesudah PR #29); skema.sql terbaru memuat tahap sesudahnya
+const A = await baru('supabase/skema.sql'); // migrasi ini yang paling baru: skema.sql terbaru = keadaan sesudahnya // skema baru terbaru = sesudah migrasi ini
 const pa = await potret(A);
 
 console.log('--- Database berisi data: kesetaraan, data utuh, idempoten ---');
-const B1 = await baru('git:56caa88'); // commit TEPAT sebelum migrasi ini (main sesudah PR #27, isian-penegak)
+const B1 = await baru('git:dd64739'); // commit TEPAT sebelum migrasi ini (main sesudah PR #29)
 await isiDataContoh(B1);
 await B1.query('update public.profiles set wajib_ganti_pin = false');
 const sebelum = await cacah(B1);
 const md5Fungsi = async (db, nama) => (await db.query(`select md5(p.prosrc) m from pg_proc p where p.proname = $1`, [nama])).rows[0].m;
-ok((await B1.query(`select to_regclass('public.portofolio_snapshot') as t`)).rows[0].t === null, 'prasyarat: skema lama belum punya tabel portofolio_snapshot');
-const lama = { cad: await md5Fungsi(B1, 'sg_cadangan_admin') };
+ok((await B1.query(`select prosrc like '%dataDiriBelum%' as t from pg_proc where proname = 'sg_pemeriksaan_data'`)).rows[0].t === false, 'prasyarat: sg_pemeriksaan_data lama belum memuat dataDiriBelum');
+const lama = { pem: await md5Fungsi(B1, 'sg_pemeriksaan_data') };
 await B1.exec(MP);
 ok(JSON.stringify(await cacah(B1)) === JSON.stringify(sebelum), 'jumlah data tidak berubah oleh migrasi: ' + JSON.stringify(sebelum));
-for (const [k, fn] of [['cad', 'sg_cadangan_admin']]) {
+for (const [k, fn] of [['pem', 'sg_pemeriksaan_data']]) {
   ok(await md5Fungsi(B1, fn) !== lama[k], `${fn} ditulis ulang oleh migrasi`);
 }
 await B1.exec(MP); await B1.exec(MP);
@@ -72,30 +72,26 @@ for (const k of Object.keys(pa)) {
 console.log('\n--- Sesudah migrasi: perilaku baru ---');
 {
   const masuk = async (username, pin) => { const k = buatKlienFake(B1); const a = buatApi(k); const r = await a.masuk(username, pin); return { k, a, id: r.id }; };
-  const admin = await masuk('admin', PIN_DEMO.admin);
   const pembina = await masuk('pembina', PIN_DEMO.pembina);
   const ahmad = await masuk('10231', PIN_DEMO.penegak);
-  const isi = { versi: 'kwarcab-2026', hari: '2026-09-26', peserta: { id: ahmad.id, nama: 'Ahmad' }, gudep: { nama: 'Gudep Uji' } };
-  let r = await pembina.a.simpanSnapshot(ahmad.id, 'Diserahkan ke Kwarcab', isi);
-  ok(r.ok, 'Pembina membuat salinan beku sesudah migrasi ' + (r.pesan ?? ''));
-  r = await ahmad.a.simpanSnapshot(ahmad.id, '', isi);
-  ok(!r.ok && /Hanya Pembina dan Admin/.test(r.pesan), 'Penegak ditolak membuat salinan beku');
-  r = await pembina.a.muatSnapshot(ahmad.id);
-  ok(r.ok && r.data.length === 1 && r.data[0].isi.gudep.nama === 'Gudep Uji' && r.data[0].catatan === 'Diserahkan ke Kwarcab', 'Pembina membaca salinan beku');
-  r = await ahmad.a.muatSnapshot(ahmad.id);
-  ok(r.ok && r.data.length === 0, 'Penegak tidak membaca salinan beku');
-  r = await admin.k.rpc('sg_cadangan_admin');
-  ok(!r.error && Array.isArray(r.data.tabel.portofolio_snapshot) && r.data.tabel.portofolio_snapshot.length === 1 && Array.isArray(r.data.tabel.penegak_isian) && Array.isArray(r.data.tabel.tim_penilai), 'cadangan data memuat tabel baru tanpa kehilangan tabel lama');
-  r = await pembina.a.hapusSnapshot(r.data ? (await pembina.a.muatSnapshot(ahmad.id)).data[0].id : 0);
-  ok(r.ok, 'Pembina menghapus salinan beku');
+  let r = await pembina.a.muatPemeriksaanData();
+  ok(r.ok && Array.isArray(r.data.dataDiriBelum) && r.data.dataDiriBelum.some((x) => x.id === ahmad.id && x.kurang.length >= 4), 'Pemeriksaan Data memuat dataDiriBelum sesudah migrasi ' + (r.pesan ?? ''));
+  ok(r.ok && ['kelasLama', 'tanpaNta', 'tanpaJk', 'pembinaTanpaAgama', 'belumPernahMasuk', 'praUjiAktif'].every((k) => k in r.data), 'kategori lama tetap ada');
+  r = await ahmad.a.simpanIsianSaya({ tempat_lahir: 'Purbalingga', alamat: 'Jl. A', ayah_nama: 'Slamet', lahir: '2009-03-15' });
+  ok(r.ok, 'Penegak mengisi sebagian data dirinya ' + (r.pesan ?? ''));
+  r = await pembina.a.muatPemeriksaanData();
+  const baris = r.data.dataDiriBelum.find((x) => x.id === ahmad.id);
+  ok(r.ok && baris && !baris.kurang.includes('alamat') && !baris.kurang.includes('tempat_lahir') && !baris.kurang.includes('ortu') && !baris.kurang.includes('lahir') && !JSON.stringify(r.data).includes('Jl. A'), 'isian yang sudah diisi tidak lagi kurang dan nilainya tidak ikut terkirim');
+  r = await ahmad.a.muatPemeriksaanData();
+  ok(!r.ok && /Hanya pengurus/.test(r.pesan), 'Penegak tetap tidak dapat melihat pemeriksaan data');
 }
 
 console.log('\n--- Tanpa migrasi sebelumnya: gagal jelas ---');
-const B3 = await baru('git:fe86d84'); // sebelum isian-penegak (tanpa tabel penegak_isian)
+const B3 = await baru('git:56caa88'); // sebelum snapshot-portofolio (tanpa tabel portofolio_snapshot)
 let galat = null;
 try { await B3.exec(MP); } catch (e) { galat = e.message; await B3.exec('rollback'); }
 ok(/Jalankan lebih dulu skema dan migrasi/.test(galat ?? ''), 'pesan yang menuntun: ' + (galat ?? 'TIDAK GAGAL').slice(0, 100));
 ok((await B3.query(`select to_regclass('public.portofolio_snapshot') as t`)).rows[0].t === null, 'kegagalan membatalkan seluruh migrasi (tabel tidak dibuat)');
 
-console.log(`\nRINGKASAN MIGRASI SNAPSHOT-PORTOFOLIO: ${l} lulus, ${g} GAGAL`);
+console.log(`\nRINGKASAN MIGRASI PERIKSA-DATA-DIRI: ${l} lulus, ${g} GAGAL`);
 process.exit(g ? 1 : 0);
