@@ -16,4 +16,4 @@ export const SURAT_GURU = [
 ];
 export const INDEKS_SURAT = Object.fromEntries(SURAT_GURU.map((s) => [s.id, s]));
 export const PITA_BAWAAN = ['Cukup', 'Baik', 'Sangat Baik'];
-export const JUMLAH_BARIS_KOSONG = 5;
+export const JUMLAH_BARIS_KOSONG = 7; // sama dengan lembar Kwarcab (tujuh baris bernomor untuk diisi guru)
