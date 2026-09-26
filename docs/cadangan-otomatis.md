@@ -3,6 +3,11 @@
 Tiap **Sabtu pukul 05.00 WIB** GitHub membaca seluruh data SIGARDA (termasuk akun login), mengenkripsinya, dan menyimpannya ke satu folder Google Drive
 akun sekolah Anda. Yang tersimpan 13 cadangan terbaru (sekitar 3 bulan). Anda tidak perlu melakukan apa pun tiap minggu.
 
+> **STATUS SAAT INI: jadwal DINONAKTIFKAN (sejak 27 September 2026).** Workflow "Cadangan mingguan" sengaja dimatikan lewat pengaturan GitHub
+> (bukan lewat kode) sampai Langkah 1 sampai 4 di bawah selesai dipasang, supaya tidak gagal tiap Sabtu dan mengirim email kegagalan. Sampai diaktifkan lagi,
+> **tidak ada cadangan otomatis**; cadangan manual (tombol Unduh cadangan di Data Gudep, dan `Cadangkan-SIGARDA.bat`) tetap satu-satunya pengaman.
+> Setelah Langkah 4 selesai, **aktifkan lagi** (Langkah 5, nomor 1). Status ini tidak terlihat di kode, jadi jangan sampai terlupa.
+
 ```
 GitHub Actions (Sabtu 05.00 WIB)
   1. sambung ke database dengan peran BACA-SAJA
@@ -77,7 +82,11 @@ Buka repositori di GitHub > **Settings > Secrets and variables > Actions > New r
 Rahasia GitHub tidak dapat dibaca lagi setelah disimpan (hanya bisa diganti), dan otomatis disamarkan pada log.
 
 ## Langkah 5. Uji sekarang (jangan menunggu Sabtu)
-1. GitHub > tab **Actions** > **Cadangan mingguan** > **Run workflow**.
+1. **Aktifkan workflow lebih dulu** (sekarang dinonaktifkan): GitHub > tab **Actions** > **Cadangan mingguan** > **Enable workflow**; atau di komputer dengan `gh`:
+   ```bash
+   gh workflow enable "Cadangan mingguan"
+   ```
+   Lalu jalankan: **Run workflow**.
 2. Tunggu 1-3 menit sampai hijau. Lihat lognya: hanya daftar tabel dan jumlah baris, lalu "cocok di Drive".
 3. Buka folder Drive: harus ada `sigarda-cadangan-TAHUN-BULAN-TANGGAL.sql.gz.enc`.
 4. **Uji membukanya** (ini yang membuktikan cadangan berguna): unduh berkas itu, lalu di komputer dengan Node:
