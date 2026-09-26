@@ -194,8 +194,11 @@ begin
     v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', null, 'teks', format('Bina Damping rombel ini baru %s dari 2 orang.', v_bd)));
   end if;
   for v_r in
-    select min(sangga) as nama, count(*)::int as n, bool_or(pinsa) as ada_pinsa from public.profiles
-    where role = 'peserta' and status = 'aktif' and kelas = p_rombel and btrim(coalesce(sangga, '')) <> '' group by lower(sangga) order by lower(sangga)
+    -- Pinsa sebuah sangga: anggota sangga itu berstatus Pinsa, atau Penegak yang ditugaskan (pinsa_tugas) ke sangga ini.
+    select g.nama, g.n, (g.ada_pinsa or exists (select 1 from public.pinsa_tugas t where t.tahun_ajaran = sigarda.tahun_ajaran_kini() and t.rombel = p_rombel and lower(t.sangga) = g.kunci)) as ada_pinsa
+    from (select lower(sangga) as kunci, min(sangga) as nama, count(*)::int as n, bool_or(pinsa) as ada_pinsa from public.profiles
+          where role = 'peserta' and status = 'aktif' and kelas = p_rombel and btrim(coalesce(sangga, '')) <> '' group by lower(sangga)) g
+    order by g.kunci
   loop
     v_sangga := v_sangga + 1;
     if v_r.n < 4 or v_r.n > 8 then
@@ -238,6 +241,18 @@ end $$;
 create trigger profiles_bina_damping_bersih after update of status, jabatan_dewan, role on public.profiles for each row
   when (new.status <> 'aktif' or new.jabatan_dewan is null or new.role <> 'peserta') execute function sigarda.bina_damping_bersihkan();
 -- ---- akhir bantu pinsa bina damping ----
+
+-- ---- Pinsa tertugas lintas rombel: fungsi bantu ----
+-- Penugasan Pinsa berakhir bila Penegaknya nonaktif/alumni (jalur apa pun yang mengubah status atau peran).
+create function sigarda.pinsa_tugas_bersihkan() returns trigger language plpgsql security definer set search_path = public as
+$$
+begin
+  delete from public.pinsa_tugas where penegak_id = new.id;
+  return null;
+end $$;
+create trigger profiles_pinsa_tugas_bersih after update of status, role on public.profiles for each row
+  when (new.status <> 'aktif' or new.role <> 'peserta') execute function sigarda.pinsa_tugas_bersihkan();
+-- ---- akhir bantu pinsa tertugas ----
 
 -- ---- Dokumen terbit: fungsi bantu (dicerminkan src/lib/dokumenLogic.js suratAgamaAktif; dijaga oleh pengujian) ----
 -- Ada surat pengantar agama yang belum dicabut untuk Penegak ini dan memuat butir (unit) itu?

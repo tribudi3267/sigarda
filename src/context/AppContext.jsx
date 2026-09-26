@@ -1182,6 +1182,32 @@ export function AppProvider({ children }) {
     if (r.data?.diubah > 0) notify('Susunan sangga disimpan.');
     return r;
   };
+  /** Pinsa tertugas lintas rombel (Bina Damping rombel itu, Pembina, Admin): daftar calon, menugaskan ke sebuah sangga, mencabut. */
+  const calonPinsa = useCallback(async (rombel) => {
+    const r = await api().calonPinsa(rombel);
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  }, [sesiBerakhir]);
+  const tugaskanPinsa = async (rombel, sangga, pesertaId) => {
+    const r = await api().tugaskanPinsa(rombel, sangga, pesertaId);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    await segarkan.pendampingan();
+    notify('Pinsa ditugaskan.');
+    return r;
+  };
+  const cabutPinsa = async (rombel, pesertaId) => {
+    const r = await api().cabutPinsa(rombel, pesertaId);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    await segarkan.pendampingan();
+    notify('Penugasan Pinsa dicabut.');
+    return r;
+  };
 
   /** Riwayat kenaikan kelas dan perubahan status (pengurus): { batch, log }. */
   const muatNaikKelas = async () => {
@@ -1347,7 +1373,7 @@ export function AppProvider({ children }) {
     dokumen: db.dokumen, muatDokumen, terbitkanSuratAgama, cabutDokumen, bolehSurat,
     penugasan: db.penugasan, penugasanPeserta: db.penugasanPeserta, guruAgama: db.guruAgama, muatPenugasan, muatLogPenugasan, aturPenugasan, aturPenugasanPeserta, salinPenugasan, simpanGuruAgama, hapusGuruAgama, bolehAturPenugasan,
     praUjiAktif, pastikanPraUji, praUjiPeserta, muatAntrianPraUji, muatPraUjiMenunggu, catatPraUji, lewatiPraUji, aturSakelarPraUji,
-    pendampingan, muatBinaDamping, aturBinaDamping, muatSanggaRombel, aturSangga,
+    pendampingan, muatBinaDamping, aturBinaDamping, muatSanggaRombel, aturSangga, calonPinsa, tugaskanPinsa, cabutPinsa,
     bolehKepengurusan, terapkanKepengurusan, aturJabatanDewan, arsipkanDewanLama, muatLogKepengurusan, muatPengukuhanDewan, simpanPengukuhanDewan, hapusPengukuhanDewan,
     muatUlang: muatSemua,
     notifikasi: db.notifikasi, belumDibaca: jumlahBelumDibaca(db.notifikasi), segarkanNotifikasi, tandaiNotifikasi, api,
