@@ -11,7 +11,7 @@ import TombolWhatsapp from '../components/TombolWhatsapp';
 import { Icon } from '../components/ui';
 
 /** Satu kategori: judul, keterangan, jumlah, tombol "Perbaiki" (bila peran ini bisa), dan daftar yang dapat dibuka/tutup. */
-function Kategori({ kategori, daftar, tab, onNav, render }) {
+function Kategori({ kategori, daftar, jumlah = daftar.length, tab, onNav, render }) {
   const [buka, setBuka] = useState(false);
   const kosong = daftar.length === 0;
   return (
@@ -21,7 +21,7 @@ function Kategori({ kategori, daftar, tab, onNav, render }) {
           <Icon nama={kosong ? 'cek' : 'jam'} className={`mt-0.5 h-4 w-4 shrink-0 ${kosong ? 'text-emerald-600' : 'text-amber-600'}`} />
           <div>
             <h2 className="font-semibold text-pramuka-900">{kategori.judul}</h2>
-            <p className="mt-0.5 text-sm text-pramuka-700">{kosong ? 'Tidak ada masalah.' : `${daftar.length} ditemukan.`}</p>
+            <p className="mt-0.5 text-sm text-pramuka-700">{kosong ? 'Tidak ada masalah.' : `${jumlah} ditemukan.`}{jumlah > daftar.length && ` Daftar menampilkan ${daftar.length} yang pertama.`}</p>
           </div>
         </div>
         {!kosong && tab && (
@@ -36,7 +36,7 @@ function Kategori({ kategori, daftar, tab, onNav, render }) {
             aria-expanded={buka}
             onClick={() => setBuka(!buka)}
           >
-            {buka ? 'Sembunyikan daftar' : `Lihat ${daftar.length === 1 ? '1 baris' : `${daftar.length} baris`}`}
+            {buka ? 'Sembunyikan daftar' : `Lihat ${daftar.length === 1 ? '1 baris' : `${daftar.length} baris`}${jumlah > daftar.length ? ` (dari ${jumlah})` : ''}`}
           </button>
           {buka && (
             <ul className="mt-2 max-h-64 divide-y divide-pramuka-100 overflow-y-auto rounded-lg border border-pramuka-100 text-sm">
@@ -131,7 +131,7 @@ export default function PemeriksaanData({ onNav }) {
       {hasil && (
         <div className="grid gap-3 md:grid-cols-2">
           {kategoriTampil(hasil).filter((k) => k.kunci !== 'tanpaPerangkat').map((k) => (
-            <Kategori key={k.kunci} kategori={k} daftar={hasil[k.kunci] ?? []} tab={tabPerbaikan(k, user)} onNav={onNav} render={render[k.kunci]} />
+            <Kategori key={k.kunci} kategori={k} daftar={hasil[k.kunci] ?? []} jumlah={jumlahKategori(hasil, k.kunci)} tab={tabPerbaikan(k, user)} onNav={onNav} render={render[k.kunci]} />
           ))}
           <div className="md:col-span-2">
             <RingkasanPerangkat />

@@ -1301,7 +1301,7 @@ h_fungsi(skema, nama, args, isi, au, an, sv) as (values
     ('public', 'sg_notifikasi_tes', '', '9cf97c96da7bb16825c10586d54befb5', true, false, true),
     ('public', 'sg_pelantikan_catat', 'p_tingkat text, p_tanggal date, p_tempat text, p_peserta_ids uuid[], p_agenda_id bigint, p_catatan text', 'b4f1d03d9acc789ab01597533f668e07', true, false, true),
     ('public', 'sg_pelantikan_hapus', 'p_id bigint', 'bdff44fa55d3ffefc36ca96530fc1fbb', true, false, true),
-    ('public', 'sg_pemeriksaan_data', '', '24487921b2e8f534f583122929721d78', true, false, true),
+    ('public', 'sg_pemeriksaan_data', '', '46b5b8239b87fd0b9b0a4715850f7d7b', true, false, true),
     ('public', 'sg_pendampingan_saya', '', '3f87bc66b0b53a6ff237e2ffcdbf1d8b', true, false, true),
     ('public', 'sg_pengaturan_simpan', 'p_kunci text, p_nilai jsonb', '86557f0c05a5fc4383ee782d2dc98730', true, false, true),
     ('public', 'sg_penguji_pilihan', 'p_sku_id text, p_peserta_id uuid', '29f88a695abd9c37b6c072d92ea79c15', true, false, true),

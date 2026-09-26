@@ -4917,11 +4917,11 @@ end $$;
 create function public.sg_pemeriksaan_data() returns jsonb
 language plpgsql stable security definer set search_path = public as
 $$
-declare v_ta text := sigarda.tahun_ajaran_kini();
+declare v_ta text := sigarda.tahun_ajaran_kini(); v_hasil jsonb;
 begin
   perform sigarda.wajib_aktif();
   if not sigarda.pengurus() then raise exception 'Hanya pengurus (Pembina, Dewan Ambalan, dan Admin Gudep) yang dapat melihat pemeriksaan data.'; end if;
-  return jsonb_build_object(
+  v_hasil := jsonb_build_object(
     'praUjiAktif', sigarda.pra_uji_aktif(),
     'kelasLama', coalesce((
       select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'nis', x.nis, 'kelas', x.kelas) order by x.nis)
@@ -5024,6 +5024,25 @@ begin
       ) x
     ), '[]'::jsonb)
   );
+  -- Jumlah SEBENARNYA untuk daftar yang bisa lebih dari 300 baris (700 Penegak: hari peluncuran data diri dan NTA belum terisi): dihitung hanya bila daftarnya penuh, jadi
+  -- biasanya tanpa biaya tambahan. Klien menampilkan "300 dari N" (pemeriksaanLogic.jumlahKategori).
+  return v_hasil || jsonb_build_object('jumlahSebenarnya', jsonb_build_object(
+    'kelasLama', case when jsonb_array_length(v_hasil -> 'kelasLama') < 300 then jsonb_array_length(v_hasil -> 'kelasLama')
+      else (select count(*) from public.profiles where role = 'peserta' and status = 'aktif' and not sigarda.rombel_sah(kelas)) end,
+    'tanpaNta', case when jsonb_array_length(v_hasil -> 'tanpaNta') < 300 then jsonb_array_length(v_hasil -> 'tanpaNta')
+      else (select count(*) from public.profiles where role = 'peserta' and status = 'aktif' and (nta is null or btrim(nta) = '')) end,
+    'tanpaJk', case when jsonb_array_length(v_hasil -> 'tanpaJk') < 300 then jsonb_array_length(v_hasil -> 'tanpaJk')
+      else (select count(*) from public.profiles where status = 'aktif' and jenis_kelamin is null) end,
+    'dataDiriBelum', case when jsonb_array_length(v_hasil -> 'dataDiriBelum') < 300 then jsonb_array_length(v_hasil -> 'dataDiriBelum')
+      else (select count(*) from public.profiles p where p.role = 'peserta' and p.status = 'aktif' and (
+        p.whatsapp is null or btrim(p.whatsapp) = '' or p.jenis_kelamin is null or p.agama is null
+        or not exists (select 1 from public.tanggal_lahir t where t.peserta_id = p.id)
+        or not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci = 'tempat_lahir')
+        or not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci = 'alamat')
+        or not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci in ('ayah_nama', 'ibu_nama', 'wali_nama')))) end,
+    'belumPernahMasuk', case when jsonb_array_length(v_hasil -> 'belumPernahMasuk') < 300 then jsonb_array_length(v_hasil -> 'belumPernahMasuk')
+      else (select count(*) from public.profiles p join auth.users u on u.id = p.id where p.status = 'aktif' and u.last_sign_in_at is null) end
+  ));
 end $$;
 -- ===== akhir fungsi pemeriksaan data =====
 

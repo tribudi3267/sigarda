@@ -1,9 +1,9 @@
-// Migrasi Perlindungan anggota / Safe From Harm (Tahap 4): kesetaraan dengan skema baru (tabel, kebijakan, fungsi, hak), data utuh, idempoten, perilaku baru, dan gagal jelas bila
-// prasyarat (migrasi periksa-data-diri) belum ada.
+// Migrasi Pemeriksaan Data: jumlah sebenarnya (simulasi beban 26 September 2026): kesetaraan dengan skema baru (fungsi dan hak), data utuh, idempoten, perilaku baru, dan gagal
+// jelas bila prasyarat (migrasi perlindungan-anggota) belum ada.
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import { skemaLama } from '../scripts/skema-lama.mjs';
-import { siapkanPg, buatKlienFake, sqlSebagai } from '../src/lokal/klienFake.js';
+import { siapkanPg, buatKlienFake } from '../src/lokal/klienFake.js';
 import { isiDataContoh } from '../src/lokal/seedLokal.js';
 import { PIN_DEMO } from '../src/lokal/pinDemo.js';
 import { buatApi } from '../src/lib/api.js';
@@ -13,7 +13,7 @@ let g = 0, l = 0;
 const ok = (c, m) => { if (c) { l++; console.log('ok   :', m); } else { g++; console.log('GAGAL:', m); } };
 const stub = readFileSync(`${P}/supabase/lokal/stub.sql`, 'utf8');
 const bersih = (s) => s.replace(/^﻿/, '').replace(/\r\n/g, '\n');
-const MP = bersih(readFileSync(`${P}/supabase/migrasi/2026-09-perlindungan-anggota.sql`, 'utf8'));
+const MP = bersih(readFileSync(`${P}/supabase/migrasi/2026-09-pemeriksaan-jumlah.sql`, 'utf8'));
 
 const skemaDari = (ref) => (ref.startsWith('git:') ? skemaLama(ref.slice(4), P) : readFileSync(ref, 'utf8'));
 const baru = async (skemaFile) => { const db = new PGlite(); await siapkanPg(db, { sqlStub: stub, sqlSkema: bersih(skemaDari(skemaFile)) }); return db; };
@@ -41,20 +41,20 @@ const potret = async (db) => {
   };
 };
 
-const A = await baru('git:e385571'); // skema tepat sesudah migrasi ini; migrasi berikutnya (pemeriksaan-jumlah) menulis ulang sg_pemeriksaan_data
+const A = await baru('supabase/skema.sql'); // migrasi ini yang paling baru: skema.sql terbaru = keadaan sesudahnya
 const pa = await potret(A);
 
 console.log('--- Database berisi data: kesetaraan, data utuh, idempoten ---');
-const B1 = await baru('git:40c98fe'); // commit TEPAT sebelum migrasi ini (main sesudah PR #30)
+const B1 = await baru('git:e385571'); // commit TEPAT sebelum migrasi ini (cabang tahap 4, sesudah migrasi perlindungan-anggota)
 await isiDataContoh(B1);
 await B1.query('update public.profiles set wajib_ganti_pin = false');
 const sebelum = await cacah(B1);
 const md5Fungsi = async (db, nama) => (await db.query(`select md5(p.prosrc) m from pg_proc p where p.proname = $1`, [nama])).rows[0].m;
-ok((await B1.query(`select to_regclass('public.sfh_catatan') as t`)).rows[0].t === null, 'prasyarat: tabel sfh_catatan belum ada');
-const lama = { pem: await md5Fungsi(B1, 'sg_pemeriksaan_data'), cad: await md5Fungsi(B1, 'sg_cadangan_admin') };
+ok((await B1.query(`select prosrc like '%jumlahSebenarnya%' as t from pg_proc where proname = 'sg_pemeriksaan_data'`)).rows[0].t === false, 'prasyarat: sg_pemeriksaan_data lama belum memuat jumlahSebenarnya');
+const lama = { pem: await md5Fungsi(B1, 'sg_pemeriksaan_data') };
 await B1.exec(MP);
 ok(JSON.stringify(await cacah(B1)) === JSON.stringify(sebelum), 'jumlah data tidak berubah oleh migrasi: ' + JSON.stringify(sebelum));
-for (const [k, fn] of [['pem', 'sg_pemeriksaan_data'], ['cad', 'sg_cadangan_admin']]) {
+for (const [k, fn] of [['pem', 'sg_pemeriksaan_data']]) {
   ok(await md5Fungsi(B1, fn) !== lama[k], `${fn} ditulis ulang oleh migrasi`);
 }
 await B1.exec(MP); await B1.exec(MP);
@@ -73,33 +73,26 @@ console.log('\n--- Sesudah migrasi: perilaku baru ---');
 {
   const masuk = async (username, pin) => { const k = buatKlienFake(B1); const a = buatApi(k); const r = await a.masuk(username, pin); return { k, a, id: r.id }; };
   const pembina = await masuk('pembina', PIN_DEMO.pembina);
-  const admin = await masuk('admin', PIN_DEMO.admin);
   const ahmad = await masuk('10231', PIN_DEMO.penegak);
   let r = await pembina.a.muatPemeriksaanData();
-  ok(r.ok && Array.isArray(r.data.sfhBelum) && r.data.sfhBelum.some((x) => x.id === pembina.id && x.kurang.length === 3) && r.data.sfhBelum.some((x) => x.id === admin.id && x.kurang.join() === 'pelatihan'), 'Pemeriksaan Data memuat sfhBelum sesudah migrasi ' + (r.pesan ?? ''));
-  ok(r.ok && ['kelasLama', 'tanpaNta', 'tanpaJk', 'pembinaTanpaAgama', 'belumPernahMasuk', 'praUjiAktif', 'dataDiriBelum'].every((k) => k in r.data), 'kategori lama tetap ada');
-  r = await pembina.a.simpanSfh({ anggotaId: pembina.id, jenis: 'pelatihan', tanggal: '2026-01-10', buktiUrl: 'https://x.id/a', catatan: 'Kwarcab' });
-  ok(r.ok, 'Pembina mencatat pelatihan ' + (r.pesan ?? ''));
-  r = await admin.a.muatSfh();
-  ok(r.ok && r.data.catatan.length === 1 && r.data.gudep === null, 'Admin membaca catatan lewat api().muatSfh');
-  r = await ahmad.a.muatSfh();
-  ok(r.ok && r.data.catatan.length === 0, 'Penegak tidak melihat catatan orang dewasa');
-  r = await ahmad.a.simpanSfh({ anggotaId: pembina.id, jenis: 'pelatihan', tanggal: '2026-01-10' });
-  ok(!r.ok && /Hanya Pembina dan Admin Gudep/.test(r.pesan), 'Penegak tidak dapat mencatat');
-  r = await admin.a.simpanGudepSfh({ penerima: 'Ka. Mabigus', kontak: '', prosedurUrl: '', catatan: '' });
-  ok(r.ok, 'Admin mengisi penerima laporan ' + (r.pesan ?? ''));
-  r = await admin.a.muatSfh();
-  ok(r.ok && r.data.gudep?.penerima === 'Ka. Mabigus', 'penerima laporan terbaca');
-  const c = (await sqlSebagai(B1, admin.id, 'select public.sg_cadangan_admin() as d')).rows[0].d;
-  ok(Array.isArray((c.data ?? c.tabel ?? c).sfh_catatan) && (c.data ?? c.tabel ?? c).sfh_catatan.length === 1, 'cadangan memuat sfh_catatan (batas argumen jsonb_build_object tidak terlampaui)');
+  ok(r.ok && r.data.jumlahSebenarnya && Object.keys(r.data.jumlahSebenarnya).sort().join() === 'belumPernahMasuk,dataDiriBelum,kelasLama,tanpaJk,tanpaNta', 'hasil memuat jumlahSebenarnya sesudah migrasi ' + (r.pesan ?? ''));
+  ok(r.ok && ['kelasLama', 'tanpaNta', 'tanpaJk', 'dataDiriBelum', 'belumPernahMasuk', 'sfhBelum', 'praUjiAktif'].every((k) => k in r.data), 'kategori lama tetap ada');
+  ok(r.ok && r.data.jumlahSebenarnya.tanpaNta === r.data.tanpaNta.length, 'di bawah 300: jumlah sebenarnya = jumlah baris');
+  await B1.exec("insert into auth.users (id, email, encrypted_password) select gen_random_uuid(), 'x' || g || '@x.invalid', '' from generate_series(1, 310) g");
+  await B1.exec("set session_replication_role = replica; insert into public.profiles (id, username, role, nama, nis, kelas, sangga, agama, jenis_kelamin, status, wajib_ganti_pin) select u.id, 'sim' || row_number() over (order by u.id), 'peserta', 'Sim ' || row_number() over (order by u.id), 'sim' || row_number() over (order by u.id), 'X-01', 'Elang', 'Islam', 'L', 'aktif', false from auth.users u where u.email like 'x%@x.invalid'; set session_replication_role = origin;");
+  r = await pembina.a.muatPemeriksaanData();
+  const nyata = Number((await B1.query("select count(*)::int n from public.profiles where role = 'peserta' and status = 'aktif' and (nta is null or btrim(nta) = '')")).rows[0].n);
+  ok(r.ok && nyata > 300 && r.data.tanpaNta.length === 300 && r.data.jumlahSebenarnya.tanpaNta === nyata, 'lebih dari 300: 300 baris dikirim, jumlah sebenarnya ' + r.data?.jumlahSebenarnya?.tanpaNta + ' = ' + nyata);
+  r = await ahmad.a.muatPemeriksaanData();
+  ok(!r.ok && /Hanya pengurus/.test(r.pesan), 'Penegak tetap tidak dapat melihat pemeriksaan data');
 }
 
 console.log('\n--- Tanpa migrasi sebelumnya: gagal jelas ---');
-const B3 = await baru('git:56caa88'); // sebelum snapshot-portofolio dan periksa-data-diri
+const B3 = await baru('git:40c98fe'); // sebelum perlindungan-anggota (tanpa kunci sfhBelum)
 let galat = null;
 try { await B3.exec(MP); } catch (e) { galat = e.message; await B3.exec('rollback'); }
 ok(/Jalankan lebih dulu skema dan migrasi/.test(galat ?? ''), 'pesan yang menuntun: ' + (galat ?? 'TIDAK GAGAL').slice(0, 100));
-ok((await B3.query(`select to_regclass('public.sfh_catatan') as t`)).rows[0].t === null, 'kegagalan membatalkan seluruh migrasi (tabel tidak dibuat)');
+ok((await B3.query(`select prosrc like '%jumlahSebenarnya%' as t from pg_proc where proname = 'sg_pemeriksaan_data'`)).rows[0].t === false, 'kegagalan membatalkan migrasi (fungsi tidak berubah)');
 
-console.log(`\nRINGKASAN MIGRASI PERLINDUNGAN-ANGGOTA: ${l} lulus, ${g} GAGAL`);
+console.log(`\nRINGKASAN MIGRASI PEMERIKSAAN-JUMLAH: ${l} lulus, ${g} GAGAL`);
 process.exit(g ? 1 : 0);

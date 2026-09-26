@@ -25,8 +25,16 @@ export const KATEGORI_PEMERIKSAAN = [
   { kunci: 'tanpaPerangkat', judul: 'Belum aktifkan notifikasi di HP', keterangan: 'Belum ada perangkat berlangganan notifikasi. Tidak dapat diperbaiki oleh Admin/Pembina: ingatkan pemiliknya lewat tombol WhatsApp pada daftar, agar membuka menu Notifikasi di HP-nya sendiri dan mengizinkan notifikasi.', tab: {} },
 ];
 
-/** Jumlah baris pada satu kategori (0 bila kosong atau kategori tidak dikenal). */
-export const jumlahKategori = (hasil, kunci) => (Array.isArray(hasil?.[kunci]) ? hasil[kunci].length : 0);
+/** Jumlah baris yang DIKIRIM untuk satu kategori (server memotong daftar di 300). */
+export const barisDikirim = (hasil, kunci) => (Array.isArray(hasil?.[kunci]) ? hasil[kunci].length : 0);
+
+/** Jumlah masalah pada satu kategori: jumlah sebenarnya dari server (hasil.jumlahSebenarnya, hanya untuk daftar yang terpotong) bila lebih besar dari baris yang dikirim; 0 bila kosong atau tidak dikenal. */
+export const jumlahKategori = (hasil, kunci) => {
+  if (!Array.isArray(hasil?.[kunci])) return 0;
+  const n = hasil[kunci].length;
+  const s = Number(hasil?.jumlahSebenarnya?.[kunci]);
+  return Number.isFinite(s) && s > n ? s : n;
+};
 
 /** Kategori yang ditampilkan: kategori pra-uji hanya bila pra-uji hidup (hasil.praUjiAktif). */
 export const kategoriTampil = (hasil) => KATEGORI_PEMERIKSAAN.filter((k) => !k.praUji || !!hasil?.praUjiAktif);

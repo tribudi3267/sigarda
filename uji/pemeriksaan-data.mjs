@@ -76,7 +76,7 @@ console.log('\n--- sg_pemeriksaan_data (server, PGlite + data contoh) ---');
   ok(!rPeserta.ok && /Hanya pengurus/.test(rPeserta.pesan), 'Penegak biasa DITOLAK memanggil sg_pemeriksaan_data');
 
   const d = rAdmin.data;
-  ok(Object.keys(d).sort().join(',') === ['belumPernahMasuk', 'dataDiriBelum', 'kelasLama', 'pembinaTanpaAgama', 'praUjiAktif', 'praUjiMacet', 'rombelTanpaBinaDamping', 'rombelTanpaPenguji', 'sanggaTanpaPinsa', 'sfhBelum', 'tanpaJk', 'tanpaNta'].sort().join(','), 'hasil memuat 8 kategori data (termasuk dataDiriBelum dan sfhBelum) + 3 daftar pra-uji + praUjiAktif (tanpaPerangkat terpisah lewat sg_push_ringkasan)');
+  ok(Object.keys(d).sort().join(',') === ['belumPernahMasuk', 'dataDiriBelum', 'jumlahSebenarnya', 'kelasLama', 'pembinaTanpaAgama', 'praUjiAktif', 'praUjiMacet', 'rombelTanpaBinaDamping', 'rombelTanpaPenguji', 'sanggaTanpaPinsa', 'sfhBelum', 'tanpaJk', 'tanpaNta'].sort().join(','), 'hasil memuat 8 kategori data (termasuk dataDiriBelum dan sfhBelum) + jumlahSebenarnya + 3 daftar pra-uji + praUjiAktif (tanpaPerangkat terpisah lewat sg_push_ringkasan)');
 
   ok(d.kelasLama.some((x) => x.id === p10231 && x.kelas === 'X'), `kelasLama memuat akun berkelas format lama: ${JSON.stringify(d.kelasLama.find((x) => x.id === p10231))}`);
   ok(!d.kelasLama.some((x) => x.kelas && /^(X|XI|XII)-(0[1-9]|10)$/.test(x.kelas)), 'kelasLama TIDAK memuat akun berkelas rombel baku');

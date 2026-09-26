@@ -34,7 +34,7 @@ gzip, 1,5 detik) sudah ada sebelum Tahap 3 dan sudah masuk model `npm run profil
 ## Temuan
 1. **Periode awal: angka "data diri belum lengkap" terpotong.** Pada hari peluncuran 684 Penegak belum mengisi, tetapi `sg_pemeriksaan_data()` hanya mengembalikan 300 baris per
    kategori, jadi layar menampilkan 300 (jumlah sebenarnya tidak terlihat). Sesudah lebih dari separuh mengisi, daftar menyusut di bawah 300 dan angkanya benar. Hal yang sama
-   berlaku untuk "Belum ada NTA" (300 dari sekitar 700). Perbaikan yang disarankan (belum dikerjakan; butuh migrasi): sertakan jumlah sebenarnya per kategori dan tulis "300 dari N".
+   berlaku untuk "Belum ada NTA" (300 dari sekitar 700). **Sudah diperbaiki** (migrasi `2026-09-pemeriksaan-jumlah.sql`): hasil memuat `jumlahSebenarnya` untuk lima daftar yang dapat terpotong, dan layar menulis "684 ditemukan. Daftar menampilkan 300 yang pertama."
 2. **Cadangan data adalah beban terbesar yang tumbuh sendiri.** Satu panggilan mengembalikan 32 MB JSON dalam 3,4 detik (PGlite). Pada Supabase, permintaan lewat API dibatasi waktu
    (bawaan sekitar 8 detik untuk peran `authenticated`), sehingga masih ada margin, tetapi `sku_riwayat` dan `sku_progress` bertambah tiap tahun. Pantau waktunya (`sg_cadangan_status`)
    dan siapkan `Cadangkan-SIGARDA.bat` sebagai cadangan penuh. Bila mendekati batas: pecah cadangan per kelompok tabel.
