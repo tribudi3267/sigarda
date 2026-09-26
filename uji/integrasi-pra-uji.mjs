@@ -21,7 +21,7 @@ const ok = (c, m) => { if (c) { lulus++; console.log('ok   :', m); } else { gaga
 console.log('--- Logika murni: kategori pra-uji di Periksa Data ---');
 {
   const baru = ['rombelTanpaBinaDamping', 'sanggaTanpaPinsa', 'praUjiMacet'];
-  ok(baru.every((k) => KATEGORI_PEMERIKSAAN.find((x) => x.kunci === k)?.praUji === true) && KATEGORI_PEMERIKSAAN.length === 11, '3 kategori pra-uji terdaftar dan bertanda praUji (11 kategori seluruhnya)');
+  ok(baru.every((k) => KATEGORI_PEMERIKSAAN.find((x) => x.kunci === k)?.praUji === true) && KATEGORI_PEMERIKSAAN.length === 12, '3 kategori pra-uji terdaftar dan bertanda praUji (12 kategori seluruhnya)');
   const hasil = { praUjiAktif: false, kelasLama: [{ id: 1 }], rombelTanpaBinaDamping: [{ rombel: 'X-01' }], praUjiMacet: [{ id: 5 }, { id: 6 }] };
   ok(!kategoriTampil(hasil).some((k) => k.praUji) && totalMasalah(hasil) === 1, 'pra-uji mati: kategori pra-uji tidak ditampilkan dan tidak dihitung');
   ok(kategoriTampil({ ...hasil, praUjiAktif: true }).filter((k) => k.praUji).length === 3 && totalMasalah({ ...hasil, praUjiAktif: true }) === 4, 'pra-uji hidup: kategori pra-uji ditampilkan dan dihitung');
@@ -145,7 +145,7 @@ console.log('\n--- Tampilan Periksa Data ---');
   // useEffect tidak berjalan pada render statis: periksa saja kerangka tanpa galat dan bahwa kategori pra-uji hanya ada di kategoriTampil
   const html = renderToStaticMarkup(h(KonteksApp.Provider, { value: konteks(data) }, h(PemeriksaanData, { onNav: () => {} })));
   ok(html.includes('Periksa Data'), 'halaman Periksa Data dirender tanpa galat');
-  ok(kategoriTampil({ praUjiAktif: false }).length === 8 && kategoriTampil({ praUjiAktif: true }).length === 11, 'daftar kategori: 8 saat pra-uji mati, 11 saat hidup');
+  ok(kategoriTampil({ praUjiAktif: false }).length === 9 && kategoriTampil({ praUjiAktif: true }).length === 12, 'daftar kategori: 9 saat pra-uji mati, 12 saat hidup');
 }
 
 console.log(`\nRINGKASAN INTEGRASI PRA-UJI: ${lulus} lulus, ${gagal} gagal`);

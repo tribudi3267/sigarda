@@ -133,7 +133,7 @@ export default function Spg() {
   const memuat = spg.memuat || pel.memuat || tkk.memuat;
   const galat = spg.galat || pel.galat || tkk.galat;
 
-  const hitung = (p) => hitungSpg({ peserta: p, progress, pelantikan: pel.pelantikan, saka: pel.saka, capaianTkk: tkk.capaian, ambang: tkk.ambang, portofolio, penetapan: spg.penetapan });
+  const hitung = (p) => hitungSpg({ peserta: p, progress, pelantikan: pel.pelantikan, saka: pel.saka, krida: tkk.krida, capaianTkk: tkk.capaian, ambang: tkk.ambang, portofolio, penetapan: spg.penetapan });
   const layak = useMemo(() => pesertaSpg(daftarPesertaSemua, progress), [daftarPesertaSemua, progress]);
   const daftar = useMemo(() => {
     const k = cari.trim().toLowerCase();

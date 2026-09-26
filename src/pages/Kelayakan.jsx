@@ -134,7 +134,7 @@ function PanelCalon({ tim, tahap, tahunAjaran }) {
       .map((u) => ({
         u,
         g: hitungGerbang({ peserta: u, tanggalLahir: tanggalLahirPeserta(gerbang.lahir, u.id), progress, aturan: gerbang.aturan }),
-        s: ringkasSpg(hitungSpg({ peserta: u, progress, pelantikan: pel.pelantikan, saka: pel.saka, capaianTkk: tkk.capaian, ambang: tkk.ambang, portofolio, penetapan: spg.penetapan })),
+        s: ringkasSpg(hitungSpg({ peserta: u, progress, pelantikan: pel.pelantikan, saka: pel.saka, krida: tkk.krida, capaianTkk: tkk.capaian, ambang: tkk.ambang, portofolio, penetapan: spg.penetapan })),
       }))
       .sort((a, b) => Number(!!b.u.calonGaruda) - Number(!!a.u.calonGaruda) || a.u.nama.localeCompare(b.u.nama, 'id'))
       .slice(0, 100);

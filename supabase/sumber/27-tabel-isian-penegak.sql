@@ -41,3 +41,21 @@ create table public.portofolio_snapshot (
 );
 create index portofolio_snapshot_peserta_idx on public.portofolio_snapshot (peserta_id, dibuat_pada desc);
 -- ===== akhir tabel salinan beku portofolio =====
+
+-- ===== Perlindungan anggota / Safe From Harm (Tahap 4): tabel =====
+-- Catatan kewajiban Safe From Harm bagi ANGGOTA DEWASA gugus depan menurut Jukran Kwarnas 004/2021: Pembina (Pasal 9 ayat 3 huruf b: lulus Pelatihan Perlindungan; Pasal 7 ayat 4 huruf f:
+-- menandatangani pakta integritas; Pasal 7 ayat 4 huruf e: pemeriksaan riwayat hidup dan rekam jejak) dan Admin Gudep (pelatihan). Aplikasi hanya MENCATAT (tanggal dan tautan bukti);
+-- laporan kejadian TIDAK disimpan di aplikasi (Pasal 8 ayat 4 huruf g: rahasia, ditangani Komite Perlindungan dan Dewan Kehormatan di luar aplikasi). Satu baris per orang per jenis.
+-- Dicatat Pembina atau Admin; dibaca pemilik, Pembina, dan Admin.
+create table public.sfh_catatan (
+  id bigint generated always as identity primary key,
+  anggota_id uuid not null references public.profiles(id) on delete cascade,
+  jenis text not null check (jenis in ('pelatihan', 'pakta_integritas', 'rekam_jejak')),
+  tanggal date not null check (tanggal >= date '2015-01-01'),
+  bukti_url text not null default '' check (char_length(bukti_url) <= 500 and (bukti_url = '' or bukti_url ~* '^https?://[^[:space:]<>]+$')),
+  catatan text not null default '' check (char_length(catatan) <= 200 and catatan !~ '[[:cntrl:]<>]'),
+  dicatat_oleh uuid references public.profiles(id) on delete set null,
+  dicatat_pada timestamptz not null default now(),
+  unique (anggota_id, jenis)
+);
+-- ===== akhir tabel perlindungan anggota =====

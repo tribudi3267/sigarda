@@ -19,7 +19,7 @@ set check_function_bodies = off;
 -- ---------------------------------------------------------------------------
 -- 0. Bersihkan versi lama
 -- ---------------------------------------------------------------------------
-drop table if exists public.portofolio_snapshot, public.dokumen_templat, public.penegak_isian, public.sku_pra_uji,public.pengukuhan_dewan, public.bina_damping, public.kepengurusan_log, public.penugasan_peserta, public.penugasan_log, public.penugasan_rombel, public.guru_agama,
+drop table if exists public.sfh_catatan, public.portofolio_snapshot, public.dokumen_templat, public.penegak_isian, public.sku_pra_uji,public.pengukuhan_dewan, public.bina_damping, public.kepengurusan_log, public.penugasan_peserta, public.penugasan_log, public.penugasan_rombel, public.guru_agama,
   public.naik_kelas_log, public.naik_kelas_batch, public.notifikasi, public.push_langganan, public.push_konfigurasi, public.keepalive_konfigurasi,
   public.dokumen_terbit, public.dokumen_urut, public.iuran_kas, public.iuran_log, public.iuran, public.asisten_iuran,
   public.sesi_ujian_peserta, public.sesi_ujian_butir, public.sesi_ujian, public.sertifikat_tingkat, public.sku_penilaian, public.instrumen_panduan, public.instrumen_penguji, public.instrumen_kriteria, public.instrumen,
@@ -1082,6 +1082,24 @@ create table public.portofolio_snapshot (
 );
 create index portofolio_snapshot_peserta_idx on public.portofolio_snapshot (peserta_id, dibuat_pada desc);
 -- ===== akhir tabel salinan beku portofolio =====
+
+-- ===== Perlindungan anggota / Safe From Harm (Tahap 4): tabel =====
+-- Catatan kewajiban Safe From Harm bagi ANGGOTA DEWASA gugus depan menurut Jukran Kwarnas 004/2021: Pembina (Pasal 9 ayat 3 huruf b: lulus Pelatihan Perlindungan; Pasal 7 ayat 4 huruf f:
+-- menandatangani pakta integritas; Pasal 7 ayat 4 huruf e: pemeriksaan riwayat hidup dan rekam jejak) dan Admin Gudep (pelatihan). Aplikasi hanya MENCATAT (tanggal dan tautan bukti);
+-- laporan kejadian TIDAK disimpan di aplikasi (Pasal 8 ayat 4 huruf g: rahasia, ditangani Komite Perlindungan dan Dewan Kehormatan di luar aplikasi). Satu baris per orang per jenis.
+-- Dicatat Pembina atau Admin; dibaca pemilik, Pembina, dan Admin.
+create table public.sfh_catatan (
+  id bigint generated always as identity primary key,
+  anggota_id uuid not null references public.profiles(id) on delete cascade,
+  jenis text not null check (jenis in ('pelatihan', 'pakta_integritas', 'rekam_jejak')),
+  tanggal date not null check (tanggal >= date '2015-01-01'),
+  bukti_url text not null default '' check (char_length(bukti_url) <= 500 and (bukti_url = '' or bukti_url ~* '^https?://[^[:space:]<>]+$')),
+  catatan text not null default '' check (char_length(catatan) <= 200 and catatan !~ '[[:cntrl:]<>]'),
+  dicatat_oleh uuid references public.profiles(id) on delete set null,
+  dicatat_pada timestamptz not null default now(),
+  unique (anggota_id, jenis)
+);
+-- ===== akhir tabel perlindungan anggota =====
 -- ---------------------------------------------------------------------------
 -- 2. Fungsi bantu (tidak diekspos lewat API)
 -- ---------------------------------------------------------------------------
@@ -2102,6 +2120,7 @@ alter table public.garuda_tahap enable row level security;   -- baca: pengurus; 
 alter table public.penegak_isian enable row level security;   -- baca: pemilik, Pembina, dan Admin; tulis: hanya fungsi sg_isian_saya_simpan
 alter table public.dokumen_templat enable row level security;   -- baca: Pembina dan Admin; tulis: hanya fungsi sg_dokumen_templat_*
 alter table public.portofolio_snapshot enable row level security;   -- baca: Pembina dan Admin; tulis: hanya fungsi sg_portofolio_snapshot_*
+alter table public.sfh_catatan enable row level security;   -- baca: pemilik, Pembina, dan Admin; tulis: hanya fungsi sg_sfh_*
 alter table public.tanggal_lahir enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tanggal_lahir_atur
 alter table public.spg_penetapan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_spg_*
 alter table public.tkk_krida enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_krida_*
@@ -2252,6 +2271,8 @@ create policy baca_penegak_isian on public.penegak_isian for select to authentic
   using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pembina_atau_admin())));
 create policy baca_dokumen_templat on public.dokumen_templat for select to authenticated using ((select sigarda.pembina_atau_admin()));
 create policy baca_portofolio_snapshot on public.portofolio_snapshot for select to authenticated using ((select sigarda.pembina_atau_admin()));
+create policy baca_sfh_catatan on public.sfh_catatan for select to authenticated
+  using ((select sigarda.aktif()) and (anggota_id = (select auth.uid()) or (select sigarda.pembina_atau_admin())));
 -- ===== akhir kebijakan isian penegak =====
 
 -- ===== Tim penilai dan kalender Garuda (Tahap 2, G4b dan G4c): kebijakan =====
@@ -4896,11 +4917,11 @@ end $$;
 create function public.sg_pemeriksaan_data() returns jsonb
 language plpgsql stable security definer set search_path = public as
 $$
-declare v_ta text := sigarda.tahun_ajaran_kini();
+declare v_ta text := sigarda.tahun_ajaran_kini(); v_hasil jsonb;
 begin
   perform sigarda.wajib_aktif();
   if not sigarda.pengurus() then raise exception 'Hanya pengurus (Pembina, Dewan Ambalan, dan Admin Gudep) yang dapat melihat pemeriksaan data.'; end if;
-  return jsonb_build_object(
+  v_hasil := jsonb_build_object(
     'praUjiAktif', sigarda.pra_uji_aktif(),
     'kelasLama', coalesce((
       select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'nis', x.nis, 'kelas', x.kelas) order by x.nis)
@@ -4977,6 +4998,22 @@ begin
         ) y where cardinality(y.kurang) > 0 order by y.kelas, y.nama limit 300
       ) x
     ), '[]'::jsonb),
+    -- Safe From Harm (Tahap 4): anggota dewasa aktif yang catatannya belum lengkap. Pembina: pelatihan, pakta_integritas, rekam_jejak; Admin Gudep: pelatihan (kode yang kurang).
+    'sfhBelum', coalesce((
+      select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'peran', x.peran, 'kurang', to_jsonb(x.kurang)) order by x.peran, x.nama)
+      from (
+        select y.* from (
+          select p.id, p.nama, case when p.role = 'admin' then 'Admin Gudep' else 'Pembina' end as peran,
+            array_remove(array[
+              case when not exists (select 1 from public.sfh_catatan s where s.anggota_id = p.id and s.jenis = 'pelatihan') then 'pelatihan' end,
+              case when p.role = 'penguji' and not exists (select 1 from public.sfh_catatan s where s.anggota_id = p.id and s.jenis = 'pakta_integritas') then 'pakta_integritas' end,
+              case when p.role = 'penguji' and not exists (select 1 from public.sfh_catatan s where s.anggota_id = p.id and s.jenis = 'rekam_jejak') then 'rekam_jejak' end
+            ], null) as kurang
+          from public.profiles p
+          where p.status = 'aktif' and (p.role = 'admin' or (p.role = 'penguji' and p.jabatan = 'Pembina'))
+        ) y where cardinality(y.kurang) > 0 order by y.peran, y.nama limit 300
+      ) x
+    ), '[]'::jsonb),
     'belumPernahMasuk', coalesce((
       select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'peran', x.peran, 'dibuat', x.dibuat) order by x.dibuat)
       from (
@@ -4987,6 +5024,25 @@ begin
       ) x
     ), '[]'::jsonb)
   );
+  -- Jumlah SEBENARNYA untuk daftar yang bisa lebih dari 300 baris (700 Penegak: hari peluncuran data diri dan NTA belum terisi): dihitung hanya bila daftarnya penuh, jadi
+  -- biasanya tanpa biaya tambahan. Klien menampilkan "300 dari N" (pemeriksaanLogic.jumlahKategori).
+  return v_hasil || jsonb_build_object('jumlahSebenarnya', jsonb_build_object(
+    'kelasLama', case when jsonb_array_length(v_hasil -> 'kelasLama') < 300 then jsonb_array_length(v_hasil -> 'kelasLama')
+      else (select count(*) from public.profiles where role = 'peserta' and status = 'aktif' and not sigarda.rombel_sah(kelas)) end,
+    'tanpaNta', case when jsonb_array_length(v_hasil -> 'tanpaNta') < 300 then jsonb_array_length(v_hasil -> 'tanpaNta')
+      else (select count(*) from public.profiles where role = 'peserta' and status = 'aktif' and (nta is null or btrim(nta) = '')) end,
+    'tanpaJk', case when jsonb_array_length(v_hasil -> 'tanpaJk') < 300 then jsonb_array_length(v_hasil -> 'tanpaJk')
+      else (select count(*) from public.profiles where status = 'aktif' and jenis_kelamin is null) end,
+    'dataDiriBelum', case when jsonb_array_length(v_hasil -> 'dataDiriBelum') < 300 then jsonb_array_length(v_hasil -> 'dataDiriBelum')
+      else (select count(*) from public.profiles p where p.role = 'peserta' and p.status = 'aktif' and (
+        p.whatsapp is null or btrim(p.whatsapp) = '' or p.jenis_kelamin is null or p.agama is null
+        or not exists (select 1 from public.tanggal_lahir t where t.peserta_id = p.id)
+        or not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci = 'tempat_lahir')
+        or not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci = 'alamat')
+        or not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci in ('ayah_nama', 'ibu_nama', 'wali_nama')))) end,
+    'belumPernahMasuk', case when jsonb_array_length(v_hasil -> 'belumPernahMasuk') < 300 then jsonb_array_length(v_hasil -> 'belumPernahMasuk')
+      else (select count(*) from public.profiles p join auth.users u on u.id = p.id where p.status = 'aktif' and u.last_sign_in_at is null) end
+  ));
 end $$;
 -- ===== akhir fungsi pemeriksaan data =====
 
@@ -5061,7 +5117,8 @@ begin
       'garuda_tahap', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.garuda_tahap t),
       'penegak_isian', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penegak_isian t),
       'dokumen_templat', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_templat t),
-      'portofolio_snapshot', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.portofolio_snapshot t)
+      'portofolio_snapshot', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.portofolio_snapshot t),
+      'sfh_catatan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sfh_catatan t)
     )
   ) into v_hasil;
   insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada)
@@ -6570,6 +6627,67 @@ begin
   delete from public.portofolio_snapshot where id = p_id;
 end $$;
 -- ===== akhir aksi salinan beku portofolio =====
+
+-- ===== Perlindungan anggota / Safe From Harm (Tahap 4): aksi =====
+-- Mencatat (atau mengoreksi) satu catatan Safe From Harm bagi anggota dewasa gugus depan: Pembina aktif (pelatihan, pakta_integritas, rekam_jejak) atau Admin Gudep aktif (pelatihan saja).
+-- Pembina dan Admin yang mencatat. tanggal tidak boleh di masa depan; bukti_url (opsional) tautan http(s); catatan <= 200 karakter. Mencatat ulang = koreksi.
+create function public.sg_sfh_catat(p_anggota_id uuid, p_jenis text, p_tanggal date, p_bukti_url text default '', p_catatan text default '') returns void language plpgsql security definer set search_path = public as
+$$
+declare v_p public.profiles; v_url text := btrim(coalesce(p_bukti_url, '')); v_cat text := sigarda.rapikan(p_catatan);
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mencatat Safe From Harm.'; end if;
+  if coalesce(p_jenis, '') not in ('pelatihan', 'pakta_integritas', 'rekam_jejak') then raise exception 'Jenis catatan harus pelatihan, pakta_integritas, atau rekam_jejak.'; end if;
+  select * into v_p from public.profiles where id = p_anggota_id;
+  if not found then raise exception 'Pilih anggota.'; end if;
+  if v_p.status <> 'aktif' or not ((v_p.role = 'penguji' and v_p.jabatan = 'Pembina') or v_p.role = 'admin') then
+    raise exception 'Catatan Safe From Harm hanya untuk anggota dewasa aktif (Pembina dan Admin Gudep).';
+  end if;
+  if v_p.role = 'admin' and p_jenis <> 'pelatihan' then raise exception 'Admin Gudep hanya dicatat untuk pelatihan; pakta integritas dan rekam jejak untuk Pembina.'; end if;
+  if p_tanggal is null or p_tanggal < date '2015-01-01' or p_tanggal > sigarda.hari_ini() then raise exception 'Tanggal tidak boleh sebelum tahun 2015 atau di masa depan.'; end if;
+  if char_length(v_url) > 500 then raise exception 'Tautan bukti maksimal 500 karakter.'; end if;
+  if v_url <> '' and v_url !~* '^https?://[^[:space:]<>]+$' then raise exception 'Tautan bukti harus berawalan http:// atau https:// tanpa spasi.'; end if;
+  if char_length(v_cat) > 200 or v_cat ~ '[[:cntrl:]<>]' then raise exception 'Catatan maksimal 200 karakter dan tanpa karakter khusus.'; end if;
+  insert into public.sfh_catatan (anggota_id, jenis, tanggal, bukti_url, catatan, dicatat_oleh, dicatat_pada)
+  values (p_anggota_id, p_jenis, p_tanggal, v_url, v_cat, auth.uid(), now())
+  on conflict (anggota_id, jenis) do update set tanggal = excluded.tanggal, bukti_url = excluded.bukti_url, catatan = excluded.catatan, dicatat_oleh = excluded.dicatat_oleh, dicatat_pada = excluded.dicatat_pada;
+end $$;
+
+create function public.sg_sfh_hapus(p_id bigint) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan Safe From Harm.'; end if;
+  delete from public.sfh_catatan where id = p_id;
+end $$;
+
+-- Penerima laporan gugus depan (Pasal 10 ayat 3: setiap gugus depan wajib memiliki prosedur penerimaan laporan). Pengaturan 'perlindungan.gudep' = { penerima, kontak, prosedurUrl, catatan }
+-- (dibaca semua pengguna agar Penegak tahu kepada siapa melapor; diubah Pembina dan Admin). Laporan sendiri TIDAK disimpan di aplikasi.
+create function public.sg_sfh_gudep_simpan(p_nilai jsonb) returns void language plpgsql security definer set search_path = public as
+$$
+declare v_k text; v_v text; v_maks int; v_h jsonb := '{}'::jsonb;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mengubah penerima laporan Safe From Harm.'; end if;
+  if p_nilai is null or jsonb_typeof(p_nilai) <> 'object' or p_nilai - 'penerima' - 'kontak' - 'prosedurUrl' - 'catatan' <> '{}'::jsonb then raise exception 'Bentuk isian tidak sah.'; end if;
+  foreach v_k in array array['penerima', 'kontak', 'prosedurUrl', 'catatan'] loop
+    if coalesce(jsonb_typeof(p_nilai -> v_k), '') <> 'string' then raise exception 'Isian % harus berupa teks.', v_k; end if;
+    if v_k = 'prosedurUrl' then
+      v_v := btrim(p_nilai ->> v_k);
+      if char_length(v_v) > 500 or (v_v <> '' and v_v !~* '^https?://[^[:space:]<>]+$') then raise exception 'Tautan prosedur harus berawalan http:// atau https:// tanpa spasi (maksimal 500 karakter).'; end if;
+    else
+      v_v := sigarda.rapikan(p_nilai ->> v_k);
+      v_maks := case v_k when 'penerima' then 120 when 'kontak' then 80 else 300 end; -- (case di dalam kondisi if terpotong pada then pertama)
+      if char_length(v_v) > v_maks or v_v ~ '[[:cntrl:]<>]' then
+        raise exception 'Isian % terlalu panjang atau memuat karakter khusus.', v_k;
+      end if;
+    end if;
+    v_h := v_h || jsonb_build_object(v_k, v_v);
+  end loop;
+  insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada) values ('perlindungan.gudep', v_h, auth.uid(), now())
+  on conflict (kunci) do update set nilai = excluded.nilai, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
+end $$;
+-- ===== akhir aksi perlindungan anggota =====
 -- ---------------------------------------------------------------------------
 -- 5. Hak akses: baca saja untuk pengguna; fungsi aksi hanya untuk pengguna masuk
 -- ---------------------------------------------------------------------------
@@ -6581,7 +6699,7 @@ grant select on public.profiles, public.sku_butir, public.sku_unit, public.pf_it
   public.sesi_ujian, public.sesi_ujian_butir, public.sesi_ujian_peserta,
   public.iuran, public.iuran_log, public.iuran_kas, public.asisten_iuran,
   public.penugasan_rombel, public.penugasan_log, public.guru_agama, public.dokumen_terbit, public.dokumen_urut, public.notifikasi,
-  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda, public.kegiatan_usulan, public.pengukuhan_dewan, public.sku_pra_uji, public.pelantikan, public.saka_anggota, public.tkk_katalog, public.tkk_capaian, public.tkk_krida, public.tkk_pengajuan, public.spg_penetapan, public.tanggal_lahir, public.tim_penilai, public.tim_penilai_anggota, public.garuda_tahap, public.penegak_isian, public.dokumen_templat, public.portofolio_snapshot to authenticated;
+  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda, public.kegiatan_usulan, public.pengukuhan_dewan, public.sku_pra_uji, public.pelantikan, public.saka_anggota, public.tkk_katalog, public.tkk_capaian, public.tkk_krida, public.tkk_pengajuan, public.spg_penetapan, public.tanggal_lahir, public.tim_penilai, public.tim_penilai_anggota, public.garuda_tahap, public.penegak_isian, public.dokumen_templat, public.portofolio_snapshot, public.sfh_catatan to authenticated;
 
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function
@@ -6635,7 +6753,8 @@ grant execute on function
   public.sg_tim_penilai_simpan(bigint, text, text, text, date, text, text, jsonb), public.sg_tim_penilai_hapus(bigint),
   public.sg_garuda_tahap_simpan(text, text, date, date, text), public.sg_garuda_tahap_hapus(bigint),
   public.sg_isian_saya_simpan(jsonb), public.sg_dokumen_templat_simpan(text, text, jsonb), public.sg_dokumen_templat_hapus(bigint),
-  public.sg_portofolio_snapshot_simpan(uuid, text, jsonb), public.sg_portofolio_snapshot_hapus(bigint)
+  public.sg_portofolio_snapshot_simpan(uuid, text, jsonb), public.sg_portofolio_snapshot_hapus(bigint),
+  public.sg_sfh_catat(uuid, text, date, text, text), public.sg_sfh_hapus(bigint), public.sg_sfh_gudep_simpan(jsonb)
   to authenticated;
 -- Fungsi yang boleh dipanggil tanpa login (hanya membaca): verifikasi keaslian dokumen, identitas gudep di halaman masuk, dan
 -- tautan berbagi baca-saja Berkas Calon Garuda (tahap L7)

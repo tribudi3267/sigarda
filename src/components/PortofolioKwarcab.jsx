@@ -24,6 +24,9 @@ import { fmtTanggal, fmtWaktu, hariIni } from '../lib/format';
 import { tahunAjaranKini } from '../lib/rombelLogic';
 import { capaianPeserta } from '../lib/tkkLogic';
 import { hitungSpg } from '../lib/spgLogic';
+import { JUMLAH_LATIHAN, daftarLatihanLaksana, rentangLatihan } from '../lib/latihanLaksanaLogic';
+import { pelantikanPeserta } from '../lib/pelantikanLogic';
+import { STATUS_ABSEN } from '../lib/absensiLogic';
 import { timUntukCalon } from '../lib/timLogic';
 import { tanggalLahirPeserta } from '../lib/gerbangLogic';
 import {
@@ -73,7 +76,7 @@ function TabelIsi({ kolom, baris, lebar = [] }) {
  * (data pribadi sampai tanda tangan), lembar SPG, formulir penilaian tim, dan daftar lampiran. Murni props (tanpa memuat data sendiri) agar dapat diuji.
  * Data yang belum disimpan aplikasi dicetak sebagai titik-titik untuk diisi tangan.
  */
-export function PortofolioKwarcabDokumen({ peserta, tanggalLahir = null, capaianTkk = [], krida = [], ambang, pelantikan = [], saka = [], hasilSpg = [], tim = null, portofolio = {}, isian = {}, templat = [], tahunAjaran = '', sertakanSurat = false, hari = hariIni() }) {
+export function PortofolioKwarcabDokumen({ peserta, tanggalLahir = null, capaianTkk = [], krida = [], ambang, pelantikan = [], saka = [], hasilSpg = [], tim = null, portofolio = {}, isian = {}, templat = [], tahunAjaran = '', sertakanSurat = false, hari = hariIni(), latihan = null }) {
   const G = useGudep();
   const iv = (k) => isian[k] ?? '';
   const tkk = barisTkkKwarcab(capaianPeserta(capaianTkk, peserta.id), ambang);
@@ -133,6 +136,7 @@ export function PortofolioKwarcabDokumen({ peserta, tanggalLahir = null, capaian
         <ol className="mx-auto mt-4 max-w-md list-decimal space-y-1 pl-6">
           <li>Daftar Isian Calon Pramuka Garuda Golongan Pramuka Penegak</li>
           <li>Syarat Pramuka Garuda (SPG) Golongan Penegak</li>
+          <li>Daftar Hadir Latihan 3 Bulan setelah Dilantik Penegak Laksana</li>
           <li>Formulir Penilaian Pramuka Penegak Garuda</li>
           <li>Lampiran-lampiran</li>
         </ol>
@@ -270,6 +274,36 @@ export function PortofolioKwarcabDokumen({ peserta, tanggalLahir = null, capaian
         <div className="mt-2"><SumberPeraturan rujukan={[{ id: 'garuda-038-2017', bagian: 'Bab II butir 1c (13 syarat Penegak Garuda)' }]} /></div>
       </section>
 
+      {/* 5b. Daftar hadir latihan 3 bulan (12 kali) setelah dilantik Laksana; dari absensi SIGARDA, sel kosong dilengkapi tulisan tangan */}
+      <section className={`${HALAMAN} border border-pramuka-300 p-6 print:border-0`}>
+        <h2 className="text-center font-display text-base font-bold">DAFTAR HADIR LATIHAN<br />3 BULAN ({JUMLAH_LATIHAN} KALI) SETELAH DILANTIK PENEGAK LAKSANA</h2>
+        <div className="mt-3">
+          <Baris label="Nama" lebarLabel="w-44"><Titik nilai={peserta.nama} lebar="w-full" /></Baris>
+          <Baris label="Dilantik Penegak Laksana" lebarLabel="w-44"><Titik nilai={latihan ? fmtTanggal(latihan.mulai) : ''} lebar="w-full" /></Baris>
+        </div>
+        <table className="mt-3 w-full border-collapse text-xs">
+          <thead><tr className="bg-pramuka-100">{['No', 'Hari, tanggal latihan', 'Kehadiran', 'Paraf Pembina'].map((k) => <th key={k} className={`${SEL} text-left font-semibold`}>{k}</th>)}</tr></thead>
+          <tbody>
+            {Array.from({ length: JUMLAH_LATIHAN }, (_, i) => {
+              const l = latihan?.latihan[i];
+              return (
+                <tr key={i} className="break-inside-avoid">
+                  <td className={`${SEL} w-8 text-center`}>{i + 1}</td>
+                  <td className={`${SEL} h-10`}>{l ? fmtTanggal(l.tanggal) : ''}</td>
+                  <td className={`${SEL} w-32`}>{l?.status ? STATUS_ABSEN[l.status].label : ''}</td>
+                  <td className={`${SEL} w-32`} />
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <p className="mt-2 text-xs">
+          {latihan
+            ? `Hadir ${latihan.hadir}, izin ${latihan.izin}, sakit ${latihan.sakit}, alpa ${latihan.alpa} dari ${latihan.total} latihan yang tercatat di aplikasi (${fmtTanggal(latihan.mulai)} s.d. ${fmtTanggal(latihan.akhir)}).`
+            : 'Belum dilantik Penegak Laksana di aplikasi: daftar diisi tangan.'}
+        </p>
+      </section>
+
       {/* 6. Formulir penilaian tim */}
       <section className={`${HALAMAN} border border-pramuka-300 p-6 print:border-0`}>
         <h2 className="text-center font-display text-base font-bold">FORMULIR PENILAIAN PRAMUKA PENEGAK GARUDA<br />{(G.kwarcab || 'KWARTIR CABANG').toUpperCase()} GERAKAN PRAMUKA<br />TAHUN {tahun}</h2>
@@ -353,7 +387,7 @@ export function PortofolioKwarcabDokumen({ peserta, tanggalLahir = null, capaian
  * Dimuat malas dari halaman Portofolio agar JS awal tetap kecil.
  */
 export default function TampilanPortofolioKwarcab({ peserta, onKembali }) {
-  const { progress, portofolio, api } = useApp();
+  const { progress, portofolio, api, absensi } = useApp();
   const tkk = useTkk();
   const spg = useSpg();
   const pel = usePelantikanSaka();
@@ -382,14 +416,29 @@ export default function TampilanPortofolioKwarcab({ peserta, onKembali }) {
   const namaOrangTuaKosong = isian.siap && !namaOrangTua(isian.isian);
   const peringatan = [isian.galat && 'Isian data diri Penegak belum dapat dimuat.', tpl.galat && 'Templat surat guru belum dapat dimuat.'].filter(Boolean);
 
+  // Daftar hadir latihan 3 bulan sesudah pelantikan Laksana (kehadiran dimuat untuk rentang itu saja)
+  const tanggalLaksana = pelantikanPeserta(pel.pelantikan, peserta.id).laksana?.tanggal ?? null;
+  const [hadirLatihan, setHadirLatihan] = useState({});
+  useEffect(() => {
+    let batal = false;
+    const r = rentangLatihan(tanggalLaksana);
+    if (!r) { setHadirLatihan({}); return undefined; }
+    api().muatHadirRentang(r.mulai, r.akhir).then((res) => { if (!batal) setHadirLatihan(res.ok ? res.data : {}); });
+    return () => { batal = true; };
+  }, [api, tanggalLaksana]);
+  const latihan = useMemo(
+    () => daftarLatihanLaksana({ sesi: absensi?.sesi ?? {}, hadir: hadirLatihan, pesertaId: peserta.id, tanggalLaksana, hari }),
+    [absensi?.sesi, hadirLatihan, peserta.id, tanggalLaksana, hari],
+  );
+
   const hasilSpg = useMemo(
-    () => hitungSpg({ peserta, progress, pelantikan: pel.pelantikan, saka: pel.saka, capaianTkk: tkk.capaian, ambang: tkk.ambang, portofolio, penetapan: spg.penetapan, hari }),
-    [peserta, progress, pel.pelantikan, pel.saka, tkk.capaian, tkk.ambang, portofolio, spg.penetapan, hari],
+    () => hitungSpg({ peserta, progress, pelantikan: pel.pelantikan, saka: pel.saka, krida: tkk.krida, capaianTkk: tkk.capaian, ambang: tkk.ambang, portofolio, penetapan: spg.penetapan, hari, latihan }),
+    [peserta, progress, pel.pelantikan, pel.saka, tkk.krida, tkk.capaian, tkk.ambang, portofolio, spg.penetapan, hari, latihan],
   );
 
   const buatIsi = () => buatIsiSnapshot({
     peserta, gudep: gudepKini, tanggalLahir: tanggalLahirPeserta(ger.lahir, peserta.id), capaianTkk: tkk.capaian, krida: tkk.krida, ambang: tkk.ambang, pelantikan: pel.pelantikan, saka: pel.saka,
-    hasilSpg, tim: timUntukCalon(tim.tim, tahunAjaran, peserta.jenisKelamin), portofolio, isian: isian.isian, templat: tpl.templat, tahunAjaran, hari,
+    hasilSpg, tim: timUntukCalon(tim.tim, tahunAjaran, peserta.jenisKelamin), portofolio, isian: isian.isian, templat: tpl.templat, tahunAjaran, hari, latihan,
   });
 
   return (
@@ -433,7 +482,7 @@ export default function TampilanPortofolioKwarcab({ peserta, onKembali }) {
           <PortofolioKwarcabDokumen
             peserta={peserta} tanggalLahir={tanggalLahirPeserta(ger.lahir, peserta.id)} capaianTkk={tkk.capaian} krida={tkk.krida} ambang={tkk.ambang}
             pelantikan={pel.pelantikan} saka={pel.saka} hasilSpg={hasilSpg} tim={timUntukCalon(tim.tim, tahunAjaran, peserta.jenisKelamin)} portofolio={portofolio}
-            isian={isian.isian} templat={tpl.templat} tahunAjaran={tahunAjaran} sertakanSurat={sertakanSurat} hari={hari}
+            isian={isian.isian} templat={tpl.templat} tahunAjaran={tahunAjaran} sertakanSurat={sertakanSurat} hari={hari} latihan={latihan}
           />
         </div>
       )}
