@@ -52,10 +52,35 @@ async function bangun() {
   await q(`insert into public.push_langganan (penerima_id, endpoint, p256dh, auth) values ($1, 'https://push.example/abcdefghijklmnop', 'p256dh-abcdefghijklmnopqrst', 'auth-abcdef')`, [id('10231')]);
   await q(`insert into public.login_gagal (username, jumlah) values ('10231', 2), ('admin', 1)`);
   await q(`insert into public.pengaturan (kunci, nilai) values ('uji.tetap', '"harus tetap"') on conflict do nothing`);
+  await q(`insert into public.materi (urutan, judul, tautan, file_id) values (1, 'Materi uji', 'https://drive.google.com/file/d/abcdefghijklmnopqrstu', 'abcdefghijklmnopqrstu')`);
+  await q(`insert into public.instrumen (sku_id) select id from public.sku_unit limit 1`);
+  await q(`insert into public.agenda (tahun_ajaran, jenis, judul, tanggal) values ($1, 'musyawarah', 'Musyawarah uji', current_date + 30)`, [ta]);
+  await q(`insert into public.kegiatan_usulan (tahun_ajaran, jenis, tanggal_usul, dokumen_url, diajukan_oleh, diajukan_oleh_nama) values ($1, 'ptgd', current_date + 40, 'https://drive.google.com/x', $2, 'Uji')`, [ta, id('10008')]);
+  await q(`insert into public.garuda_berkas_token (peserta_id, token) values ($1, $2)`, [id('10007'), 'a'.repeat(32)]);
+  await q(`insert into public.sertifikat_tingkat (token, peserta_id, tingkat) values ($1, $2, 'Bantara')`, ['b'.repeat(32), id('10007')]);
+  await q(`insert into public.push_langganan (penerima_id, endpoint, p256dh, auth) values ($1, 'https://push.example/adminadminadmin1', 'p256dh-adminadminadminadmin', 'auth-admin')`, [K.admin.id]);
+  // Tabel-tabel yang ditambah sesudah skrip ini pertama ditulis: milik akun (TKK, SPG, pelantikan, Saka, data diri, pra-uji, Bina Damping, Safe From Harm) dan tanpa pemilik (tim, kalender, pengukuhan, templat)
+  const p7 = id('10007');
+  await q(`insert into public.tkk_capaian (peserta_id, tkk_id, tingkat, tanggal, penguji1, penguji2, melatih) values ($1, (select id from public.tkk_katalog order by urut limit 1), 'purwa', current_date - 5, 'A', 'B', 'melatih')`, [p7]);
+  await q(`insert into public.tkk_krida (peserta_id, nama, tanggal) values ($1, 'Krida uji', current_date - 5)`, [p7]);
+  await q(`insert into public.spg_penetapan (peserta_id, butir, nilai, tanggal) values ($1, 1, 100, current_date - 5)`, [p7]);
+  await q(`insert into public.pelantikan (peserta_id, tingkat, tanggal, tempat) values ($1, 'bantara', current_date - 30, 'Lapangan')`, [p7]);
+  await q(`insert into public.saka_anggota (peserta_id, saka, tanggal_masuk) values ($1, 'Saka uji', current_date - 60)`, [p7]);
+  await q(`insert into public.tanggal_lahir (peserta_id, tanggal) values ($1, '2008-05-05')`, [p7]);
+  await q(`insert into public.penegak_isian (peserta_id, kunci, nilai) values ($1, 'alamat', 'Jl. Uji 1')`, [p7]);
+  await q(`insert into public.portofolio_snapshot (peserta_id, tahun_ajaran, isi) values ($1, $2, '{}'::jsonb)`, [p7, ta]);
+  await q(`insert into public.sku_pra_uji (peserta_id, sku_id, tahap, status, jadwal) values ($1, 'BAN-05', 'pinsa', 'dibatalkan', current_date)`, [p7]);
+  await q(`insert into public.bina_damping (tahun_ajaran, rombel, penegak_id) values ($1, 'X-01', $2)`, [ta, id('10008')]);
+  await q(`insert into public.sfh_catatan (anggota_id, jenis, tanggal) values ($1, 'pelatihan', current_date - 10), ($2, 'pelatihan', current_date - 10)`, [K.pembina.id, K.admin.id]);
+  const tim = (await q(`insert into public.tim_penilai (tahun_ajaran, untuk) values ($1, 'putra') returning id`, [ta]))[0].id;
+  await q(`insert into public.tim_penilai_anggota (tim_id, urut, nama, unsur) values ($1, 1, 'Anggota uji', 'pembina')`, [tim]);
+  await q(`insert into public.garuda_tahap (tahun_ajaran, tahap, mulai) values ($1, 'uji_spg', current_date + 10)`, [ta]);
+  await q(`insert into public.pengukuhan_dewan (tahun_ajaran, nomor_sk, tanggal_sk) values ($1, 'SK-1/2026', current_date - 20)`, [ta]);
+  await q(`insert into public.dokumen_templat (tahun_ajaran, jenis, isi) values ($1, 'surat_uud', '{}'::jsonb)`, [ta]);
   return { pg, q, K, N, id, meta: { sidangOk: sidang.rows?.length > 0, suratOk: surat.ok, iuranOk: iur.ok, kasOk: kas.ok } };
 }
 
-const TABEL = `('profiles','sku_progress','sku_riwayat','absensi_sesi','absensi_hadir','iuran','iuran_log','iuran_kas','asisten_iuran','penugasan_rombel','penugasan_log','penugasan_peserta','guru_agama','dokumen_terbit','dokumen_urut','notifikasi','push_langganan','push_konfigurasi','naik_kelas_batch','naik_kelas_log','kepengurusan_log','portofolio','portofolio_jurnal','materi','pengaturan','sidang_dk','sidang_urut','raport','instrumen','instrumen_kriteria','instrumen_penguji','instrumen_panduan','sku_penilaian','sertifikat_tingkat','sesi_ujian','sesi_ujian_butir','sesi_ujian_peserta','login_gagal','sku_butir','sku_unit','pf_item')`;
+const TABEL = `('profiles','sku_progress','sku_riwayat','absensi_sesi','absensi_hadir','iuran','iuran_log','iuran_kas','asisten_iuran','penugasan_rombel','penugasan_log','penugasan_peserta','guru_agama','dokumen_terbit','dokumen_urut','notifikasi','push_langganan','push_konfigurasi','naik_kelas_batch','naik_kelas_log','kepengurusan_log','portofolio','portofolio_jurnal','materi','pengaturan','sidang_dk','sidang_urut','raport','instrumen','instrumen_kriteria','instrumen_penguji','instrumen_panduan','sku_penilaian','sertifikat_tingkat','sesi_ujian','sesi_ujian_butir','sesi_ujian_peserta','login_gagal','agenda','kegiatan_usulan','garuda_berkas_token','sku_butir','sku_unit','pf_item')`;
 const potret = async (q) => ({
   kolom: await q(`select table_name, column_name, data_type, is_nullable, column_default from information_schema.columns where table_schema = 'public' and table_name in ${TABEL} order by 1, 2`),
   batasan: await q(`select conrelid::regclass::text tabel, conname, pg_get_constraintdef(oid) def from pg_constraint where connamespace = 'public'::regnamespace order by 1, 2`),
@@ -67,7 +92,7 @@ const potret = async (q) => ({
 });
 const hitung = async (q, t) => Number((await q(`select count(*)::int n from public.${t}`))[0].n);
 const semuaTabelData = ['sku_progress', 'sku_riwayat', 'absensi_hadir', 'iuran', 'iuran_log', 'iuran_kas', 'asisten_iuran', 'penugasan_rombel', 'penugasan_peserta', 'penugasan_log', 'kepengurusan_log', 'dokumen_terbit', 'dokumen_urut', 'notifikasi',
-  'push_langganan', 'naik_kelas_batch', 'naik_kelas_log', 'portofolio', 'portofolio_jurnal', 'sidang_dk', 'sidang_urut', 'raport', 'sku_penilaian', 'sertifikat_tingkat', 'sesi_ujian', 'sesi_ujian_butir', 'sesi_ujian_peserta', 'absensi_sesi', 'login_gagal'];
+  'naik_kelas_batch', 'naik_kelas_log', 'portofolio', 'portofolio_jurnal', 'sidang_dk', 'sidang_urut', 'raport', 'sku_penilaian', 'sertifikat_tingkat', 'sesi_ujian', 'sesi_ujian_butir', 'sesi_ujian_peserta', 'absensi_sesi', 'login_gagal', 'agenda', 'kegiatan_usulan', 'garuda_berkas_token', 'materi', 'pengaturan', 'guru_agama', 'instrumen', 'instrumen_kriteria', 'instrumen_penguji', 'instrumen_panduan'];
 
 console.log('--- Persiapan: database lengkap dengan dua Admin Gudep ---');
 const A = await bangun();
@@ -76,10 +101,10 @@ ok((await q("select count(*)::int n from public.profiles where role = 'admin'"))
 ok((await q("select count(*)::int n from public.profiles where role <> 'admin'"))[0].n >= 12, 'ada akun Penegak, Pembina, dan Dewan (demo)');
 ok(A.meta.sidangOk && A.meta.suratOk && A.meta.iuranOk && A.meta.kasOk, 'data uji lengkap dibuat: sidang, surat, iuran, kas ' + JSON.stringify(A.meta));
 const sebelumIsi = {};
-for (const t of ['sku_progress', 'notifikasi', 'push_langganan', 'sidang_dk', 'dokumen_terbit', 'iuran', 'iuran_kas', 'sesi_ujian', 'penugasan_rombel', 'penugasan_peserta', 'penugasan_log', 'kepengurusan_log', 'naik_kelas_log', 'absensi_sesi', 'sidang_urut', 'dokumen_urut', 'login_gagal']) sebelumIsi[t] = await hitung(q, t);
+for (const t of ['sku_progress', 'notifikasi', 'push_langganan', 'sidang_dk', 'dokumen_terbit', 'iuran', 'iuran_kas', 'sesi_ujian', 'penugasan_rombel', 'penugasan_peserta', 'penugasan_log', 'kepengurusan_log', 'naik_kelas_log', 'absensi_sesi', 'sidang_urut', 'dokumen_urut', 'login_gagal', 'agenda', 'kegiatan_usulan', 'garuda_berkas_token', 'sertifikat_tingkat', 'materi', 'pengaturan', 'guru_agama', 'instrumen']) sebelumIsi[t] = await hitung(q, t);
 ok(Object.entries(sebelumIsi).every(([, n]) => n > 0), 'setiap jenis data terisi sebelum dihapus: ' + JSON.stringify(sebelumIsi));
 const materiSebelum = await hitung(q, 'materi'), pengSebelum = await hitung(q, 'pengaturan'), guruSebelum = await hitung(q, 'guru_agama'), instrSebelum = await hitung(q, 'instrumen');
-const butirSebelum = await hitung(q, 'sku_unit');
+const butirSebelum = await hitung(q, 'sku_unit'), pushKonfSebelum = await hitung(q, 'push_konfigurasi');
 const adminSebelum = await q(`select id, username, nama, role, jabatan, wajib_ganti_pin from public.profiles where role = 'admin' order by username`);
 const authAdminSebelum = await q(`select id, email, encrypted_password from auth.users where id in (select id from public.profiles where role = 'admin') order by email`);
 const bentukSebelum = await potret(q);
@@ -87,7 +112,7 @@ const bentukSebelum = await potret(q);
 console.log('\n--- Pratinjau (hanya membaca) ---');
 {
   const r = await q(PRATINJAU.replace(/;\s*$/, ''));
-  ok(r.length > 10 && r.some((x) => x.bagian === 'DIPERTAHANKAN' && /admin\.dua/.test(x.keterangan)) && r.filter((x) => x.bagian === 'DIPERTAHANKAN').length === 2, 'pratinjau menampilkan kedua Admin Gudep sebagai DIPERTAHANKAN');
+  ok(r.length > 10 && r.some((x) => x.bagian === 'DIPERTAHANKAN' && /admin\.dua/.test(x.keterangan)) && r.filter((x) => x.bagian === 'DIPERTAHANKAN' && /^Admin Gudep:/.test(x.keterangan)).length === 2 && r.some((x) => x.bagian === 'DIPERTAHANKAN' && /Login dan PIN/.test(x.keterangan) && x.jumlah == 2), 'pratinjau menampilkan kedua Admin Gudep dan loginnya sebagai DIPERTAHANKAN');
   ok(r.some((x) => x.bagian === 'AKUN DIHAPUS') && !r.some((x) => x.bagian === 'AKUN DIHAPUS' && /Admin/.test(x.keterangan)), 'pratinjau menghitung akun yang dihapus (bukan Admin)');
   ok(r.find((x) => /Progres SKU/.test(x.keterangan))?.jumlah == sebelumIsi.sku_progress, 'pratinjau memuat jumlah data yang benar');
   ok((await hitung(q, 'sku_progress')) === sebelumIsi.sku_progress && (await hitung(q, 'profiles')) === adminSebelum.length + (await q("select count(*)::int n from public.profiles where role <> 'admin'"))[0].n, 'pratinjau tidak mengubah apa pun');
@@ -115,11 +140,12 @@ ok((await q("select count(*)::int n from auth.users")).at(0).n === 2, 'hanya dua
   ok(JSON.stringify(admin) === JSON.stringify(adminSebelum), 'profil kedua Admin persis sama (tidak berubah)');
   ok(JSON.stringify(authAdmin) === JSON.stringify(authAdminSebelum), 'login kedua Admin persis sama (email dan kata sandi tidak berubah)');
 }
-for (const t of semuaTabelData) ok((await hitung(q, t)) === 0 || t === 'login_gagal', `tabel ${t} kosong`);
-ok((await q(`select count(*)::int n from public.login_gagal where username in ('10231')`))[0].n === 0 && (await q(`select count(*)::int n from public.login_gagal where username = 'admin'`))[0].n === 1, 'percobaan masuk gagal milik akun yang dihapus hilang; milik Admin tetap');
-ok((await hitung(q, 'materi')) === materiSebelum && (await hitung(q, 'pengaturan')) === pengSebelum && (await hitung(q, 'guru_agama')) === guruSebelum && (await hitung(q, 'instrumen')) === instrSebelum && (await hitung(q, 'sku_unit')) === butirSebelum,
-  'materi, pengaturan, guru agama, instrumen, dan katalog butir tidak disentuh');
-ok((await q(`select nilai::text v from public.pengaturan where kunci = 'uji.tetap'`))[0]?.v === '"harus tetap"', 'nilai pengaturan tetap utuh');
+for (const t of semuaTabelData) ok((await hitung(q, t)) === 0, `tabel ${t} kosong`);
+ok((await hitung(q, 'sku_unit')) === butirSebelum && (await hitung(q, 'sku_butir')) > 0 && (await hitung(q, 'pf_item')) > 0, 'katalog butir SKU dan dokumen portofolio tidak disentuh');
+ok((await q(`select count(*)::int n from public.push_langganan where penerima_id in (select id from public.profiles where role = 'admin')`))[0].n === 1, 'langganan push milik Admin tetap; milik akun lain hilang');
+ok((await hitung(q, 'push_konfigurasi')) === pushKonfSebelum, 'konfigurasi Web Push server tidak disentuh');
+
+
 {
   const sesudah = await potret(q);
   for (const k of Object.keys(bentukSebelum)) ok(JSON.stringify(bentukSebelum[k]) === JSON.stringify(sesudah[k]), `struktur tidak berubah (${k}): ${bentukSebelum[k].length} entri`);
@@ -168,8 +194,56 @@ console.log('\n--- Varian v_hapus_kegiatan = false ---');
   let g = ''; try { await B.pg.exec(YA.replace('v_hapus_kegiatan   constant boolean := true;', 'v_hapus_kegiatan   constant boolean := false;')); } catch (e) { g = e.message; }
   ok(g === '', 'skrip varian berjalan tanpa galat' + (g ? ': ' + g : ''));
   ok((await B.q("select count(*)::int n from public.profiles")).at(0).n === 2, 'semua akun selain Admin dihapus');
-  ok((await hitung(B.q, 'absensi_sesi')) === sesiSebelum && sesiSebelum > 0 && (await hitung(B.q, 'sesi_ujian')) > 0 && (await hitung(B.q, 'sidang_urut')) > 0, 'sesi latihan, sesi ujian, dan penghitung nomor dipertahankan');
+  ok((await hitung(B.q, 'absensi_sesi')) === sesiSebelum && sesiSebelum > 0 && (await hitung(B.q, 'sesi_ujian')) > 0 && (await hitung(B.q, 'sidang_urut')) > 0 && (await hitung(B.q, 'agenda')) > 0 && (await hitung(B.q, 'kegiatan_usulan')) > 0, 'agenda, usulan, sesi latihan, sesi ujian, dan penghitung nomor dipertahankan');
   ok((await hitung(B.q, 'sku_progress')) === 0 && (await hitung(B.q, 'iuran')) === 0 && (await hitung(B.q, 'absensi_hadir')) === 0, 'data milik akun tetap terhapus');
+}
+
+console.log('\n--- Varian: pengaturan, materi, instrumen, guru agama dipertahankan ---');
+{
+  const C = await bangun();
+  const [pe, ma, ins, gu] = [await hitung(C.q, 'pengaturan'), await hitung(C.q, 'materi'), await hitung(C.q, 'instrumen'), await hitung(C.q, 'guru_agama')];
+  let g = '';
+  try {
+    await C.pg.exec(YA.replace(/v_hapus_(pengaturan|materi|instrumen|guru_agama)(\s+)constant boolean := true;/g, 'v_hapus_$1$2constant boolean := false;'));
+  } catch (e) { g = e.message; }
+  ok(g === '', 'skrip varian berjalan tanpa galat' + (g ? ': ' + g : ''));
+  ok((await hitung(C.q, 'pengaturan')) === pe && (await hitung(C.q, 'materi')) === ma && (await hitung(C.q, 'instrumen')) === ins && (await hitung(C.q, 'guru_agama')) === gu && pe > 0 && ma > 0 && ins > 0 && gu > 0, 'pengaturan, materi, instrumen, dan guru agama tetap utuh');
+  ok((await C.q("select count(*)::int n from public.profiles")).at(0).n === 2 && (await hitung(C.q, 'agenda')) === 0, 'akun dan kegiatan tetap terhapus');
+}
+
+console.log('\n--- Tabel baru (Tahap 2 sampai 4) dan pengaman tabel yang belum dikenal ---');
+{
+  const MILIK_AKUN = ['tkk_capaian', 'tkk_krida', 'spg_penetapan', 'pelantikan', 'saka_anggota', 'tanggal_lahir', 'penegak_isian', 'portofolio_snapshot', 'sku_pra_uji', 'bina_damping'];
+  const KEGIATAN = ['tim_penilai', 'tim_penilai_anggota', 'garuda_tahap', 'pengukuhan_dewan'];
+  const D = await bangun();
+  const sblm = {};
+  for (const t of [...MILIK_AKUN, ...KEGIATAN, 'dokumen_templat', 'sfh_catatan', 'tkk_katalog']) sblm[t] = await hitung(D.q, t);
+  ok(Object.entries(sblm).every(([, n]) => n > 0) && sblm.sfh_catatan === 2, 'setiap tabel baru terisi sebelum dihapus: ' + JSON.stringify(sblm));
+
+  // Pengaman 5: tabel yang belum dikenal skrip menggagalkan seluruh penghapusan
+  await D.pg.exec('create table public.tabel_baru_uji (id int)');
+  let g = ''; try { await D.pg.exec(YA); } catch (e) { g = e.message; }
+  ok(/Tabel yang belum dikenal skrip ini: tabel_baru_uji/.test(g), 'tabel baru yang belum didaftarkan: penghapusan ditolak dengan nama tabelnya: ' + g.slice(0, 120));
+  ok((await D.q("select count(*)::int n from public.profiles where role <> 'admin'"))[0].n >= 12 && (await hitung(D.q, 'tkk_capaian')) === sblm.tkk_capaian, 'ditolak: tidak ada yang berubah (semua atau tidak sama sekali)');
+  await D.pg.exec('drop table public.tabel_baru_uji');
+
+  // Tabel yang belum ada di database (migrasi belum dijalankan) dilewati
+  await D.pg.exec('drop table public.tkk_pengajuan');
+  g = ''; try { await D.pg.exec(YA); } catch (e) { g = e.message; }
+  ok(g === '', 'tabel yang belum ada (migrasi belum dijalankan) dilewati: skrip tetap berjalan' + (g ? ': ' + g : ''));
+
+  for (const t of MILIK_AKUN) ok((await hitung(D.q, t)) === 0, `tabel milik akun ${t} kosong`);
+  for (const t of [...KEGIATAN, 'dokumen_templat']) ok((await hitung(D.q, t)) === 0, `tabel tanpa pemilik ${t} kosong (pilihan bawaan)`);
+  ok((await hitung(D.q, 'tkk_katalog')) === sblm.tkk_katalog, 'katalog TKK tidak disentuh');
+  const adminSfh = await D.q("select p.role from public.sfh_catatan s join public.profiles p on p.id = s.anggota_id");
+  ok(adminSfh.length === 1 && adminSfh[0].role === 'admin', 'catatan Safe From Harm milik Pembina hilang, milik Admin Gudep tetap');
+
+  // Varian: kegiatan dipertahankan (tim, kalender, pengukuhan) dan pengaturan dipertahankan (templat surat)
+  const E = await bangun();
+  g = ''; try { await E.pg.exec(YA.replace('v_hapus_kegiatan   constant boolean := true;', 'v_hapus_kegiatan   constant boolean := false;').replace('v_hapus_pengaturan constant boolean := true;', 'v_hapus_pengaturan constant boolean := false;')); } catch (e) { g = e.message; }
+  ok(g === '', 'varian kegiatan dan pengaturan dipertahankan berjalan tanpa galat' + (g ? ': ' + g : ''));
+  for (const t of [...KEGIATAN, 'dokumen_templat']) ok((await hitung(E.q, t)) === sblm[t], `dipertahankan: ${t} tetap ${sblm[t]}`);
+  for (const t of MILIK_AKUN) ok((await hitung(E.q, t)) === 0, `varian: tabel milik akun ${t} tetap kosong`);
 }
 
 console.log(`\nRINGKASAN HAPUS-AKUN: ${lulus} lulus, ${gagal} GAGAL`);
