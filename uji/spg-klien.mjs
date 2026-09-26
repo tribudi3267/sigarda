@@ -67,7 +67,7 @@ const dasar = { peserta: ani, progress, pelantikan: [], saka: [], capaianTkk: []
   ok(b[3].status === 'terpenuhi', 'butir 4 mengikuti ambang yang diatur (bukan angka tetap)');
 
   b = hitungSpg({ ...dasar, saka: [{ pesertaId: 'a', saka: 'Saka Bahari', status: 'aktif' }] });
-  ok(b[5].status === 'terpenuhi' && /Saka Bahari \(aktif\)/.test(b[5].saran.teks), 'butir 6: tergabung di Saka');
+  ok(b[5].status === 'terpenuhi' && /Saka Bahari \(aktif, surat keterangan belum ditautkan\)/.test(b[5].saran.teks), 'butir 6: tergabung di Saka');
   b = hitungSpg({ ...dasar, saka: [{ pesertaId: 'a', saka: 'Saka Bahari', status: 'selesai' }] });
   ok(b[5].status === 'terpenuhi', 'butir 6: pernah tergabung (selesai) tetap terpenuhi');
   b = hitungSpg({ ...dasar, saka: [{ pesertaId: 'x', saka: 'Saka Bahari', status: 'aktif' }] });

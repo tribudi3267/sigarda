@@ -88,7 +88,7 @@ console.log('--- Krida, kepramukaan, SPG, tim ---');
   ok(a.includes('Berkemah') && a.includes('1 Mei 2026') && a.includes('Saka Bhayangkara') && a.includes('Krida Bhakti'), 'TKK, Saka, dan Krida terisi dari data aplikasi');
   ok(a.includes('Bu Guru Tim'), 'nama tim penilai tercetak pada lembar penilaian');
   ok(BUTIR_SPG.every((b) => a.includes(b.uraian.slice(0, 40))), 'seluruh 13 uraian SPG tercetak');
-  ok((a.match(/print:break-after-page/g) ?? []).length === 8, 'delapan halaman terpisah saat dicetak (tujuh diberi pemisah, satu terakhir)');
+  ok((a.match(/print:break-after-page/g) ?? []).length === 9, 'sembilan halaman terpisah saat dicetak (delapan diberi pemisah, satu terakhir; termasuk daftar hadir latihan)');
   ok(a.includes('garuda-038-2017') || a.includes('038 Tahun 2017'), 'rujukan peraturan SPG tercantum');
   const tanpaTim = html({ tim: null, tanggalLahir: null });
   ok(!tanpaTim.includes('undefined') && !tanpaTim.includes('NaN'), 'tanpa tim dan tanggal lahir: tidak ada undefined atau NaN');
@@ -109,11 +109,11 @@ console.log('--- Krida, kepramukaan, SPG, tim ---');
   ok(b.includes('Slamet Riyadi</p>') && (b.match(/Slamet Riyadi/g) ?? []).length >= 2, 'nama orang tua menjadi penanda tangan (ayah lebih dulu)');
   const ibuSaja = html({ isian: { ibu_nama: 'Ratmi' }, sertakanSurat: false });
   ok(ibuSaja.includes('<p class="font-bold underline">Ratmi</p>'), 'tanpa ayah: ibu menjadi penanda tangan');
-  ok(!b.includes('SURAT KETERANGAN') && (b.match(/print:break-after-page/g) ?? []).length === 8, 'tanpa surat: tetap delapan halaman');
+  ok(!b.includes('SURAT KETERANGAN') && (b.match(/print:break-after-page/g) ?? []).length === 9, 'tanpa surat: tetap sembilan halaman');
   const c = html({ isian, sertakanSurat: true, tahunAjaran: '2026/2027', templat: [{ id: 1, tahunAjaran: '2025/2026', jenis: 'surat_uud', isi: { uji: '', baris: ['Hafal pembukaan UUD'], pita: null } }] });
   ok((c.match(/SURAT KETERANGAN/g) ?? []).length === 8, 'dengan surat: delapan surat keterangan tercetak sebagai lampiran');
   ok(c.includes('Hafal pembukaan UUD') && c.includes('memahami UUD 1945'), 'rubrik dari templat (warisan tahun ajaran sebelumnya) dipakai');
-  ok((c.match(/print:break-after-page/g) ?? []).length === 16, 'setiap surat pada halaman sendiri (tanpa halaman kosong di akhir)');
+  ok((c.match(/print:break-after-page/g) ?? []).length === 17, 'setiap surat pada halaman sendiri (tanpa halaman kosong di akhir)');
   ok(!c.includes('undefined') && !c.includes('NaN'), 'dokumen lengkap tanpa undefined atau NaN');
 }
 

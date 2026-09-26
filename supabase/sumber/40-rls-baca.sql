@@ -45,6 +45,7 @@ alter table public.garuda_tahap enable row level security;   -- baca: pengurus; 
 alter table public.penegak_isian enable row level security;   -- baca: pemilik, Pembina, dan Admin; tulis: hanya fungsi sg_isian_saya_simpan
 alter table public.dokumen_templat enable row level security;   -- baca: Pembina dan Admin; tulis: hanya fungsi sg_dokumen_templat_*
 alter table public.portofolio_snapshot enable row level security;   -- baca: Pembina dan Admin; tulis: hanya fungsi sg_portofolio_snapshot_*
+alter table public.sfh_catatan enable row level security;   -- baca: pemilik, Pembina, dan Admin; tulis: hanya fungsi sg_sfh_*
 alter table public.tanggal_lahir enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tanggal_lahir_atur
 alter table public.spg_penetapan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_spg_*
 alter table public.tkk_krida enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_krida_*
@@ -195,6 +196,8 @@ create policy baca_penegak_isian on public.penegak_isian for select to authentic
   using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pembina_atau_admin())));
 create policy baca_dokumen_templat on public.dokumen_templat for select to authenticated using ((select sigarda.pembina_atau_admin()));
 create policy baca_portofolio_snapshot on public.portofolio_snapshot for select to authenticated using ((select sigarda.pembina_atau_admin()));
+create policy baca_sfh_catatan on public.sfh_catatan for select to authenticated
+  using ((select sigarda.aktif()) and (anggota_id = (select auth.uid()) or (select sigarda.pembina_atau_admin())));
 -- ===== akhir kebijakan isian penegak =====
 
 -- ===== Tim penilai dan kalender Garuda (Tahap 2, G4b dan G4c): kebijakan =====

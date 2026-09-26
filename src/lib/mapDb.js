@@ -333,6 +333,11 @@ export const susunIsian = (baris = [], lahir = []) => ({
   lahir: lahir[0]?.tanggal ? tgl(lahir[0].tanggal) : null,
 });
 
+/** Baris sfh_catatan -> [{ id, anggotaId, jenis, tanggal, buktiUrl, catatan, dicatatPada }], urut anggota lalu jenis. */
+export const susunSfh = (baris = []) =>
+  baris.map((r) => ({ id: Number(r.id), anggotaId: r.anggota_id, jenis: r.jenis, tanggal: tgl(r.tanggal), buktiUrl: r.bukti_url ?? '', catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada }))
+    .sort((a, b) => a.anggotaId.localeCompare(b.anggotaId) || a.jenis.localeCompare(b.jenis));
+
 /** Baris portofolio_snapshot -> [{ id, pesertaId, tahunAjaran, catatan, isi, dibuatOlehNama, dibuatPada }], terbaru dulu. */
 export const susunSnapshot = (baris = []) =>
   baris.map((r) => ({ id: Number(r.id), pesertaId: r.peserta_id, tahunAjaran: r.tahun_ajaran, catatan: r.catatan ?? '', isi: r.isi ?? {}, dibuatOlehNama: r.dibuat_oleh_nama ?? '', dibuatPada: r.dibuat_pada }))

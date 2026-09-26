@@ -85,6 +85,12 @@ export const PERATURAN = {
     judul: 'Petunjuk Penyelenggaraan Kwarnas Nomor 04 Tahun 2021 tentang Peraturan Perlindungan bagi Anggota Gerakan Pramuka (Safe From Harm)',
     url: 'https://pramuka.or.id/files/document/Jukran-Kwarnas-004-2021-Safe-From-Harm.pdf',
   },
+  'perlindungan-004-2021-teks': {
+    nama: 'Jukran Kwarnas 004/2021 (e-book)',
+    judul: 'Jukran Kwarnas Nomor 004 Tahun 2021 tentang Peraturan Perlindungan bagi Anggota Gerakan Pramuka (Safe From Harm), versi e-book yang teksnya dapat dicari',
+    url: 'https://drive.google.com/u/2/uc?id=1ZfVdgZI9PwUgQEjRdChmLficg9CWO1PD&export=download',
+    catatan: 'Berkas di Google Drive yang ditautkan Kwarda DIY (pramukadiy.or.id). Berkas pada pramuka.or.id berupa pindaian gambar sehingga teksnya tidak dapat dicari.',
+  },
   'agama-182-1979': {
     nama: 'SK Kwarnas 182/1979',
     judul: 'Keputusan Kwarnas Nomor 182 Tahun 1979 tentang Petunjuk Penyelenggaraan Pendidikan Agama dalam Gerakan Pramuka',
