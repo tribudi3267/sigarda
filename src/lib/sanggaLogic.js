@@ -21,11 +21,11 @@ const urutNama = (a, b) => String(a).localeCompare(String(b), 'id', { sensitivit
  * Anggota rombel -> daftar sangga terurut nama: [{ kunci, nama, anggota, pinsa, peringatan }] (pinsa = anggota berstatus Pinsa atau null;
  * peringatan = teks peringatan server untuk sangga itu). Penulisan sangga dibandingkan tanpa membedakan huruf besar/kecil.
  */
-export function kelompokSangga(anggota = [], peringatan = []) {
+export function kelompokSangga(anggota = [], peringatan = [], pinsaTugas = []) {
   const peta = new Map();
   for (const a of anggota) {
     const kunci = String(a.sangga ?? '').toLowerCase();
-    if (!peta.has(kunci)) peta.set(kunci, { kunci, nama: a.sangga ?? '', anggota: [], pinsa: null, peringatan: [] });
+    if (!peta.has(kunci)) peta.set(kunci, { kunci, nama: a.sangga ?? '', anggota: [], pinsa: null, tugas: [], peringatan: [] });
     const g = peta.get(kunci);
     g.anggota.push(a);
     if (a.pinsa) g.pinsa = a;
@@ -34,9 +34,27 @@ export function kelompokSangga(anggota = [], peringatan = []) {
     const g = p.sangga ? peta.get(String(p.sangga).toLowerCase()) : null;
     if (g) g.peringatan.push(p.teks);
   }
+  // Pinsa tertugas dari rombel lain (tugas): ikut kelompok sangga yang ditugasinya.
+  for (const t of pinsaTugas) peta.get(String(t.sangga ?? '').toLowerCase())?.tugas.push(t);
   return [...peta.values()]
     .map((g) => ({ ...g, anggota: g.anggota.slice().sort((x, y) => Number(y.pinsa) - Number(x.pinsa) || urutNama(x.nama, y.nama)) }))
     .sort((x, y) => urutNama(x.nama, y.nama));
+}
+
+/** Paling banyak dua Pinsa tertugas per sangga (dijaga server: sg_pinsa_tugaskan). */
+export const BATAS_PINSA_TUGAS = 2;
+
+/** Berapa Pinsa tertugas pada satu sangga (nama sangga tanpa membedakan huruf besar/kecil). */
+export const jumlahPinsaTugas = (pinsaTugas = [], sangga = '') => pinsaTugas.filter((t) => String(t.sangga ?? '').toLowerCase() === String(sangga ?? '').toLowerCase()).length;
+
+/** Tulisan satu calon Pinsa pada pilihan: "Nama (X-01, Calon Laksana)". */
+export const labelCalonPinsa = (c) => `${c.nama} (${c.kelas || '-'}, ${labelTingkat(c.tingkat) || '-'})`;
+
+/** Calon yang tulisannya sama persis (tanpa membedakan huruf besar/kecil) dengan isian pengguna, atau null. */
+export function cariCalonPinsa(calon = [], teks = '') {
+  const t = String(teks ?? '').trim().toLowerCase();
+  if (!t) return null;
+  return calon.find((c) => labelCalonPinsa(c).toLowerCase() === t) ?? null;
 }
 
 /** Peringatan tingkat rombel (bukan milik satu sangga). */

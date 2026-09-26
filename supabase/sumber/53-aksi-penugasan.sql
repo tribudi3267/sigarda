@@ -254,7 +254,8 @@ begin
 end $$;
 
 -- Susunan sangga sebuah rombel beserta Bina Damping dan peringatannya. Boleh dibaca: pengurus, Bina Damping rombel itu, dan Penegak aktif rombel itu.
--- { rombel, tahun_ajaran, bisa_atur, bina_damping: [{ id, nama, tingkat }], anggota: [{ id, nama, sangga, pinsa, tingkat, layak_pinsa }], peringatan: [{ sangga, teks }] }
+-- { rombel, tahun_ajaran, bisa_atur, bina_damping: [{ id, nama, tingkat }], anggota: [{ id, nama, sangga, pinsa, tingkat, layak_pinsa }],
+--   pinsa_tugas: [{ id, nama, sangga, kelas (asal), tingkat }] (Pinsa yang ditugaskan dari rombel lain), peringatan: [{ sangga, teks }] }
 -- `tingkat` (kemajuan SKU sesama Penegak) dan `layak_pinsa` (Bantara selesai) hanya diperlihatkan kepada yang boleh mengatur dan pengurus; Penegak biasa menerima null/false.
 create function public.sg_sangga_rombel(p_rombel text) returns jsonb
 language plpgsql stable security definer set search_path = public as
@@ -281,6 +282,11 @@ begin
                                           'layak_pinsa', x.tingkat is not null and x.tingkat <> 'calon-bantara') order by lower(x.sangga), x.pinsa desc, x.nama)
       from (select p.id, p.nama, p.sangga, p.pinsa, case when v_lihat then sigarda.tingkat_penegak(p.id) end as tingkat
             from public.profiles p where p.role = 'peserta' and p.status = 'aktif' and p.kelas = p_rombel) x), '[]'::jsonb),
+    'pinsa_tugas', coalesce((
+      select jsonb_agg(jsonb_build_object('id', p.id, 'nama', p.nama, 'sangga', t.sangga, 'kelas', p.kelas, 'tingkat', case when v_lihat then sigarda.tingkat_penegak(p.id) end)
+                       order by lower(t.sangga), p.nama)
+      from public.pinsa_tugas t join public.profiles p on p.id = t.penegak_id
+      where t.tahun_ajaran = sigarda.tahun_ajaran_kini() and t.rombel = p_rombel), '[]'::jsonb),
     'peringatan', sigarda.sangga_peringatan(p_rombel)
   );
 end $$;
@@ -350,7 +356,90 @@ begin
   return jsonb_build_object(
     'bina_damping', coalesce((select jsonb_agg(b.rombel order by b.rombel) from public.bina_damping b
                               where b.penegak_id = auth.uid() and b.tahun_ajaran = sigarda.tahun_ajaran_kini()), '[]'::jsonb),
-    'pinsa', coalesce((select pinsa from public.profiles where id = auth.uid()), false));
+    'pinsa', coalesce((select pinsa from public.profiles where id = auth.uid()), false)
+             or exists (select 1 from public.pinsa_tugas t where t.penegak_id = auth.uid() and t.tahun_ajaran = sigarda.tahun_ajaran_kini()),
+    'pinsa_tugas', coalesce((select jsonb_agg(jsonb_build_object('rombel', t.rombel, 'sangga', t.sangga) order by t.rombel, lower(t.sangga)) from public.pinsa_tugas t
+                             where t.penegak_id = auth.uid() and t.tahun_ajaran = sigarda.tahun_ajaran_kini()), '[]'::jsonb));
 end $$;
 -- ===== akhir aksi pinsa bina damping =====
+
+-- ===== Pinsa tertugas lintas rombel: aksi =====
+-- Penegak yang dapat ditugaskan menjadi Pinsa sebuah sangga di rombel p_rombel: aktif, sudah menyelesaikan SKU Bantara, belum bertugas sebagai Pinsa tahun ajaran ini
+-- (dan bukan Pinsa sangga sendiri). Dibaca hanya oleh yang boleh mengatur sangga rombel itu (Bina Damping rombel itu, Pembina, Admin); dipanggil saat panel penugasan dibuka.
+-- { tahun_ajaran, calon: [{ id, nama, kelas, tingkat }] } urut kelas lalu nama.
+create function public.sg_pinsa_calon(p_rombel text) returns jsonb
+language plpgsql stable security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.rombel_sah(p_rombel) then raise exception 'Rombel tidak sah. Contoh: X-01, XI-05, XII-10.'; end if;
+  if not sigarda.sangga_bisa_atur(p_rombel) then
+    raise exception 'Hanya Bina Damping rombel ini, Pembina, dan Admin Gudep yang dapat menugaskan Pinsa.';
+  end if;
+  return jsonb_build_object(
+    'tahun_ajaran', sigarda.tahun_ajaran_kini(),
+    'calon', coalesce((
+      select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'kelas', x.kelas, 'tingkat', x.tingkat) order by x.kelas, x.nama)
+      from (
+        select p.id, p.nama, p.kelas, sigarda.tingkat_penegak(p.id) as tingkat
+        from public.profiles p
+        where p.role = 'peserta' and p.status = 'aktif' and not p.pinsa
+          and not exists (select 1 from public.pinsa_tugas t where t.penegak_id = p.id and t.tahun_ajaran = sigarda.tahun_ajaran_kini())
+          and exists (select 1 from public.sku_progress s join public.sku_unit u on u.id = s.sku_id where s.peserta_id = p.id and s.status = 'lulus' and u.tingkat = 'Bantara')
+          and sigarda.tingkat_selesai(p.id, 'Bantara')
+        limit 400
+      ) x), '[]'::jsonb));
+end $$;
+
+-- Menugaskan satu Penegak Calon Laksana menjadi Pinsa sebuah sangga (p_sangga) di rombel p_rombel (Bina Damping rombel itu, Pembina, Admin). Sangga harus sudah ada di rombel itu.
+-- Satu orang satu sangga per tahun ajaran; paling banyak 2 Pinsa tertugas per sangga. Mengembalikan { peringatan } (sama dengan sg_sangga_atur).
+create function public.sg_pinsa_tugaskan(p_rombel text, p_sangga text, p_penegak_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as
+$$
+declare v_ta text := sigarda.tahun_ajaran_kini(); v_s text := sigarda.rapikan(p_sangga); v_nama_sangga text; v_p public.profiles; v_t public.pinsa_tugas;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.rombel_sah(p_rombel) then raise exception 'Rombel tidak sah. Contoh: X-01, XI-05, XII-10.'; end if;
+  if not sigarda.sangga_bisa_atur(p_rombel) then
+    raise exception 'Hanya Bina Damping rombel ini, Pembina, dan Admin Gudep yang dapat menugaskan Pinsa.';
+  end if;
+  select min(sangga) into v_nama_sangga from public.profiles
+    where role = 'peserta' and status = 'aktif' and kelas = p_rombel and lower(btrim(coalesce(sangga, ''))) = lower(v_s) and v_s <> '';
+  if v_nama_sangga is null then
+    raise exception 'Sangga % belum ada di rombel %. Bagi sangga lebih dulu, baru tugaskan Pinsa.', coalesce(nullif(v_s, ''), '(kosong)'), p_rombel;
+  end if;
+  select * into v_p from public.profiles where id = p_penegak_id and role = 'peserta' and status = 'aktif';
+  if not found then raise exception 'Penegak tidak ditemukan atau tidak aktif.'; end if;
+  if not sigarda.tingkat_selesai(p_penegak_id, 'Bantara') then
+    raise exception '% belum menyelesaikan SKU Bantara. Pinsa dipilih dari Penegak Calon Laksana.', v_p.nama;
+  end if;
+  if v_p.pinsa then raise exception '% sudah menjadi Pinsa di sangga sendiri. Cabut dulu Pinsa-nya di rombelnya.', v_p.nama; end if;
+  select * into v_t from public.pinsa_tugas where tahun_ajaran = v_ta and penegak_id = p_penegak_id;
+  if found then
+    raise exception '% sudah bertugas sebagai Pinsa sangga % rombel %. Cabut dulu penugasannya.', v_p.nama, v_t.sangga, v_t.rombel;
+  end if;
+  if v_p.kelas = p_rombel and lower(btrim(coalesce(v_p.sangga, ''))) = lower(v_nama_sangga) then
+    raise exception '% anggota sangga ini sendiri. Jadikan Pinsa lewat kotak centang Pinsa pada susunan sangga.', v_p.nama;
+  end if;
+  if (select count(*) from public.pinsa_tugas where tahun_ajaran = v_ta and rombel = p_rombel and lower(sangga) = lower(v_nama_sangga)) >= 2 then
+    raise exception 'Sangga % sudah punya 2 Pinsa tertugas. Cabut salah satunya lebih dulu.', v_nama_sangga;
+  end if;
+  insert into public.pinsa_tugas (tahun_ajaran, rombel, sangga, penegak_id, ditetapkan_oleh) values (v_ta, p_rombel, v_nama_sangga, p_penegak_id, auth.uid());
+  return jsonb_build_object('peringatan', sigarda.sangga_peringatan(p_rombel));
+end $$;
+
+-- Mencabut penugasan Pinsa (p_penegak_id) pada rombel p_rombel (Bina Damping rombel itu, Pembina, Admin). Mencabut yang tidak ada tidak galat.
+create function public.sg_pinsa_cabut(p_rombel text, p_penegak_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.rombel_sah(p_rombel) then raise exception 'Rombel tidak sah. Contoh: X-01, XI-05, XII-10.'; end if;
+  if not sigarda.sangga_bisa_atur(p_rombel) then
+    raise exception 'Hanya Bina Damping rombel ini, Pembina, dan Admin Gudep yang dapat mencabut penugasan Pinsa.';
+  end if;
+  delete from public.pinsa_tugas where tahun_ajaran = sigarda.tahun_ajaran_kini() and rombel = p_rombel and penegak_id = p_penegak_id;
+  return jsonb_build_object('peringatan', sigarda.sangga_peringatan(p_rombel));
+end $$;
+-- ===== akhir aksi pinsa tertugas =====
 
