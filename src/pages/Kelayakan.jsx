@@ -12,7 +12,7 @@ import { hitungSpg, ringkasSpg } from '../lib/spgLogic';
 import { layakGaruda } from '../lib/skuLogic';
 import { unduhXlsx } from '../lib/exportXlsx';
 import { ambilGudep } from '../lib/gudepStore';
-import { barisPendataan, lembarPendataan } from '../lib/pendataanGarudaLogic';
+import { lembarRekapKwarran } from '../lib/rekapKwarranLogic';
 import { tahunAjaranKini } from '../lib/rombelLogic';
 import { labelUntuk, timUntukCalon } from '../lib/timLogic';
 import TimPenilaiPanel from '../components/TimPenilaiPanel';
@@ -105,7 +105,7 @@ function PanelAturan({ data, boleh }) {
 }
 
 /** Daftar Calon Garuda dengan syarat gerbang, kuota, dan aturan. `tim` = tim penilai pada tahun ajaran terpilih (untuk menampilkan tim yang menilai tiap calon). */
-function PanelCalon({ tim, tahunAjaran }) {
+function PanelCalon({ tim, tahap, tahunAjaran }) {
   const { user, daftarPeserta, progress, portofolio } = useApp();
   const gerbang = useGerbang();
   const spg = useSpg();
@@ -120,11 +120,12 @@ function PanelCalon({ tim, tahunAjaran }) {
   const memuat = gerbang.memuat || spg.memuat || pel.memuat || tkk.memuat;
 
   const kuota = useMemo(() => kuotaCalon(daftarPeserta, gerbang.aturan), [daftarPeserta, gerbang.aturan]);
-  // Tabel Pendataan dan Verifikasi Syarat Awal Calon Garuda (Excel): seluruh Calon dan Penegak yang SKU-nya selesai, bukan hanya 100 baris yang tampil.
-  const unduhPendataan = async () => {
+  // Rekap Calon Garuda untuk Kwarran (Excel, banyak lembar): seluruh Calon dan Penegak yang SKU-nya selesai, bukan hanya 100 baris yang tampil.
+  const unduhRekap = async () => {
     const calon = daftarPeserta.filter((u) => u.calonGaruda || layakGaruda(progress, u));
-    const baris = barisPendataan({ calon, aktif: daftarPeserta, progress, pelantikan: pel.pelantikan, lahir: gerbang.lahir, aturan: gerbang.aturan });
-    await unduhXlsx({ namaFile: `pendataan-calon-garuda-${hariIni()}`, sheets: [lembarPendataan({ baris, aturan: gerbang.aturan, gudep: ambilGudep() })] });
+    const konteks = { progress, pelantikan: pel.pelantikan, saka: pel.saka, capaianTkk: tkk.capaian, ambang: tkk.ambang, portofolio, penetapan: spg.penetapan };
+    const sheets = lembarRekapKwarran({ calon, aktif: daftarPeserta, konteks, lahir: gerbang.lahir, aturan: gerbang.aturan, tim, tahap, tahunAjaran, gudep: ambilGudep() });
+    await unduhXlsx({ namaFile: `rekap-calon-garuda-kwarran-${hariIni()}`, sheets });
   };
   const baris = useMemo(() => {
     const k = cari.trim().toLowerCase();
@@ -155,7 +156,7 @@ function PanelCalon({ tim, tahunAjaran }) {
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <input className="input max-w-xs flex-1" aria-label="Cari Penegak" placeholder="Cari nama atau kelas Penegak" value={cari} onChange={(e) => setCari(e.target.value)} />
         {kelola && <button className="btn btn-outline btn-sm" onClick={() => setLengkapi(true)}>Lengkapi tanggal lahir (Excel)</button>}
-        <button className="btn btn-outline btn-sm" disabled={memuat} onClick={unduhPendataan}>Unduh tabel pendataan (Excel)</button>
+        <button className="btn btn-outline btn-sm" disabled={memuat} onClick={unduhRekap} title="Pendataan, kesiapan berkas, TKK, SPG, tim penilai, dan kalender dalam satu berkas Excel">Unduh rekap untuk Kwarran (Excel)</button>
         <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={semua} onChange={(e) => setSemua(e.target.checked)} /> Tampilkan semua Penegak aktif</label>
       </div>
 
@@ -225,7 +226,7 @@ export default function Kelayakan() {
         )}
       </div>
       {tk.galat && <p role="alert" className="mb-4 text-sm font-medium text-red-700">{tk.galat}</p>}
-      {tab === 'calon' && <PanelCalon tim={tk.tim} tahunAjaran={kini} />}
+      {tab === 'calon' && <PanelCalon tim={tk.tim} tahap={tk.tahap} tahunAjaran={kini} />}
       {tab === 'tim' && <TimPenilaiPanel data={tk} tahunAjaran={ta} boleh={kelola} />}
       {tab === 'kalender' && <KalenderGarudaPanel data={tk} tahunAjaran={ta} boleh={kelola} />}
     </div>
