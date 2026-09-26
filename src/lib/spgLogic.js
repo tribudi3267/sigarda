@@ -36,14 +36,14 @@ export function tambahBulan(tanggal, n) {
   return `${String(ny).padStart(4, '0')}-${String(nm).padStart(2, '0')}-${String(Math.min(d, akhir)).padStart(2, '0')}`;
 }
 
-function saranOtomatis(butir, { peserta, progress, pelantikan, saka, capaianTkk, ambang, portofolio, hari }) {
+function saranOtomatis(butir, { peserta, progress, pelantikan, saka, krida, capaianTkk, ambang, portofolio, hari, latihan }) {
   if (butir.aturan === 'sku-laksana') {
     if (!tingkatSelesai(progress, peserta, 'Laksana')) return { terpenuhi: false, teks: 'SKU Laksana belum selesai.' };
     const pl = pelantikanPeserta(pelantikan, peserta.id).laksana;
     if (!pl) return { terpenuhi: false, teks: 'SKU Laksana selesai; pelantikan Laksana belum dicatat (menu Pelantikan).' };
     const genap = tambahBulan(pl.tanggal, 3);
     return hari >= genap
-      ? { terpenuhi: true, teks: `Dilantik Laksana ${fmtTanggal(pl.tanggal)}; sudah berlatih 3 bulan sejak ${fmtTanggal(genap)}.` }
+      ? { terpenuhi: true, teks: `Dilantik Laksana ${fmtTanggal(pl.tanggal)}; sudah berlatih 3 bulan sejak ${fmtTanggal(genap)}.${latihan ? ` Hadir ${latihan.hadir} dari ${latihan.total} latihan sejak dilantik.` : ''}` }
       : { terpenuhi: false, teks: `Dilantik Laksana ${fmtTanggal(pl.tanggal)}; genap 3 bulan pada ${fmtTanggal(genap)}.` };
   }
   if (butir.aturan === 'tkk') {
@@ -53,7 +53,7 @@ function saranOtomatis(butir, { peserta, progress, pelantikan, saka, capaianTkk,
   if (butir.aturan === 'saka') {
     const daftar = sakaPeserta(saka, peserta.id);
     return daftar.length
-      ? { terpenuhi: true, teks: `Saka: ${daftar.map((s) => `${s.saka} (${s.status})`).join(', ')}.` }
+      ? { terpenuhi: true, teks: `Saka: ${daftar.map((s) => `${s.saka} (${s.status}${s.suratUrl ? ', surat keterangan ditautkan' : ', surat keterangan belum ditautkan'})`).join(', ')}.${Array.isArray(krida) ? ` Krida tercatat: ${krida.filter((k) => k.pesertaId === peserta.id).length}.` : ''}` }
       : { terpenuhi: false, teks: 'Belum tercatat di Saka mana pun (menu Pelantikan, tab Saka).' };
   }
   if (butir.aturan === 'penabung') {

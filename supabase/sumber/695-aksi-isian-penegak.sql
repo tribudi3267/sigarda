@@ -149,3 +149,64 @@ begin
   delete from public.portofolio_snapshot where id = p_id;
 end $$;
 -- ===== akhir aksi salinan beku portofolio =====
+
+-- ===== Perlindungan anggota / Safe From Harm (Tahap 4): aksi =====
+-- Mencatat (atau mengoreksi) satu catatan Safe From Harm bagi anggota dewasa gugus depan: Pembina aktif (pelatihan, pakta_integritas, rekam_jejak) atau Admin Gudep aktif (pelatihan saja).
+-- Pembina dan Admin yang mencatat. tanggal tidak boleh di masa depan; bukti_url (opsional) tautan http(s); catatan <= 200 karakter. Mencatat ulang = koreksi.
+create function public.sg_sfh_catat(p_anggota_id uuid, p_jenis text, p_tanggal date, p_bukti_url text default '', p_catatan text default '') returns void language plpgsql security definer set search_path = public as
+$$
+declare v_p public.profiles; v_url text := btrim(coalesce(p_bukti_url, '')); v_cat text := sigarda.rapikan(p_catatan);
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mencatat Safe From Harm.'; end if;
+  if coalesce(p_jenis, '') not in ('pelatihan', 'pakta_integritas', 'rekam_jejak') then raise exception 'Jenis catatan harus pelatihan, pakta_integritas, atau rekam_jejak.'; end if;
+  select * into v_p from public.profiles where id = p_anggota_id;
+  if not found then raise exception 'Pilih anggota.'; end if;
+  if v_p.status <> 'aktif' or not ((v_p.role = 'penguji' and v_p.jabatan = 'Pembina') or v_p.role = 'admin') then
+    raise exception 'Catatan Safe From Harm hanya untuk anggota dewasa aktif (Pembina dan Admin Gudep).';
+  end if;
+  if v_p.role = 'admin' and p_jenis <> 'pelatihan' then raise exception 'Admin Gudep hanya dicatat untuk pelatihan; pakta integritas dan rekam jejak untuk Pembina.'; end if;
+  if p_tanggal is null or p_tanggal < date '2015-01-01' or p_tanggal > sigarda.hari_ini() then raise exception 'Tanggal tidak boleh sebelum tahun 2015 atau di masa depan.'; end if;
+  if char_length(v_url) > 500 then raise exception 'Tautan bukti maksimal 500 karakter.'; end if;
+  if v_url <> '' and v_url !~* '^https?://[^[:space:]<>]+$' then raise exception 'Tautan bukti harus berawalan http:// atau https:// tanpa spasi.'; end if;
+  if char_length(v_cat) > 200 or v_cat ~ '[[:cntrl:]<>]' then raise exception 'Catatan maksimal 200 karakter dan tanpa karakter khusus.'; end if;
+  insert into public.sfh_catatan (anggota_id, jenis, tanggal, bukti_url, catatan, dicatat_oleh, dicatat_pada)
+  values (p_anggota_id, p_jenis, p_tanggal, v_url, v_cat, auth.uid(), now())
+  on conflict (anggota_id, jenis) do update set tanggal = excluded.tanggal, bukti_url = excluded.bukti_url, catatan = excluded.catatan, dicatat_oleh = excluded.dicatat_oleh, dicatat_pada = excluded.dicatat_pada;
+end $$;
+
+create function public.sg_sfh_hapus(p_id bigint) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan Safe From Harm.'; end if;
+  delete from public.sfh_catatan where id = p_id;
+end $$;
+
+-- Penerima laporan gugus depan (Pasal 10 ayat 3: setiap gugus depan wajib memiliki prosedur penerimaan laporan). Pengaturan 'perlindungan.gudep' = { penerima, kontak, prosedurUrl, catatan }
+-- (dibaca semua pengguna agar Penegak tahu kepada siapa melapor; diubah Pembina dan Admin). Laporan sendiri TIDAK disimpan di aplikasi.
+create function public.sg_sfh_gudep_simpan(p_nilai jsonb) returns void language plpgsql security definer set search_path = public as
+$$
+declare v_k text; v_v text; v_maks int; v_h jsonb := '{}'::jsonb;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mengubah penerima laporan Safe From Harm.'; end if;
+  if p_nilai is null or jsonb_typeof(p_nilai) <> 'object' or p_nilai - 'penerima' - 'kontak' - 'prosedurUrl' - 'catatan' <> '{}'::jsonb then raise exception 'Bentuk isian tidak sah.'; end if;
+  foreach v_k in array array['penerima', 'kontak', 'prosedurUrl', 'catatan'] loop
+    if coalesce(jsonb_typeof(p_nilai -> v_k), '') <> 'string' then raise exception 'Isian % harus berupa teks.', v_k; end if;
+    if v_k = 'prosedurUrl' then
+      v_v := btrim(p_nilai ->> v_k);
+      if char_length(v_v) > 500 or (v_v <> '' and v_v !~* '^https?://[^[:space:]<>]+$') then raise exception 'Tautan prosedur harus berawalan http:// atau https:// tanpa spasi (maksimal 500 karakter).'; end if;
+    else
+      v_v := sigarda.rapikan(p_nilai ->> v_k);
+      v_maks := case v_k when 'penerima' then 120 when 'kontak' then 80 else 300 end; -- (case di dalam kondisi if terpotong pada then pertama)
+      if char_length(v_v) > v_maks or v_v ~ '[[:cntrl:]<>]' then
+        raise exception 'Isian % terlalu panjang atau memuat karakter khusus.', v_k;
+      end if;
+    end if;
+    v_h := v_h || jsonb_build_object(v_k, v_v);
+  end loop;
+  insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada) values ('perlindungan.gudep', v_h, auth.uid(), now())
+  on conflict (kunci) do update set nilai = excluded.nilai, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
+end $$;
+-- ===== akhir aksi perlindungan anggota =====

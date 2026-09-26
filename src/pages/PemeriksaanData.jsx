@@ -4,6 +4,7 @@ import { gabungHasilPemeriksaan, jumlahKategori, kategoriTampil, tabPerbaikan, t
 import { namaTahap } from '../lib/praUjiLogic';
 import { bolehDihubungi, nomorWaAnggota, teksWaAjakMasuk, teksWaLengkapiDataDiri } from '../lib/eskalasiLogic';
 import { labelPokok } from '../lib/isianLogic';
+import { labelJenisSfh, teksWaLengkapiSfh } from '../lib/perlindunganLogic';
 import { alamatDasar } from '../lib/verifikasiLogic';
 import RingkasanPerangkat from '../components/RingkasanPerangkat';
 import TombolWhatsapp from '../components/TombolWhatsapp';
@@ -75,6 +76,12 @@ const RENDER = (users, user) => ({
   sanggaTanpaPinsa: (x) => <Baris key={`${x.rombel}|${x.sangga}`} kiri={x.sangga} kanan={`${x.rombel}, ${x.jumlah} Penegak`} />,
   praUjiMacet: (x) => <Baris key={x.id} kiri={x.nama} kanan={`${x.butir}, tahap ${namaTahap(x.tahap)}, ${x.hari === 0 ? 'sejak hari ini' : `${x.hari} hari`}${x.tanpaPenilai ? ', tanpa penilai' : ''}`} />,
   pembinaTanpaAgama: (x) => <Baris key={x.id} kiri={x.nama} />,
+  sfhBelum: (x) => (
+    <Baris
+      key={x.id} kiri={x.nama} kanan={`${x.peran}: ${x.kurang.map(labelJenisSfh).join(', ')}`}
+      aksi={bolehDihubungi(user, { id: x.id, peran: x.peran }) ? <TombolWhatsapp nomor={nomorWaAnggota(users, x.id)} nama={x.nama} teks={teksWaLengkapiSfh(x.nama, x.kurang.map(labelJenisSfh), alamatDasar())} /> : null}
+    />
+  ),
   dataDiriBelum: (x) => (
     <Baris
       key={x.id} kiri={x.nama} kanan={`${x.kelas || '-'}: ${x.kurang.map(labelPokok).join(', ')}`}

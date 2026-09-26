@@ -25,7 +25,7 @@ export function periksaCatatanSnapshot(catatan) {
 
 /**
  * Isi salinan beku dari data yang membentuk dokumen. `data` = { peserta, gudep, tanggalLahir, capaianTkk, krida, ambang, pelantikan, saka, hasilSpg, tim, portofolio, isian,
- * templat (daftar templat tersimpan), tahunAjaran, hari }. Hanya data Penegak ini yang disimpan (bukan seluruh gudep); templat surat dipilih per jenis menurut tahun ajaran.
+ * templat (daftar templat tersimpan), tahunAjaran, hari, latihan (hasil daftarLatihanLaksana atau null) }. Hanya data Penegak ini yang disimpan (bukan seluruh gudep); templat surat dipilih per jenis menurut tahun ajaran.
  */
 export function buatIsiSnapshot(data) {
   const { peserta } = data;
@@ -49,6 +49,7 @@ export function buatIsiSnapshot(data) {
     tim: data.tim ?? null,
     portofolio: { [peserta.id]: data.portofolio?.[peserta.id] ?? {} },
     isian: data.isian ?? {},
+    latihan: data.latihan ?? null,
     templat,
   };
 }
@@ -58,7 +59,7 @@ export function dariSnapshot(isi, { sertakanSurat = true } = {}) {
   return {
     peserta: isi.peserta, tanggalLahir: isi.tanggalLahir ?? null, capaianTkk: isi.capaianTkk ?? [], krida: isi.krida ?? [], ambang: isi.ambang,
     pelantikan: isi.pelantikan ?? [], saka: isi.saka ?? [], hasilSpg: isi.hasilSpg ?? [], tim: isi.tim ?? null, portofolio: isi.portofolio ?? {},
-    isian: isi.isian ?? {}, templat: isi.templat ?? [], tahunAjaran: isi.tahunAjaran, sertakanSurat, hari: isi.hari,
+    isian: isi.isian ?? {}, templat: isi.templat ?? [], tahunAjaran: isi.tahunAjaran, sertakanSurat, hari: isi.hari, latihan: isi.latihan ?? null,
   };
 }
 

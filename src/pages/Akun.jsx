@@ -5,6 +5,7 @@ import { fmtWaktu } from '../lib/format';
 import FormGantiPin from '../components/FormGantiPin';
 import FormWhatsapp from '../components/FormWhatsapp';
 import FormDataDiri from '../components/FormDataDiri';
+import KartuPerlindungan from '../components/KartuPerlindungan';
 import useIsianSaya from '../hooks/useIsianSaya';
 import { pokokKurang } from '../lib/isianLogic';
 import { Avatar, BadgePeran, Icon } from '../components/ui';
@@ -75,6 +76,8 @@ export default function Akun() {
           </p>
           <FormGantiPin />
         </section>
+
+        <KartuPerlindungan />
 
         {penegakAktif && (
           <section className="panel p-5 lg:col-span-2">

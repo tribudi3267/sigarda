@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSpg, susunTanggalLahir, susunIsian, susunTemplatDokumen, susunSnapshot, susunGerbang, susunTimPenilai, susunGarudaTahap, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
+import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSpg, susunTanggalLahir, susunIsian, susunTemplatDokumen, susunSnapshot, susunSfh, susunGerbang, susunTimPenilai, susunGarudaTahap, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 /** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
@@ -245,6 +245,16 @@ export function buatApi(klien) {
     muatSnapshot: (pesertaId) => muat(async () => susunSnapshot(await ambilSemua('portofolio_snapshot', { filter: [['peserta_id', pesertaId]], urut: ['id'] }))),
     simpanSnapshot: (pesertaId, catatan, isi) => rpc('sg_portofolio_snapshot_simpan', { p_peserta_id: pesertaId, p_catatan: catatan ?? '', p_isi: isi }),
     hapusSnapshot: (id) => rpc('sg_portofolio_snapshot_hapus', { p_id: id }),
+
+    /* ------------------- Perlindungan anggota / Safe From Harm (Tahap 4) ------------------- */
+    /** Catatan Safe From Harm (Pembina dan Admin: semua; lainnya: miliknya sendiri, dibatasi RLS) dan penerima laporan gugus depan (pengaturan 'perlindungan.gudep', dibaca semua). */
+    muatSfh: () => muat(async () => {
+      const [c, g] = await Promise.all([ambilSemua('sfh_catatan', { urut: ['anggota_id', 'jenis'] }), ambilSemua('pengaturan', { filter: [['kunci', 'perlindungan.gudep']] })]);
+      return { catatan: susunSfh(c), gudep: g[0]?.nilai ?? null };
+    }),
+    simpanSfh: ({ anggotaId, jenis, tanggal, buktiUrl = '', catatan = '' }) => rpc('sg_sfh_catat', { p_anggota_id: anggotaId, p_jenis: jenis, p_tanggal: tanggal || null, p_bukti_url: buktiUrl, p_catatan: catatan }),
+    hapusSfh: (id) => rpc('sg_sfh_hapus', { p_id: id }),
+    simpanGudepSfh: (nilai) => rpc('sg_sfh_gudep_simpan', { p_nilai: nilai }),
 
     /* ------------------- Tim penilai dan kalender Garuda (Tahap 2, G4b dan G4c) ------------------- */
     /** Tim penilai (dengan anggotanya) dan kalender tahap Garuda; hanya pengurus yang dapat membaca (dibatasi RLS). */
