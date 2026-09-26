@@ -1,6 +1,7 @@
 -- ===== Pra-uji berjenjang (fase C): bantu =====
 -- Aturan penilai pra-uji (aturan pengaman: hanya menyaring butir yang sudah ia lulus sendiri; butir agama bersifat per agama sehingga otomatis seagama):
---   * tahap 'pinsa'        : Pinsa (aktif) sangga dan rombel yang sama dengan Penegak; hanya butir Bantara; Pinsa yang mengajukan sendiri melewati tahap ini.
+--   * tahap 'pinsa'        : Pinsa (aktif) sangga dan rombel Penegak, yaitu anggota sangga itu berstatus Pinsa ATAU Penegak yang ditugaskan ke sangga itu (pinsa_tugas, lintas rombel);
+--                            hanya butir Bantara; Pinsa yang mengajukan sendiri melewati tahap ini.
 --   * tahap 'bina_damping' : Bina Damping rombel Penegak pada tahun ajaran berjalan; butir Laksana hanya oleh Bina Damping yang sudah Laksana;
 --                            Bina Damping yang mengajukan sendiri disaring Bina Damping lain di rombelnya.
 -- Tidak ada penilai yang memenuhi syarat pada suatu tahap = tahap itu dilewati; bila semua tahap terlewati, pengajuan langsung ke Pembina.
@@ -18,8 +19,10 @@ begin
   if not found then return false; end if;
   if not exists (select 1 from public.sku_progress where peserta_id = p_penilai and sku_id = p_sku and status = 'lulus') then return false; end if;
   if p_tahap = 'pinsa' then
-    return v_tingkat = 'Bantara' and v_n.pinsa and not v_p.pinsa and v_p.kelas is not null and v_n.kelas = v_p.kelas
-       and lower(v_n.sangga) = lower(v_p.sangga);
+    return v_tingkat = 'Bantara' and not v_p.pinsa and v_p.kelas is not null and btrim(coalesce(v_p.sangga, '')) <> ''
+       and ((v_n.pinsa and v_n.kelas = v_p.kelas and lower(v_n.sangga) = lower(v_p.sangga))
+            or exists (select 1 from public.pinsa_tugas t where t.penegak_id = p_penilai and t.tahun_ajaran = sigarda.tahun_ajaran_kini()
+                       and t.rombel = v_p.kelas and lower(t.sangga) = lower(v_p.sangga)));
   elsif p_tahap = 'bina_damping' then
     return exists (select 1 from public.bina_damping b where b.penegak_id = p_penilai and b.rombel = v_p.kelas and b.tahun_ajaran = sigarda.tahun_ajaran_kini())
        and (v_tingkat = 'Bantara' or sigarda.tingkat_penegak(p_penilai) = 'laksana');
@@ -33,7 +36,8 @@ language sql stable security definer set search_path = public as
 $$
   select u.id from public.profiles u
   where u.role = 'peserta' and u.status = 'aktif'
-    and case p_tahap when 'pinsa' then u.pinsa when 'bina_damping' then exists (select 1 from public.bina_damping b where b.penegak_id = u.id) else false end
+    and case p_tahap when 'pinsa' then (u.pinsa or exists (select 1 from public.pinsa_tugas t where t.penegak_id = u.id and t.tahun_ajaran = sigarda.tahun_ajaran_kini()))
+                     when 'bina_damping' then exists (select 1 from public.bina_damping b where b.penegak_id = u.id) else false end
     and sigarda.pra_uji_penilai_ok(p_peserta, p_sku, p_tahap, u.id)
 $$;
 

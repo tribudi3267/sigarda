@@ -472,7 +472,17 @@ export const susunNotifikasi = (baris = []) =>
 /* ---------------- Pinsa dan Bina Damping (fase B) ---------------- */
 
 /** sg_pendampingan_saya -> { binaDamping: [rombel], pinsa } (rombel yang saya dampingi pada tahun ajaran berjalan, dan apakah saya Pinsa). */
-export const susunPendampingan = (d) => ({ binaDamping: Array.isArray(d?.bina_damping) ? d.bina_damping : [], pinsa: !!d?.pinsa });
+export const susunPendampingan = (d) => ({
+  binaDamping: Array.isArray(d?.bina_damping) ? d.bina_damping : [],
+  pinsa: !!d?.pinsa,
+  pinsaTugas: Array.isArray(d?.pinsa_tugas) ? d.pinsa_tugas.map((t) => ({ rombel: t.rombel, sangga: t.sangga })) : [], // sangga yang saya pimpin sebagai Pinsa tertugas
+});
+
+/** sg_pinsa_calon -> { tahunAjaran, calon: [{ id, nama, kelas, tingkat }] } (Penegak Calon Laksana yang dapat ditugaskan menjadi Pinsa). */
+export const susunCalonPinsa = (d) => ({
+  tahunAjaran: d?.tahun_ajaran ?? '',
+  calon: (d?.calon ?? []).map((c) => ({ id: c.id, nama: c.nama, kelas: c.kelas ?? '', tingkat: c.tingkat ?? null })),
+});
 
 /** Baris sku_pra_uji -> { id, pesertaId, skuId, tahap, status, jadwal, catatanPeserta, penilaiId, penilaiNama, catatan, dibuat, diputuskanPada } (id = nomor urut). */
 export const petaPraUji = (r) => ({
@@ -516,6 +526,8 @@ export const susunSanggaRombel = (d) => ({
   bisaAtur: !!d.bisa_atur,
   binaDamping: (d.bina_damping ?? []).map((b) => ({ id: b.id, nama: b.nama, tingkat: b.tingkat ?? null })),
   anggota: (d.anggota ?? []).map((a) => ({ id: a.id, nama: a.nama, sangga: a.sangga, pinsa: !!a.pinsa, tingkat: a.tingkat ?? null, layakPinsa: !!a.layak_pinsa })),
+  // Pinsa yang ditugaskan dari rombel lain (kelas = rombel asalnya)
+  pinsaTugas: (d.pinsa_tugas ?? []).map((t) => ({ id: t.id, nama: t.nama, sangga: t.sangga, kelas: t.kelas ?? '', tingkat: t.tingkat ?? null })),
   peringatan: (d.peringatan ?? []).map((p) => ({ sangga: p.sangga ?? null, teks: p.teks })),
 });
 

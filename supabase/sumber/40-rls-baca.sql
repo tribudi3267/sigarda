@@ -34,6 +34,7 @@ alter table public.penugasan_rombel enable row level security;   -- baca: pengur
 alter table public.penugasan_log enable row level security;
 alter table public.guru_agama enable row level security;
 alter table public.bina_damping enable row level security;   -- tanpa kebijakan: hanya lewat fungsi sg_bina_damping_* dan sg_sangga_*
+alter table public.pinsa_tugas enable row level security;   -- tanpa kebijakan: hanya lewat fungsi sg_pinsa_* dan sg_sangga_rombel
 alter table public.sku_pra_uji enable row level security;   -- baca: pemilik, penilai, dan pengurus; tulis: hanya fungsi sg_pra_uji_* dan sg_sku_ajukan/batal
 alter table public.pelantikan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_pelantikan_*
 alter table public.tkk_katalog enable row level security;   -- baca: semua pengguna aktif (katalog); tulis: hanya skema/migrasi

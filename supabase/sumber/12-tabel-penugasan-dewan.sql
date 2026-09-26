@@ -87,6 +87,23 @@ create table public.bina_damping (
 create unique index bina_damping_satu_rombel_idx on public.bina_damping (tahun_ajaran, penegak_id);
 create index bina_damping_penegak_idx on public.bina_damping (penegak_id);
 -- ===== akhir tabel pinsa bina damping =====
+-- ===== Pinsa tertugas lintas rombel (persiapan uji coba 2 Okt 2026): tabel =====
+-- Pinsa sebuah sangga dapat berasal dari anggota sangga itu sendiri (profiles.pinsa) ATAU dari Penegak Calon Laksana (Bantara selesai) yang DITUGASKAN menjadi anggota
+-- sangga di rombel lain, mis. kakak kelas untuk sangga rombel Calon Bantara (keputusan pemilik gudep 26 Sep 2026). Satu orang satu sangga per tahun ajaran; paling banyak 2
+-- penugasan per sangga (dijaga sg_pinsa_tugaskan). Tanpa kebijakan baca: dibaca lewat fungsi sg_sangga_rombel dan sg_pinsa_calon. Baris hilang sendiri bila Penegaknya
+-- nonaktif/alumni (pemicu profiles_pinsa_tugas_bersih).
+create table public.pinsa_tugas (
+  tahun_ajaran text not null check (tahun_ajaran ~ '^[0-9]{4}/[0-9]{4}$'),
+  rombel text not null check (rombel ~ '^(X|XI|XII)-(0[1-9]|10)$'),
+  sangga text not null check (char_length(sangga) between 1 and 40 and sangga = btrim(sangga)),
+  penegak_id uuid not null references public.profiles(id) on delete cascade,
+  ditetapkan_oleh uuid references public.profiles(id) on delete set null,
+  ditetapkan_pada timestamptz not null default now(),
+  primary key (tahun_ajaran, penegak_id)
+);
+create index pinsa_tugas_sangga_idx on public.pinsa_tugas (tahun_ajaran, rombel, lower(sangga));
+create index pinsa_tugas_ditetapkan_oleh_idx on public.pinsa_tugas (ditetapkan_oleh);
+-- ===== akhir tabel pinsa tertugas =====
 -- Guru agama di sekolah (per agama), rujukan surat pengantar bila tidak ada Pembina yang seagama dengan Penegak (dikelola Admin).
 create table public.guru_agama (
   id bigint generated always as identity primary key,

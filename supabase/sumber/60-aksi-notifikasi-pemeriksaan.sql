@@ -140,9 +140,15 @@ begin
     'sanggaTanpaPinsa', coalesce((
       select jsonb_agg(jsonb_build_object('rombel', x.kelas, 'sangga', x.sangga, 'jumlah', x.jumlah) order by x.kelas, x.sangga)
       from (
-        select p.kelas, min(p.sangga) as sangga, count(*) as jumlah from public.profiles p
-        where p.role = 'peserta' and p.status = 'aktif' and sigarda.rombel_sah(p.kelas) and btrim(coalesce(p.sangga, '')) <> ''
-        group by p.kelas, lower(btrim(p.sangga)) having not bool_or(p.pinsa) limit 300
+        -- Pinsa sebuah sangga: anggota berstatus Pinsa, atau Penegak yang ditugaskan (pinsa_tugas) ke sangga itu.
+        select g.kelas, g.sangga, g.jumlah from (
+          select p.kelas, lower(btrim(p.sangga)) as kunci, min(p.sangga) as sangga, count(*) as jumlah, bool_or(p.pinsa) as ada
+          from public.profiles p
+          where p.role = 'peserta' and p.status = 'aktif' and sigarda.rombel_sah(p.kelas) and btrim(coalesce(p.sangga, '')) <> ''
+          group by p.kelas, lower(btrim(p.sangga))
+        ) g
+        where not g.ada and not exists (select 1 from public.pinsa_tugas t where t.tahun_ajaran = v_ta and t.rombel = g.kelas and lower(t.sangga) = g.kunci)
+        limit 300
       ) x
     ), '[]'::jsonb),
     'praUjiMacet', coalesce((

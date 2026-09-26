@@ -5,6 +5,7 @@ import {
   KELAS_TINGKAT, drafAwal, kelompokSangga, labelTingkat, namaSanggaAda, perubahanSangga, peringatanRombel, ubahDraf,
 } from '../lib/sanggaLogic';
 import { Kosong } from './ui';
+import PanelPinsaTugas from './PanelPinsaTugas';
 
 const CHIP = 'inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset';
 
@@ -31,7 +32,7 @@ function DaftarPeringatan({ teks }) {
 
 /** Tampilan baca: sangga dalam kartu, Pinsa di urutan pertama. */
 function SanggaBaca({ data }) {
-  const kelompok = useMemo(() => kelompokSangga(data.anggota, data.peringatan), [data]);
+  const kelompok = useMemo(() => kelompokSangga(data.anggota, data.peringatan, data.pinsaTugas), [data]);
   if (!kelompok.length) return <Kosong judul="Rombel ini belum punya anggota aktif" teks="Anggota muncul di sini setelah akun Penegak dibuat pada rombel ini." />;
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -47,6 +48,13 @@ function SanggaBaca({ data }) {
                 <LencanaTingkat tingkat={a.tingkat} />
               </li>
             ))}
+            {g.tugas.map((t) => (
+              <li key={t.id} className="flex flex-wrap items-center gap-2">
+                <span>{t.nama}</span>
+                <LencanaPinsa />
+                <span className="text-xs text-pramuka-600">dari {t.kelas || 'rombel lain'}</span>
+              </li>
+            ))}
           </ul>
         </section>
       ))}
@@ -56,7 +64,7 @@ function SanggaBaca({ data }) {
 
 /** Tampilan atur: satu baris per Penegak (nama sangga + Pinsa); disimpan sekaligus, semua atau tidak sama sekali. */
 function SanggaAtur({ data, rombel, onSimpan }) {
-  const { aturSangga } = useApp();
+  const { aturSangga, calonPinsa, tugaskanPinsa, cabutPinsa } = useApp();
   const [draf, setDraf] = useState(() => drafAwal(data.anggota));
   const [galat, setGalat] = useState('');
   const [sibuk, setSibuk] = useState(false);
@@ -129,6 +137,14 @@ function SanggaAtur({ data, rombel, onSimpan }) {
         {selisih.length > 0 && <button className="btn btn-outline" onClick={() => { setDraf(drafAwal(data.anggota)); setGalat(''); }}>Batalkan perubahan</button>}
         <span className="text-xs text-pramuka-600">{selisih.length ? `${selisih.length} Penegak berubah` : 'Belum ada perubahan'}</span>
       </div>
+      <PanelPinsaTugas
+        rombel={rombel}
+        tugas={data.pinsaTugas}
+        sangga={saran}
+        muatCalon={() => calonPinsa(rombel)}
+        onTugaskan={async (s, id) => { const r = await tugaskanPinsa(rombel, s, id); if (r.ok) await onSimpan(); return r; }}
+        onCabut={async (id) => { const r = await cabutPinsa(rombel, id); if (r.ok) await onSimpan(); return r; }}
+      />
     </div>
   );
 }
