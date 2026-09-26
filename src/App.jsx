@@ -16,11 +16,20 @@ import { Modal } from './components/ui';
 import { parameterVerifikasi } from './lib/verifikasiLogic';
 import { parameterBerkasGaruda } from './lib/garudaLogic';
 import { pembinaAtauAdmin } from './lib/hakLogic';
+import { menuSanggaTampil } from './lib/sanggaLogic';
+import { menuPraUjiTampil, ujiResmiTampil } from './lib/praUjiLogic';
 import { bolehKelolaMateri } from './lib/materiLogic';
 import LogoMark from './components/LogoMark';
 
 // Halaman selain beranda dimuat malas (berkasnya diunduh saat pertama dibuka); lihat BatasHalaman.
 const PesertaSku = lazy(() => import('./pages/PesertaSku'));
+const PraUji = lazy(() => import('./pages/PraUji'));
+const Pelantikan = lazy(() => import('./pages/Pelantikan'));
+const Tkk = lazy(() => import('./pages/Tkk'));
+const Spg = lazy(() => import('./pages/Spg'));
+const Perlindungan = lazy(() => import('./pages/Perlindungan'));
+const AjakanIsian = lazy(() => import('./components/AjakanIsian')); // ajakan mengisi data diri Penegak sesudah masuk (Tahap 3, H1)
+const Kelayakan = lazy(() => import('./pages/Kelayakan'));
 const PesertaDetail = lazy(() => import('./pages/PesertaDetail'));
 const AdminAnggota = lazy(() => import('./pages/AdminAnggota'));
 const AbsensiPeserta = lazy(() => import('./pages/Absensi').then((m) => ({ default: m.AbsensiPeserta })));
@@ -44,6 +53,7 @@ const Notifikasi = lazy(() => import('./pages/Notifikasi'));
 const PemeriksaanData = lazy(() => import('./pages/PemeriksaanData'));
 const TindakLanjut = lazy(() => import('./pages/TindakLanjut'));
 const Agenda = lazy(() => import('./pages/Agenda'));
+const Sangga = lazy(() => import('./pages/Sangga'));
 const Laporan = lazy(() => import('./pages/Laporan'));
 const Bantuan = lazy(() => import('./pages/Bantuan'));
 
@@ -51,14 +61,14 @@ const Bantuan = lazy(() => import('./pages/Bantuan'));
  * Menu per peran, dikelompokkan menurut fungsinya (tampil sebagai kelompok di menu samping, dan berurutan di menu bawah ponsel).
  *  Utama            : Dashboard (Penegak: Beranda atau Garuda), Notifikasi (semua peran; lencana = belum dibaca), Bantuan (tahap L10, semua peran)
  *  Pengujian SKU    : Penegak: Poin SKU, Cetak. Dewan/Pembina: Antrian, Peserta, Sesi, Instrumen, Penugasan, Pengurus (Pembina), Periksa Data (Dewan dan Pembina), Sidang, Cetak. Admin: Sesi, Instrumen, Sidang, Cetak
- *  Kegiatan Ambalan : Absensi, Iuran, Agenda (tahap L6, semua peran), Portofolio, Tindak Lanjut (tahap L5, pengurus), Raport dan Laporan (tahap L8, Pembina dan Admin)
+ *  Kegiatan Ambalan : Absensi, Iuran, Agenda (tahap L6, semua peran), Sangga (fase B; pengurus, dan Penegak yang menjadi Bina Damping), Portofolio, Tindak Lanjut (tahap L5, pengurus), Raport dan Laporan (tahap L8, Pembina dan Admin)
  *  Materi           : Materi, Kelola Materi (Pembina dan Admin)
  *  Pengelolaan      : Anggota, Pengurus, Naik Kelas, Data Gudep, Periksa Data (Admin). Menu Pengurus (Kepengurusan Dewan Ambalan) juga untuk Pembina (di Pengujian SKU).
  * Periksa Data (tahap L3; Pembina, Dewan Ambalan, dan Admin): ringkasan masalah kualitas data umum (lihat src/lib/pemeriksaanLogic.js).
  * Dewan Ambalan = jabatan pada akun Penegak: pemegangnya memilih tampilan Penegak atau Dewan (user.role berubah menjadi 'penguji' pada tampilan Dewan).
  * Akun saya dan Reset PIN anggota (pengurus) tidak ada di daftar ini: keduanya di menu akun (nama pengguna di menu samping atau header).
  */
-function buatNav(user, peran, belumDibaca = 0) {
+function buatNav(user, peran, belumDibaca = 0, pendampingan = null, praUjiAktif = false) {
   const materi = { id: 'materi', label: 'Materi', ikon: 'buku' };
   const kelola = { id: 'kelolamateri', label: 'Kelola Materi', ikon: 'pustaka' };
   const raport = { id: 'raport', label: 'Raport', ikon: 'raport' };
@@ -75,6 +85,16 @@ function buatNav(user, peran, belumDibaca = 0) {
   const pemeriksaan = { id: 'pemeriksaan', label: 'Periksa Data', ikon: 'cari' };
   const tindakLanjut = { id: 'tindaklanjut', label: 'Tindak Lanjut', ikon: 'lonceng' };
   const agenda = { id: 'agenda', label: 'Agenda', ikon: 'kalender' };
+  const sangga = { id: 'sangga', label: 'Sangga', ikon: 'anggota' };
+  const adaSangga = menuSanggaTampil(user, pendampingan);
+  const praUji = { id: 'pra-uji', label: 'Pra-uji', ikon: 'cek' };
+  const pelantikan = { id: 'pelantikan', label: 'Pelantikan', ikon: 'lencana' };
+  const tkk = { id: 'tkk', label: 'TKK', ikon: 'bintang' };
+  const spg = { id: 'spg', label: 'SPG', ikon: 'cek' };
+  const kelayakan = { id: 'kelayakan', label: 'Kelayakan', ikon: 'perisai' };
+  const perlindungan = { id: 'perlindungan', label: 'Perlindungan', ikon: 'perisai' }; // Safe From Harm (Tahap 4; Pembina dan Admin)
+  const adaPraUji = menuPraUjiTampil(user, pendampingan, praUjiAktif);
+  const ujiResmi = ujiResmiTampil(user, praUjiAktif); // pra-uji hidup: uji resmi hanya Pembina, jadi Antrian dan Sesi ujian tidak untuk Dewan Ambalan
   const kelolaBoleh = bolehKelolaMateri(user);
   const notifikasi = { id: 'notifikasi', label: 'Notifikasi', ikon: 'lonceng', lencana: belumDibaca };
   const bantuan = { id: 'bantuan', label: 'Bantuan', ikon: 'tanya' };
@@ -82,25 +102,25 @@ function buatNav(user, peran, belumDibaca = 0) {
   if (user.role === 'peserta') {
     return [
       { judul: 'Utama', item: [peran === 'calon-garuda' ? { id: 'beranda', label: 'Garuda', ikon: 'bintang' } : { id: 'beranda', label: 'Beranda', ikon: 'beranda' }, notifikasi, bantuan] },
-      { judul: 'Pengujian SKU', item: [{ id: 'sku', label: 'Poin SKU', ikon: 'daftar' }, cetak] },
-      { judul: 'Kegiatan Ambalan', item: [absensi, iuran, agenda] },
+      { judul: 'Pengujian SKU', item: [{ id: 'sku', label: 'Poin SKU', ikon: 'daftar' }, ...(adaPraUji ? [praUji] : []), tkk, ...(peran === 'calon-garuda' ? [spg] : []), cetak] },
+      { judul: 'Kegiatan Ambalan', item: [absensi, iuran, agenda, ...(adaSangga ? [sangga] : [])] },
       { judul: 'Materi', item: [materi] },
     ];
   }
   if (user.role === 'penguji') {
     return [
       { judul: 'Utama', item: [{ id: 'dashboard', label: 'Dashboard', ikon: 'dashboard' }, notifikasi, bantuan] },
-      { judul: 'Pengujian SKU', item: [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }, { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, sesi, ...(kelolaBoleh ? [instrumen, penugasan, kepengurusan] : []), pemeriksaan, sidang, cetak] },
-      { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, ...(kelolaBoleh ? [raport, laporan] : [])] },
+      { judul: 'Pengujian SKU', item: [...(ujiResmi ? [{ id: 'antrian', label: 'Antrian', ikon: 'jam' }] : []), ...(adaPraUji ? [praUji] : []), { id: 'peserta', label: 'Peserta', ikon: 'anggota' }, ...(ujiResmi ? [sesi] : []), ...(kelolaBoleh ? [instrumen, penugasan, kepengurusan, pelantikan, perlindungan] : []), tkk, spg, kelayakan, pemeriksaan, sidang, cetak] },
+      { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, sangga, ...(kelolaBoleh ? [raport, laporan] : [])] },
       { judul: 'Materi', item: [materi, ...(kelolaBoleh ? [kelola] : [])] },
     ];
   }
   return [
     { judul: 'Utama', item: [{ id: 'rekap', label: 'Dashboard', ikon: 'dashboard' }, notifikasi, bantuan] },
-    { judul: 'Pengujian SKU', item: [sesi, instrumen, sidang, cetak] },
-    { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, raport, laporan] },
+    { judul: 'Pengujian SKU', item: [praUji, sesi, instrumen, pelantikan, tkk, spg, kelayakan, sidang, cetak] },
+    { judul: 'Kegiatan Ambalan', item: [absensi, iuran, portofolio, tindakLanjut, agenda, sangga, raport, laporan] },
     { judul: 'Materi', item: [materi, kelola] },
-    { judul: 'Pengelolaan', item: [{ id: 'anggota', label: 'Anggota', ikon: 'anggota' }, kepengurusan, { id: 'naikkelas', label: 'Naik Kelas', ikon: 'naikkelas' }, { id: 'gudep', label: 'Data Gudep', ikon: 'perisai' }, pemeriksaan] },
+    { judul: 'Pengelolaan', item: [{ id: 'anggota', label: 'Anggota', ikon: 'anggota' }, kepengurusan, { id: 'naikkelas', label: 'Naik Kelas', ikon: 'naikkelas' }, { id: 'gudep', label: 'Data Gudep', ikon: 'perisai' }, perlindungan, pemeriksaan] },
   ];
 }
 function Toast() {
@@ -158,13 +178,14 @@ function LayarArsip() {
 }
 
 function Shell() {
-  const { user, peranUser, status, galatMuat, belumDibaca, segarkanNotifikasi } = useApp();
+  const { user, akun, peranUser, status, galatMuat, belumDibaca, segarkanNotifikasi, pendampingan, praUjiAktif } = useApp();
   const [tab, setTab] = useState(null);
   const [fokusId, setFokusId] = useState(null); // peserta yang sedang dibuka penguji/admin
   const [jenisCetak, setJenisCetak] = useState('kartu'); // tab awal halaman Cetak (kartu | stl | surat)
   const [tingkat, setTingkat] = useState('Bantara');
   const [materiButir, setMateriButir] = useState(null); // butir SKU yang dituju tombol "Materi"
   const [kelolaId, setKelolaId] = useState(null); // materi yang langsung dibuka di Kelola Materi ('baru' = tambah)
+  const ajakData = akun?.role === 'peserta' && (akun.status ?? 'aktif') === 'aktif'; // Penegak aktif: ajakan data diri (memuat nomor WhatsApp); peran lain: hanya nomor WhatsApp
   const [waTutup, setWaTutup] = useState(false); // ajakan isi nomor WhatsApp ditutup/dilewati untuk sesi masuk ini (tahap L5)
 
   useEffect(() => {
@@ -212,7 +233,7 @@ function Shell() {
   // Akun Dewan Ambalan LAMA yang sudah diarsipkan: Dewan kini jabatan pada akun Penegak, jadi masuk memakai akun Penegak sendiri
   if (user.role === 'penguji' && (user.status ?? 'aktif') !== 'aktif') return <LayarArsip />;
 
-  const grup = buatNav(user, peranUser, belumDibaca);
+  const grup = buatNav(user, peranUser, belumDibaca, pendampingan, praUjiAktif);
   const nav = grup.flatMap((g) => g.item);
   // Bila menu yang dipilih tidak ada lagi (mis. peran berubah), kembali ke menu pertama. Akun saya dan Reset PIN dibuka dari menu akun.
   const halamanAkun = tab === 'akun' || (tab === 'resetpin' && user.role !== 'peserta');
@@ -273,12 +294,26 @@ function Shell() {
     isi = <Penugasan />;
   } else if (tabAktif === 'kepengurusan' && pembinaAtauAdmin(user)) {
     isi = <Kepengurusan />;
+  } else if (tabAktif === 'perlindungan' && pembinaAtauAdmin(user)) {
+    isi = <Perlindungan />;
   } else if (tabAktif === 'pemeriksaan' && user.role !== 'peserta') {
     isi = <PemeriksaanData onNav={pindah} />;
   } else if (tabAktif === 'tindaklanjut' && user.role !== 'peserta') {
     isi = <TindakLanjut onNav={(id) => pindah(user.role === 'penguji' ? 'peserta' : 'rekap', id)} />;
   } else if (tabAktif === 'agenda') {
     isi = <Agenda />;
+  } else if (tabAktif === 'sangga') {
+    isi = <Sangga />;
+  } else if (tabAktif === 'tkk') {
+    isi = <Tkk />;
+  } else if (tabAktif === 'spg') {
+    isi = <Spg />;
+  } else if (tabAktif === 'kelayakan' && user.role !== 'peserta') {
+    isi = <Kelayakan />;
+  } else if (tabAktif === 'pelantikan' && bolehKelolaMateri(user)) {
+    isi = <Pelantikan />;
+  } else if (tabAktif === 'pra-uji' && menuPraUjiTampil(user, pendampingan, praUjiAktif)) {
+    isi = <PraUji />;
   } else if (tabAktif === 'materi') {
     isi = <Materi key={materiButir ?? 'semua'} butirAwal={materiButir} onKelola={bukaKelola} />;
   } else if (tabAktif === 'kelolamateri') {
@@ -329,8 +364,12 @@ function Shell() {
       <Layout nav={nav} grup={grup} tab={tabAktif} setTab={pilihTab}>
         <BatasHalaman>{isi}</BatasHalaman>
       </Layout>
-      {/* Ajakan isi nomor WhatsApp (tahap L5): satu kali per masuk, dapat dilewati, tampil lagi pada masuk berikutnya bila masih kosong. */}
-      <Modal buka={!user.whatsapp && !waTutup} tutup={() => setWaTutup(true)} judul="Isi nomor WhatsApp">
+      {/* Ajakan melengkapi data diri Penegak (Tahap 3, H1; termasuk nomor WhatsApp): satu kali per masuk, dapat dilewati, tampil lagi pada masuk berikutnya bila isian pokok belum lengkap. */}
+      {ajakData && (
+        <BatasHalaman senyap><AjakanIsian tutup={waTutup} onTutup={() => setWaTutup(true)} /></BatasHalaman>
+      )}
+      {/* Ajakan isi nomor WhatsApp (tahap L5) untuk peran selain Penegak: satu kali per masuk, dapat dilewati, tampil lagi pada masuk berikutnya bila masih kosong. */}
+      <Modal buka={!ajakData && !user.whatsapp && !waTutup} tutup={() => setWaTutup(true)} judul="Isi nomor WhatsApp">
         <p className="mb-4 text-sm text-pramuka-600">
           Supaya Pembina atau Dewan Ambalan dapat menghubungi Anda bila diperlukan (mis. SKU sudah lama tidak bergerak). Boleh dilewati; akan
           ditanyakan lagi lain kali sampai diisi.

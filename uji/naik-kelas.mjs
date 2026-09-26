@@ -133,6 +133,7 @@ console.log('\n--- Penjagaan: nonaktif dan alumni hanya dapat dilihat ---');
   await K.admin.a.aturStatusAnggota(idDimas, 'aktif', 'XI-01');
   const tandai = await sebagai(K.pembina.id, "select public.sg_absen_buat_sesi(d::date) from generate_series(sigarda.hari_ini() - 6, sigarda.hari_ini(), interval '1 day') d where extract(dow from d) = 5");
   const jumat = (await q("select d::date::text t from generate_series(sigarda.hari_ini() - 6, sigarda.hari_ini(), interval '1 day') d where extract(dow from d) = 5"))[0].t;
+  await q('delete from public.absensi_hadir where tanggal = $1::date', [jumat]); // data contoh sudah mengisi kehadiran Jumat ini bila hari ini Jumat; kosongkan agar hasil tidak bergantung pada hari uji
   const a1 = await sebagai(K.pembina.id, "select public.sg_absen_set($1::date, (select id from public.profiles where username = '10232'), 'H')", [jumat]);
   ok(!a1.ok && /Siti Nurhaliza berstatus nonaktif/.test(a1.pesan), 'absensi Penegak nonaktif ditolak (pesan menyebut nama dan status)');
   await sebagai(K.pembina.id, "select public.sg_absen_set_banyak($1::date, array(select id from public.profiles where username in ('10231','10232','10007')), 'H', true)", [jumat]);

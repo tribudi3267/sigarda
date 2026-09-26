@@ -9,7 +9,7 @@ grant select on public.profiles, public.sku_butir, public.sku_unit, public.pf_it
   public.sesi_ujian, public.sesi_ujian_butir, public.sesi_ujian_peserta,
   public.iuran, public.iuran_log, public.iuran_kas, public.asisten_iuran,
   public.penugasan_rombel, public.penugasan_log, public.guru_agama, public.dokumen_terbit, public.dokumen_urut, public.notifikasi,
-  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda, public.kegiatan_usulan to authenticated;
+  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda, public.kegiatan_usulan, public.pengukuhan_dewan, public.sku_pra_uji, public.pelantikan, public.saka_anggota, public.tkk_katalog, public.tkk_capaian, public.tkk_krida, public.tkk_pengajuan, public.spg_penetapan, public.tanggal_lahir, public.tim_penilai, public.tim_penilai_anggota, public.garuda_tahap, public.penegak_isian, public.dokumen_templat, public.portofolio_snapshot, public.sfh_catatan to authenticated;
 
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function
@@ -44,12 +44,27 @@ grant execute on function
   public.sg_gudep_simpan(jsonb),
   public.sg_naik_kelas(text, jsonb, boolean), public.sg_naik_kelas_batalkan(bigint), public.sg_anggota_status_atur(uuid, text, text, text),
   public.sg_notifikasi_tandai(bigint[]), public.sg_push_kunci(), public.sg_push_simpan(text, text, text, text), public.sg_push_hapus(text), public.sg_push_ringkasan(), public.sg_notifikasi_tes(),
-  public.sg_penugasan_peserta_atur(text, uuid, uuid[], text), public.sg_kepengurusan_terapkan(jsonb, boolean, boolean), public.sg_dewan_lama_arsipkan(uuid[], boolean),
+  public.sg_penugasan_peserta_atur(text, uuid, uuid[], text), public.sg_kepengurusan_terapkan(jsonb, boolean, boolean), public.sg_pengukuhan_dewan_simpan(text, text, date, text, date, text), public.sg_pengukuhan_dewan_hapus(text), public.sg_dewan_lama_arsipkan(uuid[], boolean),
   public.sg_pemeriksaan_data(), public.sg_cadangan_admin(), public.sg_cadangan_status(),
   public.sg_profil_whatsapp_atur(text), public.sg_eskalasi_daftar(),
   public.sg_agenda_simpan(bigint, text, text, text, date, text, uuid[], boolean), public.sg_agenda_hapus(bigint),
   public.sg_kegiatan_usul(text, text, date, text, text), public.sg_kegiatan_tinjau(bigint, text, text), public.sg_kegiatan_ping(bigint),
-  public.sg_garuda_berkas_baca(uuid), public.sg_garuda_token_buat(uuid), public.sg_garuda_token_cabut(uuid)
+  public.sg_garuda_berkas_baca(uuid), public.sg_garuda_token_buat(uuid), public.sg_garuda_token_cabut(uuid),
+  public.sg_bina_damping_atur(text, text, uuid[]), public.sg_bina_damping_daftar(text), public.sg_sangga_rombel(text), public.sg_sangga_atur(text, jsonb), public.sg_pendampingan_saya(),
+  public.sg_pra_uji_antrian(), public.sg_pra_uji_catat(bigint, text, text), public.sg_pra_uji_lewati(bigint, text), public.sg_pra_uji_sakelar(boolean), public.sg_pra_uji_cakupan(integer),
+  public.sg_pelantikan_catat(text, date, text, uuid[], bigint, text), public.sg_pelantikan_hapus(bigint),
+  public.sg_saka_simpan(bigint, uuid, text, date, text, date, text, text), public.sg_saka_hapus(bigint),
+  public.sg_tkk_catat(uuid, text, text, date, text, text, text, text, text), public.sg_tkk_hapus(bigint),
+  public.sg_tkk_krida_simpan(bigint, uuid, text, text, date, text, text), public.sg_tkk_krida_hapus(bigint), public.sg_tkk_ambang_simpan(jsonb),
+  public.sg_tkk_ajukan(text, text, date, uuid, text, text, text, text), public.sg_tkk_ajukan_batal(bigint), public.sg_tkk_tinjau(bigint, text, text, text, text),
+  public.sg_tkk_penguji_pilihan(),
+  public.sg_spg_catat(uuid, integer, integer, date, text, boolean), public.sg_spg_hapus(uuid, integer),
+  public.sg_tanggal_lahir_atur(uuid, date), public.sg_gerbang_simpan(jsonb), public.sg_tanggal_lahir_impor(jsonb),
+  public.sg_tim_penilai_simpan(bigint, text, text, text, date, text, text, jsonb), public.sg_tim_penilai_hapus(bigint),
+  public.sg_garuda_tahap_simpan(text, text, date, date, text), public.sg_garuda_tahap_hapus(bigint),
+  public.sg_isian_saya_simpan(jsonb), public.sg_dokumen_templat_simpan(text, text, jsonb), public.sg_dokumen_templat_hapus(bigint),
+  public.sg_portofolio_snapshot_simpan(uuid, text, jsonb), public.sg_portofolio_snapshot_hapus(bigint),
+  public.sg_sfh_catat(uuid, text, date, text, text), public.sg_sfh_hapus(bigint), public.sg_sfh_gudep_simpan(jsonb)
   to authenticated;
 -- Fungsi yang boleh dipanggil tanpa login (hanya membaca): verifikasi keaslian dokumen, identitas gudep di halaman masuk, dan
 -- tautan berbagi baca-saja Berkas Calon Garuda (tahap L7)

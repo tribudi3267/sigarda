@@ -4,15 +4,22 @@
 -- penguji dihapus) bukan penulisan pengguna dan dilewati (pg_trigger_depth() > 1). Fungsi naik kelas membatalkan pengajuan SEBELUM mengubah status.
 create function sigarda.tolak_peserta_tak_aktif() returns trigger language plpgsql security definer set search_path = public as
 $$
-declare v_status text; v_nama text;
+declare v_status text; v_nama text; v_agama text;
 begin
   if TG_OP = 'UPDATE' and pg_trigger_depth() > 1 then return new; end if;
-  select status, nama into v_status, v_nama from public.profiles where id = new.peserta_id;
+  select status, nama, agama into v_status, v_nama, v_agama from public.profiles where id = new.peserta_id;
   if v_status is not null and v_status <> 'aktif' then
     if new.peserta_id = auth.uid() then
       raise exception 'Akun Anda berstatus % dan hanya dapat dilihat. Hubungi Pembina atau Admin Gudep bila ingin aktif kembali.', v_status;
     end if;
     raise exception '% berstatus % dan tidak dapat diubah. Aktifkan kembali lebih dulu di menu Anggota.', v_nama, v_status;
+  end if;
+  -- Agama Penegak baru diisi sendiri sesudah akun dibuat (Tahap 3, H1). Tanpa agama, butir agama tidak tampak baginya sehingga progres SKU-nya tidak lengkap: penulisan progres SKU ditolak sampai agama diisi.
+  if v_status = 'aktif' and v_agama is null and TG_TABLE_NAME in ('sku_progress', 'sku_riwayat', 'sku_pra_uji', 'sesi_ujian_peserta') then
+    if new.peserta_id = auth.uid() then
+      raise exception 'Isi agama Anda lebih dulu di menu Akun saya (Data diri) sebelum mengajukan SKU.';
+    end if;
+    raise exception '% belum mengisi agama. Penegak melengkapinya di menu Akun saya (Data diri), atau Admin Gudep mengisinya di menu Anggota.', v_nama;
   end if;
   return new;
 end $$;
@@ -26,7 +33,28 @@ create trigger tak_aktif_portofolio before insert or update on public.portofolio
 create trigger tak_aktif_portofolio_jurnal before insert or update on public.portofolio_jurnal for each row execute function sigarda.tolak_peserta_tak_aktif();
 create trigger tak_aktif_sku_penilaian before insert or update on public.sku_penilaian for each row execute function sigarda.tolak_peserta_tak_aktif();
 create trigger tak_aktif_raport before insert or update on public.raport for each row execute function sigarda.tolak_peserta_tak_aktif();
+create trigger tak_aktif_sku_pra_uji before insert or update on public.sku_pra_uji for each row execute function sigarda.tolak_peserta_tak_aktif();
 create trigger tak_aktif_sesi_peserta before insert or update on public.sesi_ujian_peserta for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== Pelantikan dan Saka (Tahap 2, G1): pemicu =====
+create trigger tak_aktif_pelantikan before insert or update on public.pelantikan for each row execute function sigarda.tolak_peserta_tak_aktif();
+create trigger tak_aktif_saka_anggota before insert or update on public.saka_anggota for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu pelantikan dan saka =====
+-- ===== TKK (Tahap 2, G2): pemicu =====
+create trigger tak_aktif_tkk_capaian before insert or update on public.tkk_capaian for each row execute function sigarda.tolak_peserta_tak_aktif();
+create trigger tak_aktif_tkk_krida before insert or update on public.tkk_krida for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu tkk =====
+-- ===== TKK pengajuan (Tahap 2, G2b): pemicu tak aktif =====
+create trigger tak_aktif_tkk_pengajuan before insert or update on public.tkk_pengajuan for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu tak aktif tkk pengajuan =====
+-- ===== SPG (Tahap 2, G3): pemicu =====
+create trigger tak_aktif_spg_penetapan before insert or update on public.spg_penetapan for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu spg =====
+-- ===== Gerbang calon Garuda (Tahap 2, G4): pemicu =====
+create trigger tak_aktif_tanggal_lahir before insert or update on public.tanggal_lahir for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu gerbang =====
+-- ===== Isian Penegak (Tahap 3, H1): pemicu =====
+create trigger tak_aktif_penegak_isian before insert or update on public.penegak_isian for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu isian penegak =====
 
 -- Status Calon Garuda hanya untuk Penegak yang aktif (diberikan sendiri lewat sg_calon_garuda_daftar atau oleh Admin lewat sg_anggota_ubah).
 create function sigarda.tolak_calon_garuda_tak_aktif() returns trigger language plpgsql as
@@ -56,6 +84,11 @@ begin
       set status = 'belum', penguji_id = null, tanggal_uji = null, jadwal = null, nilai = null, catatan = '', catatan_peserta = '',
           verifikasi = null, diverifikasi_pada = null, verifikasi_token = null, diubah = now()
       where peserta_id = p_peserta and sku_id = v_sku;
+    insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh) values (p_peserta, v_sku, p_alasan, auth.uid());
+    v_n := v_n + 1;
+  end loop;
+  for v_sku in select sku_id from public.sku_pra_uji where peserta_id = p_peserta and status = 'menunggu' loop
+    update public.sku_pra_uji set status = 'dibatalkan', diputuskan_pada = now() where peserta_id = p_peserta and sku_id = v_sku and status = 'menunggu';
     insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh) values (p_peserta, v_sku, p_alasan, auth.uid());
     v_n := v_n + 1;
   end loop;

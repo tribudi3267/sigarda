@@ -33,8 +33,26 @@ alter table public.asisten_iuran enable row level security;
 alter table public.penugasan_rombel enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_penugasan_*
 alter table public.penugasan_log enable row level security;
 alter table public.guru_agama enable row level security;
+alter table public.bina_damping enable row level security;   -- tanpa kebijakan: hanya lewat fungsi sg_bina_damping_* dan sg_sangga_*
+alter table public.sku_pra_uji enable row level security;   -- baca: pemilik, penilai, dan pengurus; tulis: hanya fungsi sg_pra_uji_* dan sg_sku_ajukan/batal
+alter table public.pelantikan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_pelantikan_*
+alter table public.tkk_katalog enable row level security;   -- baca: semua pengguna aktif (katalog); tulis: hanya skema/migrasi
+alter table public.tkk_capaian enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_*
+alter table public.tkk_pengajuan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_ajukan/_batal dan sg_tkk_tinjau
+alter table public.tim_penilai enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_tim_penilai_*
+alter table public.tim_penilai_anggota enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_tim_penilai_*
+alter table public.garuda_tahap enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_garuda_tahap_*
+alter table public.penegak_isian enable row level security;   -- baca: pemilik, Pembina, dan Admin; tulis: hanya fungsi sg_isian_saya_simpan
+alter table public.dokumen_templat enable row level security;   -- baca: Pembina dan Admin; tulis: hanya fungsi sg_dokumen_templat_*
+alter table public.portofolio_snapshot enable row level security;   -- baca: Pembina dan Admin; tulis: hanya fungsi sg_portofolio_snapshot_*
+alter table public.sfh_catatan enable row level security;   -- baca: pemilik, Pembina, dan Admin; tulis: hanya fungsi sg_sfh_*
+alter table public.tanggal_lahir enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tanggal_lahir_atur
+alter table public.spg_penetapan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_spg_*
+alter table public.tkk_krida enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_krida_*
+alter table public.saka_anggota enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_saka_*
 alter table public.penugasan_peserta enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_penugasan_peserta_atur
 alter table public.kepengurusan_log enable row level security;    -- baca: pengurus; tulis: hanya fungsi kepengurusan
+alter table public.pengukuhan_dewan enable row level security;    -- baca: pengurus; tulis: hanya fungsi sg_pengukuhan_dewan_*
 alter table public.naik_kelas_batch enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_naik_kelas*
 alter table public.naik_kelas_log enable row level security;
 alter table public.agenda enable row level security;   -- baca: semua yang aktif; tulis: hanya fungsi sg_agenda_*
@@ -93,6 +111,8 @@ create policy baca_penugasan_peserta on public.penugasan_peserta for select to a
   using ((select sigarda.aktif()) and (select sigarda.pengurus()));
 create policy baca_kepengurusan_log on public.kepengurusan_log for select to authenticated
   using ((select sigarda.aktif()) and (select sigarda.pengurus()));
+create policy baca_pengukuhan_dewan on public.pengukuhan_dewan for select to authenticated
+  using ((select sigarda.aktif()) and (select sigarda.pengurus()));
 -- ===== Kebijakan naik kelas =====
 create policy baca_naik_kelas_batch on public.naik_kelas_batch for select to authenticated
   using ((select sigarda.aktif()) and (select sigarda.pengurus()));
@@ -128,6 +148,64 @@ create policy baca_instrumen_penguji on public.instrumen_penguji for select to a
 create policy baca_instrumen_panduan on public.instrumen_panduan for select to authenticated using ((select sigarda.pengurus()));
 create policy baca_penilaian on public.sku_penilaian for select to authenticated
   using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+
+-- ===== Pra-uji berjenjang (fase C): kebijakan =====
+-- Pra-uji: Penegak melihat pengajuannya sendiri, penilai (Pinsa/Bina Damping) yang sudah memutuskan, pengurus semua. Antrian penilai lewat sg_pra_uji_antrian.
+create policy baca_pra_uji on public.sku_pra_uji for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or penilai_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan pra-uji =====
+
+-- ===== Pelantikan dan Saka (Tahap 2, G1): kebijakan =====
+-- Pelantikan dan keanggotaan Saka: Penegak melihat miliknya sendiri, pengurus (Pembina, Dewan, Admin) semua.
+create policy baca_pelantikan on public.pelantikan for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+create policy baca_saka_anggota on public.saka_anggota for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan pelantikan dan saka =====
+
+-- ===== TKK (Tahap 2, G2): kebijakan =====
+-- Katalog TKK dibaca semua pengguna aktif; capaian dan TKK Krida: Penegak melihat miliknya sendiri, pengurus semua.
+create policy baca_tkk_katalog on public.tkk_katalog for select to authenticated using ((select sigarda.aktif()));
+create policy baca_tkk_capaian on public.tkk_capaian for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+create policy baca_tkk_krida on public.tkk_krida for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan tkk =====
+
+-- ===== TKK pengajuan (Tahap 2, G2b): kebijakan =====
+-- Pengajuan TKK: Penegak melihat pengajuannya sendiri, pengurus semua.
+create policy baca_tkk_pengajuan on public.tkk_pengajuan for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan tkk pengajuan =====
+
+-- ===== SPG (Tahap 2, G3): kebijakan =====
+-- Penetapan SPG: Penegak melihat miliknya sendiri, pengurus semua.
+create policy baca_spg_penetapan on public.spg_penetapan for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan spg =====
+
+-- ===== Gerbang calon Garuda (Tahap 2, G4): kebijakan =====
+-- Tanggal lahir: Penegak melihat miliknya sendiri, pengurus semua (tabel terpisah dari profiles agar tidak terbaca Penegak lain).
+create policy baca_tanggal_lahir on public.tanggal_lahir for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan gerbang =====
+
+-- ===== Isian Penegak dan templat dokumen (Tahap 3, H1): kebijakan =====
+-- Isian data diri: pemilik, Pembina, dan Admin (BUKAN Dewan Ambalan: alamat dan riwayat kesehatan pribadi). Templat dokumen: Pembina dan Admin.
+create policy baca_penegak_isian on public.penegak_isian for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pembina_atau_admin())));
+create policy baca_dokumen_templat on public.dokumen_templat for select to authenticated using ((select sigarda.pembina_atau_admin()));
+create policy baca_portofolio_snapshot on public.portofolio_snapshot for select to authenticated using ((select sigarda.pembina_atau_admin()));
+create policy baca_sfh_catatan on public.sfh_catatan for select to authenticated
+  using ((select sigarda.aktif()) and (anggota_id = (select auth.uid()) or (select sigarda.pembina_atau_admin())));
+-- ===== akhir kebijakan isian penegak =====
+
+-- ===== Tim penilai dan kalender Garuda (Tahap 2, G4b dan G4c): kebijakan =====
+-- Tim penilai dan kalender tahap Garuda dibaca pengurus (Pembina, Dewan, Admin); ditulis hanya lewat fungsi.
+create policy baca_tim_penilai on public.tim_penilai for select to authenticated using ((select sigarda.aktif()) and (select sigarda.pengurus()));
+create policy baca_tim_penilai_anggota on public.tim_penilai_anggota for select to authenticated using ((select sigarda.aktif()) and (select sigarda.pengurus()));
+create policy baca_garuda_tahap on public.garuda_tahap for select to authenticated using ((select sigarda.aktif()) and (select sigarda.pengurus()));
+-- ===== akhir kebijakan tim kalender =====
 
 -- Sesi ujian: pengurus melihat semua; Penegak hanya sesi yang mencantumkan dirinya.
 create policy baca_sesi_ujian on public.sesi_ujian for select to authenticated

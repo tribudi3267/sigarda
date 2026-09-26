@@ -159,18 +159,23 @@ $$
     (select jsonb_strip_nulls(jsonb_build_object('nama', p.nilai -> 'nama', 'singkat', p.nilai -> 'singkat', 'sekolah', p.nilai -> 'sekolah', 'kota', p.nilai -> 'kota'))
      from public.pengaturan p where p.kunci = 'gudep.data'), '{}'::jsonb)
 $$;
--- Ketua sidang untuk berita acara: anggota Dewan Ambalan berjabatan Pradana (nama; sebutan "Pradana Dewan Ambalan"). Bila belum ada Pradana,
--- dipakai pengaturan lama sidang.nama_ketua dan sidang.sebutan_ketua (bawaan: kosong dan "Ketua Dewan Penegak / Pemangku Adat").
+-- ===== Ketua sidang (Fase A): fungsi =====
+-- Ketua sidang untuk berita acara = anggota Dewan Ambalan berjabatan PEMANGKU ADAT (sebutan "Pemangku Adat Dewan Ambalan"): Dewan Kehormatan Penegak diketuai
+-- Pemangku Adat (Jukran Kwarnas 05/2026 Pasal 24 ayat (15), yang menggantikan SK 231/2007; SK Kwarnas 176/2013 butir 7 c). Bila belum ada Pemangku Adat, dipakai Pradana ("Pradana Dewan Ambalan").
+-- Bila belum ada keduanya, dipakai pengaturan lama sidang.nama_ketua dan sidang.sebutan_ketua (bawaan: kosong dan "Ketua Dewan Penegak / Pemangku Adat").
 -- Cermin ketuaSidang di src/lib/dewanLogic.js (dijaga oleh pengujian).
 create function sigarda.ketua_sidang(out o_nama text, out o_sebutan text) language plpgsql stable security definer set search_path = public as
 $$
 begin
-  select sigarda.rapikan(nama), 'Pradana Dewan Ambalan' into o_nama, o_sebutan
-  from public.profiles where jabatan_dewan = 'Pradana' and status = 'aktif' and (role = 'peserta' or (role = 'penguji' and jabatan = 'Dewan Ambalan')) limit 1;
+  select sigarda.rapikan(nama), jabatan_dewan || ' Dewan Ambalan' into o_nama, o_sebutan
+  from public.profiles
+  where jabatan_dewan in ('Pemangku Adat', 'Pradana') and status = 'aktif' and (role = 'peserta' or (role = 'penguji' and jabatan = 'Dewan Ambalan'))
+  order by case jabatan_dewan when 'Pemangku Adat' then 0 else 1 end limit 1;
   if not found then
     o_nama := sigarda.pengaturan_teks('sidang.nama_ketua', '');
     o_sebutan := sigarda.pengaturan_teks('sidang.sebutan_ketua', 'Ketua Dewan Penegak / Pemangku Adat');
   end if;
 end $$;
+-- ===== akhir fungsi ketua sidang =====
 -- ===== akhir fungsi gudep =====
 

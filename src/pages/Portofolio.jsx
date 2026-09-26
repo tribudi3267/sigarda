@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { layakGaruda } from '../lib/skuLogic';
 import { rekapPortofolio, ringkasPortofolio } from '../lib/portofolioLogic';
@@ -10,11 +10,17 @@ import PortofolioChecklist from '../components/PortofolioChecklist';
 import RekapKesiapan, { JurnalTerbaru } from '../components/RekapKesiapan';
 import { TampilanBerkasGaruda } from '../components/BerkasGaruda';
 import { Avatar, Icon, Kosong, ProgressBar } from '../components/ui';
+import SumberPeraturan from '../components/SumberPeraturan';
+import BatasHalaman from '../components/BatasHalaman';
+
+// Cetak format Kwarcab dimuat malas: hanya diunduh saat tombolnya dipakai (anggaran JS awal).
+const TampilanPortofolioKwarcab = lazy(() => import('../components/PortofolioKwarcab'));
 
 function Detail({ pesertaId, onKembali, onBukaSku }) {
   const { daftarPesertaSemua: daftarPeserta } = useApp();
   const peserta = daftarPeserta.find((u) => u.id === pesertaId);
   const [tampilBerkas, setTampilBerkas] = useState(false);
+  const [tampilKwarcab, setTampilKwarcab] = useState(false);
   if (!peserta || peserta.peran !== 'calon-garuda') {
     return (
       <div className="animasi-naik">
@@ -26,6 +32,7 @@ function Detail({ pesertaId, onKembali, onBukaSku }) {
     );
   }
 
+  if (tampilKwarcab) return <BatasHalaman><TampilanPortofolioKwarcab peserta={peserta} onKembali={() => setTampilKwarcab(false)} /></BatasHalaman>;
   if (tampilBerkas) return <TampilanBerkasGaruda peserta={peserta} onKembali={() => setTampilBerkas(false)} />;
 
   return (
@@ -45,6 +52,9 @@ function Detail({ pesertaId, onKembali, onBukaSku }) {
         <button className="btn btn-outline btn-sm" onClick={() => onBukaSku(peserta.id)}>Lihat SKU</button>
         <button className="btn btn-gold btn-sm" onClick={() => setTampilBerkas(true)}>
           <Icon nama="cetak" className="h-4 w-4" /> Cetak / bagikan berkas
+        </button>
+        <button className="btn btn-outline btn-sm" onClick={() => setTampilKwarcab(true)}>
+          <Icon nama="cetak" className="h-4 w-4" /> Portofolio format Kwarcab
         </button>
       </section>
 
@@ -100,6 +110,12 @@ export default function PortofolioPengurus({ fokusId, onBuka, onKembali, onBukaS
         <div>
           <h1 className="text-2xl font-bold">Portofolio Penegak Garuda</h1>
           <p className="text-sm text-pramuka-600">Rekap kesiapan 26 dokumen portofolio seluruh Calon Garuda.</p>
+          <SumberPeraturan
+            className="mt-1"
+            rujukan={[
+              { id: 'garuda-038-2017', bagian: 'Bab II butir 1c (syarat Penegak Garuda), Bab IV (tim penilai), Bab VII (penetapan oleh Ketua Kwarcab)' },
+            ]}
+          />
         </div>
         <button className="btn btn-gold btn-sm" onClick={unduh} disabled={mengunduh || rekap.length === 0}>
           <Icon nama="unduh" className="h-4 w-4" /> {mengunduh ? 'Menyiapkan...' : 'Unduh Excel (.xlsx)'}

@@ -86,11 +86,13 @@ create trigger notif_dokumen after insert on public.dokumen_terbit
 -- ===== Agenda tahunan (tahap L6): pengingat ===== (penanda ketiga yang membungkus fungsi SAMA; dipakai migrasi L6)
 -- ===== Usulan Musyawarah Ambalan (tahap L6b): pengingat ===== (penanda keempat, fungsi SAMA; dipakai migrasi L6b)
 -- ===== Usulan kegiatan lain (tahap L6b): pengingat ===== (penanda kelima, fungsi SAMA; dipakai migrasi L6b)
+-- ===== Pra-uji berjenjang (fase C): pengingat ===== (penanda keenam, fungsi SAMA; dipakai migrasi pra-uji)
+-- ===== Kalender Garuda (Tahap 2, G4d): pengingat ===== (penanda ketujuh, fungsi SAMA; dipakai migrasi pengingat kalender)
 -- Pengingat harian (dijalankan pg_cron pukul 07.00 WIB): pengujian dan sesi ujian besok, pengajuan yang menunggu lebih dari 3 hari,
 -- cadangan data yang sudah sebulan tidak diunduh (tahap L4), tangga eskalasi tidak bergerak (tahap L5), agenda tahunan H-30/H-7/H-1
 -- (tahap L6), usulan Musyawarah Ambalan belum terjadwal H-60 lalu tiap 14 hari (tahap L6b), usulan 10 kegiatan lain belum terjadwal
 -- H-30/H-60 lalu tiap 14 hari (tahap L6b, juga di luar jam senyap karena selalu berjalan 07.00 WIB), dan pembersihan notifikasi
--- berumur lebih dari 90 hari. Kunci membuat tiap pengingat terkirim sekali walau dijalankan berulang.
+-- berumur lebih dari 90 hari, dan tahap kalender seleksi Garuda H-7/H-3/H-1/hari-H serta berakhir besok (Tahap 2, G4d). Kunci membuat tiap pengingat terkirim sekali walau dijalankan berulang.
 create function sigarda.notif_pengingat() returns void language plpgsql security definer set search_path = public as
 $$
 declare v_besok date := sigarda.hari_ini() + 1; r record; v_x uuid; v_label text;
@@ -128,6 +130,8 @@ begin
   perform sigarda.agenda_proses();
   perform sigarda.musyawarah_pengingat();
   perform sigarda.kegiatan_pengingat();
+  perform sigarda.pra_uji_pengingat();
+  perform sigarda.garuda_kalender_pengingat();
   delete from public.notifikasi where dibuat < now() - interval '90 days';
 end $$;
 -- ===== akhir pengingat cadangan =====
@@ -135,6 +139,8 @@ end $$;
 -- ===== akhir pengingat agenda =====
 -- ===== akhir pengingat usulan musyawarah =====
 -- ===== akhir pengingat usulan kegiatan lain =====
+-- ===== akhir pengingat pra-uji =====
+-- ===== akhir pengingat kalender garuda =====
 
 -- Mengantre Web Push: satu permintaan HTTP per pernyataan INSERT (pg_net) ke Edge Function notif-push, hanya untuk penerima yang punya perangkat.
 -- Tanpa konfigurasi (sigarda.push_atur) atau tanpa pg_net tidak ada yang dikirim; Kotak Notifikasi di aplikasi tetap berjalan. Galat push tidak

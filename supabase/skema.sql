@@ -19,7 +19,7 @@ set check_function_bodies = off;
 -- ---------------------------------------------------------------------------
 -- 0. Bersihkan versi lama
 -- ---------------------------------------------------------------------------
-drop table if exists public.kepengurusan_log, public.penugasan_peserta, public.penugasan_log, public.penugasan_rombel, public.guru_agama,
+drop table if exists public.sfh_catatan, public.portofolio_snapshot, public.dokumen_templat, public.penegak_isian, public.sku_pra_uji,public.pengukuhan_dewan, public.bina_damping, public.kepengurusan_log, public.penugasan_peserta, public.penugasan_log, public.penugasan_rombel, public.guru_agama,
   public.naik_kelas_log, public.naik_kelas_batch, public.notifikasi, public.push_langganan, public.push_konfigurasi, public.keepalive_konfigurasi,
   public.dokumen_terbit, public.dokumen_urut, public.iuran_kas, public.iuran_log, public.iuran, public.asisten_iuran,
   public.sesi_ujian_peserta, public.sesi_ujian_butir, public.sesi_ujian, public.sertifikat_tingkat, public.sku_penilaian, public.instrumen_panduan, public.instrumen_penguji, public.instrumen_kriteria, public.instrumen,
@@ -66,19 +66,27 @@ create table public.profiles (
   status text not null default 'aktif' check (status in ('aktif','nonaktif','alumni')),   -- Penegak: nonaktif = tidak melanjutkan Pramuka (masih siswa), alumni = sudah lulus; keduanya hanya dapat dilihat
   status_pada date,                                                -- sejak kapan status ini berlaku
   lulus_ta text check (lulus_ta is null or lulus_ta ~ '^[0-9]{4}/[0-9]{4}$'),   -- tahun ajaran kelulusan (angkatan), hanya alumni
+  pinsa boolean not null default false,                           -- Pimpinan Sangga (Penegak Calon Laksana ke atas, dipilih Bina Damping rombelnya); satu Pinsa per sangga per rombel; hilang sendiri bila pindah rombel/sangga atau tidak aktif
   wajib_ganti_pin boolean not null default true,
   pin_direset_oleh uuid references public.profiles(id) on delete set null,
   pin_direset_pada timestamptz,
   pin_diubah timestamptz,
   dibuat date not null default sigarda.hari_ini(),
-  constraint profil_peserta check (role <> 'peserta' or (nis is not null and kelas is not null and sangga is not null and agama is not null and jabatan is null)),
+  -- Penegak: hanya NIS dan rombel yang wajib sejak akun dibuat; sangga (dibagi Pembina/Bina Damping) dan agama (diisi Penegak sendiri, dijaga pemicu tolak_peserta_tak_aktif: tanpa agama tidak ada progres SKU) boleh kosong.
+  constraint profil_peserta check (role <> 'peserta' or (nis is not null and kelas is not null and jabatan is null)),
   constraint profil_penguji check (role <> 'penguji' or jabatan in ('Dewan Ambalan','Pembina')),
   constraint profil_admin check (role <> 'admin' or jabatan = 'Admin Gudep'),
   constraint profil_nta check (nta is null or nta ~ '^[0-9A-Za-z./ -]{1,40}$'),
-  constraint profil_jabatan_dewan check (jabatan_dewan is null or role = 'peserta' or (role = 'penguji' and jabatan = 'Dewan Ambalan'))
+  constraint profil_jabatan_dewan check (jabatan_dewan is null or role = 'peserta' or (role = 'penguji' and jabatan = 'Dewan Ambalan')),
+  constraint profil_pinsa check (not pinsa or role = 'peserta')
 );
--- Pradana dan Pradani masing-masing hanya satu pemegang (mereka menjadi ketua sidang dan penanda tangan Surat Tanda Lulus)
-create unique index profil_pradana_pradani_unik on public.profiles (jabatan_dewan) where jabatan_dewan in ('Pradana','Pradani');
+-- ===== Jabatan tunggal Dewan Ambalan (Fase A): indeks =====
+-- Pradana, Pradani, dan Pemangku Adat masing-masing hanya satu pemegang (Pemangku Adat = ketua sidang Dewan Kehormatan; Pradana dan Pradani
+-- menandatangani Surat Tanda Lulus). Daftar jabatan tunggal sama dengan sigarda.jabatan_tunggal.
+create unique index profil_pradana_pradani_unik on public.profiles (jabatan_dewan) where jabatan_dewan in ('Pradana','Pradani','Pemangku Adat');
+-- ===== akhir indeks jabatan tunggal =====
+-- Satu Pinsa untuk tiap sangga di dalam satu rombel (nama sangga tanpa membedakan huruf besar/kecil)
+create unique index profil_pinsa_unik on public.profiles (kelas, lower(sangga)) where pinsa;
 
 -- Katalog (diisi otomatis di bagian akhir berkas ini dari data aplikasi)
 create table public.sku_butir (
@@ -241,6 +249,37 @@ create table public.kepengurusan_log (
 );
 create index kepengurusan_log_waktu_idx on public.kepengurusan_log (id);
 -- ===== akhir tabel dewan penegak =====
+-- ===== Pengukuhan Dewan Ambalan (Fase A): tabel =====
+-- Pengukuhan kepengurusan Dewan Ambalan (ketua dan wakil ketua) oleh Ketua Kwartir Ranting: satu catatan per tahun ajaran. Dasar: AD/ART Munas 2023, Anggaran Rumah Tangga
+-- Pasal 51 ayat (2) huruf a (ditetapkan berdasarkan rekomendasi Ketua Majelis Pembimbing Gugusdepan dan dikukuhkan dengan surat keputusan Ketua Kwartir Ranting).
+-- Nomor dan tanggal rekomendasi Ketua Mabigus opsional, tetapi harus diisi berpasangan.
+create table public.pengukuhan_dewan (
+  tahun_ajaran text primary key check (tahun_ajaran ~ '^[0-9]{4}/[0-9]{4}$'),
+  nomor_sk text not null check (char_length(nomor_sk) between 1 and 80 and nomor_sk !~ '[[:cntrl:]<>]'),
+  tanggal_sk date not null,
+  rekomendasi_nomor text not null default '' check (char_length(rekomendasi_nomor) <= 80 and rekomendasi_nomor !~ '[[:cntrl:]<>]'),
+  rekomendasi_tanggal date,
+  catatan text not null default '' check (char_length(catatan) <= 200),
+  diubah_oleh uuid references public.profiles(id) on delete set null,
+  diubah_pada timestamptz not null default now(),
+  constraint pengukuhan_rekomendasi_pasangan check ((rekomendasi_nomor = '') = (rekomendasi_tanggal is null))
+);
+-- ===== akhir tabel pengukuhan dewan =====
+-- ===== Pinsa dan Bina Damping (fase B): tabel =====
+-- Bina Damping: 2 orang per rombel per tahun ajaran, Penegak berjabatan Dewan Ambalan yang minimal Calon Laksana (utamakan yang sudah Laksana), ditunjuk lewat
+-- sg_bina_damping_atur. Satu orang hanya satu rombel per tahun ajaran (persediaan pendamping terbatas). Tanpa kebijakan baca: dibaca lewat fungsi sg_* saja.
+-- Baris hilang sendiri (pemicu profiles_bina_damping_bersih) bila Penegaknya nonaktif/alumni atau tidak lagi berjabatan Dewan.
+create table public.bina_damping (
+  tahun_ajaran text not null check (tahun_ajaran ~ '^[0-9]{4}/[0-9]{4}$'),
+  rombel text not null check (rombel ~ '^(X|XI|XII)-(0[1-9]|10)$'),
+  penegak_id uuid not null references public.profiles(id) on delete cascade,
+  ditetapkan_oleh uuid references public.profiles(id) on delete set null,
+  ditetapkan_pada timestamptz not null default now(),
+  primary key (tahun_ajaran, rombel, penegak_id)
+);
+create unique index bina_damping_satu_rombel_idx on public.bina_damping (tahun_ajaran, penegak_id);
+create index bina_damping_penegak_idx on public.bina_damping (penegak_id);
+-- ===== akhir tabel pinsa bina damping =====
 -- Guru agama di sekolah (per agama), rujukan surat pengantar bila tidak ada Pembina yang seagama dengan Penegak (dikelola Admin).
 create table public.guru_agama (
   id bigint generated always as identity primary key,
@@ -297,7 +336,7 @@ create table public.dokumen_urut (          -- penghitung nomor dokumen per jeni
 create table public.notifikasi (
   id bigint generated always as identity primary key,
   penerima_id uuid not null references public.profiles(id) on delete cascade,
-  jenis text not null check (jenis in ('ajukan','alih','mulai','hasil','pengingat','lama','sesi','surat','tes','eskalasi','agenda','musyawarah','kegiatan')),   -- 'tes' = notifikasi uji dari tombol di halaman Notifikasi; 'eskalasi' = tangga pengingat tahap L5; 'agenda' = pengingat H-30/H-7/H-1 tahap L6; 'musyawarah' = usulan/pengingat Musyawarah Ambalan tahap L6b; 'kegiatan' = usulan/pengingat 10 jenis kegiatan lain tahap L6b
+  jenis text not null check (jenis in ('ajukan','alih','mulai','hasil','pengingat','lama','sesi','surat','tes','eskalasi','agenda','musyawarah','kegiatan','pra_uji','tkk')),   -- 'tes' = notifikasi uji dari tombol di halaman Notifikasi; 'eskalasi' = tangga pengingat tahap L5; 'agenda' = pengingat H-30/H-7/H-1 tahap L6; 'musyawarah' = usulan/pengingat Musyawarah Ambalan tahap L6b; 'kegiatan' = usulan/pengingat 10 jenis kegiatan lain tahap L6b
   judul text not null check (char_length(judul) between 1 and 120),
   isi text not null default '' check (char_length(isi) <= 300),
   tautan jsonb not null default '{}'::jsonb,                        -- { tab: 'antrian' | 'sku' | 'beranda' | 'cetak' }
@@ -784,6 +823,283 @@ create table public.login_gagal (
   diperbarui timestamptz not null default now()
 );
 
+-- ===== Pra-uji berjenjang (fase C): tabel =====
+-- Pra-uji SKU sebelum uji resmi Pembina. Jalur butir Bantara: Penegak > Pinsa > Bina Damping > Pembina; butir Laksana: Penegak > Bina Damping (yang sudah
+-- Laksana) > Pembina. Satu baris = satu tahap untuk satu pengajuan; lulus meneruskan pengajuan (baris tahap berikut, atau pengajuan uji resmi di sku_progress),
+-- belum = kembali ke Penegak dengan catatan. Baris lama disimpan sebagai riwayat. Pra-uji hanya REKOMENDASI: tidak pernah mengubah status lulus butir.
+-- Tanpa hak baca langsung selain kebijakan baca (pemilik, pengurus, penilai); tulis hanya lewat fungsi sg_*.
+create table public.sku_pra_uji (
+  id bigint generated always as identity primary key,
+  peserta_id uuid not null references public.profiles(id) on delete cascade,
+  sku_id text not null references public.sku_unit(id),
+  tahap text not null check (tahap in ('pinsa','bina_damping')),
+  status text not null default 'menunggu' check (status in ('menunggu','lulus','belum','dibatalkan','dilewati')),
+  jadwal date not null,                                          -- tanggal uji resmi yang diinginkan Penegak (dibawa sampai tahap Pembina)
+  catatan_peserta text not null default '' check (char_length(catatan_peserta) <= 500),
+  penilai_id uuid references public.profiles(id) on delete set null,   -- yang memutuskan (Pinsa/Bina Damping), atau Pembina/Admin yang melewati tahap
+  penilai_nama text,                                             -- nama saat memutuskan (Penegak tidak dapat membaca profil Pinsa/Bina Damping)
+  catatan text not null default '' check (char_length(catatan) <= 1000),
+  dibuat timestamptz not null default now(),
+  diputuskan_pada timestamptz,
+  constraint sku_pra_uji_belum_catatan check (status <> 'belum' or btrim(catatan) <> '')
+);
+-- Satu tahap menunggu per Penegak per butir
+create unique index sku_pra_uji_menunggu_unik on public.sku_pra_uji (peserta_id, sku_id) where status = 'menunggu';
+create index sku_pra_uji_peserta_idx on public.sku_pra_uji (peserta_id, sku_id);
+create index sku_pra_uji_penilai_idx on public.sku_pra_uji (penilai_id);
+create index sku_pra_uji_sku_idx on public.sku_pra_uji (sku_id);
+-- ===== akhir tabel pra-uji =====
+-- ===== Pelantikan dan Saka (Tahap 2, G1): tabel =====
+-- Pelantikan Penegak Bantara dan Laksana (penyematan TKU) dan keanggotaan Saka (Satuan Karya). Data inti untuk syarat Garuda dan formulir daftar isian Kwarcab
+-- (tempat dan tanggal pelantikan, surat keterangan aktif Saka). Dicatat Pembina atau Admin Gudep; dibaca pemilik dan pengurus (RLS baca); tulis hanya lewat fungsi sg_*.
+create table public.pelantikan (
+  id bigint generated always as identity primary key,
+  peserta_id uuid not null references public.profiles(id) on delete cascade,
+  tingkat text not null check (tingkat in ('bantara','laksana')),
+  tanggal date not null check (tanggal >= date '2000-01-01'),
+  tempat text not null check (char_length(btrim(tempat)) between 1 and 120),
+  agenda_id bigint references public.agenda(id) on delete set null,          -- kegiatan pelantikan di Agenda (opsional)
+  catatan text not null default '' check (char_length(catatan) <= 200),
+  dicatat_oleh uuid references public.profiles(id) on delete set null,
+  dicatat_pada timestamptz not null default now(),
+  constraint pelantikan_satu_per_tingkat unique (peserta_id, tingkat)
+);
+create index pelantikan_tanggal_idx on public.pelantikan (tanggal);
+create index pelantikan_agenda_idx on public.pelantikan (agenda_id);
+
+create table public.saka_anggota (
+  id bigint generated always as identity primary key,
+  peserta_id uuid not null references public.profiles(id) on delete cascade,
+  saka text not null check (char_length(btrim(saka)) between 1 and 60),                -- nama Saka, isian bebas (saran di layar)
+  tanggal_masuk date not null check (tanggal_masuk >= date '2000-01-01'),
+  status text not null default 'aktif' check (status in ('aktif','selesai')),
+  tanggal_selesai date,
+  surat_url text not null default '' check (surat_url = '' or (surat_url ~* '^https?://' and char_length(surat_url) <= 500)),   -- tautan surat keterangan aktif Saka
+  catatan text not null default '' check (char_length(catatan) <= 200),
+  dicatat_oleh uuid references public.profiles(id) on delete set null,
+  dicatat_pada timestamptz not null default now(),
+  constraint saka_selesai_konsisten check ((status = 'aktif' and tanggal_selesai is null) or (status = 'selesai' and tanggal_selesai is not null and tanggal_selesai >= tanggal_masuk))
+);
+create unique index saka_peserta_unik on public.saka_anggota (peserta_id, lower(btrim(saka)));
+-- ===== akhir tabel pelantikan dan saka =====
+-- ===== TKK (Tahap 2, G2): tabel =====
+-- Tanda Kecakapan Khusus (TKK) Penegak: katalog (nama, bidang, sumber; isinya dibangkitkan dari src/data/tkkData.js oleh scripts/buat-skema.mjs dan migrasi),
+-- capaian bertingkat Purwa > Madya > Utama per Penegak, dan TKK Krida (Saka). Dicatat Pembina atau Admin Gudep (Pembina yang langsung membina yang memberi TKK);
+-- dibaca pemilik dan pengurus (RLS baca); tulis hanya lewat fungsi sg_tkk_*. Syarat tiap SKK TIDAK disimpan (lihat berkas peraturan).
+create table public.tkk_katalog (
+  id text primary key check (id ~ '^[a-z0-9]+(-[a-z0-9]+)*$' and char_length(id) <= 40),
+  nama text not null check (char_length(btrim(nama)) between 1 and 80),
+  bidang smallint not null check (bidang between 1 and 5),
+  golongan text not null default 'penegak' check (golongan in ('penegak','siaga')),      -- 'siaga' = khusus Siaga, tidak dapat dikenakan pada Penegak
+  agama text check (agama is null or agama in ('Islam','Katolik','Protestan','Hindu','Buddha','Khonghucu')),   -- khusus satu agama (mis. Sholat)
+  sumber text not null check (sumber in ('skk-132-1979','tambahan','penabung-01-2024')),
+  urut smallint not null
+);
+
+create table public.tkk_capaian (
+  id bigint generated always as identity primary key,
+  peserta_id uuid not null references public.profiles(id) on delete cascade,
+  tkk_id text not null references public.tkk_katalog(id),
+  tingkat text not null check (tingkat in ('purwa','madya','utama')),
+  tanggal date not null check (tanggal >= date '2000-01-01'),
+  penguji1 text not null check (char_length(btrim(penguji1)) between 1 and 80),       -- tim penguji 2 orang (Pembina yang membina, pembantu Pembina, atau ahli): nama saja
+  penguji2 text not null check (char_length(btrim(penguji2)) between 1 and 80),
+  melatih text not null check (char_length(btrim(melatih)) between 1 and 200),         -- syarat Penegak: telah melatih sedikitnya seorang Pramuka sampai TKK tingkat di bawahnya
+  bukti_url text not null default '' check (bukti_url = '' or (bukti_url ~* '^https?://' and char_length(bukti_url) <= 500)),   -- tautan surat keterangan lulus/piagam
+  catatan text not null default '' check (char_length(catatan) <= 200),
+  dicatat_oleh uuid references public.profiles(id) on delete set null,
+  dicatat_pada timestamptz not null default now(),
+  constraint tkk_capaian_satu_per_tingkat unique (peserta_id, tkk_id, tingkat)
+);
+create index tkk_capaian_tkk_idx on public.tkk_capaian (tkk_id);
+
+create table public.tkk_krida (
+  id bigint generated always as identity primary key,
+  peserta_id uuid not null references public.profiles(id) on delete cascade,
+  nama text not null check (char_length(btrim(nama)) between 1 and 80),               -- nama TKK Krida (mis. dari Saka), isian bebas
+  saka text not null default '' check (char_length(saka) <= 60),
+  tanggal date not null check (tanggal >= date '2000-01-01'),
+  bukti_url text not null default '' check (bukti_url = '' or (bukti_url ~* '^https?://' and char_length(bukti_url) <= 500)),
+  catatan text not null default '' check (char_length(catatan) <= 200),
+  dicatat_oleh uuid references public.profiles(id) on delete set null,
+  dicatat_pada timestamptz not null default now()
+);
+create unique index tkk_krida_unik on public.tkk_krida (peserta_id, lower(btrim(nama)));
+
+-- Ambang kesiapan Garuda (MINIMAL, dapat dilampaui; standar Kwarcab Purbalingga 2026). Bawaan sama dengan AMBANG_TKK_BAWAAN di src/data/tkkData.js (dijaga uji/tkk-klien.mjs).
+insert into public.pengaturan (kunci, nilai) values ('tkk.ambang',
+  '{"total": 45, "madya": 3, "utamaWajib": ["berkemah","gerak-jalan","pppk","pengatur-rumah","pengamat","juru-masak","penabung","menjahit","juru-kebun","pengamanan-kampung"]}'::jsonb)
+on conflict (kunci) do nothing;
+-- ===== akhir tabel tkk =====
+
+-- ===== TKK pengajuan (Tahap 2, G2b): tabel =====
+-- Penegak mengajukan capaian TKK sendiri (data sama dengan tkk_capaian); Pembina atau Admin meninjau: disetujui = menjadi capaian resmi, ditolak = catatan wajib.
+-- Satu pengajuan yang menunggu per (Penegak, TKK, tingkat). Baris lama disimpan sebagai riwayat. Tulis hanya lewat fungsi sg_tkk_ajukan/_batal/sg_tkk_tinjau.
+create table public.tkk_pengajuan (
+  id bigint generated always as identity primary key,
+  peserta_id uuid not null references public.profiles(id) on delete cascade,
+  tkk_id text not null references public.tkk_katalog(id),
+  tingkat text not null check (tingkat in ('purwa','madya','utama')),
+  tanggal date not null check (tanggal >= date '2000-01-01'),
+  penguji1 text not null check (char_length(btrim(penguji1)) between 1 and 80),
+  penguji2 text not null check (char_length(btrim(penguji2)) between 1 and 80),
+  penguji1_id uuid references public.profiles(id) on delete set null,                   -- Pembina Penguji 1 yang dipilih Penegak dari yang ditugaskan untuk kelasnya (G2c); Pembina ini yang diberi tahu
+  penguji_awal text not null default '' check (char_length(penguji_awal) <= 200),        -- nama penguji SEBELUM diganti Pembina saat meninjau (kosong bila tidak diganti)
+  melatih text not null check (char_length(btrim(melatih)) between 1 and 200),
+  bukti_url text not null default '' check (bukti_url = '' or (bukti_url ~* '^https?://' and char_length(bukti_url) <= 500)),
+  catatan text not null default '' check (char_length(catatan) <= 200),
+  status text not null default 'menunggu' check (status in ('menunggu','disetujui','ditolak','dibatalkan')),
+  diajukan_pada timestamptz not null default now(),
+  ditinjau_oleh uuid references public.profiles(id) on delete set null,
+  ditinjau_nama text,                                                                   -- nama peninjau saat meninjau (Penegak tidak dapat membaca profil Pembina)
+  ditinjau_pada timestamptz,
+  catatan_tinjauan text not null default '' check (char_length(catatan_tinjauan) <= 200),
+  capaian_id bigint references public.tkk_capaian(id) on delete set null,               -- capaian resmi hasil persetujuan
+  constraint tkk_pengajuan_tolak_wajib_catatan check (status <> 'ditolak' or btrim(catatan_tinjauan) <> '')
+);
+create unique index tkk_pengajuan_menunggu_unik on public.tkk_pengajuan (peserta_id, tkk_id, tingkat) where status = 'menunggu';
+create index tkk_pengajuan_tkk_idx on public.tkk_pengajuan (tkk_id);
+create index tkk_pengajuan_capaian_idx on public.tkk_pengajuan (capaian_id);
+create index tkk_pengajuan_penguji1_idx on public.tkk_pengajuan (penguji1_id);
+-- ===== akhir tabel tkk pengajuan =====
+-- ===== SPG (Tahap 2, G3): tabel =====
+-- Penetapan Syarat Pramuka Garuda (SPG, 13 butir SK Kwarnas 038/2017) oleh Pembina: satu baris per Penegak per butir. Butir yang dapat dihitung dari data aplikasi (SKU Laksana
+-- dan 3 bulan sesudah dilantik, TKK, Saka, Penabung) dihitung di klien; baris ini mencatat PENETAPAN Pembina: butir berbasis dokumen (lengkap = 100, belum = 0) dan penimpaan
+-- hasil hitung otomatis (timpa = true, alasan di catatan). Tanggal = tanggal pengujian pada lembar SPG. Isi rubrik pengujian TIDAK disimpan di sini.
+create table public.spg_penetapan (
+  peserta_id uuid not null references public.profiles(id) on delete cascade,
+  butir smallint not null check (butir between 1 and 13),
+  nilai smallint not null check (nilai in (0, 100)),
+  tanggal date not null check (tanggal >= date '2000-01-01'),
+  catatan text not null default '' check (char_length(catatan) <= 200),
+  timpa boolean not null default false,
+  dicatat_oleh uuid references public.profiles(id) on delete set null,
+  dicatat_pada timestamptz not null default now(),
+  primary key (peserta_id, butir),
+  constraint spg_timpa_beralasan check (not timpa or char_length(btrim(catatan)) >= 5)
+);
+-- ===== akhir tabel spg =====
+-- ===== Gerbang calon Garuda (Tahap 2, G4): tabel =====
+-- Tanggal lahir Penegak untuk memeriksa syarat usia Calon Garuda (pedoman Kwarcab Purbalingga 2026: usia 16-20 tahun). Sengaja TABEL TERPISAH, bukan kolom profiles: RLS profil
+-- memperlihatkan Penegak berjabatan Dewan kepada semua Penegak, sedangkan tanggal lahir hanya boleh dibaca pemilik dan pengurus. Dicatat Pembina atau Admin (sg_tanggal_lahir_atur).
+create table public.tanggal_lahir (
+  peserta_id uuid primary key references public.profiles(id) on delete cascade,
+  tanggal date not null check (tanggal >= date '1990-01-01'),
+  dicatat_oleh uuid references public.profiles(id) on delete set null,
+  dicatat_pada timestamptz not null default now()
+);
+
+-- Aturan gerbang calon (pengaturan 'garuda.gerbang'; diperbarui tiap tahun oleh Pembina atau Admin): kelas minimal, rentang tanggal lahir yang sah, dan kuota calon
+-- sebagai persen dari Penegak aktif. Bawaan sama dengan GERBANG_BAWAAN di src/lib/gerbangLogic.js (dijaga uji/gerbang-klien.mjs).
+insert into public.pengaturan (kunci, nilai) values ('garuda.gerbang',
+  '{"kelasMin": "XI", "lahirDari": "2007-11-01", "lahirSampai": "2009-05-01", "kuotaPersen": 5}'::jsonb)
+on conflict (kunci) do nothing;
+-- ===== akhir tabel gerbang =====
+-- ===== Tim penilai dan kalender Garuda (Tahap 2, G4b dan G4c): tabel =====
+-- Tim penilai Calon Garuda (pedoman Kwarcab Purbalingga 2026): dibentuk dengan SK Kwarcab, TERPISAH untuk putra dan putri (calon putra dinilai tim putra, calon putri tim putri),
+-- anggotanya Ketua Gudep (bukan Ka Mabigus sebagai ketua tim), Pembina Gudep, Andalan Ranting urusan Penegak, tokoh masyarakat, dan orang tua (ayah untuk putra, ibu untuk putri).
+-- Satu tim per (tahun ajaran, untuk); Calon Garuda dinilai tim yang sesuai jenis kelaminnya. Komposisi yang tidak lengkap hanya diperingatkan di klien. Nomor dan tanggal SK berpasangan.
+create table public.tim_penilai (
+  id bigint generated always as identity primary key,
+  tahun_ajaran text not null check (tahun_ajaran ~ '^[0-9]{4}/[0-9]{4}$'),
+  untuk text not null check (untuk in ('putra', 'putri')),
+  nomor_sk text not null default '' check (char_length(nomor_sk) <= 80),
+  tanggal_sk date check (tanggal_sk is null or tanggal_sk >= date '2000-01-01'),
+  sk_url text not null default '' check (sk_url = '' or (sk_url ~* '^https?://' and char_length(sk_url) <= 500)),
+  catatan text not null default '' check (char_length(catatan) <= 300),
+  dicatat_oleh uuid references public.profiles(id) on delete set null,
+  dicatat_pada timestamptz not null default now(),
+  constraint tim_penilai_unik unique (tahun_ajaran, untuk),
+  constraint tim_penilai_sk_pasangan check ((nomor_sk = '') = (tanggal_sk is null))
+);
+create table public.tim_penilai_anggota (
+  id bigint generated always as identity primary key,
+  tim_id bigint not null references public.tim_penilai(id) on delete cascade,
+  urut smallint not null check (urut between 1 and 15),
+  nama text not null check (char_length(btrim(nama)) between 1 and 80),
+  unsur text not null check (unsur in ('ketua_gudep', 'pembina', 'andalan_ranting', 'tokoh_masyarakat', 'orang_tua', 'lainnya')),
+  jabatan text not null default 'anggota' check (jabatan in ('ketua', 'anggota')),
+  keterangan text not null default '' check (char_length(keterangan) <= 120),
+  constraint tim_penilai_anggota_urut unique (tim_id, urut)
+);
+create unique index tim_penilai_satu_ketua on public.tim_penilai_anggota (tim_id) where jabatan = 'ketua';
+
+-- Kalender tahap Garuda dari Kwarcab (permohonan SK tim, serah portofolio ke Kwarran, verifikasi, pelantikan, dan seterusnya): satu baris per (tahun ajaran, tahap) berisi tanggal
+-- mulai dan (opsional) akhir. Daftar tahap = TAHAP_GARUDA di src/lib/kalenderGarudaLogic.js (dijaga uji/tim-kalender-klien.mjs).
+create table public.garuda_tahap (
+  id bigint generated always as identity primary key,
+  tahun_ajaran text not null check (tahun_ajaran ~ '^[0-9]{4}/[0-9]{4}$'),
+  tahap text not null check (tahap in ('uji_spg', 'ajukan_tim', 'ambil_sk', 'penilaian_gudep', 'serah_kwarran', 'nilai_kwarran', 'kirim_kwarcab', 'verifikasi_visitasi', 'iuran', 'pelantikan')),
+  mulai date not null check (mulai >= date '2000-01-01'),
+  akhir date,
+  catatan text not null default '' check (char_length(catatan) <= 200),
+  dicatat_oleh uuid references public.profiles(id) on delete set null,
+  dicatat_pada timestamptz not null default now(),
+  constraint garuda_tahap_unik unique (tahun_ajaran, tahap),
+  constraint garuda_tahap_rentang check (akhir is null or akhir >= mulai)
+);
+-- ===== akhir tabel tim kalender =====
+-- ===== Isian Penegak dan templat dokumen (Tahap 3, H1): tabel =====
+-- Isian data diri Penegak untuk portofolio Garuda (tempat lahir, alamat, keluarga, pendidikan, prestasi, kegiatan, kecakapan, perangkat IT), dipakai sebagai pasangan kunci-nilai.
+-- Diisi SENDIRI oleh Penegak (sg_isian_saya_simpan); admin gudep hanya membuat akun dengan nama, NIS, dan rombel. Daftar kunci dan aturan tiap kunci ada di
+-- sigarda.isian_periksa (dicerminkan src/lib/isianLogic.js dan dibandingkan langsung pada kisi masukan di uji/isian-klien.mjs). Dibaca pemilik, Pembina, dan Admin (BUKAN Dewan
+-- Ambalan: alamat dan riwayat kesehatan bersifat pribadi); ditulis hanya lewat fungsi.
+create table public.penegak_isian (
+  peserta_id uuid not null references public.profiles(id) on delete cascade,
+  kunci text not null check (kunci ~ '^[a-z0-9_]{1,40}$'),
+  nilai text not null check (char_length(nilai) between 1 and 200),
+  diubah_pada timestamptz not null default now(),
+  primary key (peserta_id, kunci)
+);
+
+-- Isi templat dokumen per tahun ajaran (rubrik surat keterangan guru untuk portofolio Garuda). Rubrik Kwarcab HANYA di basis data, tidak di repositori: Pembina atau Admin
+-- mengisinya dari menu Portofolio. isi = { uji?: teks, baris: [teks], pita?: [tiga teks] }; baris berawalan "# " adalah judul kelompok. Tahun ajaran tanpa templat memakai templat
+-- tahun ajaran sebelumnya yang terdekat.
+create table public.dokumen_templat (
+  id bigint generated always as identity primary key,
+  tahun_ajaran text not null check (tahun_ajaran ~ '^\d{4}/\d{4}$'),
+  jenis text not null check (jenis in ('surat_uud', 'surat_uu_pramuka', 'surat_tik', 'surat_internet', 'surat_bahasa', 'surat_seni', 'surat_iptek', 'surat_olahraga')),
+  isi jsonb not null check (jsonb_typeof(isi) = 'object'),
+  diubah_oleh uuid references public.profiles(id) on delete set null,
+  diubah_pada timestamptz not null default now(),
+  unique (tahun_ajaran, jenis)
+);
+-- ===== akhir tabel isian penegak =====
+
+-- ===== Salinan beku portofolio (Tahap 3, H3): tabel =====
+-- Salinan beku Portofolio format Kwarcab satu Penegak pada saat dicetak atau dikirim ke Kwarcab: seluruh data yang membentuk dokumen (identitas, TKK, SPG, isian data diri,
+-- rubrik surat guru, data gudep) disimpan apa adanya, sehingga dokumen yang sama dapat dibuka lagi meski data aplikasi kemudian berubah. Dibuat dan dihapus Pembina atau Admin;
+-- dibaca Pembina dan Admin (memuat data pribadi Penegak).
+create table public.portofolio_snapshot (
+  id bigint generated always as identity primary key,
+  peserta_id uuid not null references public.profiles(id) on delete cascade,
+  tahun_ajaran text not null check (tahun_ajaran ~ '^\d{4}/\d{4}$'),
+  catatan text not null default '' check (char_length(catatan) <= 200 and catatan !~ '[[:cntrl:]<>]'),
+  isi jsonb not null check (jsonb_typeof(isi) = 'object'),
+  dibuat_oleh uuid references public.profiles(id) on delete set null,
+  dibuat_oleh_nama text not null default '',
+  dibuat_pada timestamptz not null default now()
+);
+create index portofolio_snapshot_peserta_idx on public.portofolio_snapshot (peserta_id, dibuat_pada desc);
+-- ===== akhir tabel salinan beku portofolio =====
+
+-- ===== Perlindungan anggota / Safe From Harm (Tahap 4): tabel =====
+-- Catatan kewajiban Safe From Harm bagi ANGGOTA DEWASA gugus depan menurut Jukran Kwarnas 004/2021: Pembina (Pasal 9 ayat 3 huruf b: lulus Pelatihan Perlindungan; Pasal 7 ayat 4 huruf f:
+-- menandatangani pakta integritas; Pasal 7 ayat 4 huruf e: pemeriksaan riwayat hidup dan rekam jejak) dan Admin Gudep (pelatihan). Aplikasi hanya MENCATAT (tanggal dan tautan bukti);
+-- laporan kejadian TIDAK disimpan di aplikasi (Pasal 8 ayat 4 huruf g: rahasia, ditangani Komite Perlindungan dan Dewan Kehormatan di luar aplikasi). Satu baris per orang per jenis.
+-- Dicatat Pembina atau Admin; dibaca pemilik, Pembina, dan Admin.
+create table public.sfh_catatan (
+  id bigint generated always as identity primary key,
+  anggota_id uuid not null references public.profiles(id) on delete cascade,
+  jenis text not null check (jenis in ('pelatihan', 'pakta_integritas', 'rekam_jejak')),
+  tanggal date not null check (tanggal >= date '2015-01-01'),
+  bukti_url text not null default '' check (char_length(bukti_url) <= 500 and (bukti_url = '' or bukti_url ~* '^https?://[^[:space:]<>]+$')),
+  catatan text not null default '' check (char_length(catatan) <= 200 and catatan !~ '[[:cntrl:]<>]'),
+  dicatat_oleh uuid references public.profiles(id) on delete set null,
+  dicatat_pada timestamptz not null default now(),
+  unique (anggota_id, jenis)
+);
+-- ===== akhir tabel perlindungan anggota =====
 -- ---------------------------------------------------------------------------
 -- 2. Fungsi bantu (tidak diekspos lewat API)
 -- ---------------------------------------------------------------------------
@@ -839,6 +1155,13 @@ $$ begin
 end $$;
 -- ===== akhir peran usulan kegiatan =====
 
+
+-- ===== Pra-uji berjenjang (fase C): sakelar =====
+-- Sakelar pra-uji (pengaturan 'pra_uji.aktif' = {"aktif": true|false}), bawaan MATI agar peralihan dapat dipilih Pembina lewat sg_pra_uji_sakelar.
+-- Bila hidup: uji resmi hanya Pembina (sigarda.bisa_menguji) dan pengajuan Penegak lebih dulu melewati pra-uji Pinsa/Bina Damping.
+create function sigarda.pra_uji_aktif() returns boolean language sql stable security definer set search_path = public as
+$$ select coalesce((select (nilai ->> 'aktif')::boolean from public.pengaturan where kunci = 'pra_uji.aktif'), false) $$;
+-- ===== akhir sakelar pra-uji =====
 -- ---- Iuran bumbung: siapa yang boleh mencatat ----
 -- Dewan Ambalan (yang sudah mengganti PIN awal)
 create function sigarda.dewan() returns boolean language plpgsql stable security definer set search_path = public as
@@ -1169,14 +1492,19 @@ language sql stable security definer set search_path = public as
 $$ select exists (select 1 from sigarda.penguji_sah(p_peserta, p_sku) s where s.o_penguji = p_penguji) $$;
 
 -- ---- Dewan Ambalan sebagai atribut Penegak: fungsi bantu (dicerminkan src/lib/rombelLogic.js dan dewanLogic.js; dijaga oleh pengujian) ----
+-- ===== Pra-uji berjenjang (fase C): bisa_menguji =====
 -- Boleh menguji: Pembina, Dewan Ambalan lama (belum diarsipkan), atau Penegak aktif berjabatan Dewan Ambalan. Admin Gudep tidak menguji.
+-- Sakelar pra-uji HIDUP: uji resmi HANYA Pembina (AD/ART Munas 2023 Pasal 33 ayat (6) dan 35 ayat (3)); Dewan Ambalan tidak menguji.
 create function sigarda.bisa_menguji(p_id uuid) returns boolean language sql stable security definer set search_path = public as
 $$
   select exists (
     select 1 from public.profiles
-    where id = p_id and status = 'aktif' and (role = 'penguji' or (role = 'peserta' and jabatan_dewan is not null))
+    where id = p_id and status = 'aktif'
+      and case when sigarda.pra_uji_aktif() then role = 'penguji' and jabatan = 'Pembina'
+               else role = 'penguji' or (role = 'peserta' and jabatan_dewan is not null) end
   )
 $$;
+-- ===== akhir bisa_menguji pra-uji =====
 
 -- Penguji ini DITUGASKAN untuk Penegak ini pada tahun ajaran berjalan? Penugasan khusus Penegak (bila ada) menggantikan penugasan rombelnya.
 create function sigarda.ditugaskan(p_peserta uuid, p_penguji uuid) returns boolean language plpgsql stable security definer set search_path = public as
@@ -1191,11 +1519,16 @@ begin
     select 1 from public.penugasan_rombel where tahun_ajaran = sigarda.tahun_ajaran_kini() and rombel = v_kelas and penguji_id = p_penguji);
 end $$;
 
--- Jabatan Dewan tanpa selisih huruf: "pradana" -> "Pradana", "PRADANI" -> "Pradani"; selain itu spasi dirapikan dan ditulis apa adanya.
+-- ===== Jabatan tunggal dan ketua sidang (Fase A): bantu =====
+-- Jabatan Dewan tanpa selisih huruf: "pradana" -> "Pradana", "PRADANI" -> "Pradani", "pemangku  ADAT" -> "Pemangku Adat"; selain itu spasi dirapikan dan ditulis apa adanya.
 create function sigarda.jabatan_baku(p_teks text) returns text language sql immutable as
 $$
-  select case lower(sigarda.rapikan(p_teks)) when 'pradana' then 'Pradana' when 'pradani' then 'Pradani' else sigarda.rapikan(p_teks) end
+  select case lower(sigarda.rapikan(p_teks)) when 'pradana' then 'Pradana' when 'pradani' then 'Pradani' when 'pemangku adat' then 'Pemangku Adat' else sigarda.rapikan(p_teks) end
 $$;
+-- Jabatan yang hanya boleh dipegang satu anggota (cermin JABATAN_TUNGGAL di src/lib/dewanLogic.js; dijaga oleh pengujian).
+create function sigarda.jabatan_tunggal(p_jabatan text) returns boolean language sql immutable as
+$$ select p_jabatan in ('Pradana', 'Pradani', 'Pemangku Adat') $$;
+-- ===== akhir bantu jabatan tunggal =====
 
 -- Mencabut jabatan Dewan dari satu anggota (Penegak, atau akun Dewan lama) dan merapikan akibatnya: penugasan sebagai penguji dihapus (tercatat) dan
 -- pengajuan uji yang menunggu dan ditujukan kepadanya kembali ke antrian rombel. Pengujian yang sedang berjalan ("proses") dibiarkan
@@ -1224,6 +1557,85 @@ begin
 end $$;
 -- ---- akhir bantu dewan penegak ----
 -- ---- akhir bantu penegakan ----
+
+-- ---- Pinsa dan Bina Damping (fase B): fungsi bantu ----
+-- Tingkat SKU seorang Penegak untuk penunjukan pendamping: 'calon-bantara' (butir Bantara belum semua lulus), 'calon-laksana' (Bantara selesai),
+-- 'laksana' (Bantara dan Laksana selesai).
+create function sigarda.tingkat_penegak(p_id uuid) returns text language sql stable security definer set search_path = public as
+$$
+  select case when not sigarda.tingkat_selesai(p_id, 'Bantara') then 'calon-bantara'
+              when not sigarda.tingkat_selesai(p_id, 'Laksana') then 'calon-laksana'
+              else 'laksana' end
+$$;
+
+-- Pemanggil adalah Bina Damping (aktif) untuk rombel ini pada tahun ajaran berjalan.
+create function sigarda.bina_damping_rombel(p_rombel text) returns boolean language plpgsql stable security definer set search_path = public as
+$$
+begin
+  return coalesce((select p.role = 'peserta' and p.status = 'aktif' and not p.wajib_ganti_pin
+                     and exists (select 1 from public.bina_damping b where b.penegak_id = p.id and b.rombel = p_rombel and b.tahun_ajaran = sigarda.tahun_ajaran_kini())
+                   from public.profiles p where p.id = auth.uid()), false);
+end $$;
+
+-- Boleh membagi sangga dan menentukan Pinsa di rombel ini: Pembina, Admin, atau Bina Damping rombel itu.
+create function sigarda.sangga_bisa_atur(p_rombel text) returns boolean language sql stable security definer set search_path = public as
+$$ select sigarda.pembina_atau_admin() or sigarda.bina_damping_rombel(p_rombel) $$;
+
+-- Peringatan (tidak memblokir) tentang susunan sangga sebuah rombel: [{ "sangga": nama atau null, "teks": ... }]. Batas: 2 Bina Damping, 4-5 sangga
+-- per rombel, 4-8 Penegak per sangga, dan tiap sangga punya Pinsa. Rombel tanpa anggota aktif tidak diperingatkan soal sangga.
+create function sigarda.sangga_peringatan(p_rombel text) returns jsonb language plpgsql stable security definer set search_path = public as
+$$
+declare v_p jsonb := '[]'::jsonb; v_r record; v_sangga int := 0; v_bd int; v_tanpa int;
+begin
+  select count(*) into v_bd from public.bina_damping where tahun_ajaran = sigarda.tahun_ajaran_kini() and rombel = p_rombel;
+  if v_bd < 2 then
+    v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', null, 'teks', format('Bina Damping rombel ini baru %s dari 2 orang.', v_bd)));
+  end if;
+  for v_r in
+    select min(sangga) as nama, count(*)::int as n, bool_or(pinsa) as ada_pinsa from public.profiles
+    where role = 'peserta' and status = 'aktif' and kelas = p_rombel and btrim(coalesce(sangga, '')) <> '' group by lower(sangga) order by lower(sangga)
+  loop
+    v_sangga := v_sangga + 1;
+    if v_r.n < 4 or v_r.n > 8 then
+      v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', v_r.nama, 'teks', format('Sangga %s beranggotakan %s Penegak (seharusnya 4 sampai 8).', v_r.nama, v_r.n)));
+    end if;
+    if not v_r.ada_pinsa then
+      v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', v_r.nama, 'teks', format('Sangga %s belum punya Pinsa.', v_r.nama)));
+    end if;
+  end loop;
+  -- Penegak baru dibuat tanpa sangga (Tahap 3, H1): Pembina atau Bina Damping membaginya.
+  select count(*)::int into v_tanpa from public.profiles where role = 'peserta' and status = 'aktif' and kelas = p_rombel and btrim(coalesce(sangga, '')) = '';
+  if v_tanpa > 0 then
+    v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', null, 'teks', format('%s Penegak rombel ini belum punya sangga.', v_tanpa)));
+  end if;
+  if v_sangga > 0 and (v_sangga < 4 or v_sangga > 5) then
+    v_p := v_p || jsonb_build_array(jsonb_build_object('sangga', null, 'teks', format('Rombel ini punya %s sangga (seharusnya 4 sampai 5).', v_sangga)));
+  end if;
+  return v_p;
+end $$;
+
+-- Pinsa hilang sendiri bila Penegak pindah rombel atau sangga, atau tidak lagi aktif (jalur apa pun yang mengubahnya, termasuk naik kelas).
+create function sigarda.pinsa_bersihkan() returns trigger language plpgsql set search_path = public as
+$$
+begin
+  if new.pinsa and (new.role <> 'peserta' or new.status <> 'aktif' or new.kelas is distinct from old.kelas
+                    or lower(coalesce(new.sangga, '')) is distinct from lower(coalesce(old.sangga, ''))) then
+    new.pinsa := false;
+  end if;
+  return new;
+end $$;
+create trigger profiles_pinsa_bersih before update on public.profiles for each row execute function sigarda.pinsa_bersihkan();
+
+-- Bina Damping berakhir bila Penegaknya nonaktif/alumni atau tidak lagi berjabatan Dewan (dicabut, atau kepengurusan diganti).
+create function sigarda.bina_damping_bersihkan() returns trigger language plpgsql security definer set search_path = public as
+$$
+begin
+  delete from public.bina_damping where penegak_id = new.id;
+  return null;
+end $$;
+create trigger profiles_bina_damping_bersih after update of status, jabatan_dewan, role on public.profiles for each row
+  when (new.status <> 'aktif' or new.jabatan_dewan is null or new.role <> 'peserta') execute function sigarda.bina_damping_bersihkan();
+-- ---- akhir bantu pinsa bina damping ----
 
 -- ---- Dokumen terbit: fungsi bantu (dicerminkan src/lib/dokumenLogic.js suratAgamaAktif; dijaga oleh pengujian) ----
 -- Ada surat pengantar agama yang belum dicabut untuk Penegak ini dan memuat butir (unit) itu?
@@ -1325,11 +1737,13 @@ create trigger notif_dokumen after insert on public.dokumen_terbit
 -- ===== Agenda tahunan (tahap L6): pengingat ===== (penanda ketiga yang membungkus fungsi SAMA; dipakai migrasi L6)
 -- ===== Usulan Musyawarah Ambalan (tahap L6b): pengingat ===== (penanda keempat, fungsi SAMA; dipakai migrasi L6b)
 -- ===== Usulan kegiatan lain (tahap L6b): pengingat ===== (penanda kelima, fungsi SAMA; dipakai migrasi L6b)
+-- ===== Pra-uji berjenjang (fase C): pengingat ===== (penanda keenam, fungsi SAMA; dipakai migrasi pra-uji)
+-- ===== Kalender Garuda (Tahap 2, G4d): pengingat ===== (penanda ketujuh, fungsi SAMA; dipakai migrasi pengingat kalender)
 -- Pengingat harian (dijalankan pg_cron pukul 07.00 WIB): pengujian dan sesi ujian besok, pengajuan yang menunggu lebih dari 3 hari,
 -- cadangan data yang sudah sebulan tidak diunduh (tahap L4), tangga eskalasi tidak bergerak (tahap L5), agenda tahunan H-30/H-7/H-1
 -- (tahap L6), usulan Musyawarah Ambalan belum terjadwal H-60 lalu tiap 14 hari (tahap L6b), usulan 10 kegiatan lain belum terjadwal
 -- H-30/H-60 lalu tiap 14 hari (tahap L6b, juga di luar jam senyap karena selalu berjalan 07.00 WIB), dan pembersihan notifikasi
--- berumur lebih dari 90 hari. Kunci membuat tiap pengingat terkirim sekali walau dijalankan berulang.
+-- berumur lebih dari 90 hari, dan tahap kalender seleksi Garuda H-7/H-3/H-1/hari-H serta berakhir besok (Tahap 2, G4d). Kunci membuat tiap pengingat terkirim sekali walau dijalankan berulang.
 create function sigarda.notif_pengingat() returns void language plpgsql security definer set search_path = public as
 $$
 declare v_besok date := sigarda.hari_ini() + 1; r record; v_x uuid; v_label text;
@@ -1367,6 +1781,8 @@ begin
   perform sigarda.agenda_proses();
   perform sigarda.musyawarah_pengingat();
   perform sigarda.kegiatan_pengingat();
+  perform sigarda.pra_uji_pengingat();
+  perform sigarda.garuda_kalender_pengingat();
   delete from public.notifikasi where dibuat < now() - interval '90 days';
 end $$;
 -- ===== akhir pengingat cadangan =====
@@ -1374,6 +1790,8 @@ end $$;
 -- ===== akhir pengingat agenda =====
 -- ===== akhir pengingat usulan musyawarah =====
 -- ===== akhir pengingat usulan kegiatan lain =====
+-- ===== akhir pengingat pra-uji =====
+-- ===== akhir pengingat kalender garuda =====
 
 -- Mengantre Web Push: satu permintaan HTTP per pernyataan INSERT (pg_net) ke Edge Function notif-push, hanya untuk penerima yang punya perangkat.
 -- Tanpa konfigurasi (sigarda.push_atur) atau tanpa pg_net tidak ada yang dikirim; Kotak Notifikasi di aplikasi tetap berjalan. Galat push tidak
@@ -1425,6 +1843,236 @@ begin
 end $$;
 -- ---- akhir bantu notifikasi ----
 
+-- ===== Pra-uji berjenjang (fase C): bantu =====
+-- Aturan penilai pra-uji (aturan pengaman: hanya menyaring butir yang sudah ia lulus sendiri; butir agama bersifat per agama sehingga otomatis seagama):
+--   * tahap 'pinsa'        : Pinsa (aktif) sangga dan rombel yang sama dengan Penegak; hanya butir Bantara; Pinsa yang mengajukan sendiri melewati tahap ini.
+--   * tahap 'bina_damping' : Bina Damping rombel Penegak pada tahun ajaran berjalan; butir Laksana hanya oleh Bina Damping yang sudah Laksana;
+--                            Bina Damping yang mengajukan sendiri disaring Bina Damping lain di rombelnya.
+-- Tidak ada penilai yang memenuhi syarat pada suatu tahap = tahap itu dilewati; bila semua tahap terlewati, pengajuan langsung ke Pembina.
+create function sigarda.pra_uji_penilai_ok(p_peserta uuid, p_sku text, p_tahap text, p_penilai uuid) returns boolean
+language plpgsql stable security definer set search_path = public as
+$$
+declare v_p public.profiles; v_n public.profiles; v_tingkat text;
+begin
+  if p_penilai is null or p_penilai = p_peserta then return false; end if;
+  select * into v_p from public.profiles where id = p_peserta and role = 'peserta';
+  if not found then return false; end if;
+  select * into v_n from public.profiles where id = p_penilai and role = 'peserta' and status = 'aktif';
+  if not found then return false; end if;
+  select tingkat into v_tingkat from public.sku_unit where id = p_sku;
+  if not found then return false; end if;
+  if not exists (select 1 from public.sku_progress where peserta_id = p_penilai and sku_id = p_sku and status = 'lulus') then return false; end if;
+  if p_tahap = 'pinsa' then
+    return v_tingkat = 'Bantara' and v_n.pinsa and not v_p.pinsa and v_p.kelas is not null and v_n.kelas = v_p.kelas
+       and lower(v_n.sangga) = lower(v_p.sangga);
+  elsif p_tahap = 'bina_damping' then
+    return exists (select 1 from public.bina_damping b where b.penegak_id = p_penilai and b.rombel = v_p.kelas and b.tahun_ajaran = sigarda.tahun_ajaran_kini())
+       and (v_tingkat = 'Bantara' or sigarda.tingkat_penegak(p_penilai) = 'laksana');
+  end if;
+  return false;
+end $$;
+
+-- Semua penilai yang memenuhi syarat pada satu tahap untuk satu Penegak dan satu butir.
+create function sigarda.pra_uji_penilai_daftar(p_peserta uuid, p_sku text, p_tahap text) returns setof uuid
+language sql stable security definer set search_path = public as
+$$
+  select u.id from public.profiles u
+  where u.role = 'peserta' and u.status = 'aktif'
+    and case p_tahap when 'pinsa' then u.pinsa when 'bina_damping' then exists (select 1 from public.bina_damping b where b.penegak_id = u.id) else false end
+    and sigarda.pra_uji_penilai_ok(p_peserta, p_sku, p_tahap, u.id)
+$$;
+
+-- Tahap sesudah p_setelah (null = mulai dari awal) yang punya penilai: 'pinsa', 'bina_damping', atau 'pembina' (uji resmi).
+create function sigarda.pra_uji_tahap_berikut(p_peserta uuid, p_sku text, p_setelah text) returns text
+language plpgsql stable security definer set search_path = public as
+$$
+declare v_urut text[]; v_tahap text;
+begin
+  v_urut := case when (select tingkat from public.sku_unit where id = p_sku) = 'Bantara' then array['pinsa', 'bina_damping'] else array['bina_damping'] end;
+  foreach v_tahap in array v_urut loop
+    if p_setelah is not null and array_position(v_urut, v_tahap) <= coalesce(array_position(v_urut, p_setelah), 0) then continue; end if;
+    if exists (select 1 from sigarda.pra_uji_penilai_daftar(p_peserta, p_sku, v_tahap)) then return v_tahap; end if;
+  end loop;
+  return 'pembina';
+end $$;
+
+create function sigarda.pra_uji_nama_tahap(p_tahap text) returns text language sql immutable as
+$$ select case p_tahap when 'pinsa' then 'Pinsa' when 'bina_damping' then 'Bina Damping' else 'Pembina' end $$;
+
+-- Meneruskan pengajuan ke tahap berikutnya sesudah p_setelah (null = pengajuan baru): baris pra-uji tahap itu, atau bila tidak ada lagi, pengajuan uji resmi
+-- (sku_progress 'diajukan', antrian rombel Pembina). Mengembalikan tahap tujuan. Riwayat SKU mencatat perjalanannya.
+create function sigarda.pra_uji_teruskan(p_peserta uuid, p_sku text, p_setelah text, p_jadwal date, p_catatan_peserta text, p_oleh uuid) returns text
+language plpgsql security definer set search_path = public as
+$$
+declare v_tahap text := sigarda.pra_uji_tahap_berikut(p_peserta, p_sku, p_setelah);
+begin
+  if v_tahap = 'pembina' then
+    if not exists (select 1 from sigarda.penguji_sah(p_peserta, p_sku)) then
+      raise exception 'Belum ada Pembina yang dapat menguji butir ini untuk rombel Penegak tersebut. Hubungi Admin Gudep.';
+    end if;
+    insert into public.sku_progress (peserta_id, sku_id, status, jadwal, penguji_id, catatan_peserta, diubah)
+    values (p_peserta, p_sku, 'diajukan', p_jadwal, null, p_catatan_peserta, now())
+    on conflict (peserta_id, sku_id) do update
+      set status = 'diajukan', jadwal = excluded.jadwal, penguji_id = null, catatan_peserta = excluded.catatan_peserta, diubah = now();
+    insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh)
+    values (p_peserta, p_sku, case when p_setelah is null then 'Mengajukan pengujian untuk ' || to_char(p_jadwal, 'YYYY-MM-DD') || ' (antrian rombel, tanpa pra-uji)'
+                                   else 'Diteruskan ke pengujian resmi Pembina untuk ' || to_char(p_jadwal, 'YYYY-MM-DD') end, p_oleh);
+  else
+    insert into public.sku_pra_uji (peserta_id, sku_id, tahap, jadwal, catatan_peserta) values (p_peserta, p_sku, v_tahap, p_jadwal, p_catatan_peserta);
+    insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh)
+    values (p_peserta, p_sku, case when p_setelah is null then 'Mengajukan pengujian untuk ' || to_char(p_jadwal, 'YYYY-MM-DD') || '; menunggu pra-uji ' || sigarda.pra_uji_nama_tahap(v_tahap)
+                                   else 'Diteruskan ke pra-uji ' || sigarda.pra_uji_nama_tahap(v_tahap) end, p_oleh);
+  end if;
+  return v_tahap;
+end $$;
+
+-- Penegak mengajukan butir lewat jalur pra-uji (dipanggil sg_sku_ajukan sesudah pemeriksaan umum). Satu pengajuan menunggu per butir.
+create function sigarda.pra_uji_mulai(p_peserta uuid, p_sku text, p_jadwal date, p_catatan text) returns void
+language plpgsql security definer set search_path = public as
+$$
+begin
+  if exists (select 1 from public.sku_pra_uji where peserta_id = p_peserta and sku_id = p_sku and status = 'menunggu') then
+    raise exception 'Poin ini sedang menunggu pra-uji.';
+  end if;
+  if not exists (select 1 from sigarda.penguji_sah(p_peserta, p_sku)) then
+    raise exception 'Belum ada penguji yang dapat menguji butir ini untuk rombel Anda. Hubungi Admin Gudep.';
+  end if;
+  perform sigarda.pra_uji_teruskan(p_peserta, p_sku, null, p_jadwal, btrim(coalesce(p_catatan, '')), p_peserta);
+end $$;
+
+-- Notifikasi ke Penegak sesudah pra-uji lulus (atau tahap dilewati Pembina): kata kunci "diteruskan ke pra-uji selanjutnya" atau
+-- "diteruskan ke pengujian resmi ke Pembina" (keputusan pemilik; berbeda dari hasil uji resmi yang isinya tanpa hasil).
+create function sigarda.pra_uji_beritahu_lulus(p_peserta uuid, p_sku text, p_tujuan text, p_dilewati boolean default false) returns void
+language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.notif_buat(p_peserta, 'pra_uji', case when p_dilewati then 'Tahap pra-uji dilewati' else 'Pra-uji lulus' end,
+    sigarda.notif_label_butir(p_sku) || case when p_dilewati then ' melewati satu tahap pra-uji dan ' else ' lulus pra-uji dan ' end || case when p_tujuan = 'pembina' then 'diteruskan ke pengujian resmi ke Pembina.' else 'diteruskan ke pra-uji selanjutnya.' end,
+    '{"tab":"sku"}');
+end $$;
+
+-- Pengajuan pra-uji baru: beri tahu semua penilai yang memenuhi syarat pada tahap itu.
+create function sigarda.notif_pra_uji() returns trigger language plpgsql security definer set search_path = public as
+$$
+declare v_x uuid; v_nama text; v_label text := sigarda.notif_label_butir(NEW.sku_id);
+begin
+  if NEW.status <> 'menunggu' then return null; end if;
+  select nama into v_nama from public.profiles where id = NEW.peserta_id;
+  for v_x in select * from sigarda.pra_uji_penilai_daftar(NEW.peserta_id, NEW.sku_id, NEW.tahap) loop
+    perform sigarda.notif_buat(v_x, 'pra_uji', 'Pengajuan pra-uji baru', v_nama || ' mengajukan ' || v_label || ' untuk pra-uji ' || sigarda.pra_uji_nama_tahap(NEW.tahap), '{"tab":"pra-uji"}');
+  end loop;
+  return null;
+end $$;
+create trigger notif_pra_uji after insert on public.sku_pra_uji for each row execute function sigarda.notif_pra_uji();
+
+-- Pengingat harian (dipanggil sigarda.notif_pengingat): pra-uji menunggu lebih dari 3 hari diingatkan kepada penilainya (sekali per pengajuan). Tanpa penilai
+-- (macet) hanya diingatkan kepada Pembina; pengajuan TIDAK pernah lolos otomatis.
+create function sigarda.pra_uji_pengingat() returns void language plpgsql security definer set search_path = public as
+$$
+declare r record; v_x uuid; v_ada boolean;
+begin
+  for r in select u.id, u.peserta_id, u.sku_id, u.tahap, p.nama from public.sku_pra_uji u join public.profiles p on p.id = u.peserta_id
+           where u.status = 'menunggu' and u.dibuat < now() - interval '3 days' loop
+    v_ada := false;
+    for v_x in select * from sigarda.pra_uji_penilai_daftar(r.peserta_id, r.sku_id, r.tahap) loop
+      v_ada := true;
+      perform sigarda.notif_buat(v_x, 'pra_uji', 'Pra-uji menunggu lebih dari 3 hari', r.nama || ', ' || sigarda.notif_label_butir(r.sku_id), '{"tab":"pra-uji"}', 'pra-lama:' || r.id);
+    end loop;
+    if not v_ada then
+      for v_x in select id from public.profiles where role = 'penguji' and jabatan = 'Pembina' and status = 'aktif' loop
+        perform sigarda.notif_buat(v_x, 'pra_uji', 'Pra-uji tanpa penilai',
+          r.nama || ', ' || sigarda.notif_label_butir(r.sku_id) || ': belum ada ' || sigarda.pra_uji_nama_tahap(r.tahap) || ' yang dapat menilai. Lewati tahap ini bila perlu.',
+          '{"tab":"pra-uji"}', 'pra-macet:' || r.id);
+      end loop;
+    end if;
+  end loop;
+end $$;
+-- ===== akhir bantu pra-uji =====
+-- ===== Isian Penegak (Tahap 3, H1): fungsi bantu =====
+-- Pemeriksa satu isian data diri (kunci dan nilai sudah dirapikan; nilai kosong = menghapus isian). Mengembalikan teks galat atau NULL bila sah. Cermin klien:
+-- src/lib/isianLogic.js (periksaIsian), dibandingkan langsung dengan fungsi ini pada kisi masukan di uji/isian-klien.mjs. Daftar kunci:
+--   pribadi   : panggilan, tempat_lahir, alamat, gol_darah (A/B/AB/O), no_hp, tinggi (cm), berat (kg), penyakit
+--   keluarga  : ayah|ibu|wali_{nama,hp,kerja,alamat}, anak_ke, dari_saudara, sdr1..3_{nama,sebagai}
+--   pendidikan: pend_{tk,sd,smp,sma}_{nama,lulus}; prestasi: akd_{tk,sd,smp,sma}, non_{tk,sd,smp,sma}
+--   kegiatan  : keg1..7_{nama,tingkat (kwarran/kwarcab/kwarda)}; bidang: bid1..6_{nama,jenis}; perangkat IT: it1..4_{nama,level (bisa/cukup/kurang)}
+create function sigarda.isian_periksa(p_kunci text, p_nilai text) returns text language plpgsql immutable as
+$$
+declare v_maks int; v_n int;
+begin
+  v_maks := case
+    when p_kunci = 'panggilan' then 40
+    when p_kunci = 'tempat_lahir' then 60
+    when p_kunci = 'alamat' then 200
+    when p_kunci = 'penyakit' then 120
+    when p_kunci ~ '^(ayah|ibu|wali)_(nama|kerja)$' then 80
+    when p_kunci ~ '^(ayah|ibu|wali)_alamat$' then 200
+    when p_kunci ~ '^sdr[1-3]_nama$' then 80
+    when p_kunci ~ '^sdr[1-3]_sebagai$' then 40
+    when p_kunci ~ '^pend_(tk|sd|smp|sma)_nama$' then 100
+    when p_kunci ~ '^(akd|non)_(tk|sd|smp|sma)$' then 200
+    when p_kunci ~ '^keg[1-7]_nama$' then 120
+    when p_kunci ~ '^bid[1-6]_nama$' then 80
+    when p_kunci ~ '^bid[1-6]_jenis$' then 60
+    when p_kunci ~ '^it[1-4]_nama$' then 80
+    -- bentuk khusus (diperiksa di bawah)
+    when p_kunci in ('gol_darah', 'no_hp', 'tinggi', 'berat', 'anak_ke', 'dari_saudara') then 30
+    when p_kunci ~ '^((ayah|ibu|wali)_hp|pend_(tk|sd|smp|sma)_lulus|keg[1-7]_tingkat|it[1-4]_level)$' then 30
+    else null end;
+  if v_maks is null then return format('Isian "%s" tidak dikenal.', left(coalesce(p_kunci, ''), 40)); end if;
+  if p_nilai is null then return 'Isian harus berupa teks.'; end if;
+  if char_length(p_nilai) > v_maks then return format('Isian %s maksimal %s karakter.', p_kunci, v_maks); end if;
+  if p_nilai ~ '[[:cntrl:]<>]' then return format('Isian %s memuat karakter yang tidak diizinkan.', p_kunci); end if;
+  if p_nilai = '' then return null; end if;
+
+  if p_kunci = 'gol_darah' then
+    if p_nilai not in ('A', 'B', 'AB', 'O') then return 'Golongan darah harus A, B, AB, atau O.'; end if;
+  elsif p_kunci = 'no_hp' or p_kunci ~ '^(ayah|ibu|wali)_hp$' then
+    if p_nilai !~ '^[0-9 +()./-]{8,20}$' then return 'Nomor telepon hanya boleh berisi angka, spasi, dan tanda + ( ) . / - (8-20 karakter).'; end if;
+  elsif p_kunci in ('tinggi', 'berat') then
+    if p_nilai !~ '^[0-9]{2,3}$' then return format('%s harus berupa angka bulat.', case when p_kunci = 'tinggi' then 'Tinggi badan' else 'Berat badan' end); end if;
+    v_n := p_nilai::int;
+    if p_kunci = 'tinggi' and v_n not between 50 and 250 then return 'Tinggi badan harus 50 sampai 250 cm.'; end if;
+    if p_kunci = 'berat' and v_n not between 20 and 250 then return 'Berat badan harus 20 sampai 250 kg.'; end if;
+  elsif p_kunci in ('anak_ke', 'dari_saudara') then
+    if p_nilai !~ '^[0-9]{1,2}$' then return 'Isi angka 1 sampai 20.'; end if;
+    if p_nilai::int not between 1 and 20 then return 'Isi angka 1 sampai 20.'; end if;
+  elsif p_kunci ~ '^pend_(tk|sd|smp|sma)_lulus$' then
+    if p_nilai !~ '^[0-9]{4}$' then return 'Tahun lulus harus 1990 sampai 2100.'; end if;
+    if p_nilai::int not between 1990 and 2100 then return 'Tahun lulus harus 1990 sampai 2100.'; end if;
+  elsif p_kunci ~ '^keg[1-7]_tingkat$' then
+    if p_nilai not in ('kwarran', 'kwarcab', 'kwarda') then return 'Tingkat kegiatan harus kwarran, kwarcab, atau kwarda.'; end if;
+  elsif p_kunci ~ '^it[1-4]_level$' then
+    if p_nilai not in ('bisa', 'cukup', 'kurang') then return 'Tingkat penguasaan harus bisa, cukup, atau kurang.'; end if;
+  end if;
+  return null;
+end $$;
+
+-- Pemeriksa isian tingkat profil (jk, agama, lahir, nta): nilai kosong berarti tidak diubah. Mengembalikan teks galat atau NULL.
+create function sigarda.isian_periksa_profil(p_kunci text, p_nilai text) returns text language plpgsql stable as
+$$
+declare v_t date;
+begin
+  if p_nilai is null then return 'Isian harus berupa teks.'; end if;
+  if p_nilai = '' then return null; end if;
+  if p_kunci = 'jk' then
+    if p_nilai not in ('L', 'P') then return 'Jenis kelamin harus L (laki-laki) atau P (perempuan).'; end if;
+  elsif p_kunci = 'agama' then
+    if p_nilai not in ('Islam', 'Katolik', 'Protestan', 'Hindu', 'Buddha', 'Khonghucu') then return 'Agama tidak dikenal.'; end if;
+  elsif p_kunci = 'lahir' then
+    if p_nilai !~ '^\d{4}-\d{2}-\d{2}$' then return 'Tanggal lahir harus berbentuk TTTT-BB-HH.'; end if;
+    begin
+      v_t := p_nilai::date;
+    exception when others then return 'Tanggal lahir tidak sah.';
+    end;
+    if v_t < date '1990-01-01' or v_t > sigarda.hari_ini() then return 'Tanggal lahir tidak boleh sebelum tahun 1990 atau di masa depan.'; end if;
+  elsif p_kunci = 'nta' then
+    if p_nilai !~ '^[0-9A-Za-z./ -]{1,40}$' then return 'NTA tidak valid: maksimal 40 karakter (huruf, angka, titik, garis miring, strip, spasi).'; end if;
+  else
+    return format('Isian "%s" tidak dikenal.', left(coalesce(p_kunci, ''), 40));
+  end if;
+  return null;
+end $$;
+-- ===== akhir bantu isian penegak =====
 -- ---------------------------------------------------------------------------
 -- 3. Row Level Security: baca sesuai peran, tanpa tulis langsung
 -- ---------------------------------------------------------------------------
@@ -1460,8 +2108,26 @@ alter table public.asisten_iuran enable row level security;
 alter table public.penugasan_rombel enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_penugasan_*
 alter table public.penugasan_log enable row level security;
 alter table public.guru_agama enable row level security;
+alter table public.bina_damping enable row level security;   -- tanpa kebijakan: hanya lewat fungsi sg_bina_damping_* dan sg_sangga_*
+alter table public.sku_pra_uji enable row level security;   -- baca: pemilik, penilai, dan pengurus; tulis: hanya fungsi sg_pra_uji_* dan sg_sku_ajukan/batal
+alter table public.pelantikan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_pelantikan_*
+alter table public.tkk_katalog enable row level security;   -- baca: semua pengguna aktif (katalog); tulis: hanya skema/migrasi
+alter table public.tkk_capaian enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_*
+alter table public.tkk_pengajuan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_ajukan/_batal dan sg_tkk_tinjau
+alter table public.tim_penilai enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_tim_penilai_*
+alter table public.tim_penilai_anggota enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_tim_penilai_*
+alter table public.garuda_tahap enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_garuda_tahap_*
+alter table public.penegak_isian enable row level security;   -- baca: pemilik, Pembina, dan Admin; tulis: hanya fungsi sg_isian_saya_simpan
+alter table public.dokumen_templat enable row level security;   -- baca: Pembina dan Admin; tulis: hanya fungsi sg_dokumen_templat_*
+alter table public.portofolio_snapshot enable row level security;   -- baca: Pembina dan Admin; tulis: hanya fungsi sg_portofolio_snapshot_*
+alter table public.sfh_catatan enable row level security;   -- baca: pemilik, Pembina, dan Admin; tulis: hanya fungsi sg_sfh_*
+alter table public.tanggal_lahir enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tanggal_lahir_atur
+alter table public.spg_penetapan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_spg_*
+alter table public.tkk_krida enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_krida_*
+alter table public.saka_anggota enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_saka_*
 alter table public.penugasan_peserta enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_penugasan_peserta_atur
 alter table public.kepengurusan_log enable row level security;    -- baca: pengurus; tulis: hanya fungsi kepengurusan
+alter table public.pengukuhan_dewan enable row level security;    -- baca: pengurus; tulis: hanya fungsi sg_pengukuhan_dewan_*
 alter table public.naik_kelas_batch enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_naik_kelas*
 alter table public.naik_kelas_log enable row level security;
 alter table public.agenda enable row level security;   -- baca: semua yang aktif; tulis: hanya fungsi sg_agenda_*
@@ -1520,6 +2186,8 @@ create policy baca_penugasan_peserta on public.penugasan_peserta for select to a
   using ((select sigarda.aktif()) and (select sigarda.pengurus()));
 create policy baca_kepengurusan_log on public.kepengurusan_log for select to authenticated
   using ((select sigarda.aktif()) and (select sigarda.pengurus()));
+create policy baca_pengukuhan_dewan on public.pengukuhan_dewan for select to authenticated
+  using ((select sigarda.aktif()) and (select sigarda.pengurus()));
 -- ===== Kebijakan naik kelas =====
 create policy baca_naik_kelas_batch on public.naik_kelas_batch for select to authenticated
   using ((select sigarda.aktif()) and (select sigarda.pengurus()));
@@ -1556,6 +2224,64 @@ create policy baca_instrumen_panduan on public.instrumen_panduan for select to a
 create policy baca_penilaian on public.sku_penilaian for select to authenticated
   using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
 
+-- ===== Pra-uji berjenjang (fase C): kebijakan =====
+-- Pra-uji: Penegak melihat pengajuannya sendiri, penilai (Pinsa/Bina Damping) yang sudah memutuskan, pengurus semua. Antrian penilai lewat sg_pra_uji_antrian.
+create policy baca_pra_uji on public.sku_pra_uji for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or penilai_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan pra-uji =====
+
+-- ===== Pelantikan dan Saka (Tahap 2, G1): kebijakan =====
+-- Pelantikan dan keanggotaan Saka: Penegak melihat miliknya sendiri, pengurus (Pembina, Dewan, Admin) semua.
+create policy baca_pelantikan on public.pelantikan for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+create policy baca_saka_anggota on public.saka_anggota for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan pelantikan dan saka =====
+
+-- ===== TKK (Tahap 2, G2): kebijakan =====
+-- Katalog TKK dibaca semua pengguna aktif; capaian dan TKK Krida: Penegak melihat miliknya sendiri, pengurus semua.
+create policy baca_tkk_katalog on public.tkk_katalog for select to authenticated using ((select sigarda.aktif()));
+create policy baca_tkk_capaian on public.tkk_capaian for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+create policy baca_tkk_krida on public.tkk_krida for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan tkk =====
+
+-- ===== TKK pengajuan (Tahap 2, G2b): kebijakan =====
+-- Pengajuan TKK: Penegak melihat pengajuannya sendiri, pengurus semua.
+create policy baca_tkk_pengajuan on public.tkk_pengajuan for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan tkk pengajuan =====
+
+-- ===== SPG (Tahap 2, G3): kebijakan =====
+-- Penetapan SPG: Penegak melihat miliknya sendiri, pengurus semua.
+create policy baca_spg_penetapan on public.spg_penetapan for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan spg =====
+
+-- ===== Gerbang calon Garuda (Tahap 2, G4): kebijakan =====
+-- Tanggal lahir: Penegak melihat miliknya sendiri, pengurus semua (tabel terpisah dari profiles agar tidak terbaca Penegak lain).
+create policy baca_tanggal_lahir on public.tanggal_lahir for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pengurus())));
+-- ===== akhir kebijakan gerbang =====
+
+-- ===== Isian Penegak dan templat dokumen (Tahap 3, H1): kebijakan =====
+-- Isian data diri: pemilik, Pembina, dan Admin (BUKAN Dewan Ambalan: alamat dan riwayat kesehatan pribadi). Templat dokumen: Pembina dan Admin.
+create policy baca_penegak_isian on public.penegak_isian for select to authenticated
+  using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pembina_atau_admin())));
+create policy baca_dokumen_templat on public.dokumen_templat for select to authenticated using ((select sigarda.pembina_atau_admin()));
+create policy baca_portofolio_snapshot on public.portofolio_snapshot for select to authenticated using ((select sigarda.pembina_atau_admin()));
+create policy baca_sfh_catatan on public.sfh_catatan for select to authenticated
+  using ((select sigarda.aktif()) and (anggota_id = (select auth.uid()) or (select sigarda.pembina_atau_admin())));
+-- ===== akhir kebijakan isian penegak =====
+
+-- ===== Tim penilai dan kalender Garuda (Tahap 2, G4b dan G4c): kebijakan =====
+-- Tim penilai dan kalender tahap Garuda dibaca pengurus (Pembina, Dewan, Admin); ditulis hanya lewat fungsi.
+create policy baca_tim_penilai on public.tim_penilai for select to authenticated using ((select sigarda.aktif()) and (select sigarda.pengurus()));
+create policy baca_tim_penilai_anggota on public.tim_penilai_anggota for select to authenticated using ((select sigarda.aktif()) and (select sigarda.pengurus()));
+create policy baca_garuda_tahap on public.garuda_tahap for select to authenticated using ((select sigarda.aktif()) and (select sigarda.pengurus()));
+-- ===== akhir kebijakan tim kalender =====
+
 -- Sesi ujian: pengurus melihat semua; Penegak hanya sesi yang mencantumkan dirinya.
 create policy baca_sesi_ujian on public.sesi_ujian for select to authenticated
   using ((select sigarda.aktif()) and ((select sigarda.pengurus()) or id in (select sesi_id from public.sesi_ujian_peserta where peserta_id = (select auth.uid()))));
@@ -1588,6 +2314,12 @@ begin
     raise exception 'Selesaikan seluruh butir Bantara lebih dulu.';
   end if;
   if p_jadwal is null then raise exception 'Tanggal pengujian wajib diisi.'; end if;
+  if char_length(coalesce(p_catatan, '')) > 500 then raise exception 'Catatan maksimal 500 karakter.'; end if;
+  -- Sakelar pra-uji hidup: pengajuan lebih dulu melewati pra-uji Pinsa/Bina Damping (p_penguji_id diabaikan; uji resmi selalu ke antrian Pembina rombel).
+  if sigarda.pra_uji_aktif() then
+    perform sigarda.pra_uji_mulai(v_uid, p_sku_id, p_jadwal, p_catatan);
+    return;
+  end if;
   -- Ketat saat memilih penguji: hanya penguji yang sah (penugasan rombel, butir Laksana dan butir agama hanya Pembina, agama seagama).
   -- p_penguji_id kosong = antrian bersama rombel: penguji yang sah mana pun mengambilnya lewat "Mulai uji".
   if p_penguji_id is not null and not sigarda.bisa_menguji(p_penguji_id) then
@@ -1606,7 +2338,6 @@ begin
       raise exception 'Penguji ini tidak bertugas pada rombel Anda. Pilih penguji dari daftar.';
     end if;
   end if;
-  if char_length(coalesce(p_catatan, '')) > 500 then raise exception 'Catatan maksimal 500 karakter.'; end if;
 
   insert into public.sku_progress (peserta_id, sku_id, status, jadwal, penguji_id, catatan_peserta, diubah)
   values (v_uid, p_sku_id, 'diajukan', p_jadwal, p_penguji_id, btrim(coalesce(p_catatan, '')), now())
@@ -1625,6 +2356,12 @@ begin
   perform sigarda.wajib_aktif();
   if not exists (select 1 from public.profiles where id = v_uid and role = 'peserta') then
     raise exception 'Hanya peserta yang dapat membatalkan pengajuan.';
+  end if;
+  -- Pengajuan yang masih menunggu pra-uji (Pinsa/Bina Damping) juga dapat dibatalkan.
+  if exists (select 1 from public.sku_pra_uji where peserta_id = v_uid and sku_id = p_sku_id and status = 'menunggu') then
+    update public.sku_pra_uji set status = 'dibatalkan', diputuskan_pada = now() where peserta_id = v_uid and sku_id = p_sku_id and status = 'menunggu';
+    insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh) values (v_uid, p_sku_id, 'Pengajuan pra-uji dibatalkan peserta', v_uid);
+    return;
   end if;
   select status into v_status from public.sku_progress where peserta_id = v_uid and sku_id = p_sku_id;
   if v_status is distinct from 'diajukan' then
@@ -1710,7 +2447,7 @@ $$
 declare v_p public.profiles; v_kode text; v_cat text := btrim(coalesce(p_catatan, '')); v_lama public.sku_progress; v_ganti text := ''; v_luar text;
 begin
   if not sigarda.bisa_menguji(p_oleh) then
-    raise exception 'Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.';
+    raise exception '%', case when sigarda.pra_uji_aktif() then 'Hanya Pembina yang dapat mencatat hasil uji resmi.' else 'Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.' end;
   end if;
   if p_oleh = p_peserta_id then raise exception 'Anda tidak dapat menilai diri sendiri.'; end if;
   select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';
@@ -1752,6 +2489,12 @@ begin
     raise exception 'Peserta belum menyelesaikan seluruh butir Bantara.';
   end if;
   if char_length(v_cat) > 1000 then raise exception 'Catatan maksimal 1000 karakter.'; end if;
+
+  -- Pembina memulai atau menuntaskan butir yang masih menunggu pra-uji: pra-uji itu tidak diperlukan lagi.
+  if p_hasil in ('proses', 'lulus', 'ulang') then
+    update public.sku_pra_uji set status = 'dibatalkan', catatan = 'Dilanjutkan langsung oleh penguji resmi', diputuskan_pada = now()
+      where peserta_id = p_peserta_id and sku_id = p_sku_id and status = 'menunggu';
+  end if;
 
   if p_hasil = 'proses' then
     insert into public.sku_progress (peserta_id, sku_id, status, penguji_id, tanggal_uji)
@@ -1804,7 +2547,7 @@ declare
   v_p public.profiles; v_cat text := btrim(coalesce(p_catatan, '')); v_h record; v_diganti boolean; v_rinci jsonb; v_saran_iuran int; v_beda_iuran boolean := false;
 begin
   if not sigarda.bisa_menguji(p_oleh) then
-    raise exception 'Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.';
+    raise exception '%', case when sigarda.pra_uji_aktif() then 'Hanya Pembina yang dapat mencatat hasil uji resmi.' else 'Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.' end;
   end if;
   if p_oleh = p_peserta_id then raise exception 'Anda tidak dapat menilai diri sendiri.'; end if;
   select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';
@@ -2398,21 +3141,211 @@ begin
 end $$;
 -- ===== akhir fungsi penugasan =====
 
+-- ===== Pinsa dan Bina Damping (fase B): aksi =====
+-- Menunjuk Bina Damping satu rombel (menggantikan daftar lama; kosong = mengosongkan). Dewan Ambalan, Pembina, dan Admin Gudep.
+-- Bina Damping = Penegak aktif berjabatan Dewan Ambalan yang minimal Calon Laksana (Bantara selesai), maksimal 2 per rombel, satu rombel per orang per tahun
+-- ajaran. PRIORITAS: Penegak Dewan yang sudah Laksana lebih dulu; yang masih Calon Laksana hanya bila tidak ada lagi Penegak Dewan yang sudah Laksana
+-- dan belum bertugas. Mengembalikan jumlah perubahan (yang dicabut + yang ditambah).
+create function public.sg_bina_damping_atur(p_tahun_ajaran text, p_rombel text, p_penegak_ids uuid[]) returns int
+language plpgsql security definer set search_path = public as
+$$
+declare v_ids uuid[]; v_id uuid; v_p public.profiles; v_n int := 0; v_k int; v_bebas int;
+begin
+  perform sigarda.wajib_aktif();
+  if not (sigarda.dewan() or sigarda.pembina_atau_admin()) then
+    raise exception 'Hanya Dewan Ambalan, Pembina, dan Admin Gudep yang dapat menunjuk Bina Damping.';
+  end if;
+  if not sigarda.tahun_ajaran_sah(p_tahun_ajaran) then raise exception 'Tahun ajaran tidak sah. Contoh: 2026/2027.'; end if;
+  if not sigarda.rombel_sah(p_rombel) then raise exception 'Rombel tidak sah. Contoh: X-01, XI-05, XII-10.'; end if;
+  v_ids := coalesce((select array_agg(distinct x) from unnest(p_penegak_ids) x), '{}');
+  if cardinality(v_ids) > 2 then raise exception 'Bina Damping maksimal 2 orang per rombel.'; end if;
+  foreach v_id in array v_ids loop
+    select * into v_p from public.profiles where id = v_id and role = 'peserta';
+    if not found or v_p.status <> 'aktif' then raise exception 'Penegak tidak ditemukan atau tidak aktif.'; end if;
+    if v_p.jabatan_dewan is null then
+      raise exception '% bukan pengurus Dewan Ambalan. Bina Damping dipilih dari Penegak berjabatan Dewan Ambalan.', v_p.nama;
+    end if;
+    if not sigarda.tingkat_selesai(v_id, 'Bantara') then
+      raise exception '% belum menyelesaikan SKU Bantara. Bina Damping minimal Penegak Calon Laksana.', v_p.nama;
+    end if;
+    if exists (select 1 from public.bina_damping where tahun_ajaran = p_tahun_ajaran and penegak_id = v_id and rombel <> p_rombel) then
+      raise exception '% sudah menjadi Bina Damping rombel lain pada tahun ajaran ini.', v_p.nama;
+    end if;
+    if not sigarda.tingkat_selesai(v_id, 'Laksana') then
+      select count(*) into v_bebas from public.profiles q
+      where q.role = 'peserta' and q.status = 'aktif' and q.jabatan_dewan is not null and q.id <> all (v_ids)
+        and sigarda.tingkat_selesai(q.id, 'Bantara') and sigarda.tingkat_selesai(q.id, 'Laksana')
+        and not exists (select 1 from public.bina_damping b where b.tahun_ajaran = p_tahun_ajaran and b.penegak_id = q.id and b.rombel <> p_rombel);
+      if v_bebas > 0 then
+        raise exception '% masih Calon Laksana. Dahulukan Penegak berjabatan Dewan yang sudah Laksana (masih ada % yang belum bertugas).', v_p.nama, v_bebas;
+      end if;
+    end if;
+  end loop;
+
+  delete from public.bina_damping where tahun_ajaran = p_tahun_ajaran and rombel = p_rombel and not (penegak_id = any (v_ids));
+  get diagnostics v_k = row_count;
+  v_n := v_k;
+  foreach v_id in array v_ids loop
+    insert into public.bina_damping (tahun_ajaran, rombel, penegak_id, ditetapkan_oleh) values (p_tahun_ajaran, p_rombel, v_id, auth.uid()) on conflict do nothing;
+    get diagnostics v_k = row_count;
+    v_n := v_n + v_k;
+  end loop;
+  return v_n;
+end $$;
+
+-- Penunjukan Bina Damping satu tahun ajaran (bawaan: tahun ajaran berjalan) beserta calon yang dapat dipilih. Pengurus (Dewan, Pembina, Admin).
+-- { tahun_ajaran, bisa_atur (boleh menunjuk: Dewan, Pembina, Admin), penugasan: [{ rombel, penegak_id, nama, kelas, jabatan_dewan, tingkat }],
+--   calon: [{ id, nama, kelas, jabatan_dewan, tingkat, rombel }] } dengan calon = Penegak berjabatan Dewan yang minimal Calon Laksana (Laksana lebih dulu);
+-- rombel = tempat ia sudah bertugas pada tahun ajaran itu (null = belum).
+create function public.sg_bina_damping_daftar(p_tahun_ajaran text default null) returns jsonb
+language plpgsql stable security definer set search_path = public as
+$$
+declare v_ta text := coalesce(p_tahun_ajaran, sigarda.tahun_ajaran_kini());
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pengurus() then raise exception 'Hanya pengurus yang dapat melihat penunjukan Bina Damping.'; end if;
+  if not sigarda.tahun_ajaran_sah(v_ta) then raise exception 'Tahun ajaran tidak sah. Contoh: 2026/2027.'; end if;
+  return jsonb_build_object(
+    'tahun_ajaran', v_ta,
+    'bisa_atur', sigarda.dewan() or sigarda.pembina_atau_admin(),
+    'penugasan', coalesce((
+      select jsonb_agg(jsonb_build_object('rombel', b.rombel, 'penegak_id', p.id, 'nama', p.nama, 'kelas', p.kelas, 'jabatan_dewan', p.jabatan_dewan,
+                                          'tingkat', sigarda.tingkat_penegak(p.id)) order by b.rombel, p.nama)
+      from public.bina_damping b join public.profiles p on p.id = b.penegak_id where b.tahun_ajaran = v_ta), '[]'::jsonb),
+    'calon', coalesce((
+      select jsonb_agg(x.j order by x.urut, x.nama) from (
+        select p.nama, case when sigarda.tingkat_selesai(p.id, 'Laksana') then 0 else 1 end as urut,
+               jsonb_build_object('id', p.id, 'nama', p.nama, 'kelas', p.kelas, 'jabatan_dewan', p.jabatan_dewan, 'tingkat', sigarda.tingkat_penegak(p.id),
+                                  'rombel', (select b.rombel from public.bina_damping b where b.penegak_id = p.id and b.tahun_ajaran = v_ta)) as j
+        from public.profiles p
+        where p.role = 'peserta' and p.status = 'aktif' and p.jabatan_dewan is not null and sigarda.tingkat_selesai(p.id, 'Bantara')
+      ) x), '[]'::jsonb)
+  );
+end $$;
+
+-- Susunan sangga sebuah rombel beserta Bina Damping dan peringatannya. Boleh dibaca: pengurus, Bina Damping rombel itu, dan Penegak aktif rombel itu.
+-- { rombel, tahun_ajaran, bisa_atur, bina_damping: [{ id, nama, tingkat }], anggota: [{ id, nama, sangga, pinsa, tingkat, layak_pinsa }], peringatan: [{ sangga, teks }] }
+-- `tingkat` (kemajuan SKU sesama Penegak) dan `layak_pinsa` (Bantara selesai) hanya diperlihatkan kepada yang boleh mengatur dan pengurus; Penegak biasa menerima null/false.
+create function public.sg_sangga_rombel(p_rombel text) returns jsonb
+language plpgsql stable security definer set search_path = public as
+$$
+declare v_atur boolean; v_lihat boolean;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.rombel_sah(p_rombel) then raise exception 'Rombel tidak sah. Contoh: X-01, XI-05, XII-10.'; end if;
+  v_atur := sigarda.sangga_bisa_atur(p_rombel);
+  v_lihat := v_atur or sigarda.pengurus();
+  if not (v_lihat or exists (select 1 from public.profiles where id = auth.uid() and role = 'peserta' and status = 'aktif' and kelas = p_rombel)) then
+    raise exception 'Susunan sangga hanya dapat dilihat pengurus, Bina Damping, dan anggota rombel ini.';
+  end if;
+  return jsonb_build_object(
+    'rombel', p_rombel,
+    'tahun_ajaran', sigarda.tahun_ajaran_kini(),
+    'bisa_atur', v_atur,
+    'bina_damping', coalesce((
+      select jsonb_agg(jsonb_build_object('id', p.id, 'nama', p.nama, 'tingkat', case when v_lihat then sigarda.tingkat_penegak(p.id) end) order by p.nama)
+      from public.bina_damping b join public.profiles p on p.id = b.penegak_id
+      where b.rombel = p_rombel and b.tahun_ajaran = sigarda.tahun_ajaran_kini()), '[]'::jsonb),
+    'anggota', coalesce((
+      select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'sangga', x.sangga, 'pinsa', x.pinsa, 'tingkat', x.tingkat,
+                                          'layak_pinsa', x.tingkat is not null and x.tingkat <> 'calon-bantara') order by lower(x.sangga), x.pinsa desc, x.nama)
+      from (select p.id, p.nama, p.sangga, p.pinsa, case when v_lihat then sigarda.tingkat_penegak(p.id) end as tingkat
+            from public.profiles p where p.role = 'peserta' and p.status = 'aktif' and p.kelas = p_rombel) x), '[]'::jsonb),
+    'peringatan', sigarda.sangga_peringatan(p_rombel)
+  );
+end $$;
+
+-- Membagi sangga dan menentukan Pinsa di satu rombel (Bina Damping rombel itu, Pembina, dan Admin). p_data = [{ id, sangga?, pinsa? }] untuk Penegak aktif
+-- rombel itu; kunci yang tidak ada = tidak diubah. Semua atau tidak sama sekali. Pinsa minimal Calon Laksana, satu per sangga; pindah sangga otomatis melepas
+-- Pinsa-nya. Mengembalikan { diubah, peringatan } (peringatan tidak memblokir).
+create function public.sg_sangga_atur(p_rombel text, p_data jsonb) returns jsonb
+language plpgsql security definer set search_path = public as
+$$
+declare v_e jsonb; v_id uuid; v_t public.profiles; v_s text; v_pinsa boolean; v_lain text; v_n int := 0; v_tahap int;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.rombel_sah(p_rombel) then raise exception 'Rombel tidak sah. Contoh: X-01, XI-05, XII-10.'; end if;
+  if not sigarda.sangga_bisa_atur(p_rombel) then
+    raise exception 'Hanya Bina Damping rombel ini, Pembina, dan Admin Gudep yang dapat mengatur sangga.';
+  end if;
+  if p_data is null or jsonb_typeof(p_data) <> 'array' then raise exception 'Data sangga tidak sah.'; end if;
+  if jsonb_array_length(p_data) > 60 then raise exception 'Maksimal 60 Penegak per penyimpanan.'; end if;
+
+  -- Tahap 1: nama sangga.
+  for v_e in select * from jsonb_array_elements(p_data) loop
+    v_id := (v_e ->> 'id')::uuid;
+    select * into v_t from public.profiles where id = v_id and role = 'peserta' and kelas = p_rombel and status = 'aktif';
+    if not found then raise exception 'Penegak tidak ditemukan di rombel % atau tidak aktif.', p_rombel; end if;
+    if v_e ? 'sangga' then
+      v_s := sigarda.rapikan(v_e ->> 'sangga');
+      if v_s = '' or char_length(v_s) > 40 then raise exception 'Nama sangga wajib diisi (maksimal 40 karakter).'; end if;
+      v_s := coalesce((select sangga from public.profiles where role = 'peserta' and lower(sangga) = lower(v_s) limit 1), v_s);
+      if v_s is distinct from v_t.sangga then
+        update public.profiles set sangga = v_s where id = v_id;
+        v_n := v_n + 1;
+      end if;
+    end if;
+  end loop;
+
+  -- Tahap 2: Pinsa. Yang dicabut lebih dulu (agar tukar Pinsa dalam satu simpanan berhasil), lalu yang ditetapkan.
+  for v_tahap in 1..2 loop
+    for v_e in select * from jsonb_array_elements(p_data) loop
+      if not (v_e ? 'pinsa') then continue; end if;
+      v_pinsa := (v_e ->> 'pinsa')::boolean;
+      if (v_tahap = 1) <> (not v_pinsa) then continue; end if;
+      v_id := (v_e ->> 'id')::uuid;
+      select * into v_t from public.profiles where id = v_id;
+      if v_pinsa is not distinct from v_t.pinsa then continue; end if;
+      if v_pinsa then
+        if btrim(coalesce(v_t.sangga, '')) = '' then raise exception '% belum punya sangga. Bagi sangga lebih dulu, baru pilih Pinsa.', v_t.nama; end if;
+        if not sigarda.tingkat_selesai(v_id, 'Bantara') then
+          raise exception '% belum menyelesaikan SKU Bantara. Pinsa dipilih dari Penegak Calon Laksana.', v_t.nama;
+        end if;
+        select nama into v_lain from public.profiles where role = 'peserta' and status = 'aktif' and kelas = v_t.kelas and lower(sangga) = lower(v_t.sangga) and pinsa and id <> v_id limit 1;
+        if v_lain is not null then raise exception 'Sangga % sudah punya Pinsa (%). Cabut dulu Pinsa yang lama.', v_t.sangga, v_lain; end if;
+      end if;
+      update public.profiles set pinsa = v_pinsa where id = v_id;
+      v_n := v_n + 1;
+    end loop;
+  end loop;
+  return jsonb_build_object('diubah', v_n, 'peringatan', sigarda.sangga_peringatan(p_rombel));
+end $$;
+
+-- Peran pendampingan diri sendiri (dipakai menu): rombel yang saya dampingi sebagai Bina Damping pada tahun ajaran berjalan, dan apakah saya Pinsa.
+create function public.sg_pendampingan_saya() returns jsonb
+language plpgsql stable security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  return jsonb_build_object(
+    'bina_damping', coalesce((select jsonb_agg(b.rombel order by b.rombel) from public.bina_damping b
+                              where b.penegak_id = auth.uid() and b.tahun_ajaran = sigarda.tahun_ajaran_kini()), '[]'::jsonb),
+    'pinsa', coalesce((select pinsa from public.profiles where id = auth.uid()), false));
+end $$;
+-- ===== akhir aksi pinsa bina damping =====
+
 -- ===== Naik kelas dan status anggota: fungsi =====
 -- Penegak berstatus nonaktif atau alumni hanya dapat DILIHAT (dan dicetak). Semua penulisan yang menyangkut Penegak itu ditolak pemicu di bawah,
 -- sehingga tidak bergantung pada tiap fungsi aksi. Pembaruan yang dipicu tindakan kunci asing (mis. penguji_id menjadi kosong saat akun
 -- penguji dihapus) bukan penulisan pengguna dan dilewati (pg_trigger_depth() > 1). Fungsi naik kelas membatalkan pengajuan SEBELUM mengubah status.
 create function sigarda.tolak_peserta_tak_aktif() returns trigger language plpgsql security definer set search_path = public as
 $$
-declare v_status text; v_nama text;
+declare v_status text; v_nama text; v_agama text;
 begin
   if TG_OP = 'UPDATE' and pg_trigger_depth() > 1 then return new; end if;
-  select status, nama into v_status, v_nama from public.profiles where id = new.peserta_id;
+  select status, nama, agama into v_status, v_nama, v_agama from public.profiles where id = new.peserta_id;
   if v_status is not null and v_status <> 'aktif' then
     if new.peserta_id = auth.uid() then
       raise exception 'Akun Anda berstatus % dan hanya dapat dilihat. Hubungi Pembina atau Admin Gudep bila ingin aktif kembali.', v_status;
     end if;
     raise exception '% berstatus % dan tidak dapat diubah. Aktifkan kembali lebih dulu di menu Anggota.', v_nama, v_status;
+  end if;
+  -- Agama Penegak baru diisi sendiri sesudah akun dibuat (Tahap 3, H1). Tanpa agama, butir agama tidak tampak baginya sehingga progres SKU-nya tidak lengkap: penulisan progres SKU ditolak sampai agama diisi.
+  if v_status = 'aktif' and v_agama is null and TG_TABLE_NAME in ('sku_progress', 'sku_riwayat', 'sku_pra_uji', 'sesi_ujian_peserta') then
+    if new.peserta_id = auth.uid() then
+      raise exception 'Isi agama Anda lebih dulu di menu Akun saya (Data diri) sebelum mengajukan SKU.';
+    end if;
+    raise exception '% belum mengisi agama. Penegak melengkapinya di menu Akun saya (Data diri), atau Admin Gudep mengisinya di menu Anggota.', v_nama;
   end if;
   return new;
 end $$;
@@ -2426,7 +3359,28 @@ create trigger tak_aktif_portofolio before insert or update on public.portofolio
 create trigger tak_aktif_portofolio_jurnal before insert or update on public.portofolio_jurnal for each row execute function sigarda.tolak_peserta_tak_aktif();
 create trigger tak_aktif_sku_penilaian before insert or update on public.sku_penilaian for each row execute function sigarda.tolak_peserta_tak_aktif();
 create trigger tak_aktif_raport before insert or update on public.raport for each row execute function sigarda.tolak_peserta_tak_aktif();
+create trigger tak_aktif_sku_pra_uji before insert or update on public.sku_pra_uji for each row execute function sigarda.tolak_peserta_tak_aktif();
 create trigger tak_aktif_sesi_peserta before insert or update on public.sesi_ujian_peserta for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== Pelantikan dan Saka (Tahap 2, G1): pemicu =====
+create trigger tak_aktif_pelantikan before insert or update on public.pelantikan for each row execute function sigarda.tolak_peserta_tak_aktif();
+create trigger tak_aktif_saka_anggota before insert or update on public.saka_anggota for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu pelantikan dan saka =====
+-- ===== TKK (Tahap 2, G2): pemicu =====
+create trigger tak_aktif_tkk_capaian before insert or update on public.tkk_capaian for each row execute function sigarda.tolak_peserta_tak_aktif();
+create trigger tak_aktif_tkk_krida before insert or update on public.tkk_krida for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu tkk =====
+-- ===== TKK pengajuan (Tahap 2, G2b): pemicu tak aktif =====
+create trigger tak_aktif_tkk_pengajuan before insert or update on public.tkk_pengajuan for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu tak aktif tkk pengajuan =====
+-- ===== SPG (Tahap 2, G3): pemicu =====
+create trigger tak_aktif_spg_penetapan before insert or update on public.spg_penetapan for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu spg =====
+-- ===== Gerbang calon Garuda (Tahap 2, G4): pemicu =====
+create trigger tak_aktif_tanggal_lahir before insert or update on public.tanggal_lahir for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu gerbang =====
+-- ===== Isian Penegak (Tahap 3, H1): pemicu =====
+create trigger tak_aktif_penegak_isian before insert or update on public.penegak_isian for each row execute function sigarda.tolak_peserta_tak_aktif();
+-- ===== akhir pemicu isian penegak =====
 
 -- Status Calon Garuda hanya untuk Penegak yang aktif (diberikan sendiri lewat sg_calon_garuda_daftar atau oleh Admin lewat sg_anggota_ubah).
 create function sigarda.tolak_calon_garuda_tak_aktif() returns trigger language plpgsql as
@@ -2456,6 +3410,11 @@ begin
       set status = 'belum', penguji_id = null, tanggal_uji = null, jadwal = null, nilai = null, catatan = '', catatan_peserta = '',
           verifikasi = null, diverifikasi_pada = null, verifikasi_token = null, diubah = now()
       where peserta_id = p_peserta and sku_id = v_sku;
+    insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh) values (p_peserta, v_sku, p_alasan, auth.uid());
+    v_n := v_n + 1;
+  end loop;
+  for v_sku in select sku_id from public.sku_pra_uji where peserta_id = p_peserta and status = 'menunggu' loop
+    update public.sku_pra_uji set status = 'dibatalkan', diputuskan_pada = now() where peserta_id = p_peserta and sku_id = v_sku and status = 'menunggu';
     insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh) values (p_peserta, v_sku, p_alasan, auth.uid());
     v_n := v_n + 1;
   end loop;
@@ -2663,9 +3622,9 @@ begin
 
   v_kelas := sigarda.rapikan(p_kelas);
   v_sangga := sigarda.rapikan(p_sangga);
-  if v_kelas = '' or v_sangga = '' then raise exception 'Kelas dan sangga peserta wajib diisi.'; end if;
-  if p_agama is null or p_agama = '' then raise exception 'Agama wajib diisi. Butir 1 SKU menyesuaikan agama peserta.'; end if;
-  if p_agama not in ('Islam','Katolik','Protestan','Hindu','Buddha','Khonghucu') then raise exception 'Agama tidak dikenal.'; end if;
+  -- Hanya rombel yang wajib. Sangga boleh kosong (dibagi Pembina/Bina Damping). Agama: kosong = tidak diubah (Penegak mengisinya sendiri; agama yang sudah ada tidak dapat dikosongkan).
+  if v_kelas = '' then raise exception 'Kelas (rombel) peserta wajib diisi.'; end if;
+  if coalesce(p_agama, '') <> '' and p_agama not in ('Islam','Katolik','Protestan','Hindu','Buddha','Khonghucu') then raise exception 'Agama tidak dikenal.'; end if;
   -- Kelas berupa rombel baku (X-01..XII-10). Nilai lama yang tidak diubah (mis. "X") dibiarkan agar data lain tetap dapat diubah;
   -- rapikan massal lewat sg_rombel_perbarui.
   if lower(v_kelas) = lower(coalesce(v_t.kelas, '')) then
@@ -2674,9 +3633,9 @@ begin
     v_kelas := sigarda.rombel_baku(v_kelas);
     if not sigarda.rombel_sah(v_kelas) then raise exception 'Kelas harus berupa rombel: X-01 sampai X-10, XI-01 sampai XI-10, atau XII-01 sampai XII-10.'; end if;
   end if;
-  v_sangga := coalesce((select sangga from public.profiles where role = 'peserta' and lower(sangga) = lower(v_sangga) limit 1), v_sangga);
+  if v_sangga <> '' then v_sangga := coalesce((select sangga from public.profiles where role = 'peserta' and lower(sangga) = lower(v_sangga) limit 1), v_sangga); end if;
 
-  update public.profiles set nama = v_nama, kelas = v_kelas, sangga = v_sangga, agama = p_agama where id = p_id;
+  update public.profiles set nama = v_nama, kelas = v_kelas, sangga = nullif(v_sangga, ''), agama = coalesce(nullif(p_agama, ''), agama) where id = p_id;
 
   if p_calon_garuda is true then
     if v_t.calon_garuda is null then
@@ -2766,10 +3725,10 @@ end $$;
 -- ===== akhir fungsi jenis kelamin =====
 
 -- ===== Jabatan Dewan Ambalan: fungsi =====
--- Jabatan Dewan Ambalan pada akun PENEGAK (isian bebas, mis. Pradana, Pradani, Wakil Pradana, Sekretaris, Bendahara, Ketua Bidang Kegiatan), oleh Pembina atau Admin Gudep.
+-- Jabatan Dewan Ambalan pada akun PENEGAK (isian bebas, mis. Pradana, Pradani, Pemangku Adat, Wakil Pradana, Sekretaris, Bendahara, Ketua Bidang Kegiatan), oleh Pembina atau Admin Gudep.
 -- p_data = [{"username": "10231", "jabatan": "Pradana"}, ...] (username = NIS Penegak); jabatan kosong mencabut jabatan (penugasan penguji ikut dihapus). Jabatan hanya untuk
--- Penegak yang AKTIF. Pradana dan Pradani masing-masing hanya satu pemegang: pemegang lama harus dikosongkan lebih dulu (boleh pada permintaan yang sama,
--- mis. [{"username": "lama", "jabatan": ""}, {"username": "baru", "jabatan": "Pradana"}]). Semua atau tidak sama sekali. Pradana menjadi ketua sidang; Pradana dan Pradani
+-- Penegak yang AKTIF. Pradana, Pradani, dan Pemangku Adat masing-masing hanya satu pemegang (sigarda.jabatan_tunggal): pemegang lama harus dikosongkan lebih dulu (boleh pada permintaan yang sama,
+-- mis. [{"username": "lama", "jabatan": ""}, {"username": "baru", "jabatan": "Pradana"}]). Semua atau tidak sama sekali. Pemangku Adat menjadi ketua sidang (cadangannya Pradana); Pradana dan Pradani
 -- menandatangani Surat Tanda Lulus. Dewan Ambalan berupa atribut akun Penegak (bukan akun terpisah): pemegang jabatan dapat memakai tampilan Dewan.
 -- Tercatat di kepengurusan_log. Mengembalikan jumlah anggota yang berubah.
 create function public.sg_anggota_jabatan_dewan_atur(p_data jsonb) returns int
@@ -2800,7 +3759,7 @@ begin
     end if;
     if v_t.role <> 'peserta' then raise exception '% bukan Penegak. Jabatan Dewan Ambalan hanya untuk Penegak.', v_t.nama; end if;
     if v_t.status <> 'aktif' then raise exception '% berstatus % dan tidak dapat menjabat. Aktifkan kembali lebih dulu.', v_t.nama, v_t.status; end if;
-    if v_jab in ('Pradana', 'Pradani') then
+    if sigarda.jabatan_tunggal(v_jab) then
       select nama into v_lain from public.profiles where jabatan_dewan = v_jab and id <> v_t.id limit 1;
       if found then raise exception '% sudah dijabat oleh %. Kosongkan jabatan itu lebih dulu.', v_jab, v_lain; end if;
     end if;
@@ -2815,7 +3774,7 @@ end $$;
 
 -- Kepengurusan Dewan Ambalan lewat berkas (Pembina atau Admin Gudep). p_data = [{"username": "10231", "jabatan": "Pradana"}, ...] (username = NIS; jabatan bebas).
 -- p_ganti = true: SELURUH kepengurusan diganti (pemegang jabatan yang tidak ada di berkas dicabut; termasuk jabatan pada akun Dewan lama). false: hanya yang ada di berkas
--- diberi atau diubah (Pradana atau Pradani yang berpindah tangan tetap mencabut pemegang lamanya). p_terapkan = false: PRATINJAU (tidak mengubah apa pun); true: menerapkan
+-- diberi atau diubah (jabatan tunggal yang berpindah tangan, yaitu Pradana, Pradani, atau Pemangku Adat, tetap mencabut pemegang lamanya). p_terapkan = false: PRATINJAU (tidak mengubah apa pun); true: menerapkan
 -- SEMUA atau tidak sama sekali. Hasil { galat, ringkasan { beri, ganti, cabut, sama, galat }, baris: [{ no, id, username, nama, kelas, dari_jabatan, jabatan, hasil:
 -- 'beri' | 'ganti' | 'sama' | 'cabut' | 'galat', pesan: [...] }] }. Peringatan (bukan galat): belum menyelesaikan seluruh butir Bantara.
 create function public.sg_kepengurusan_terapkan(p_data jsonb, p_ganti boolean default true, p_terapkan boolean default false) returns jsonb
@@ -2846,12 +3805,12 @@ begin
       v_hasil := 'galat'; v_pesan := array['Jabatan Dewan Ambalan kosong.'];
     elsif char_length(v_jab) not between 2 and 60 or v_jab ~ '[[:cntrl:]<>]' then
       v_hasil := 'galat'; v_pesan := array['Jabatan harus 2 sampai 60 karakter tanpa tanda < atau >.'];
-    elsif v_jab in ('Pradana', 'Pradani') and v_jab = any (v_tunggal) then
+    elsif sigarda.jabatan_tunggal(v_jab) and v_jab = any (v_tunggal) then
       v_hasil := 'galat'; v_pesan := array[v_jab || ' hanya boleh satu orang, tetapi muncul lebih dari sekali dalam berkas.'];
     end if;
     if v_user <> '' then v_pakai := v_pakai || v_user; end if;
     if v_hasil = 'ubah' then
-      if v_jab in ('Pradana', 'Pradani') then v_tunggal := v_tunggal || v_jab; end if;
+      if sigarda.jabatan_tunggal(v_jab) then v_tunggal := v_tunggal || v_jab; end if;
       if v_t.jabatan_dewan is not distinct from v_jab then v_hasil := 'sama'; v_sama := v_sama + 1;
       elsif v_t.jabatan_dewan is null then v_hasil := 'beri'; v_beri := v_beri + 1;
       else v_hasil := 'ganti'; v_ganti := v_ganti + 1; v_pesan := v_pesan || ('Jabatan berubah dari ' || v_t.jabatan_dewan || '.'); end if;
@@ -2864,11 +3823,11 @@ begin
       'hasil', v_hasil, 'pesan', to_jsonb(v_pesan)));
   end loop;
 
-  -- Pemegang jabatan yang dicabut: semua yang tidak ada di berkas (p_ganti), atau pemegang Pradana/Pradani yang jabatannya berpindah ke orang lain di berkas.
+  -- Pemegang jabatan yang dicabut: semua yang tidak ada di berkas (p_ganti), atau pemegang jabatan tunggal (Pradana, Pradani, Pemangku Adat) yang jabatannya berpindah ke orang lain di berkas.
   for v_r in
     select p.id, p.username, p.nama, p.kelas, p.role, p.jabatan_dewan from public.profiles p
     where p.jabatan_dewan is not null and p.username <> all (v_pakai)
-      and (p_ganti or (p.jabatan_dewan in ('Pradana', 'Pradani') and p.jabatan_dewan = any (v_tunggal)))
+      and (p_ganti or (sigarda.jabatan_tunggal(p.jabatan_dewan) and p.jabatan_dewan = any (v_tunggal)))
     order by p.nama
   loop
     v_cabut := v_cabut + 1;
@@ -2883,11 +3842,11 @@ begin
     if v_galat > 0 then raise exception 'Ada % baris bermasalah, jadi tidak ada yang diubah. Periksa pratinjau, perbaiki berkas, lalu coba lagi.', v_galat; end if;
     if v_beri + v_ganti + v_cabut = 0 then raise exception 'Tidak ada perubahan yang perlu diterapkan.'; end if;
     select nama into v_oleh from public.profiles where id = auth.uid();
-    -- mencabut lebih dulu agar Pradana dan Pradani berpindah tangan tanpa bentrok
+    -- mencabut lebih dulu agar jabatan tunggal berpindah tangan tanpa bentrok
     for v_r in select id from public.profiles where id = any (v_ids) loop
       perform sigarda.jabatan_dewan_lepas(v_r.id, case when p_ganti then 'Kepengurusan diganti' else 'Jabatan berpindah' end);
     end loop;
-    -- yang berganti jabatan dikosongkan sebentar agar pertukaran Pradana dan Pradani tidak bentrok dengan indeks unik
+    -- yang berganti jabatan dikosongkan sebentar agar pertukaran jabatan tunggal tidak bentrok dengan indeks unik
     update public.profiles set jabatan_dewan = null
       where id in (select (x ->> 'id')::uuid from jsonb_array_elements(v_baris) x where x ->> 'hasil' = 'ganti');
     for v_e in select * from jsonb_array_elements(v_baris) loop
@@ -2952,6 +3911,46 @@ begin
 end $$;
 -- ===== akhir fungsi jabatan dewan =====
 
+
+-- ===== Pengukuhan Dewan Ambalan (Fase A): fungsi =====
+-- Mencatat pengukuhan kepengurusan Dewan Ambalan oleh Ketua Kwartir Ranting untuk satu tahun ajaran (Pembina atau Admin Gudep): nomor dan tanggal SK, dan (opsional, berpasangan)
+-- nomor dan tanggal rekomendasi Ketua Mabigus. Tanggal tidak boleh di masa depan (WIB) dan rekomendasi tidak boleh sesudah SK. Simpan ulang = perbarui.
+-- Aturan isian dicerminkan periksaPengukuhan di src/lib/dewanLogic.js (dijaga oleh pengujian).
+create function public.sg_pengukuhan_dewan_simpan(
+  p_tahun_ajaran text, p_nomor_sk text, p_tanggal_sk date, p_rekomendasi_nomor text default '', p_rekomendasi_tanggal date default null, p_catatan text default ''
+) returns void language plpgsql security definer set search_path = public as
+$$
+declare v_nomor text := sigarda.rapikan(p_nomor_sk); v_rn text := sigarda.rapikan(p_rekomendasi_nomor); v_cat text := sigarda.rapikan(p_catatan);
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mencatat pengukuhan Dewan Ambalan.'; end if;
+  if not sigarda.tahun_ajaran_sah(p_tahun_ajaran) then raise exception 'Tahun ajaran tidak sah. Contoh: 2026/2027.'; end if;
+  if char_length(v_nomor) not between 1 and 80 or v_nomor ~ '[[:cntrl:]<>]' then raise exception 'Nomor SK pengukuhan wajib diisi (maksimal 80 karakter, tanpa tanda < atau >).'; end if;
+  if p_tanggal_sk is null then raise exception 'Tanggal SK pengukuhan wajib diisi.'; end if;
+  if p_tanggal_sk < date '2000-01-01' or p_tanggal_sk > sigarda.hari_ini() then raise exception 'Tanggal SK pengukuhan tidak boleh sebelum tahun 2000 atau di masa depan.'; end if;
+  if char_length(v_rn) > 80 or v_rn ~ '[[:cntrl:]<>]' then raise exception 'Nomor rekomendasi maksimal 80 karakter, tanpa tanda < atau >.'; end if;
+  if (v_rn = '') <> (p_rekomendasi_tanggal is null) then raise exception 'Isi nomor dan tanggal rekomendasi Ketua Mabigus sekaligus, atau kosongkan keduanya.'; end if;
+  if p_rekomendasi_tanggal is not null and (p_rekomendasi_tanggal < date '2000-01-01' or p_rekomendasi_tanggal > p_tanggal_sk) then
+    raise exception 'Tanggal rekomendasi tidak boleh sebelum tahun 2000 atau sesudah tanggal SK.';
+  end if;
+  if char_length(v_cat) > 200 then raise exception 'Catatan maksimal 200 karakter.'; end if;
+  insert into public.pengukuhan_dewan (tahun_ajaran, nomor_sk, tanggal_sk, rekomendasi_nomor, rekomendasi_tanggal, catatan, diubah_oleh, diubah_pada)
+  values (p_tahun_ajaran, v_nomor, p_tanggal_sk, v_rn, p_rekomendasi_tanggal, v_cat, auth.uid(), now())
+  on conflict (tahun_ajaran) do update
+    set nomor_sk = excluded.nomor_sk, tanggal_sk = excluded.tanggal_sk, rekomendasi_nomor = excluded.rekomendasi_nomor, rekomendasi_tanggal = excluded.rekomendasi_tanggal,
+        catatan = excluded.catatan, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
+end $$;
+
+-- Menghapus catatan pengukuhan satu tahun ajaran (Pembina atau Admin Gudep), mis. salah tahun ajaran.
+create function public.sg_pengukuhan_dewan_hapus(p_tahun_ajaran text) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan pengukuhan Dewan Ambalan.'; end if;
+  delete from public.pengukuhan_dewan where tahun_ajaran = p_tahun_ajaran;
+  if not found then raise exception 'Belum ada catatan pengukuhan untuk tahun ajaran itu.'; end if;
+end $$;
+-- ===== akhir fungsi pengukuhan dewan =====
 -- ===== Materi SKU (Pembina dan Admin Gudep) =====
 create function public.sg_materi_simpan(
   p_id uuid, p_judul text, p_deskripsi text, p_tautan text, p_file_id text, p_resource_key text,
@@ -3689,19 +4688,24 @@ $$
     (select jsonb_strip_nulls(jsonb_build_object('nama', p.nilai -> 'nama', 'singkat', p.nilai -> 'singkat', 'sekolah', p.nilai -> 'sekolah', 'kota', p.nilai -> 'kota'))
      from public.pengaturan p where p.kunci = 'gudep.data'), '{}'::jsonb)
 $$;
--- Ketua sidang untuk berita acara: anggota Dewan Ambalan berjabatan Pradana (nama; sebutan "Pradana Dewan Ambalan"). Bila belum ada Pradana,
--- dipakai pengaturan lama sidang.nama_ketua dan sidang.sebutan_ketua (bawaan: kosong dan "Ketua Dewan Penegak / Pemangku Adat").
+-- ===== Ketua sidang (Fase A): fungsi =====
+-- Ketua sidang untuk berita acara = anggota Dewan Ambalan berjabatan PEMANGKU ADAT (sebutan "Pemangku Adat Dewan Ambalan"): Dewan Kehormatan Penegak diketuai
+-- Pemangku Adat (Jukran Kwarnas 05/2026 Pasal 24 ayat (15), yang menggantikan SK 231/2007; SK Kwarnas 176/2013 butir 7 c). Bila belum ada Pemangku Adat, dipakai Pradana ("Pradana Dewan Ambalan").
+-- Bila belum ada keduanya, dipakai pengaturan lama sidang.nama_ketua dan sidang.sebutan_ketua (bawaan: kosong dan "Ketua Dewan Penegak / Pemangku Adat").
 -- Cermin ketuaSidang di src/lib/dewanLogic.js (dijaga oleh pengujian).
 create function sigarda.ketua_sidang(out o_nama text, out o_sebutan text) language plpgsql stable security definer set search_path = public as
 $$
 begin
-  select sigarda.rapikan(nama), 'Pradana Dewan Ambalan' into o_nama, o_sebutan
-  from public.profiles where jabatan_dewan = 'Pradana' and status = 'aktif' and (role = 'peserta' or (role = 'penguji' and jabatan = 'Dewan Ambalan')) limit 1;
+  select sigarda.rapikan(nama), jabatan_dewan || ' Dewan Ambalan' into o_nama, o_sebutan
+  from public.profiles
+  where jabatan_dewan in ('Pemangku Adat', 'Pradana') and status = 'aktif' and (role = 'peserta' or (role = 'penguji' and jabatan = 'Dewan Ambalan'))
+  order by case jabatan_dewan when 'Pemangku Adat' then 0 else 1 end limit 1;
   if not found then
     o_nama := sigarda.pengaturan_teks('sidang.nama_ketua', '');
     o_sebutan := sigarda.pengaturan_teks('sidang.sebutan_ketua', 'Ketua Dewan Penegak / Pemangku Adat');
   end if;
 end $$;
+-- ===== akhir fungsi ketua sidang =====
 -- ===== akhir fungsi gudep =====
 
 -- ===== Dokumen terbit: fungsi aksi =====
@@ -3906,17 +4910,19 @@ end $$;
 
 -- ===== Pemeriksaan data (tahap L3): fungsi =====
 -- Pengurus (Pembina, Dewan Ambalan, Admin; Dewan ikut membantu memeriksa sejak migrasi periksa-dewan): ringkasan masalah kualitas data yang umum ditemui (kelas belum format rombel baku, NTA kosong, jenis kelamin kosong,
--- rombel tanpa penugasan penguji, Pembina tanpa agama, akun yang belum pernah masuk). Sebagian besar hanya dapat diperbaiki Admin Gudep
+-- rombel tanpa penugasan penguji, Pembina tanpa agama, akun yang belum pernah masuk; dan untuk pra-uji (Fase E): praUjiAktif, rombel tanpa 2 Bina Damping, sangga tanpa Pinsa,
+-- pra-uji yang macet). Tiga daftar pra-uji hanya ditampilkan klien bila praUjiAktif. Sebagian besar hanya dapat diperbaiki Admin Gudep
 -- (lihat sg_anggota_jk_atur, sg_rombel_perbarui, sg_anggota_nta_atur, sg_anggota_agama_atur); Pembina tetap dapat melihatnya agar tahu apa
 -- yang perlu diminta ke Admin. "Perangkat tanpa notifikasi" TIDAK diulang di sini: sudah ada di sg_push_ringkasan. Tiap daftar dibatasi 300 baris.
 create function public.sg_pemeriksaan_data() returns jsonb
 language plpgsql stable security definer set search_path = public as
 $$
-declare v_ta text := sigarda.tahun_ajaran_kini();
+declare v_ta text := sigarda.tahun_ajaran_kini(); v_hasil jsonb;
 begin
   perform sigarda.wajib_aktif();
   if not sigarda.pengurus() then raise exception 'Hanya pengurus (Pembina, Dewan Ambalan, dan Admin Gudep) yang dapat melihat pemeriksaan data.'; end if;
-  return jsonb_build_object(
+  v_hasil := jsonb_build_object(
+    'praUjiAktif', sigarda.pra_uji_aktif(),
     'kelasLama', coalesce((
       select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'nis', x.nis, 'kelas', x.kelas) order by x.nis)
       from (select id, nama, nis, kelas from public.profiles where role = 'peserta' and status = 'aktif' and not sigarda.rombel_sah(kelas) limit 300) x
@@ -3939,9 +4945,74 @@ begin
           and not exists (select 1 from public.penugasan_rombel r where r.tahun_ajaran = v_ta and r.rombel = rb.rombel)
       ) x
     ), '[]'::jsonb),
+    'rombelTanpaBinaDamping', coalesce((
+      select jsonb_agg(jsonb_build_object('rombel', x.rombel, 'jumlah', x.jumlah, 'binaDamping', x.bd) order by x.rombel)
+      from (
+        select rb.rombel, (select count(*) from public.profiles p2 where p2.role = 'peserta' and p2.status = 'aktif' and p2.kelas = rb.rombel) as jumlah,
+               (select count(*) from public.bina_damping b where b.tahun_ajaran = v_ta and b.rombel = rb.rombel) as bd
+        from (select k || '-' || lpad(n::text, 2, '0') as rombel from (values ('X'), ('XI'), ('XII')) t(k), generate_series(1, 10) n) rb
+        where exists (select 1 from public.profiles p2 where p2.role = 'peserta' and p2.status = 'aktif' and p2.kelas = rb.rombel)
+          and (select count(*) from public.bina_damping b where b.tahun_ajaran = v_ta and b.rombel = rb.rombel) < 2
+      ) x
+    ), '[]'::jsonb),
+    'sanggaTanpaPinsa', coalesce((
+      select jsonb_agg(jsonb_build_object('rombel', x.kelas, 'sangga', x.sangga, 'jumlah', x.jumlah) order by x.kelas, x.sangga)
+      from (
+        select p.kelas, min(p.sangga) as sangga, count(*) as jumlah from public.profiles p
+        where p.role = 'peserta' and p.status = 'aktif' and sigarda.rombel_sah(p.kelas) and btrim(coalesce(p.sangga, '')) <> ''
+        group by p.kelas, lower(btrim(p.sangga)) having not bool_or(p.pinsa) limit 300
+      ) x
+    ), '[]'::jsonb),
+    'praUjiMacet', coalesce((
+      select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'kelas', x.kelas, 'butir', x.butir, 'tahap', x.tahap, 'hari', x.hari, 'tanpaPenilai', x.tanpa_penilai) order by x.hari desc)
+      from (
+        select r.id, p.nama, p.kelas, sigarda.notif_label_butir(r.sku_id) as butir, r.tahap, floor(extract(epoch from now() - r.dibuat) / 86400)::int as hari,
+               not exists (select 1 from sigarda.pra_uji_penilai_daftar(r.peserta_id, r.sku_id, r.tahap)) as tanpa_penilai
+        from public.sku_pra_uji r join public.profiles p on p.id = r.peserta_id
+        where r.status = 'menunggu'
+          and (r.dibuat < now() - interval '3 days' or not exists (select 1 from sigarda.pra_uji_penilai_daftar(r.peserta_id, r.sku_id, r.tahap)))
+        limit 300
+      ) x
+    ), '[]'::jsonb),
     'pembinaTanpaAgama', coalesce((
       select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama) order by x.nama)
       from (select id, nama from public.profiles where role = 'penguji' and jabatan = 'Pembina' and status = 'aktif' and agama is null limit 300) x
+    ), '[]'::jsonb),
+    -- Data diri Penegak yang belum lengkap (Tahap 3, H1): isian POKOK saja (WhatsApp, jenis kelamin, agama, tanggal lahir, tempat lahir, alamat, nama ayah/ibu/wali; cermin
+    -- isianLogic.POKOK). Hanya nama dan KODE isian yang kurang, tidak pernah nilainya (bukan data pribadi). Diisi Penegak sendiri, jadi tanpa tombol perbaiki.
+    'dataDiriBelum', coalesce((
+      select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'nis', x.nis, 'kelas', x.kelas, 'kurang', to_jsonb(x.kurang)) order by x.kelas, x.nama)
+      from (
+        select y.* from (
+          select p.id, p.nama, p.nis, p.kelas,
+            array_remove(array[
+              case when p.whatsapp is null or btrim(p.whatsapp) = '' then 'whatsapp' end,
+              case when p.jenis_kelamin is null then 'jk' end,
+              case when p.agama is null then 'agama' end,
+              case when not exists (select 1 from public.tanggal_lahir t where t.peserta_id = p.id) then 'lahir' end,
+              case when not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci = 'tempat_lahir') then 'tempat_lahir' end,
+              case when not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci = 'alamat') then 'alamat' end,
+              case when not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci in ('ayah_nama', 'ibu_nama', 'wali_nama')) then 'ortu' end
+            ], null) as kurang
+          from public.profiles p where p.role = 'peserta' and p.status = 'aktif'
+        ) y where cardinality(y.kurang) > 0 order by y.kelas, y.nama limit 300
+      ) x
+    ), '[]'::jsonb),
+    -- Safe From Harm (Tahap 4): anggota dewasa aktif yang catatannya belum lengkap. Pembina: pelatihan, pakta_integritas, rekam_jejak; Admin Gudep: pelatihan (kode yang kurang).
+    'sfhBelum', coalesce((
+      select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'peran', x.peran, 'kurang', to_jsonb(x.kurang)) order by x.peran, x.nama)
+      from (
+        select y.* from (
+          select p.id, p.nama, case when p.role = 'admin' then 'Admin Gudep' else 'Pembina' end as peran,
+            array_remove(array[
+              case when not exists (select 1 from public.sfh_catatan s where s.anggota_id = p.id and s.jenis = 'pelatihan') then 'pelatihan' end,
+              case when p.role = 'penguji' and not exists (select 1 from public.sfh_catatan s where s.anggota_id = p.id and s.jenis = 'pakta_integritas') then 'pakta_integritas' end,
+              case when p.role = 'penguji' and not exists (select 1 from public.sfh_catatan s where s.anggota_id = p.id and s.jenis = 'rekam_jejak') then 'rekam_jejak' end
+            ], null) as kurang
+          from public.profiles p
+          where p.status = 'aktif' and (p.role = 'admin' or (p.role = 'penguji' and p.jabatan = 'Pembina'))
+        ) y where cardinality(y.kurang) > 0 order by y.peran, y.nama limit 300
+      ) x
     ), '[]'::jsonb),
     'belumPernahMasuk', coalesce((
       select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'peran', x.peran, 'dibuat', x.dibuat) order by x.dibuat)
@@ -3953,6 +5024,25 @@ begin
       ) x
     ), '[]'::jsonb)
   );
+  -- Jumlah SEBENARNYA untuk daftar yang bisa lebih dari 300 baris (700 Penegak: hari peluncuran data diri dan NTA belum terisi): dihitung hanya bila daftarnya penuh, jadi
+  -- biasanya tanpa biaya tambahan. Klien menampilkan "300 dari N" (pemeriksaanLogic.jumlahKategori).
+  return v_hasil || jsonb_build_object('jumlahSebenarnya', jsonb_build_object(
+    'kelasLama', case when jsonb_array_length(v_hasil -> 'kelasLama') < 300 then jsonb_array_length(v_hasil -> 'kelasLama')
+      else (select count(*) from public.profiles where role = 'peserta' and status = 'aktif' and not sigarda.rombel_sah(kelas)) end,
+    'tanpaNta', case when jsonb_array_length(v_hasil -> 'tanpaNta') < 300 then jsonb_array_length(v_hasil -> 'tanpaNta')
+      else (select count(*) from public.profiles where role = 'peserta' and status = 'aktif' and (nta is null or btrim(nta) = '')) end,
+    'tanpaJk', case when jsonb_array_length(v_hasil -> 'tanpaJk') < 300 then jsonb_array_length(v_hasil -> 'tanpaJk')
+      else (select count(*) from public.profiles where status = 'aktif' and jenis_kelamin is null) end,
+    'dataDiriBelum', case when jsonb_array_length(v_hasil -> 'dataDiriBelum') < 300 then jsonb_array_length(v_hasil -> 'dataDiriBelum')
+      else (select count(*) from public.profiles p where p.role = 'peserta' and p.status = 'aktif' and (
+        p.whatsapp is null or btrim(p.whatsapp) = '' or p.jenis_kelamin is null or p.agama is null
+        or not exists (select 1 from public.tanggal_lahir t where t.peserta_id = p.id)
+        or not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci = 'tempat_lahir')
+        or not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci = 'alamat')
+        or not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci in ('ayah_nama', 'ibu_nama', 'wali_nama')))) end,
+    'belumPernahMasuk', case when jsonb_array_length(v_hasil -> 'belumPernahMasuk') < 300 then jsonb_array_length(v_hasil -> 'belumPernahMasuk')
+      else (select count(*) from public.profiles p join auth.users u on u.id = p.id where p.status = 'aktif' and u.last_sign_in_at is null) end
+  ));
 end $$;
 -- ===== akhir fungsi pemeriksaan data =====
 
@@ -3987,6 +5077,7 @@ begin
       'penugasan_log', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penugasan_log t),
       'penugasan_peserta', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penugasan_peserta t),
       'kepengurusan_log', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.kepengurusan_log t),
+      'pengukuhan_dewan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.pengukuhan_dewan t),
       'guru_agama', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.guru_agama t),
       'dokumen_terbit', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_terbit t),
       'dokumen_urut', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_urut t),
@@ -4007,9 +5098,27 @@ begin
       'sertifikat_tingkat', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sertifikat_tingkat t),
       'sesi_ujian', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian t),
       'sesi_ujian_butir', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian_butir t),
-      'sesi_ujian_peserta', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian_peserta t),
+      'sesi_ujian_peserta', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian_peserta t)
+    -- PostgreSQL membatasi 100 argumen per fungsi (50 pasang): daftar tabel dibagi dua objek yang digabung dengan ||
+    ) || jsonb_build_object(
       'agenda', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.agenda t),
-      'kegiatan_usulan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.kegiatan_usulan t)
+      'kegiatan_usulan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.kegiatan_usulan t),
+      'bina_damping', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.bina_damping t),
+      'sku_pra_uji', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sku_pra_uji t),
+      'pelantikan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.pelantikan t),
+      'saka_anggota', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.saka_anggota t),
+      'tkk_capaian', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tkk_capaian t),
+      'tkk_krida', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tkk_krida t),
+      'tkk_pengajuan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tkk_pengajuan t),
+      'spg_penetapan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.spg_penetapan t),
+      'tanggal_lahir', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tanggal_lahir t),
+      'tim_penilai', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tim_penilai t),
+      'tim_penilai_anggota', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tim_penilai_anggota t),
+      'garuda_tahap', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.garuda_tahap t),
+      'penegak_isian', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penegak_isian t),
+      'dokumen_templat', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_templat t),
+      'portofolio_snapshot', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.portofolio_snapshot t),
+      'sfh_catatan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sfh_catatan t)
     )
   ) into v_hasil;
   insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada)
@@ -4046,7 +5155,8 @@ end $$;
 -- Tangga eskalasi untuk Penegak yang "tidak bergerak", dijalankan dari sigarda.notif_pengingat() (pengingat harian 07.00 WIB, jadi otomatis
 -- di luar jam senyap 22.00-04.00 WIB tanpa logika tambahan). Tiga kejadian independen, masing-masing dihitung ULANG setiap hari dari data
 -- sumbernya (BUKAN status tersimpan) sehingga otomatis "reset" begitu ada tindak lanjut -- tanpa perlu tabel status terpisah:
---   sku      : tidak ada sku_progress/riwayat baru (peserta ATAU penguji) selama >= 7 hari.
+--   sku      : tidak ada sku_progress/riwayat baru (peserta ATAU penguji) selama >= 7 hari. TIDAK dihitung selama ada pra-uji yang menunggu penilai (Fase E):
+--              penghambatnya penilai, bukan Penegak; yang macet muncul di Periksa Data (praUjiMacet) dan diingatkan sigarda.pra_uji_pengingat.
 --   absensi  : 2 kali latihan Jumat TERAKHIR berturut-turut berstatus Alpa ('A'; izin/sakit tidak dihitung).
 --   iuran    : 2 kali latihan Jumat TERAKHIR berturut-turut tanpa baris iuran (terpisah dari status absensi, sesuai catatan tabel iuran).
 -- "mulai" = tanggal kejadian PERTAMA kali memenuhi syarat (tetap sejak itu selama belum ada tindak lanjut, tidak ikut mundur bila kejadian
@@ -4056,6 +5166,7 @@ create function sigarda.eskalasi_mulai_sku(p_peserta uuid) returns date language
 $$
 declare v_terakhir date;
 begin
+  if exists (select 1 from public.sku_pra_uji where peserta_id = p_peserta and status = 'menunggu') then return null; end if;
   select greatest(
     coalesce((select max(diubah)::date from public.sku_progress where peserta_id = p_peserta), (select dibuat from public.profiles where id = p_peserta)),
     coalesce((select max(waktu)::date from public.sku_riwayat where peserta_id = p_peserta), (select dibuat from public.profiles where id = p_peserta))
@@ -4584,6 +5695,999 @@ create function public.sg_kunci_lepas_internal(p_username text) returns void
 language plpgsql security definer set search_path = public as
 $$ begin delete from public.login_gagal where username = p_username; end $$;
 
+-- ===== Pra-uji berjenjang (fase C): aksi =====
+-- Pengajuan Penegak lewat sg_sku_ajukan (bila sakelar hidup, diteruskan ke pra-uji); pembatalan lewat sg_sku_batal. Di sini: keputusan penilai pra-uji,
+-- antrian penilai, melewati tahap yang macet, dan sakelar. Pra-uji TIDAK memakai PIN (hanya rekomendasi; uji resmi Pembina tetap lewat Edge Function + PIN).
+
+-- Antrian pra-uji milik penilai yang sedang masuk (Pinsa atau Bina Damping) beserta yang sudah ia putuskan. Nama Penegak dikirim lewat fungsi ini karena
+-- Penegak biasa tidak dapat membaca profil Penegak lain. { aktif, menunggu: [...], selesai: [... 50 terbaru] }
+create function public.sg_pra_uji_antrian() returns jsonb language plpgsql stable security definer set search_path = public as
+$$
+declare v_uid uuid := auth.uid();
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pra_uji_aktif() then return jsonb_build_object('aktif', false, 'menunggu', '[]'::jsonb, 'selesai', '[]'::jsonb); end if;
+  return jsonb_build_object(
+    'aktif', true,
+    'menunggu', coalesce((
+      select jsonb_agg(jsonb_build_object('id', r.id, 'peserta_id', r.peserta_id, 'peserta_nama', p.nama, 'kelas', p.kelas, 'sangga', p.sangga, 'sku_id', r.sku_id,
+        'tahap', r.tahap, 'jadwal', r.jadwal, 'catatan_peserta', r.catatan_peserta, 'dibuat', r.dibuat) order by r.dibuat)
+      from public.sku_pra_uji r join public.profiles p on p.id = r.peserta_id
+      where r.status = 'menunggu' and sigarda.pra_uji_penilai_ok(r.peserta_id, r.sku_id, r.tahap, v_uid)
+    ), '[]'::jsonb),
+    'selesai', coalesce((
+      select jsonb_agg(x.j order by x.waktu desc) from (
+        select r.diputuskan_pada as waktu, jsonb_build_object('id', r.id, 'peserta_id', r.peserta_id, 'peserta_nama', p.nama, 'kelas', p.kelas, 'sangga', p.sangga,
+          'sku_id', r.sku_id, 'tahap', r.tahap, 'status', r.status, 'catatan', r.catatan, 'diputuskan_pada', r.diputuskan_pada) as j
+        from public.sku_pra_uji r join public.profiles p on p.id = r.peserta_id
+        where r.penilai_id = v_uid and r.status in ('lulus', 'belum') order by r.diputuskan_pada desc limit 50
+      ) x
+    ), '[]'::jsonb));
+end $$;
+
+-- Penilai (Pinsa atau Bina Damping yang memenuhi syarat) memutuskan satu pra-uji. p_hasil: 'lulus' (diteruskan otomatis ke tahap berikut, atau ke uji resmi
+-- Pembina bila tahap terakhir) atau 'belum' (kembali ke Penegak; catatan perbaikan wajib). Hasil: { hasil, tujuan } (tujuan: 'pinsa' | 'bina_damping' | 'pembina' | null).
+create function public.sg_pra_uji_catat(p_id bigint, p_hasil text, p_catatan text default '') returns jsonb
+language plpgsql security definer set search_path = public as
+$$
+declare v_uid uuid := auth.uid(); v_r public.sku_pra_uji; v_cat text := btrim(coalesce(p_catatan, '')); v_nama text; v_tujuan text; v_status text;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pra_uji_aktif() then raise exception 'Pra-uji belum diaktifkan.'; end if;
+  if p_hasil is null or p_hasil not in ('lulus', 'belum') then raise exception 'Hasil pra-uji harus lulus atau belum lulus.'; end if;
+  if char_length(v_cat) > 1000 then raise exception 'Catatan maksimal 1000 karakter.'; end if;
+  select * into v_r from public.sku_pra_uji where id = p_id for update;
+  if not found or v_r.status <> 'menunggu' then raise exception 'Pengajuan pra-uji ini sudah tidak menunggu.'; end if;
+  if not sigarda.pra_uji_penilai_ok(v_r.peserta_id, v_r.sku_id, v_r.tahap, v_uid) then
+    raise exception 'Anda tidak dapat menilai pra-uji ini. Penilai adalah Pinsa sangga atau Bina Damping rombel Penegak yang sudah lulus butir yang sama.';
+  end if;
+  select status into v_status from public.sku_progress where peserta_id = v_r.peserta_id and sku_id = v_r.sku_id;
+  if v_status in ('lulus', 'diajukan', 'proses') then raise exception 'Butir ini sudah lulus atau sedang dalam pengujian resmi.'; end if;
+  if p_hasil = 'belum' and v_cat = '' then raise exception 'Isi catatan agar Penegak tahu bagian yang perlu diperbaiki.'; end if;
+  select nama into v_nama from public.profiles where id = v_uid;
+
+  update public.sku_pra_uji set status = p_hasil, penilai_id = v_uid, penilai_nama = v_nama, catatan = v_cat, diputuskan_pada = now() where id = p_id;
+  if p_hasil = 'lulus' then
+    insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh)
+    values (v_r.peserta_id, v_r.sku_id, 'Lulus pra-uji ' || sigarda.pra_uji_nama_tahap(v_r.tahap) || ' (' || v_nama || ')', v_uid);
+    v_tujuan := sigarda.pra_uji_teruskan(v_r.peserta_id, v_r.sku_id, v_r.tahap, v_r.jadwal, v_r.catatan_peserta, v_uid);
+    perform sigarda.pra_uji_beritahu_lulus(v_r.peserta_id, v_r.sku_id, v_tujuan);
+  else
+    insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh)
+    values (v_r.peserta_id, v_r.sku_id, 'Belum lulus pra-uji ' || sigarda.pra_uji_nama_tahap(v_r.tahap) || ' (' || v_nama || ')', v_uid);
+    perform sigarda.notif_buat(v_r.peserta_id, 'pra_uji', 'Pra-uji belum lulus',
+      sigarda.notif_label_butir(v_r.sku_id) || ' belum lulus pra-uji. Buka aplikasi untuk melihat catatan perbaikan.', '{"tab":"sku"}');
+  end if;
+  return jsonb_build_object('hasil', p_hasil, 'tujuan', v_tujuan);
+end $$;
+
+-- Pembina atau Admin Gudep melewati tahap pra-uji yang macet (mis. Pinsa berhalangan): pengajuan diteruskan ke tahap berikutnya atau uji resmi, dengan alasan.
+create function public.sg_pra_uji_lewati(p_id bigint, p_alasan text) returns text language plpgsql security definer set search_path = public as
+$$
+declare v_uid uuid := auth.uid(); v_r public.sku_pra_uji; v_alasan text := btrim(coalesce(p_alasan, '')); v_nama text; v_tujuan text;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina atau Admin Gudep yang dapat melewati tahap pra-uji.'; end if;
+  if v_alasan = '' then raise exception 'Isi alasan melewati tahap pra-uji.'; end if;
+  if char_length(v_alasan) > 200 then raise exception 'Alasan maksimal 200 karakter.'; end if;
+  select * into v_r from public.sku_pra_uji where id = p_id for update;
+  if not found or v_r.status <> 'menunggu' then raise exception 'Pengajuan pra-uji ini sudah tidak menunggu.'; end if;
+  select nama into v_nama from public.profiles where id = v_uid;
+  update public.sku_pra_uji set status = 'dilewati', penilai_id = v_uid, penilai_nama = v_nama, catatan = v_alasan, diputuskan_pada = now() where id = p_id;
+  insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh)
+  values (v_r.peserta_id, v_r.sku_id, 'Tahap pra-uji ' || sigarda.pra_uji_nama_tahap(v_r.tahap) || ' dilewati oleh ' || v_nama || '. Alasan: ' || v_alasan, v_uid);
+  v_tujuan := sigarda.pra_uji_teruskan(v_r.peserta_id, v_r.sku_id, v_r.tahap, v_r.jadwal, v_r.catatan_peserta, v_uid);
+  perform sigarda.pra_uji_beritahu_lulus(v_r.peserta_id, v_r.sku_id, v_tujuan, true);
+  return v_tujuan;
+end $$;
+
+-- Sakelar pra-uji (Pembina dan Admin Gudep). Hidup: uji resmi hanya Pembina; pengajuan yang menunggu dan ditujukan kepada penguji non-Pembina kembali ke
+-- antrian rombel. Mati: pra-uji yang masih menunggu diteruskan langsung ke uji resmi (antrian rombel). Hasil: { aktif, dialihkan }.
+create function public.sg_pra_uji_sakelar(p_aktif boolean) returns jsonb language plpgsql security definer set search_path = public as
+$$
+declare v_uid uuid := auth.uid(); v_lama boolean := sigarda.pra_uji_aktif(); v_r record; v_n int := 0; v_nama text;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina atau Admin Gudep yang dapat mengubah pengaturan pra-uji.'; end if;
+  if p_aktif is null then raise exception 'Pilih hidup atau mati.'; end if;
+  if p_aktif = v_lama then return jsonb_build_object('aktif', v_lama, 'dialihkan', 0); end if;
+  select nama into v_nama from public.profiles where id = v_uid;
+  insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada) values ('pra_uji.aktif', jsonb_build_object('aktif', p_aktif), v_uid, now())
+  on conflict (kunci) do update set nilai = excluded.nilai, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
+  if p_aktif then
+    for v_r in select peserta_id, sku_id from public.sku_progress where status = 'diajukan' and penguji_id is not null and not sigarda.bisa_menguji(penguji_id) loop
+      update public.sku_progress set penguji_id = null, diubah = now() where peserta_id = v_r.peserta_id and sku_id = v_r.sku_id;
+      insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh)
+      values (v_r.peserta_id, v_r.sku_id, 'Dikembalikan ke antrian rombel karena pra-uji diaktifkan (uji resmi hanya Pembina)', v_uid);
+      v_n := v_n + 1;
+    end loop;
+  else
+    for v_r in select * from public.sku_pra_uji where status = 'menunggu' order by id loop
+      if exists (select 1 from sigarda.penguji_sah(v_r.peserta_id, v_r.sku_id)) then
+        update public.sku_pra_uji set status = 'dilewati', penilai_id = v_uid, penilai_nama = v_nama, catatan = 'Pra-uji dimatikan', diputuskan_pada = now() where id = v_r.id;
+        perform sigarda.pra_uji_teruskan(v_r.peserta_id, v_r.sku_id, 'bina_damping', v_r.jadwal, v_r.catatan_peserta, v_uid);
+      else
+        update public.sku_pra_uji set status = 'dibatalkan', catatan = 'Pra-uji dimatikan', diputuskan_pada = now() where id = v_r.id;
+        insert into public.sku_riwayat (peserta_id, sku_id, teks, oleh) values (v_r.peserta_id, v_r.sku_id, 'Pengajuan pra-uji dibatalkan karena pra-uji dimatikan', v_uid);
+      end if;
+      v_n := v_n + 1;
+    end loop;
+  end if;
+  return jsonb_build_object('aktif', p_aktif, 'dialihkan', v_n);
+end $$;
+-- ===== akhir aksi pra-uji =====
+
+-- ===== Cakupan pra-uji (Tahap 2, G4e): aksi =====
+-- Seberapa banyak pengajuan baru yang benar-benar melewati pra-uji (punya penilai Pinsa atau Bina Damping) dibanding yang langsung ke antrian rombel Pembina karena tidak ada penilai
+-- (hasil simulasi 2 Okt 2026: cakupan sangat bergantung pada banyaknya Bina Damping yang memenuhi syarat). Dihitung dari riwayat pengajuan (teks yang ditulis
+-- sigarda.pra_uji_teruskan saat pengajuan awal), per rombel Penegak, untuk p_hari hari terakhir, beserta jumlah Bina Damping rombel itu pada tahun ajaran berjalan. Pembina dan Admin.
+create function public.sg_pra_uji_cakupan(p_hari integer default 30) returns jsonb language plpgsql stable security definer set search_path = public as
+$$
+declare v_dari timestamptz; v_ta text := sigarda.tahun_ajaran_kini();
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat melihat cakupan pra-uji.'; end if;
+  if p_hari is null or p_hari not between 1 and 365 then raise exception 'Jumlah hari harus 1 sampai 365.'; end if;
+  v_dari := now() - make_interval(days => p_hari);
+  return jsonb_build_object('aktif', sigarda.pra_uji_aktif(), 'hari', p_hari, 'perRombel', coalesce((
+    select jsonb_agg(jsonb_build_object('rombel', x.kelas, 'lewat', x.lewat, 'langsung', x.langsung, 'binaDamping', coalesce(bd.n, 0)) order by x.langsung desc, x.kelas)
+    from (
+      select p.kelas, count(*) filter (where h.teks like '%; menunggu pra-uji %')::int as lewat, count(*) filter (where h.teks like '%(antrian rombel, tanpa pra-uji)')::int as langsung
+      from public.sku_riwayat h join public.profiles p on p.id = h.peserta_id
+      where h.waktu >= v_dari and h.teks like 'Mengajukan pengujian untuk %' and (h.teks like '%; menunggu pra-uji %' or h.teks like '%(antrian rombel, tanpa pra-uji)')
+      group by p.kelas
+    ) x left join (select rombel, count(*)::int as n from public.bina_damping where tahun_ajaran = v_ta group by rombel) bd on bd.rombel = x.kelas
+  ), '[]'::jsonb));
+end $$;
+-- ===== akhir aksi cakupan pra-uji =====
+-- ===== Pelantikan dan Saka (Tahap 2, G1): aksi =====
+-- Hanya Pembina dan Admin Gudep yang mencatat (Pembina yang langsung membina menentukan kelayakan; Dewan hanya melihat). Pelantikan dicatat SESUDAH terjadi: tanggal tidak boleh
+-- di masa depan (rencana kegiatan ada di Agenda). Penegak harus aktif dan sudah menyelesaikan SEMUA butir SKU tingkat itu (sigarda.tingkat_selesai; cermin klien
+-- skuLogic.tingkatSelesai). Mencatat ulang Penegak yang sudah tercatat pada tingkat itu MENGGANTI catatannya (koreksi tanggal/tempat).
+
+-- Mencatat pelantikan untuk banyak Penegak sekaligus (satu upacara): semua atau tidak sama sekali. Mengembalikan jumlah Penegak yang dicatat.
+create function public.sg_pelantikan_catat(
+  p_tingkat text, p_tanggal date, p_tempat text, p_peserta_ids uuid[], p_agenda_id bigint default null, p_catatan text default ''
+) returns integer language plpgsql security definer set search_path = public as
+$$
+declare
+  v_tempat text := sigarda.rapikan(p_tempat); v_cat text := sigarda.rapikan(p_catatan); v_ids uuid[]; v_id uuid; v_p public.profiles; v_tk text; v_bantara date; v_n int := 0;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mencatat pelantikan.'; end if;
+  if p_tingkat is null or p_tingkat not in ('bantara','laksana') then raise exception 'Tingkat pelantikan harus Bantara atau Laksana.'; end if;
+  if p_tanggal is null then raise exception 'Tanggal pelantikan wajib diisi.'; end if;
+  if p_tanggal < date '2000-01-01' or p_tanggal > sigarda.hari_ini() then raise exception 'Tanggal pelantikan tidak boleh sebelum tahun 2000 atau di masa depan. Catat pelantikan sesudah terlaksana.'; end if;
+  if char_length(v_tempat) not between 1 and 120 or v_tempat ~ '[[:cntrl:]<>]' then raise exception 'Tempat pelantikan wajib diisi (maksimal 120 karakter, tanpa tanda < atau >).'; end if;
+  if char_length(v_cat) > 200 or v_cat ~ '[[:cntrl:]<>]' then raise exception 'Catatan maksimal 200 karakter, tanpa tanda < atau >.'; end if;
+  select coalesce(array_agg(distinct x), '{}') into v_ids from unnest(coalesce(p_peserta_ids, '{}')) x;
+  if coalesce(array_length(v_ids, 1), 0) = 0 then raise exception 'Pilih sedikitnya satu Penegak.'; end if;
+  if array_length(v_ids, 1) > 200 then raise exception 'Maksimal 200 Penegak sekali catat.'; end if;
+  if p_agenda_id is not null and not exists (select 1 from public.agenda where id = p_agenda_id and jenis = 'pelantikan_' || p_tingkat) then
+    raise exception 'Kegiatan Agenda yang dipilih bukan pelantikan %.', initcap(p_tingkat);
+  end if;
+  v_tk := case p_tingkat when 'bantara' then 'Bantara' else 'Laksana' end;
+  foreach v_id in array v_ids loop
+    select * into v_p from public.profiles where id = v_id and role = 'peserta';
+    if not found then raise exception 'Ada anggota yang bukan Penegak.'; end if;
+    if v_p.status <> 'aktif' then raise exception '% tidak aktif; pelantikan hanya untuk Penegak aktif.', v_p.nama; end if;
+    if not sigarda.tingkat_selesai(v_id, v_tk) then raise exception '% belum menyelesaikan seluruh butir SKU %.', v_p.nama, v_tk; end if;
+    if p_tingkat = 'laksana' then
+      select tanggal into v_bantara from public.pelantikan where peserta_id = v_id and tingkat = 'bantara';
+      if v_bantara is not null and p_tanggal <= v_bantara then raise exception 'Pelantikan Laksana % harus sesudah pelantikan Bantaranya (%).', v_p.nama, to_char(v_bantara, 'YYYY-MM-DD'); end if;
+    end if;
+    insert into public.pelantikan (peserta_id, tingkat, tanggal, tempat, agenda_id, catatan, dicatat_oleh, dicatat_pada)
+    values (v_id, p_tingkat, p_tanggal, v_tempat, p_agenda_id, v_cat, auth.uid(), now())
+    on conflict (peserta_id, tingkat) do update
+      set tanggal = excluded.tanggal, tempat = excluded.tempat, agenda_id = excluded.agenda_id, catatan = excluded.catatan, dicatat_oleh = excluded.dicatat_oleh, dicatat_pada = excluded.dicatat_pada;
+    v_n := v_n + 1;
+  end loop;
+  return v_n;
+end $$;
+
+-- Menghapus satu catatan pelantikan (salah Penegak atau salah tingkat).
+create function public.sg_pelantikan_hapus(p_id bigint) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan pelantikan.'; end if;
+  delete from public.pelantikan where id = p_id;
+  if not found then raise exception 'Catatan pelantikan tidak ditemukan.'; end if;
+end $$;
+
+-- Keanggotaan Saka: tambah (p_id null) atau ubah. Satu Penegak boleh di beberapa Saka, tetapi satu catatan per nama Saka. Status 'aktif' (tanpa tanggal selesai) atau 'selesai'.
+create function public.sg_saka_simpan(
+  p_id bigint, p_peserta_id uuid, p_saka text, p_tanggal_masuk date, p_status text, p_tanggal_selesai date, p_surat_url text default '', p_catatan text default ''
+) returns bigint language plpgsql security definer set search_path = public as
+$$
+declare
+  v_saka text := sigarda.rapikan(p_saka); v_url text := btrim(coalesce(p_surat_url, '')); v_cat text := sigarda.rapikan(p_catatan); v_p public.profiles; v_hasil bigint;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mencatat keanggotaan Saka.'; end if;
+  select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';
+  if not found then raise exception 'Pilih Penegak.'; end if;
+  if v_p.status <> 'aktif' then raise exception '% tidak aktif; keanggotaan Saka hanya dicatat untuk Penegak aktif.', v_p.nama; end if;
+  if char_length(v_saka) not between 1 and 60 or v_saka ~ '[[:cntrl:]<>]' then raise exception 'Nama Saka wajib diisi (maksimal 60 karakter, tanpa tanda < atau >).'; end if;
+  if p_tanggal_masuk is null then raise exception 'Tanggal masuk Saka wajib diisi.'; end if;
+  if p_tanggal_masuk < date '2000-01-01' or p_tanggal_masuk > sigarda.hari_ini() then raise exception 'Tanggal masuk Saka tidak boleh sebelum tahun 2000 atau di masa depan.'; end if;
+  if p_status is null or p_status not in ('aktif','selesai') then raise exception 'Status Saka harus aktif atau selesai.'; end if;
+  if p_status = 'aktif' and p_tanggal_selesai is not null then raise exception 'Anggota Saka yang masih aktif tidak punya tanggal selesai.'; end if;
+  if p_status = 'selesai' and (p_tanggal_selesai is null or p_tanggal_selesai < p_tanggal_masuk or p_tanggal_selesai > sigarda.hari_ini()) then
+    raise exception 'Isi tanggal selesai (tidak sebelum tanggal masuk dan tidak di masa depan).';
+  end if;
+  if v_url <> '' and (v_url !~* '^https?://' or char_length(v_url) > 500 or v_url ~ '[[:cntrl:][:space:]<>]') then raise exception 'Tautan surat keterangan harus berawalan http:// atau https:// (maksimal 500 karakter, tanpa spasi).'; end if;
+  if char_length(v_cat) > 200 or v_cat ~ '[[:cntrl:]<>]' then raise exception 'Catatan maksimal 200 karakter, tanpa tanda < atau >.'; end if;
+  begin
+    if p_id is null then
+      insert into public.saka_anggota (peserta_id, saka, tanggal_masuk, status, tanggal_selesai, surat_url, catatan, dicatat_oleh)
+      values (p_peserta_id, v_saka, p_tanggal_masuk, p_status, p_tanggal_selesai, v_url, v_cat, auth.uid()) returning id into v_hasil;
+    else
+      update public.saka_anggota set peserta_id = p_peserta_id, saka = v_saka, tanggal_masuk = p_tanggal_masuk, status = p_status, tanggal_selesai = p_tanggal_selesai,
+        surat_url = v_url, catatan = v_cat, dicatat_oleh = auth.uid(), dicatat_pada = now()
+      where id = p_id returning id into v_hasil;
+      if v_hasil is null then raise exception 'Catatan Saka tidak ditemukan.'; end if;
+    end if;
+  exception when unique_violation then
+    raise exception '% sudah tercatat di Saka %. Ubah catatan yang ada.', v_p.nama, v_saka;
+  end;
+  return v_hasil;
+end $$;
+
+create function public.sg_saka_hapus(p_id bigint) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan Saka.'; end if;
+  delete from public.saka_anggota where id = p_id;
+  if not found then raise exception 'Catatan Saka tidak ditemukan.'; end if;
+end $$;
+-- ===== akhir aksi pelantikan dan saka =====
+-- ===== TKK (Tahap 2, G2): aksi =====
+-- Hanya Pembina dan Admin Gudep yang mencatat (Pembina yang langsung membina yang memberi TKK; Dewan hanya membaca). TKK dicatat SESUDAH lulus uji (tanggal bukan
+-- masa depan). Penegak harus aktif dan sudah menyelesaikan SKU Bantara (SK Kwarnas 134/1976: TKK dapat dikenakan sesudah Penegak Bantara). TKK harus dari golongan
+-- Penegak dan, bila khusus satu agama (Sholat, Khotib, Qori, Muadzin), sesuai agama Penegak. Tingkat berurutan: Madya butuh Purwa jenis yang sama, Utama butuh Madya, dan
+-- tanggalnya tidak boleh mendahului tingkat di bawahnya. Tim penguji 2 orang (nama; tanpa akun) dan bukti melatih wajib. Mencatat ulang tingkat yang sama = koreksi.
+
+-- Mencatat (atau mengoreksi) satu capaian TKK. Mengembalikan id catatan.
+create function public.sg_tkk_catat(
+  p_peserta_id uuid, p_tkk_id text, p_tingkat text, p_tanggal date, p_penguji1 text, p_penguji2 text, p_melatih text, p_bukti_url text default '', p_catatan text default ''
+) returns bigint language plpgsql security definer set search_path = public as
+$$
+declare v_id bigint;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mencatat TKK.'; end if;
+  perform sigarda.tkk_periksa(p_peserta_id, p_tkk_id, p_tingkat, p_tanggal, p_penguji1, p_penguji2, p_melatih, p_bukti_url, p_catatan);
+  insert into public.tkk_capaian (peserta_id, tkk_id, tingkat, tanggal, penguji1, penguji2, melatih, bukti_url, catatan, dicatat_oleh, dicatat_pada)
+  values (p_peserta_id, p_tkk_id, p_tingkat, p_tanggal, sigarda.rapikan(p_penguji1), sigarda.rapikan(p_penguji2), sigarda.rapikan(p_melatih), btrim(coalesce(p_bukti_url, '')), sigarda.rapikan(p_catatan), auth.uid(), now())
+  on conflict (peserta_id, tkk_id, tingkat) do update
+    set tanggal = excluded.tanggal, penguji1 = excluded.penguji1, penguji2 = excluded.penguji2, melatih = excluded.melatih, bukti_url = excluded.bukti_url,
+        catatan = excluded.catatan, dicatat_oleh = excluded.dicatat_oleh, dicatat_pada = excluded.dicatat_pada
+  returning id into v_id;
+  return v_id;
+end $$;
+
+-- Menghapus satu catatan capaian (salah Penegak atau salah jenis). Tingkat di bawah yang masih ditopang tingkat di atasnya tidak dapat dihapus lebih dulu.
+create function public.sg_tkk_hapus(p_id bigint) returns void language plpgsql security definer set search_path = public as
+$$
+declare v public.tkk_capaian;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan TKK.'; end if;
+  select * into v from public.tkk_capaian where id = p_id;
+  if not found then raise exception 'Catatan TKK tidak ditemukan.'; end if;
+  if v.tingkat <> 'utama' and exists (
+    select 1 from public.tkk_capaian where peserta_id = v.peserta_id and tkk_id = v.tkk_id and tingkat = case v.tingkat when 'purwa' then 'madya' else 'utama' end
+  ) then raise exception 'Hapus tingkat yang lebih tinggi dari TKK ini lebih dulu.'; end if;
+  delete from public.tkk_capaian where id = p_id;
+end $$;
+
+-- TKK Krida: tambah (p_id null) atau ubah. Satu catatan per nama Krida per Penegak.
+create function public.sg_tkk_krida_simpan(
+  p_id bigint, p_peserta_id uuid, p_nama text, p_saka text, p_tanggal date, p_bukti_url text default '', p_catatan text default ''
+) returns bigint language plpgsql security definer set search_path = public as
+$$
+declare v_nama text := sigarda.rapikan(p_nama); v_saka text := sigarda.rapikan(p_saka); v_url text := btrim(coalesce(p_bukti_url, '')); v_cat text := sigarda.rapikan(p_catatan); v_p public.profiles; v_id bigint;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mencatat TKK Krida.'; end if;
+  select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';
+  if not found then raise exception 'Pilih Penegak.'; end if;
+  if v_p.status <> 'aktif' then raise exception '% tidak aktif; TKK Krida hanya dicatat untuk Penegak aktif.', v_p.nama; end if;
+  if char_length(v_nama) not between 1 and 80 or v_nama ~ '[[:cntrl:]<>]' then raise exception 'Nama TKK Krida wajib diisi (maksimal 80 karakter, tanpa tanda < atau >).'; end if;
+  if char_length(v_saka) > 60 or v_saka ~ '[[:cntrl:]<>]' then raise exception 'Nama Saka maksimal 60 karakter, tanpa tanda < atau >.'; end if;
+  if p_tanggal is null then raise exception 'Tanggal lulus wajib diisi.'; end if;
+  if p_tanggal < date '2000-01-01' or p_tanggal > sigarda.hari_ini() then raise exception 'Tanggal lulus tidak boleh sebelum tahun 2000 atau di masa depan.'; end if;
+  if v_url <> '' and (v_url !~* '^https?://' or char_length(v_url) > 500 or v_url ~ '[[:cntrl:][:space:]<>]') then raise exception 'Tautan bukti harus berawalan http:// atau https:// (maksimal 500 karakter, tanpa spasi).'; end if;
+  if char_length(v_cat) > 200 or v_cat ~ '[[:cntrl:]<>]' then raise exception 'Catatan maksimal 200 karakter, tanpa tanda < atau >.'; end if;
+  begin
+    if p_id is null then
+      insert into public.tkk_krida (peserta_id, nama, saka, tanggal, bukti_url, catatan, dicatat_oleh) values (p_peserta_id, v_nama, v_saka, p_tanggal, v_url, v_cat, auth.uid()) returning id into v_id;
+    else
+      update public.tkk_krida set peserta_id = p_peserta_id, nama = v_nama, saka = v_saka, tanggal = p_tanggal, bukti_url = v_url, catatan = v_cat, dicatat_oleh = auth.uid(), dicatat_pada = now()
+      where id = p_id returning id into v_id;
+      if v_id is null then raise exception 'Catatan TKK Krida tidak ditemukan.'; end if;
+    end if;
+  exception when unique_violation then
+    raise exception '% sudah tercatat memiliki TKK Krida %. Ubah catatan yang ada.', v_p.nama, v_nama;
+  end;
+  return v_id;
+end $$;
+
+create function public.sg_tkk_krida_hapus(p_id bigint) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan TKK Krida.'; end if;
+  delete from public.tkk_krida where id = p_id;
+  if not found then raise exception 'Catatan TKK Krida tidak ditemukan.'; end if;
+end $$;
+
+-- Ambang kesiapan Garuda (pengaturan 'tkk.ambang'): { total, madya, utamaWajib: [id TKK Penegak, unik] }. total 1-200; madya 0-100; total harus memuat semua yang wajib Utama dan Madya-nya.
+create function public.sg_tkk_ambang_simpan(p_nilai jsonb) returns void language plpgsql security definer set search_path = public as
+$$
+declare v_total int; v_madya int; v_wajib text[]; v_n int;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mengubah ambang TKK.'; end if;
+  if p_nilai is null or jsonb_typeof(p_nilai) <> 'object' or p_nilai - 'total' - 'madya' - 'utamaWajib' <> '{}'::jsonb then raise exception 'Bentuk ambang TKK tidak sah.'; end if;
+  -- coalesce: kunci yang hilang menghasilkan NULL, dan perbandingan dengan NULL tidak akan memicu galat
+  if coalesce(jsonb_typeof(p_nilai -> 'total'), '') <> 'number' or coalesce(jsonb_typeof(p_nilai -> 'madya'), '') <> 'number' or coalesce(jsonb_typeof(p_nilai -> 'utamaWajib'), '') <> 'array' then raise exception 'Bentuk ambang TKK tidak sah.'; end if;
+  if (p_nilai ->> 'total') !~ '^[0-9]+$' or (p_nilai ->> 'madya') !~ '^[0-9]+$' then raise exception 'Jumlah TKK harus bilangan bulat tidak negatif.'; end if;
+  v_total := (p_nilai ->> 'total')::int; v_madya := (p_nilai ->> 'madya')::int;
+  if v_total not between 1 and 200 then raise exception 'Total TKK harus 1 sampai 200.'; end if;
+  if v_madya not between 0 and 100 then raise exception 'Jumlah TKK Madya harus 0 sampai 100.'; end if;
+  if exists (select 1 from jsonb_array_elements(p_nilai -> 'utamaWajib') e where jsonb_typeof(e) <> 'string') then raise exception 'Daftar TKK wajib Utama tidak sah.'; end if;
+  select coalesce(array_agg(e #>> '{}'), '{}') into v_wajib from jsonb_array_elements(p_nilai -> 'utamaWajib') e;
+  if (select count(distinct x) from unnest(v_wajib) x) <> coalesce(array_length(v_wajib, 1), 0) then raise exception 'Daftar TKK wajib Utama tidak boleh berulang.'; end if;
+  select count(*) into v_n from public.tkk_katalog where id = any(v_wajib) and golongan = 'penegak';
+  if v_n <> coalesce(array_length(v_wajib, 1), 0) then raise exception 'Ada TKK wajib Utama yang tidak dikenal atau khusus Siaga.'; end if;
+  if v_total < coalesce(array_length(v_wajib, 1), 0) + v_madya then raise exception 'Total TKK harus memuat semua TKK wajib Utama ditambah TKK Madya.'; end if;
+  insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada)
+  values ('tkk.ambang', jsonb_build_object('total', v_total, 'madya', v_madya, 'utamaWajib', to_jsonb(v_wajib)), auth.uid(), now())
+  on conflict (kunci) do update set nilai = excluded.nilai, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
+end $$;
+-- ===== akhir aksi tkk =====
+
+-- ===== TKK pengajuan (Tahap 2, G2b): aksi =====
+-- Pemeriksa isian capaian TKK yang DIPAKAI BERSAMA sg_tkk_catat (Pembina/Admin), sg_tkk_ajukan (Penegak), dan persetujuan sg_tkk_tinjau, sehingga aturannya persis sama:
+-- Penegak aktif, SKU Bantara selesai, TKK golongan Penegak dan seagama bila khusus agama, tingkat berurutan (Madya butuh Purwa, Utama butuh Madya, tanggal tidak
+-- mendahului tingkat di bawahnya atau melewati tingkat di atasnya), tanggal bukan masa depan, dua penguji berbeda, bukti melatih, tautan, catatan. Melempar galat.
+create function sigarda.tkk_periksa(
+  p_peserta_id uuid, p_tkk_id text, p_tingkat text, p_tanggal date, p_penguji1 text, p_penguji2 text, p_melatih text, p_bukti_url text, p_catatan text
+) returns void language plpgsql stable security definer set search_path = public as
+$$
+declare
+  v_p public.profiles; v_t public.tkk_katalog; v_p1 text := sigarda.rapikan(p_penguji1); v_p2 text := sigarda.rapikan(p_penguji2); v_lat text := sigarda.rapikan(p_melatih);
+  v_url text := btrim(coalesce(p_bukti_url, '')); v_cat text := sigarda.rapikan(p_catatan); v_bawah date; v_atas date;
+begin
+  select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';
+  if not found then raise exception 'Pilih Penegak.'; end if;
+  if v_p.status <> 'aktif' then raise exception '% tidak aktif; TKK hanya dicatat untuk Penegak aktif.', v_p.nama; end if;
+  if not sigarda.tingkat_selesai(p_peserta_id, 'Bantara') then raise exception '% belum menyelesaikan SKU Bantara; TKK dapat dikenakan sesudah Penegak Bantara.', v_p.nama; end if;
+  select * into v_t from public.tkk_katalog where id = p_tkk_id;
+  if not found then raise exception 'TKK tidak dikenal.'; end if;
+  if v_t.golongan <> 'penegak' then raise exception 'TKK % khusus golongan Siaga, tidak untuk Penegak.', v_t.nama; end if;
+  if v_t.agama is not null and v_t.agama is distinct from v_p.agama then raise exception 'TKK % khusus penganut agama %.', v_t.nama, v_t.agama; end if;
+  if p_tingkat is null or p_tingkat not in ('purwa','madya','utama') then raise exception 'Tingkat TKK harus Purwa, Madya, atau Utama.'; end if;
+  if p_tanggal is null then raise exception 'Tanggal lulus wajib diisi.'; end if;
+  if p_tanggal < date '2000-01-01' or p_tanggal > sigarda.hari_ini() then raise exception 'Tanggal lulus tidak boleh sebelum tahun 2000 atau di masa depan.'; end if;
+  if char_length(v_p1) not between 1 and 80 or char_length(v_p2) not between 1 and 80 or v_p1 ~ '[[:cntrl:]<>]' or v_p2 ~ '[[:cntrl:]<>]' then
+    raise exception 'Isi nama kedua penguji (tim 2 orang; maksimal 80 karakter, tanpa tanda < atau >).';
+  end if;
+  if lower(v_p1) = lower(v_p2) then raise exception 'Kedua penguji harus dua orang yang berbeda.'; end if;
+  if char_length(v_lat) not between 1 and 200 or v_lat ~ '[[:cntrl:]<>]' then raise exception 'Isi bukti melatih: siapa yang telah dilatih sampai TKK tingkat di bawahnya (maksimal 200 karakter, tanpa tanda < atau >).'; end if;
+  if v_url <> '' and (v_url !~* '^https?://' or char_length(v_url) > 500 or v_url ~ '[[:cntrl:][:space:]<>]') then raise exception 'Tautan bukti harus berawalan http:// atau https:// (maksimal 500 karakter, tanpa spasi).'; end if;
+  if char_length(v_cat) > 200 or v_cat ~ '[[:cntrl:]<>]' then raise exception 'Catatan maksimal 200 karakter, tanpa tanda < atau >.'; end if;
+  if p_tingkat <> 'purwa' then
+    select tanggal into v_bawah from public.tkk_capaian where peserta_id = p_peserta_id and tkk_id = p_tkk_id and tingkat = case p_tingkat when 'madya' then 'purwa' else 'madya' end;
+    if v_bawah is null then raise exception '% Utama butuh Madya, dan Madya butuh Purwa, dari jenis TKK yang sama. Catat tingkat di bawahnya lebih dulu.', v_t.nama; end if;
+    if p_tanggal < v_bawah then raise exception 'Tanggal % tidak boleh sebelum tanggal tingkat di bawahnya (%).', initcap(p_tingkat), to_char(v_bawah, 'YYYY-MM-DD'); end if;
+  end if;
+  if p_tingkat <> 'utama' then
+    select tanggal into v_atas from public.tkk_capaian where peserta_id = p_peserta_id and tkk_id = p_tkk_id and tingkat = case p_tingkat when 'purwa' then 'madya' else 'utama' end;
+    if v_atas is not null and p_tanggal > v_atas then raise exception 'Tanggal % tidak boleh sesudah tanggal tingkat di atasnya (%).', initcap(p_tingkat), to_char(v_atas, 'YYYY-MM-DD'); end if;
+  end if;
+end $$;
+
+-- Pembina yang boleh menjadi Penguji 1 pengajuan TKK seorang Penegak (G2c): Pembina aktif yang ditugaskan untuk Penegak itu pada tahun ajaran berjalan, dengan urutan yang sama seperti
+-- penugasan penguji SKU: penugasan khusus Penegak (bila ada Pembina di dalamnya) mengalahkan penugasan rombel kelasnya; bila keduanya tidak memuat Pembina, semua Pembina aktif.
+create function sigarda.tkk_pembina_penilai(p_peserta uuid) returns setof uuid language plpgsql stable security definer set search_path = public as
+$$
+declare v_ta text := sigarda.tahun_ajaran_kini(); v_kelas text; v_ada boolean;
+begin
+  select kelas into v_kelas from public.profiles where id = p_peserta;
+  select exists (select 1 from public.penugasan_peserta pp join public.profiles u on u.id = pp.penguji_id
+                 where pp.tahun_ajaran = v_ta and pp.peserta_id = p_peserta and u.role = 'penguji' and u.jabatan = 'Pembina' and u.status = 'aktif') into v_ada;
+  if v_ada then
+    return query select u.id from public.penugasan_peserta pp join public.profiles u on u.id = pp.penguji_id
+                 where pp.tahun_ajaran = v_ta and pp.peserta_id = p_peserta and u.role = 'penguji' and u.jabatan = 'Pembina' and u.status = 'aktif';
+    return;
+  end if;
+  select exists (select 1 from public.penugasan_rombel pr join public.profiles u on u.id = pr.penguji_id
+                 where pr.tahun_ajaran = v_ta and pr.rombel = v_kelas and u.role = 'penguji' and u.jabatan = 'Pembina' and u.status = 'aktif') into v_ada;
+  if v_ada then
+    return query select u.id from public.penugasan_rombel pr join public.profiles u on u.id = pr.penguji_id
+                 where pr.tahun_ajaran = v_ta and pr.rombel = v_kelas and u.role = 'penguji' and u.jabatan = 'Pembina' and u.status = 'aktif';
+    return;
+  end if;
+  return query select u.id from public.profiles u where u.role = 'penguji' and u.jabatan = 'Pembina' and u.status = 'aktif';
+end $$;
+
+-- Pilihan Penguji 1 bagi Penegak yang sedang masuk: [{ id, nama }] menurut nama (pengajuan hanya diterima bila Penguji 1 ada di daftar ini).
+create function public.sg_tkk_penguji_pilihan() returns jsonb language plpgsql stable security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not exists (select 1 from public.profiles where id = auth.uid() and role = 'peserta') then return '[]'::jsonb; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('id', u.id, 'nama', u.nama) order by u.nama)
+                   from public.profiles u where u.id in (select sigarda.tkk_pembina_penilai(auth.uid()))), '[]'::jsonb);
+end $$;
+
+-- Penegak mengajukan capaian TKK-nya sendiri (Pembina mencatat langsung lewat sg_tkk_catat). Penguji 1 = Pembina yang ditugaskan untuk kelasnya (dipilih dari sg_tkk_penguji_pilihan;
+-- namanya disalin server), Penguji 2 diisi Penegak. Maksimal 20 pengajuan menunggu; tingkat yang sudah tercatat resmi tidak diajukan lagi.
+create function public.sg_tkk_ajukan(
+  p_tkk_id text, p_tingkat text, p_tanggal date, p_penguji1_id uuid, p_penguji2 text, p_melatih text, p_bukti_url text default '', p_catatan text default ''
+) returns bigint language plpgsql security definer set search_path = public as
+$$
+declare v_uid uuid := auth.uid(); v_id bigint; v_nama1 text;
+begin
+  perform sigarda.wajib_aktif();
+  if not exists (select 1 from public.profiles where id = v_uid and role = 'peserta') then raise exception 'Hanya Penegak yang dapat mengajukan TKK. Pembina mencatat langsung di menu TKK.'; end if;
+  if (select count(*) from public.tkk_pengajuan where peserta_id = v_uid and status = 'menunggu') >= 20 then raise exception 'Terlalu banyak pengajuan yang menunggu (maksimal 20). Tunggu Pembina meninjau.'; end if;
+  if p_penguji1_id is null or p_penguji1_id not in (select sigarda.tkk_pembina_penilai(v_uid)) then raise exception 'Penguji 1 harus Pembina yang ditugaskan untuk kelasmu. Pilih dari daftar.'; end if;
+  select nama into v_nama1 from public.profiles where id = p_penguji1_id;
+  perform sigarda.tkk_periksa(v_uid, p_tkk_id, p_tingkat, p_tanggal, v_nama1, p_penguji2, p_melatih, p_bukti_url, p_catatan);
+  if exists (select 1 from public.tkk_capaian where peserta_id = v_uid and tkk_id = p_tkk_id and tingkat = p_tingkat) then
+    raise exception 'TKK ini pada tingkat itu sudah tercatat resmi. Koreksi dilakukan Pembina.';
+  end if;
+  begin
+    insert into public.tkk_pengajuan (peserta_id, tkk_id, tingkat, tanggal, penguji1, penguji1_id, penguji2, melatih, bukti_url, catatan)
+    values (v_uid, p_tkk_id, p_tingkat, p_tanggal, sigarda.rapikan(v_nama1), p_penguji1_id, sigarda.rapikan(p_penguji2), sigarda.rapikan(p_melatih), btrim(coalesce(p_bukti_url, '')), sigarda.rapikan(p_catatan))
+    returning id into v_id;
+  exception when unique_violation then
+    raise exception 'Pengajuan yang sama masih menunggu ditinjau Pembina.';
+  end;
+  return v_id;
+end $$;
+
+-- Penegak membatalkan pengajuannya yang masih menunggu.
+create function public.sg_tkk_ajukan_batal(p_id bigint) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  update public.tkk_pengajuan set status = 'dibatalkan' where id = p_id and peserta_id = auth.uid() and status = 'menunggu';
+  if not found then raise exception 'Pengajuan tidak ditemukan atau sudah ditinjau.'; end if;
+end $$;
+
+-- Pembina atau Admin meninjau satu pengajuan. p_keputusan 'disetujui' (menjadi capaian resmi lewat pemeriksa yang sama; keadaan dicek ulang saat ini) atau 'ditolak' (catatan wajib).
+-- Saat menyetujui, peninjau boleh MENGGANTI nama penguji (p_penguji1/p_penguji2; kosong = tetap), mis. bila Pembina 1 dan 2 berhalangan hadir: alasan wajib di catatan, dan nama
+-- sebelumnya tersimpan di penguji_awal. Penggantian diabaikan saat menolak.
+create function public.sg_tkk_tinjau(p_id bigint, p_keputusan text, p_catatan text default '', p_penguji1 text default null, p_penguji2 text default null) returns void language plpgsql security definer set search_path = public as
+$$
+declare
+  v public.tkk_pengajuan; v_cat text := sigarda.rapikan(p_catatan); v_nama text; v_cid bigint;
+  v_p1 text; v_p2 text; v_awal text := ''; v_ganti boolean;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat meninjau pengajuan TKK.'; end if;
+  if p_keputusan is null or p_keputusan not in ('disetujui','ditolak') then raise exception 'Keputusan harus disetujui atau ditolak.'; end if;
+  if char_length(v_cat) > 200 or v_cat ~ '[[:cntrl:]<>]' then raise exception 'Catatan maksimal 200 karakter, tanpa tanda < atau >.'; end if;
+  if p_keputusan = 'ditolak' and v_cat = '' then raise exception 'Isi catatan agar Penegak tahu alasan penolakan.'; end if;
+  select * into v from public.tkk_pengajuan where id = p_id for update;
+  if not found or v.status <> 'menunggu' then raise exception 'Pengajuan ini sudah tidak menunggu.'; end if;
+  select nama into v_nama from public.profiles where id = auth.uid();
+  v_p1 := v.penguji1; v_p2 := v.penguji2;
+  if p_keputusan = 'disetujui' then
+    if sigarda.rapikan(p_penguji1) <> '' then v_p1 := sigarda.rapikan(p_penguji1); end if;
+    if sigarda.rapikan(p_penguji2) <> '' then v_p2 := sigarda.rapikan(p_penguji2); end if;
+    v_ganti := v_p1 <> v.penguji1 or v_p2 <> v.penguji2;
+    if v_ganti then
+      if v_cat = '' then raise exception 'Nama penguji diganti: isi alasannya di catatan (mis. Pembina 1 dan 2 berhalangan hadir).'; end if;
+      v_awal := left(v.penguji1 || ' dan ' || v.penguji2, 200);
+    end if;
+    perform sigarda.tkk_periksa(v.peserta_id, v.tkk_id, v.tingkat, v.tanggal, v_p1, v_p2, v.melatih, v.bukti_url, v.catatan);
+    insert into public.tkk_capaian (peserta_id, tkk_id, tingkat, tanggal, penguji1, penguji2, melatih, bukti_url, catatan, dicatat_oleh, dicatat_pada)
+    values (v.peserta_id, v.tkk_id, v.tingkat, v.tanggal, v_p1, v_p2, v.melatih, v.bukti_url, v.catatan, auth.uid(), now())
+    on conflict (peserta_id, tkk_id, tingkat) do update
+      set tanggal = excluded.tanggal, penguji1 = excluded.penguji1, penguji2 = excluded.penguji2, melatih = excluded.melatih, bukti_url = excluded.bukti_url,
+          catatan = excluded.catatan, dicatat_oleh = excluded.dicatat_oleh, dicatat_pada = excluded.dicatat_pada
+    returning id into v_cid;
+  end if;
+  update public.tkk_pengajuan set status = p_keputusan, penguji1 = v_p1, penguji2 = v_p2, penguji_awal = v_awal, ditinjau_oleh = auth.uid(), ditinjau_nama = v_nama, ditinjau_pada = now(),
+    catatan_tinjauan = v_cat, capaian_id = v_cid where id = p_id;
+end $$;
+
+-- Notifikasi: Pembina Penguji 1 diberi tahu pengajuan baru (semua Pembina bila Penguji 1 tidak tercatat); Penegak diberi tahu pengajuannya ditinjau (isi singkat, hasil dilihat di aplikasi).
+create function sigarda.notif_tkk_pengajuan() returns trigger language plpgsql security definer set search_path = public as
+$$
+declare v_x uuid; v_nama text; v_tkk text;
+begin
+  select nama into v_tkk from public.tkk_katalog where id = NEW.tkk_id;
+  if TG_OP = 'INSERT' then
+    select nama into v_nama from public.profiles where id = NEW.peserta_id;
+    for v_x in select id from public.profiles where role = 'penguji' and jabatan = 'Pembina' and status = 'aktif' and (NEW.penguji1_id is null or id = NEW.penguji1_id) loop
+      perform sigarda.notif_buat(v_x, 'tkk', 'Pengajuan TKK baru', v_nama || ' mengajukan TKK ' || v_tkk || ' ' || initcap(NEW.tingkat), '{"tab":"tkk"}', 'tkk-baru:' || NEW.id);
+    end loop;
+  elsif OLD.status = 'menunggu' and NEW.status in ('disetujui','ditolak') then
+    perform sigarda.notif_buat(NEW.peserta_id, 'tkk', 'Pengajuan TKK ditinjau', 'Pengajuan TKK ' || v_tkk || ' ' || initcap(NEW.tingkat) || ' sudah ditinjau Pembina. Buka aplikasi untuk melihat hasilnya.', '{"tab":"tkk"}', 'tkk-tinjau:' || NEW.id);
+  end if;
+  return null;
+end $$;
+create trigger notif_tkk_pengajuan_baru after insert on public.tkk_pengajuan for each row execute function sigarda.notif_tkk_pengajuan();
+create trigger notif_tkk_pengajuan_tinjau after update of status on public.tkk_pengajuan for each row execute function sigarda.notif_tkk_pengajuan();
+-- ===== akhir aksi tkk pengajuan =====
+-- ===== SPG (Tahap 2, G3): aksi =====
+-- Hanya Pembina dan Admin Gudep yang menetapkan (Pembina menguji SPG; Dewan hanya membaca). Penegak harus aktif dan sudah menyelesaikan seluruh SKU Bantara dan Laksana
+-- (sigarda.layak_garuda). Menetapkan ulang butir yang sama = koreksi. Penetapan yang berbeda dari hasil hitung aplikasi (p_timpa) wajib beralasan di catatan; server tidak
+-- menghitung ulang hasil aplikasi (dihitung di klien), jadi p_timpa dipercaya sebatas tanda dan alasan.
+
+create function public.sg_spg_catat(
+  p_peserta_id uuid, p_butir integer, p_nilai integer, p_tanggal date, p_catatan text default '', p_timpa boolean default false
+) returns void language plpgsql security definer set search_path = public as
+$$
+declare v_p public.profiles; v_cat text := sigarda.rapikan(p_catatan);
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menetapkan Syarat Pramuka Garuda.'; end if;
+  select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';
+  if not found then raise exception 'Pilih Penegak.'; end if;
+  if v_p.status <> 'aktif' then raise exception '% tidak aktif; Syarat Pramuka Garuda hanya untuk Penegak aktif.', v_p.nama; end if;
+  if not sigarda.layak_garuda(p_peserta_id) then raise exception '% belum menyelesaikan seluruh SKU Bantara dan Laksana.', v_p.nama; end if;
+  if p_butir is null or p_butir not between 1 and 13 then raise exception 'Butir SPG harus 1 sampai 13.'; end if;
+  if p_nilai is null or p_nilai not in (0, 100) then raise exception 'Nilai harus 100 (lengkap dan memenuhi) atau 0 (belum).'; end if;
+  if p_tanggal is null then raise exception 'Tanggal pengujian wajib diisi.'; end if;
+  if p_tanggal < date '2000-01-01' or p_tanggal > sigarda.hari_ini() then raise exception 'Tanggal pengujian tidak boleh sebelum tahun 2000 atau di masa depan.'; end if;
+  if char_length(v_cat) > 200 or v_cat ~ '[[:cntrl:]<>]' then raise exception 'Catatan maksimal 200 karakter, tanpa tanda < atau >.'; end if;
+  if coalesce(p_timpa, false) and char_length(v_cat) < 5 then raise exception 'Penetapan berbeda dari hasil aplikasi: tulis alasannya di catatan (sedikitnya 5 karakter).'; end if;
+  insert into public.spg_penetapan (peserta_id, butir, nilai, tanggal, catatan, timpa, dicatat_oleh, dicatat_pada)
+  values (p_peserta_id, p_butir, p_nilai, p_tanggal, v_cat, coalesce(p_timpa, false), auth.uid(), now())
+  on conflict (peserta_id, butir) do update
+    set nilai = excluded.nilai, tanggal = excluded.tanggal, catatan = excluded.catatan, timpa = excluded.timpa, dicatat_oleh = excluded.dicatat_oleh, dicatat_pada = excluded.dicatat_pada;
+end $$;
+
+-- Menghapus penetapan satu butir (kembali ke hasil hitung aplikasi atau "menunggu ditetapkan").
+create function public.sg_spg_hapus(p_peserta_id uuid, p_butir integer) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus penetapan SPG.'; end if;
+  delete from public.spg_penetapan where peserta_id = p_peserta_id and butir = p_butir;
+  if not found then raise exception 'Penetapan SPG tidak ditemukan.'; end if;
+end $$;
+-- ===== akhir aksi spg =====
+-- ===== Gerbang calon Garuda (Tahap 2, G4): aksi =====
+-- Gerbang calon hanya PERINGATAN (keputusan pemilik 25 Sep 2026): kelas, usia, dan kuota dihitung dan ditampilkan di klien; server tidak memblokir pendaftaran Calon Garuda.
+-- Server hanya menyimpan tanggal lahir dan aturan gerbang. Keduanya oleh Pembina atau Admin Gudep.
+
+-- Mengisi (atau mengoreksi) tanggal lahir satu Penegak aktif; tanggal kosong = menghapus catatan.
+create function public.sg_tanggal_lahir_atur(p_peserta_id uuid, p_tanggal date) returns void language plpgsql security definer set search_path = public as
+$$
+declare v_p public.profiles;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mengisi tanggal lahir.'; end if;
+  select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';
+  if not found then raise exception 'Pilih Penegak.'; end if;
+  if v_p.status <> 'aktif' then raise exception '% tidak aktif; tanggal lahir hanya diisi untuk Penegak aktif.', v_p.nama; end if;
+  if p_tanggal is null then
+    delete from public.tanggal_lahir where peserta_id = p_peserta_id;
+    return;
+  end if;
+  if p_tanggal < date '1990-01-01' or p_tanggal > sigarda.hari_ini() then raise exception 'Tanggal lahir tidak boleh sebelum tahun 1990 atau di masa depan.'; end if;
+  insert into public.tanggal_lahir (peserta_id, tanggal, dicatat_oleh, dicatat_pada) values (p_peserta_id, p_tanggal, auth.uid(), now())
+  on conflict (peserta_id) do update set tanggal = excluded.tanggal, dicatat_oleh = excluded.dicatat_oleh, dicatat_pada = excluded.dicatat_pada;
+end $$;
+
+-- Aturan gerbang calon (pengaturan 'garuda.gerbang'): { kelasMin: 'X'|'XI'|'XII', lahirDari, lahirSampai ('YYYY-MM-DD', dari <= sampai), kuotaPersen: bilangan bulat 0-100 }.
+create function public.sg_gerbang_simpan(p_nilai jsonb) returns void language plpgsql security definer set search_path = public as
+$$
+declare v_dari date; v_sampai date; v_kuota int;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mengubah aturan gerbang calon.'; end if;
+  if p_nilai is null or jsonb_typeof(p_nilai) <> 'object' or p_nilai - 'kelasMin' - 'lahirDari' - 'lahirSampai' - 'kuotaPersen' <> '{}'::jsonb then raise exception 'Bentuk aturan gerbang tidak sah.'; end if;
+  -- coalesce: kunci yang hilang menghasilkan NULL, dan perbandingan dengan NULL tidak akan memicu galat
+  if coalesce(jsonb_typeof(p_nilai -> 'kelasMin'), '') <> 'string' or coalesce(jsonb_typeof(p_nilai -> 'lahirDari'), '') <> 'string'
+     or coalesce(jsonb_typeof(p_nilai -> 'lahirSampai'), '') <> 'string' or coalesce(jsonb_typeof(p_nilai -> 'kuotaPersen'), '') <> 'number' then raise exception 'Bentuk aturan gerbang tidak sah.'; end if;
+  if (p_nilai ->> 'kelasMin') not in ('X', 'XI', 'XII') then raise exception 'Kelas minimal harus X, XI, atau XII.'; end if;
+  if (p_nilai ->> 'lahirDari') !~ '^\d{4}-\d{2}-\d{2}$' or (p_nilai ->> 'lahirSampai') !~ '^\d{4}-\d{2}-\d{2}$' then raise exception 'Tanggal lahir harus berbentuk TTTT-BB-HH.'; end if;
+  begin
+    v_dari := (p_nilai ->> 'lahirDari')::date; v_sampai := (p_nilai ->> 'lahirSampai')::date;
+  exception when others then raise exception 'Tanggal lahir tidak sah.';
+  end;
+  if v_dari < date '1990-01-01' or v_sampai > date '2030-12-31' then raise exception 'Rentang tanggal lahir harus antara tahun 1990 dan 2030.'; end if;
+  if v_dari > v_sampai then raise exception 'Tanggal lahir awal tidak boleh sesudah tanggal akhir.'; end if;
+  if (p_nilai ->> 'kuotaPersen') !~ '^[0-9]+$' then raise exception 'Kuota harus bilangan bulat 0 sampai 100 persen.'; end if;
+  v_kuota := (p_nilai ->> 'kuotaPersen')::int;
+  if v_kuota > 100 then raise exception 'Kuota harus bilangan bulat 0 sampai 100 persen.'; end if;
+  insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada)
+  values ('garuda.gerbang', jsonb_build_object('kelasMin', p_nilai ->> 'kelasMin', 'lahirDari', to_char(v_dari, 'YYYY-MM-DD'), 'lahirSampai', to_char(v_sampai, 'YYYY-MM-DD'), 'kuotaPersen', v_kuota), auth.uid(), now())
+  on conflict (kunci) do update set nilai = excluded.nilai, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
+end $$;
+-- ===== akhir aksi gerbang =====
+
+-- ===== Tanggal lahir impor (Tahap 2, G4b): aksi =====
+-- Mengisi tanggal lahir banyak Penegak sekaligus sesudah impor akun dari Excel (kolom "Tanggal Lahir" pada template). `p_data` = [{ username, tanggal 'YYYY-MM-DD' }]. Semua atau
+-- tidak sama sekali: satu baris keliru membatalkan seluruhnya. Hanya Penegak aktif yang diperbarui (nama pengguna yang tidak dikenal dilewati, seperti sg_anggota_jk_atur).
+-- Mengembalikan jumlah Penegak yang diperbarui.
+create function public.sg_tanggal_lahir_impor(p_data jsonb) returns integer language plpgsql security definer set search_path = public as
+$$
+declare v_e jsonb; v_user text; v_tgl date; v_n int := 0; v_k int;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mengisi tanggal lahir.'; end if;
+  if p_data is null or jsonb_typeof(p_data) <> 'array' then raise exception 'Data tanggal lahir tidak valid.'; end if;
+  if jsonb_array_length(p_data) > 500 then raise exception 'Maksimal 500 baris tanggal lahir per permintaan.'; end if;
+  for v_e in select * from jsonb_array_elements(p_data) loop
+    v_user := lower(btrim(coalesce(v_e ->> 'username', '')));
+    if v_user = '' then raise exception 'Nama pengguna anggota wajib diisi.'; end if;
+    if coalesce(v_e ->> 'tanggal', '') !~ '^\d{4}-\d{2}-\d{2}$' then raise exception 'Tanggal lahir % harus berbentuk TTTT-BB-HH.', v_user; end if;
+    begin
+      v_tgl := (v_e ->> 'tanggal')::date;
+    exception when others then raise exception 'Tanggal lahir % tidak sah.', v_user;
+    end;
+    if v_tgl < date '1990-01-01' or v_tgl > sigarda.hari_ini() then raise exception 'Tanggal lahir % tidak boleh sebelum tahun 1990 atau di masa depan.', v_user; end if;
+    insert into public.tanggal_lahir (peserta_id, tanggal, dicatat_oleh, dicatat_pada)
+      select id, v_tgl, auth.uid(), now() from public.profiles where username = v_user and role = 'peserta' and status = 'aktif'
+    on conflict (peserta_id) do update set tanggal = excluded.tanggal, dicatat_oleh = excluded.dicatat_oleh, dicatat_pada = excluded.dicatat_pada;
+    get diagnostics v_k = row_count;
+    v_n := v_n + v_k;
+  end loop;
+  return v_n;
+end $$;
+-- ===== akhir aksi tanggal lahir impor =====
+-- ===== Tim penilai dan kalender Garuda (Tahap 2, G4b dan G4c): aksi =====
+-- Hanya Pembina dan Admin Gudep yang mengubah (Ketua Gudep mengajukan tim penilai lewat Kwarran; di aplikasi Pembina atau Admin yang mencatat hasilnya). Dewan hanya membaca.
+-- Komposisi tim tidak diblokir (peringatan di klien); yang ditegakkan hanya bentuk isian.
+
+-- Menyimpan satu tim penilai beserta seluruh anggotanya (atomik; anggota lama diganti). p_id kosong = tim baru. Satu tim per (tahun ajaran, untuk).
+-- p_anggota = [{ nama, unsur, jabatan ('ketua' | 'anggota'), keterangan }] 1-15 orang (urutan larik = urutan tampil); paling banyak satu ketua.
+create function public.sg_tim_penilai_simpan(
+  p_id bigint, p_tahun_ajaran text, p_untuk text, p_nomor_sk text, p_tanggal_sk date, p_sk_url text, p_catatan text, p_anggota jsonb
+) returns bigint language plpgsql security definer set search_path = public as
+$$
+declare
+  v_nomor text := sigarda.rapikan(p_nomor_sk); v_url text := btrim(coalesce(p_sk_url, '')); v_cat text := sigarda.rapikan(p_catatan);
+  v_id bigint; v_e jsonb; v_i int := 0; v_nama text; v_unsur text; v_jab text; v_ket text; v_ketua int := 0;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mencatat tim penilai.'; end if;
+  if p_tahun_ajaran is null or p_tahun_ajaran !~ '^[0-9]{4}/[0-9]{4}$' then raise exception 'Tahun ajaran tidak sah.'; end if;
+  if p_untuk is null or p_untuk not in ('putra', 'putri') then raise exception 'Tim penilai harus untuk putra atau putri.'; end if;
+  if char_length(v_nomor) > 80 or v_nomor ~ '[[:cntrl:]<>]' then raise exception 'Nomor SK maksimal 80 karakter, tanpa tanda < atau >.'; end if;
+  if (v_nomor = '') <> (p_tanggal_sk is null) then raise exception 'Nomor SK dan tanggal SK diisi berpasangan (keduanya atau tidak sama sekali).'; end if;
+  if p_tanggal_sk is not null and (p_tanggal_sk < date '2000-01-01' or p_tanggal_sk > sigarda.hari_ini()) then raise exception 'Tanggal SK tidak boleh sebelum tahun 2000 atau di masa depan.'; end if;
+  if v_url <> '' and (v_url !~* '^https?://' or char_length(v_url) > 500 or v_url ~ '[[:cntrl:][:space:]<>]') then raise exception 'Tautan SK harus berawalan http:// atau https:// (maksimal 500 karakter, tanpa spasi).'; end if;
+  if char_length(v_cat) > 300 or v_cat ~ '[[:cntrl:]<>]' then raise exception 'Catatan maksimal 300 karakter, tanpa tanda < atau >.'; end if;
+  if p_anggota is null or jsonb_typeof(p_anggota) <> 'array' or jsonb_array_length(p_anggota) not between 1 and 15 then raise exception 'Isi 1 sampai 15 anggota tim penilai.'; end if;
+  for v_e in select * from jsonb_array_elements(p_anggota) loop
+    v_i := v_i + 1;
+    if jsonb_typeof(v_e) <> 'object' then raise exception 'Anggota tim nomor % tidak sah.', v_i; end if;
+    v_nama := sigarda.rapikan(v_e ->> 'nama'); v_unsur := coalesce(v_e ->> 'unsur', ''); v_jab := coalesce(v_e ->> 'jabatan', 'anggota'); v_ket := sigarda.rapikan(v_e ->> 'keterangan');
+    if char_length(v_nama) not between 1 and 80 or v_nama ~ '[[:cntrl:]<>]' then raise exception 'Nama anggota tim nomor % wajib diisi (maksimal 80 karakter, tanpa tanda < atau >).', v_i; end if;
+    if v_unsur not in ('ketua_gudep', 'pembina', 'andalan_ranting', 'tokoh_masyarakat', 'orang_tua', 'lainnya') then raise exception 'Unsur anggota tim nomor % tidak dikenal.', v_i; end if;
+    if v_jab not in ('ketua', 'anggota') then raise exception 'Jabatan anggota tim nomor % harus ketua atau anggota.', v_i; end if;
+    if char_length(v_ket) > 120 or v_ket ~ '[[:cntrl:]<>]' then raise exception 'Keterangan anggota tim nomor % maksimal 120 karakter, tanpa tanda < atau >.', v_i; end if;
+    if v_jab = 'ketua' then v_ketua := v_ketua + 1; end if;
+  end loop;
+  if v_ketua > 1 then raise exception 'Tim penilai hanya boleh punya satu ketua.'; end if;
+  if p_id is null then
+    if exists (select 1 from public.tim_penilai where tahun_ajaran = p_tahun_ajaran and untuk = p_untuk) then raise exception 'Tim penilai % untuk tahun ajaran % sudah ada; ubah yang sudah ada.', p_untuk, p_tahun_ajaran; end if;
+    insert into public.tim_penilai (tahun_ajaran, untuk, nomor_sk, tanggal_sk, sk_url, catatan, dicatat_oleh, dicatat_pada)
+    values (p_tahun_ajaran, p_untuk, v_nomor, p_tanggal_sk, v_url, v_cat, auth.uid(), now()) returning id into v_id;
+  else
+    if not exists (select 1 from public.tim_penilai where id = p_id) then raise exception 'Tim penilai tidak ditemukan.'; end if;
+    if exists (select 1 from public.tim_penilai where tahun_ajaran = p_tahun_ajaran and untuk = p_untuk and id <> p_id) then raise exception 'Tim penilai % untuk tahun ajaran % sudah ada.', p_untuk, p_tahun_ajaran; end if;
+    update public.tim_penilai set tahun_ajaran = p_tahun_ajaran, untuk = p_untuk, nomor_sk = v_nomor, tanggal_sk = p_tanggal_sk, sk_url = v_url, catatan = v_cat, dicatat_oleh = auth.uid(), dicatat_pada = now()
+      where id = p_id returning id into v_id;
+    delete from public.tim_penilai_anggota where tim_id = v_id;
+  end if;
+  v_i := 0;
+  for v_e in select * from jsonb_array_elements(p_anggota) loop
+    v_i := v_i + 1;
+    insert into public.tim_penilai_anggota (tim_id, urut, nama, unsur, jabatan, keterangan)
+    values (v_id, v_i, sigarda.rapikan(v_e ->> 'nama'), v_e ->> 'unsur', coalesce(v_e ->> 'jabatan', 'anggota'), sigarda.rapikan(v_e ->> 'keterangan'));
+  end loop;
+  return v_id;
+end $$;
+
+create function public.sg_tim_penilai_hapus(p_id bigint) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus tim penilai.'; end if;
+  delete from public.tim_penilai where id = p_id;
+  if not found then raise exception 'Tim penilai tidak ditemukan.'; end if;
+end $$;
+
+-- Mengisi (atau mengoreksi) satu tahap kalender Garuda dari Kwarcab. Mengembalikan id.
+create function public.sg_garuda_tahap_simpan(p_tahun_ajaran text, p_tahap text, p_mulai date, p_akhir date, p_catatan text default '') returns bigint
+language plpgsql security definer set search_path = public as
+$$
+declare v_cat text := sigarda.rapikan(p_catatan); v_id bigint;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mengisi kalender Garuda.'; end if;
+  if p_tahun_ajaran is null or p_tahun_ajaran !~ '^[0-9]{4}/[0-9]{4}$' then raise exception 'Tahun ajaran tidak sah.'; end if;
+  if p_tahap is null or p_tahap not in ('uji_spg', 'ajukan_tim', 'ambil_sk', 'penilaian_gudep', 'serah_kwarran', 'nilai_kwarran', 'kirim_kwarcab', 'verifikasi_visitasi', 'iuran', 'pelantikan') then raise exception 'Tahap tidak dikenal.'; end if;
+  if p_mulai is null then raise exception 'Tanggal mulai wajib diisi.'; end if;
+  if p_mulai < date '2000-01-01' or p_mulai > date '2100-12-31' then raise exception 'Tanggal mulai tidak sah.'; end if;
+  if p_akhir is not null and (p_akhir < p_mulai or p_akhir > date '2100-12-31') then raise exception 'Tanggal akhir tidak boleh sebelum tanggal mulai.'; end if;
+  if char_length(v_cat) > 200 or v_cat ~ '[[:cntrl:]<>]' then raise exception 'Catatan maksimal 200 karakter, tanpa tanda < atau >.'; end if;
+  insert into public.garuda_tahap (tahun_ajaran, tahap, mulai, akhir, catatan, dicatat_oleh, dicatat_pada)
+  values (p_tahun_ajaran, p_tahap, p_mulai, p_akhir, v_cat, auth.uid(), now())
+  on conflict (tahun_ajaran, tahap) do update set mulai = excluded.mulai, akhir = excluded.akhir, catatan = excluded.catatan, dicatat_oleh = excluded.dicatat_oleh, dicatat_pada = excluded.dicatat_pada
+  returning id into v_id;
+  return v_id;
+end $$;
+
+create function public.sg_garuda_tahap_hapus(p_id bigint) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus tahap kalender Garuda.'; end if;
+  delete from public.garuda_tahap where id = p_id;
+  if not found then raise exception 'Tahap kalender tidak ditemukan.'; end if;
+end $$;
+-- ===== akhir aksi tim kalender =====
+
+-- ===== Pengingat kalender Garuda (Tahap 2, G4d): fungsi =====
+-- Nama tahap kalender Garuda untuk isi notifikasi; sama dengan TAHAP_GARUDA di src/lib/kalenderGarudaLogic.js (dijaga uji/tim-kalender-klien.mjs).
+create function sigarda.garuda_tahap_label(p_tahap text) returns text language sql immutable as
+$$
+  select case p_tahap
+    when 'uji_spg' then 'Pengujian SPG oleh Pembina'
+    when 'ajukan_tim' then 'Pengajuan SK tim penilai'
+    when 'ambil_sk' then 'Pengambilan SK tim penilai'
+    when 'penilaian_gudep' then 'Penilaian tim penilai gugus depan'
+    when 'serah_kwarran' then 'Penyerahan portofolio ke Kwarran'
+    when 'nilai_kwarran' then 'Penilaian portofolio oleh Kwarran'
+    when 'kirim_kwarcab' then 'Pengiriman berkas ke Kwarcab'
+    when 'verifikasi_visitasi' then 'Verifikasi dan visitasi Kwarcab'
+    when 'iuran' then 'Iuran gotong royong'
+    when 'pelantikan' then 'Pelantikan Pramuka Garuda'
+    else p_tahap
+  end
+$$;
+
+-- Pengingat pukul 07.00 WIB (dari notif_pengingat) untuk tahap kalender Garuda yang sudah diisi: H-7, H-3, H-1, dan hari-H mulainya, serta "berakhir besok" untuk tahap
+-- berentang yang sedang berjalan. Penerima: semua pengurus aktif (Pembina, Admin, akun Dewan lama, Penegak berjabatan Dewan), jenis 'agenda'. Sekali per tahap per hari (kunci).
+create function sigarda.garuda_kalender_pengingat() returns void language plpgsql security definer set search_path = public as
+$$
+declare v_hari date := sigarda.hari_ini(); r record; v_x uuid; v_n int; v_judul text; v_isi text; v_rentang text;
+begin
+  for r in select id, tahap, mulai, akhir, catatan from public.garuda_tahap where mulai - v_hari in (7, 3, 1, 0) loop
+    v_n := r.mulai - v_hari;
+    v_rentang := case when r.akhir is not null and r.akhir <> r.mulai then to_char(r.mulai, 'DD-MM-YYYY') || ' s.d. ' || to_char(r.akhir, 'DD-MM-YYYY') else to_char(r.mulai, 'DD-MM-YYYY') end;
+    v_judul := case when v_n = 0 then 'Hari ini: ' else 'H-' || v_n::text || ': ' end || sigarda.garuda_tahap_label(r.tahap);
+    v_isi := 'Tahap seleksi Garuda dari Kwarcab, ' || v_rentang || '.' || case when r.catatan <> '' then ' ' || r.catatan else '' end;
+    for v_x in select id from public.profiles where status = 'aktif' and (role in ('penguji', 'admin') or (role = 'peserta' and jabatan_dewan is not null)) loop
+      perform sigarda.notif_buat(v_x, 'agenda', v_judul, v_isi, '{"tab":"kelayakan"}', 'garuda:' || r.id || ':' || v_hari);
+    end loop;
+  end loop;
+  for r in select id, tahap, mulai, akhir from public.garuda_tahap where akhir is not null and akhir > mulai and mulai <= v_hari and akhir - v_hari = 1 loop
+    v_judul := 'Berakhir besok: ' || sigarda.garuda_tahap_label(r.tahap);
+    v_isi := 'Tahap seleksi Garuda dari Kwarcab berakhir ' || to_char(r.akhir, 'DD-MM-YYYY') || '.';
+    for v_x in select id from public.profiles where status = 'aktif' and (role in ('penguji', 'admin') or (role = 'peserta' and jabatan_dewan is not null)) loop
+      perform sigarda.notif_buat(v_x, 'agenda', v_judul, v_isi, '{"tab":"kelayakan"}', 'garuda-akhir:' || r.id || ':' || v_hari);
+    end loop;
+  end loop;
+end $$;
+-- ===== akhir fungsi pengingat kalender garuda =====
+-- ===== Isian Penegak dan templat dokumen (Tahap 3, H1): aksi =====
+-- Isian data diri milik SENDIRI oleh Penegak aktif (admin gudep hanya membuat akun dengan nama, NIS, dan rombel). p_data = objek datar { kunci: teks }: kunci profil (jk, agama,
+-- lahir, nta) hanya boleh diisi bila belum ada (koreksi sesudahnya lewat Pembina atau Admin) dan kunci isian lain (lihat sigarda.isian_periksa) boleh diubah kapan saja; nilai
+-- kosong menghapus isian (kunci profil kosong = tidak diubah). Semua atau tidak sama sekali. Mengembalikan jumlah isian yang berubah.
+create function public.sg_isian_saya_simpan(p_data jsonb) returns integer language plpgsql security definer set search_path = public as
+$$
+declare v_p public.profiles; v_k text; v_e jsonb; v_v text; v_err text; v_n int := 0; v_k2 int; v_tgl date;
+begin
+  perform sigarda.wajib_aktif();
+  select * into v_p from public.profiles where id = auth.uid();
+  if not found or v_p.role <> 'peserta' then raise exception 'Isian data diri hanya untuk Penegak.'; end if;
+  if v_p.status <> 'aktif' then raise exception 'Akun Anda berstatus % dan hanya dapat dilihat.', v_p.status; end if;
+  if p_data is null or jsonb_typeof(p_data) <> 'object' then raise exception 'Data isian tidak sah.'; end if;
+  if (select count(*) from jsonb_object_keys(p_data)) > 120 then raise exception 'Terlalu banyak isian dalam satu permintaan.'; end if;
+
+  -- Tahap 1: periksa semuanya lebih dulu
+  for v_k, v_e in select key, value from jsonb_each(p_data) loop
+    if jsonb_typeof(v_e) <> 'string' then raise exception 'Isian % harus berupa teks.', left(v_k, 40); end if;
+    v_v := sigarda.rapikan(v_e #>> '{}');
+    if v_k in ('jk', 'agama', 'lahir', 'nta') then v_err := sigarda.isian_periksa_profil(v_k, v_v);
+    else v_err := sigarda.isian_periksa(v_k, v_v);
+    end if;
+    if v_err is not null then raise exception '%', v_err; end if;
+  end loop;
+
+  -- Tahap 2: tulis
+  for v_k, v_e in select key, value from jsonb_each(p_data) loop
+    v_v := sigarda.rapikan(v_e #>> '{}');
+    if v_k = 'jk' then
+      if v_v <> '' and v_p.jenis_kelamin is distinct from v_v then
+        if v_p.jenis_kelamin is not null then raise exception 'Jenis kelamin sudah tercatat. Untuk mengoreksi, hubungi Pembina atau Admin Gudep.'; end if;
+        update public.profiles set jenis_kelamin = v_v where id = v_p.id; v_n := v_n + 1;
+      end if;
+    elsif v_k = 'agama' then
+      if v_v <> '' and v_p.agama is distinct from v_v then
+        if v_p.agama is not null then raise exception 'Agama sudah tercatat. Untuk mengoreksi, hubungi Admin Gudep.'; end if;
+        update public.profiles set agama = v_v where id = v_p.id; v_n := v_n + 1;
+      end if;
+    elsif v_k = 'nta' then
+      if v_v <> '' and v_p.nta is distinct from v_v then
+        if v_p.nta is not null then raise exception 'NTA sudah tercatat. Untuk mengoreksi, hubungi Admin Gudep.'; end if;
+        update public.profiles set nta = v_v where id = v_p.id; v_n := v_n + 1;
+      end if;
+    elsif v_k = 'lahir' then
+      if v_v <> '' then
+        v_tgl := v_v::date;
+        if exists (select 1 from public.tanggal_lahir where peserta_id = v_p.id and tanggal <> v_tgl) then
+          raise exception 'Tanggal lahir sudah tercatat. Untuk mengoreksi, hubungi Pembina atau Admin Gudep.';
+        end if;
+        insert into public.tanggal_lahir (peserta_id, tanggal, dicatat_oleh, dicatat_pada) values (v_p.id, v_tgl, v_p.id, now()) on conflict (peserta_id) do nothing;
+        get diagnostics v_k2 = row_count; v_n := v_n + v_k2;
+      end if;
+    elsif v_v = '' then
+      delete from public.penegak_isian where peserta_id = v_p.id and kunci = v_k;
+      get diagnostics v_k2 = row_count; v_n := v_n + v_k2;
+    else
+      insert into public.penegak_isian (peserta_id, kunci, nilai, diubah_pada) values (v_p.id, v_k, v_v, now())
+      on conflict (peserta_id, kunci) do update set nilai = excluded.nilai, diubah_pada = excluded.diubah_pada where public.penegak_isian.nilai is distinct from excluded.nilai;
+      get diagnostics v_k2 = row_count; v_n := v_n + v_k2;
+    end if;
+  end loop;
+  return v_n;
+end $$;
+
+-- Templat isi dokumen per tahun ajaran (rubrik surat keterangan guru): Pembina atau Admin. isi = { uji?: teks (<= 200), baris: [teks 1-300 karakter, paling banyak 40; berawalan "# " =
+-- judul kelompok], pita?: [tiga teks <= 20] }. Menyimpan ulang tahun ajaran dan jenis yang sama mengganti isinya. Mengembalikan id.
+create function public.sg_dokumen_templat_simpan(p_tahun_ajaran text, p_jenis text, p_isi jsonb) returns bigint language plpgsql security definer set search_path = public as
+$$
+declare v_ta text := sigarda.rapikan(p_tahun_ajaran); v_e jsonb; v_t text; v_uji text; v_baris jsonb := '[]'::jsonb; v_pita jsonb; v_id bigint;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mengubah templat dokumen.'; end if;
+  if v_ta !~ '^\d{4}/\d{4}$' then raise exception 'Tahun ajaran harus berbentuk 2026/2027.'; end if;
+  if split_part(v_ta, '/', 2)::int <> split_part(v_ta, '/', 1)::int + 1 then raise exception 'Tahun ajaran harus berbentuk 2026/2027.'; end if;
+  if coalesce(p_jenis, '') not in ('surat_uud', 'surat_uu_pramuka', 'surat_tik', 'surat_internet', 'surat_bahasa', 'surat_seni', 'surat_iptek', 'surat_olahraga') then raise exception 'Jenis templat tidak dikenal.'; end if;
+  if p_isi is null or jsonb_typeof(p_isi) <> 'object' or p_isi - 'uji' - 'baris' - 'pita' <> '{}'::jsonb then raise exception 'Bentuk isi templat tidak sah.'; end if;
+
+  if p_isi ? 'uji' then
+    if jsonb_typeof(p_isi -> 'uji') <> 'string' then raise exception 'Topik uji harus berupa teks.'; end if;
+    v_uji := sigarda.rapikan(p_isi ->> 'uji');
+    if char_length(v_uji) > 200 or v_uji ~ '[[:cntrl:]<>]' then raise exception 'Topik uji maksimal 200 karakter dan tanpa karakter khusus.'; end if;
+  end if;
+  if coalesce(jsonb_typeof(p_isi -> 'baris'), '') <> 'array' then raise exception 'Baris rubrik harus berupa daftar.'; end if;
+  if jsonb_array_length(p_isi -> 'baris') > 40 then raise exception 'Baris rubrik maksimal 40.'; end if;
+  for v_e in select * from jsonb_array_elements(p_isi -> 'baris') loop
+    if jsonb_typeof(v_e) <> 'string' then raise exception 'Setiap baris rubrik harus berupa teks.'; end if;
+    v_t := sigarda.rapikan(v_e #>> '{}');
+    if v_t = '' or char_length(v_t) > 300 or v_t ~ '[[:cntrl:]<>]' then raise exception 'Setiap baris rubrik 1 sampai 300 karakter dan tanpa karakter khusus.'; end if;
+    v_baris := v_baris || to_jsonb(v_t);
+  end loop;
+  if p_isi ? 'pita' and jsonb_typeof(p_isi -> 'pita') <> 'null' then
+    if jsonb_typeof(p_isi -> 'pita') <> 'array' or jsonb_array_length(p_isi -> 'pita') <> 3 then raise exception 'Pita nilai harus tiga teks.'; end if;
+    v_pita := '[]'::jsonb;
+    for v_e in select * from jsonb_array_elements(p_isi -> 'pita') loop
+      if jsonb_typeof(v_e) <> 'string' then raise exception 'Pita nilai harus berupa teks.'; end if;
+      v_t := sigarda.rapikan(v_e #>> '{}');
+      if char_length(v_t) > 20 or v_t ~ '[[:cntrl:]<>]' then raise exception 'Setiap pita nilai maksimal 20 karakter dan tanpa karakter khusus.'; end if;
+      v_pita := v_pita || to_jsonb(v_t);
+    end loop;
+  end if;
+
+  insert into public.dokumen_templat (tahun_ajaran, jenis, isi, diubah_oleh, diubah_pada)
+  values (v_ta, p_jenis, jsonb_strip_nulls(jsonb_build_object('uji', nullif(v_uji, ''), 'baris', v_baris, 'pita', v_pita)), auth.uid(), now())
+  on conflict (tahun_ajaran, jenis) do update set isi = excluded.isi, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada
+  returning id into v_id;
+  return v_id;
+end $$;
+
+create function public.sg_dokumen_templat_hapus(p_id bigint) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus templat dokumen.'; end if;
+  delete from public.dokumen_templat where id = p_id;
+end $$;
+-- ===== akhir aksi isian penegak =====
+
+-- ===== Salinan beku portofolio (Tahap 3, H3): aksi =====
+-- Menyimpan salinan beku Portofolio format Kwarcab satu Penegak (Pembina dan Admin). p_isi = objek yang memuat `peserta` (id harus sama dengan p_peserta_id) dan `hari`; paling
+-- banyak 600 kB dan 20 salinan per Penegak. Mengembalikan id salinan.
+create function public.sg_portofolio_snapshot_simpan(p_peserta_id uuid, p_catatan text, p_isi jsonb) returns bigint language plpgsql security definer set search_path = public as
+$$
+declare v_p public.profiles; v_cat text := sigarda.rapikan(p_catatan); v_id bigint; v_oleh text;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat membuat salinan beku portofolio.'; end if;
+  select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';
+  if not found then raise exception 'Pilih Penegak.'; end if;
+  if char_length(v_cat) > 200 or v_cat ~ '[[:cntrl:]<>]' then raise exception 'Catatan maksimal 200 karakter dan tanpa karakter khusus.'; end if;
+  if p_isi is null or jsonb_typeof(p_isi) <> 'object' then raise exception 'Isi salinan tidak sah.'; end if;
+  if coalesce(jsonb_typeof(p_isi -> 'peserta'), '') <> 'object' or coalesce(p_isi #>> '{peserta,id}', '') <> p_peserta_id::text or coalesce(jsonb_typeof(p_isi -> 'hari'), '') <> 'string' then
+    raise exception 'Isi salinan tidak sesuai dengan Penegak yang dipilih.';
+  end if;
+  if octet_length(p_isi::text) > 600000 then raise exception 'Isi salinan terlalu besar (maksimal 600 kB).'; end if;
+  if (select count(*) from public.portofolio_snapshot where peserta_id = p_peserta_id) >= 20 then
+    raise exception 'Sudah ada 20 salinan beku untuk Penegak ini. Hapus yang tidak diperlukan lebih dulu.';
+  end if;
+  select nama into v_oleh from public.profiles where id = auth.uid();
+  insert into public.portofolio_snapshot (peserta_id, tahun_ajaran, catatan, isi, dibuat_oleh, dibuat_oleh_nama)
+  values (p_peserta_id, sigarda.tahun_ajaran_kini(), v_cat, p_isi, auth.uid(), coalesce(v_oleh, '')) returning id into v_id;
+  return v_id;
+end $$;
+
+create function public.sg_portofolio_snapshot_hapus(p_id bigint) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus salinan beku portofolio.'; end if;
+  delete from public.portofolio_snapshot where id = p_id;
+end $$;
+-- ===== akhir aksi salinan beku portofolio =====
+
+-- ===== Perlindungan anggota / Safe From Harm (Tahap 4): aksi =====
+-- Mencatat (atau mengoreksi) satu catatan Safe From Harm bagi anggota dewasa gugus depan: Pembina aktif (pelatihan, pakta_integritas, rekam_jejak) atau Admin Gudep aktif (pelatihan saja).
+-- Pembina dan Admin yang mencatat. tanggal tidak boleh di masa depan; bukti_url (opsional) tautan http(s); catatan <= 200 karakter. Mencatat ulang = koreksi.
+create function public.sg_sfh_catat(p_anggota_id uuid, p_jenis text, p_tanggal date, p_bukti_url text default '', p_catatan text default '') returns void language plpgsql security definer set search_path = public as
+$$
+declare v_p public.profiles; v_url text := btrim(coalesce(p_bukti_url, '')); v_cat text := sigarda.rapikan(p_catatan);
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mencatat Safe From Harm.'; end if;
+  if coalesce(p_jenis, '') not in ('pelatihan', 'pakta_integritas', 'rekam_jejak') then raise exception 'Jenis catatan harus pelatihan, pakta_integritas, atau rekam_jejak.'; end if;
+  select * into v_p from public.profiles where id = p_anggota_id;
+  if not found then raise exception 'Pilih anggota.'; end if;
+  if v_p.status <> 'aktif' or not ((v_p.role = 'penguji' and v_p.jabatan = 'Pembina') or v_p.role = 'admin') then
+    raise exception 'Catatan Safe From Harm hanya untuk anggota dewasa aktif (Pembina dan Admin Gudep).';
+  end if;
+  if v_p.role = 'admin' and p_jenis <> 'pelatihan' then raise exception 'Admin Gudep hanya dicatat untuk pelatihan; pakta integritas dan rekam jejak untuk Pembina.'; end if;
+  if p_tanggal is null or p_tanggal < date '2015-01-01' or p_tanggal > sigarda.hari_ini() then raise exception 'Tanggal tidak boleh sebelum tahun 2015 atau di masa depan.'; end if;
+  if char_length(v_url) > 500 then raise exception 'Tautan bukti maksimal 500 karakter.'; end if;
+  if v_url <> '' and v_url !~* '^https?://[^[:space:]<>]+$' then raise exception 'Tautan bukti harus berawalan http:// atau https:// tanpa spasi.'; end if;
+  if char_length(v_cat) > 200 or v_cat ~ '[[:cntrl:]<>]' then raise exception 'Catatan maksimal 200 karakter dan tanpa karakter khusus.'; end if;
+  insert into public.sfh_catatan (anggota_id, jenis, tanggal, bukti_url, catatan, dicatat_oleh, dicatat_pada)
+  values (p_anggota_id, p_jenis, p_tanggal, v_url, v_cat, auth.uid(), now())
+  on conflict (anggota_id, jenis) do update set tanggal = excluded.tanggal, bukti_url = excluded.bukti_url, catatan = excluded.catatan, dicatat_oleh = excluded.dicatat_oleh, dicatat_pada = excluded.dicatat_pada;
+end $$;
+
+create function public.sg_sfh_hapus(p_id bigint) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan Safe From Harm.'; end if;
+  delete from public.sfh_catatan where id = p_id;
+end $$;
+
+-- Penerima laporan gugus depan (Pasal 10 ayat 3: setiap gugus depan wajib memiliki prosedur penerimaan laporan). Pengaturan 'perlindungan.gudep' = { penerima, kontak, prosedurUrl, catatan }
+-- (dibaca semua pengguna agar Penegak tahu kepada siapa melapor; diubah Pembina dan Admin). Laporan sendiri TIDAK disimpan di aplikasi.
+create function public.sg_sfh_gudep_simpan(p_nilai jsonb) returns void language plpgsql security definer set search_path = public as
+$$
+declare v_k text; v_v text; v_maks int; v_h jsonb := '{}'::jsonb;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mengubah penerima laporan Safe From Harm.'; end if;
+  if p_nilai is null or jsonb_typeof(p_nilai) <> 'object' or p_nilai - 'penerima' - 'kontak' - 'prosedurUrl' - 'catatan' <> '{}'::jsonb then raise exception 'Bentuk isian tidak sah.'; end if;
+  foreach v_k in array array['penerima', 'kontak', 'prosedurUrl', 'catatan'] loop
+    if coalesce(jsonb_typeof(p_nilai -> v_k), '') <> 'string' then raise exception 'Isian % harus berupa teks.', v_k; end if;
+    if v_k = 'prosedurUrl' then
+      v_v := btrim(p_nilai ->> v_k);
+      if char_length(v_v) > 500 or (v_v <> '' and v_v !~* '^https?://[^[:space:]<>]+$') then raise exception 'Tautan prosedur harus berawalan http:// atau https:// tanpa spasi (maksimal 500 karakter).'; end if;
+    else
+      v_v := sigarda.rapikan(p_nilai ->> v_k);
+      v_maks := case v_k when 'penerima' then 120 when 'kontak' then 80 else 300 end; -- (case di dalam kondisi if terpotong pada then pertama)
+      if char_length(v_v) > v_maks or v_v ~ '[[:cntrl:]<>]' then
+        raise exception 'Isian % terlalu panjang atau memuat karakter khusus.', v_k;
+      end if;
+    end if;
+    v_h := v_h || jsonb_build_object(v_k, v_v);
+  end loop;
+  insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada) values ('perlindungan.gudep', v_h, auth.uid(), now())
+  on conflict (kunci) do update set nilai = excluded.nilai, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
+end $$;
+-- ===== akhir aksi perlindungan anggota =====
 -- ---------------------------------------------------------------------------
 -- 5. Hak akses: baca saja untuk pengguna; fungsi aksi hanya untuk pengguna masuk
 -- ---------------------------------------------------------------------------
@@ -4595,7 +6699,7 @@ grant select on public.profiles, public.sku_butir, public.sku_unit, public.pf_it
   public.sesi_ujian, public.sesi_ujian_butir, public.sesi_ujian_peserta,
   public.iuran, public.iuran_log, public.iuran_kas, public.asisten_iuran,
   public.penugasan_rombel, public.penugasan_log, public.guru_agama, public.dokumen_terbit, public.dokumen_urut, public.notifikasi,
-  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda, public.kegiatan_usulan to authenticated;
+  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda, public.kegiatan_usulan, public.pengukuhan_dewan, public.sku_pra_uji, public.pelantikan, public.saka_anggota, public.tkk_katalog, public.tkk_capaian, public.tkk_krida, public.tkk_pengajuan, public.spg_penetapan, public.tanggal_lahir, public.tim_penilai, public.tim_penilai_anggota, public.garuda_tahap, public.penegak_isian, public.dokumen_templat, public.portofolio_snapshot, public.sfh_catatan to authenticated;
 
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function
@@ -4630,12 +6734,27 @@ grant execute on function
   public.sg_gudep_simpan(jsonb),
   public.sg_naik_kelas(text, jsonb, boolean), public.sg_naik_kelas_batalkan(bigint), public.sg_anggota_status_atur(uuid, text, text, text),
   public.sg_notifikasi_tandai(bigint[]), public.sg_push_kunci(), public.sg_push_simpan(text, text, text, text), public.sg_push_hapus(text), public.sg_push_ringkasan(), public.sg_notifikasi_tes(),
-  public.sg_penugasan_peserta_atur(text, uuid, uuid[], text), public.sg_kepengurusan_terapkan(jsonb, boolean, boolean), public.sg_dewan_lama_arsipkan(uuid[], boolean),
+  public.sg_penugasan_peserta_atur(text, uuid, uuid[], text), public.sg_kepengurusan_terapkan(jsonb, boolean, boolean), public.sg_pengukuhan_dewan_simpan(text, text, date, text, date, text), public.sg_pengukuhan_dewan_hapus(text), public.sg_dewan_lama_arsipkan(uuid[], boolean),
   public.sg_pemeriksaan_data(), public.sg_cadangan_admin(), public.sg_cadangan_status(),
   public.sg_profil_whatsapp_atur(text), public.sg_eskalasi_daftar(),
   public.sg_agenda_simpan(bigint, text, text, text, date, text, uuid[], boolean), public.sg_agenda_hapus(bigint),
   public.sg_kegiatan_usul(text, text, date, text, text), public.sg_kegiatan_tinjau(bigint, text, text), public.sg_kegiatan_ping(bigint),
-  public.sg_garuda_berkas_baca(uuid), public.sg_garuda_token_buat(uuid), public.sg_garuda_token_cabut(uuid)
+  public.sg_garuda_berkas_baca(uuid), public.sg_garuda_token_buat(uuid), public.sg_garuda_token_cabut(uuid),
+  public.sg_bina_damping_atur(text, text, uuid[]), public.sg_bina_damping_daftar(text), public.sg_sangga_rombel(text), public.sg_sangga_atur(text, jsonb), public.sg_pendampingan_saya(),
+  public.sg_pra_uji_antrian(), public.sg_pra_uji_catat(bigint, text, text), public.sg_pra_uji_lewati(bigint, text), public.sg_pra_uji_sakelar(boolean), public.sg_pra_uji_cakupan(integer),
+  public.sg_pelantikan_catat(text, date, text, uuid[], bigint, text), public.sg_pelantikan_hapus(bigint),
+  public.sg_saka_simpan(bigint, uuid, text, date, text, date, text, text), public.sg_saka_hapus(bigint),
+  public.sg_tkk_catat(uuid, text, text, date, text, text, text, text, text), public.sg_tkk_hapus(bigint),
+  public.sg_tkk_krida_simpan(bigint, uuid, text, text, date, text, text), public.sg_tkk_krida_hapus(bigint), public.sg_tkk_ambang_simpan(jsonb),
+  public.sg_tkk_ajukan(text, text, date, uuid, text, text, text, text), public.sg_tkk_ajukan_batal(bigint), public.sg_tkk_tinjau(bigint, text, text, text, text),
+  public.sg_tkk_penguji_pilihan(),
+  public.sg_spg_catat(uuid, integer, integer, date, text, boolean), public.sg_spg_hapus(uuid, integer),
+  public.sg_tanggal_lahir_atur(uuid, date), public.sg_gerbang_simpan(jsonb), public.sg_tanggal_lahir_impor(jsonb),
+  public.sg_tim_penilai_simpan(bigint, text, text, text, date, text, text, jsonb), public.sg_tim_penilai_hapus(bigint),
+  public.sg_garuda_tahap_simpan(text, text, date, date, text), public.sg_garuda_tahap_hapus(bigint),
+  public.sg_isian_saya_simpan(jsonb), public.sg_dokumen_templat_simpan(text, text, jsonb), public.sg_dokumen_templat_hapus(bigint),
+  public.sg_portofolio_snapshot_simpan(uuid, text, jsonb), public.sg_portofolio_snapshot_hapus(bigint),
+  public.sg_sfh_catat(uuid, text, date, text, text), public.sg_sfh_hapus(bigint), public.sg_sfh_gudep_simpan(jsonb)
   to authenticated;
 -- Fungsi yang boleh dipanggil tanpa login (hanya membaca): verifikasi keaslian dokumen, identitas gudep di halaman masuk, dan
 -- tautan berbagi baca-saja Berkas Calon Garuda (tahap L7)
@@ -4821,5 +6940,98 @@ insert into public.pf_item (id) values
   ('PF-24'),
   ('PF-25'),
   ('PF-26');
+
+insert into public.tkk_katalog (id, nama, bidang, golongan, agama, sumber, urut) values
+  ('sholat', 'Sholat', 1, 'penegak', 'Islam', 'skk-132-1979', 1),
+  ('khotib', 'Khotib', 1, 'penegak', 'Islam', 'skk-132-1979', 2),
+  ('qori', 'Qori', 1, 'penegak', 'Islam', 'skk-132-1979', 3),
+  ('muadzin', 'Muadzin', 1, 'penegak', 'Islam', 'skk-132-1979', 4),
+  ('penabung', 'Penabung', 1, 'penegak', null, 'skk-132-1979', 5),
+  ('cakap-keuangan', 'Cakap Keuangan', 1, 'penegak', null, 'penabung-01-2024', 6),
+  ('pengatur-ruangan', 'Pengatur Ruangan', 2, 'siaga', null, 'skk-132-1979', 7),
+  ('pengatur-rumah', 'Pengatur Rumah', 2, 'penegak', null, 'skk-132-1979', 8),
+  ('pengatur-meja-makan', 'Pengatur Meja Makan', 2, 'penegak', null, 'skk-132-1979', 9),
+  ('pemimpin-menyanyi', 'Pemimpin Menyanyi', 2, 'penegak', null, 'skk-132-1979', 10),
+  ('menyanyi', 'Menyanyi', 2, 'penegak', null, 'skk-132-1979', 11),
+  ('pelukis', 'Pelukis', 2, 'penegak', null, 'skk-132-1979', 12),
+  ('juru-gambar', 'Juru Gambar', 2, 'penegak', null, 'skk-132-1979', 13),
+  ('pengarang', 'Pengarang', 2, 'penegak', null, 'skk-132-1979', 14),
+  ('pembaca', 'Pembaca', 2, 'penegak', null, 'tambahan', 15),
+  ('gerak-jalan', 'Gerak Jalan', 3, 'penegak', null, 'skk-132-1979', 16),
+  ('pengamat', 'Pengamat', 3, 'penegak', null, 'skk-132-1979', 17),
+  ('penyelidik', 'Penyelidik', 3, 'penegak', null, 'skk-132-1979', 18),
+  ('perenang', 'Perenang', 3, 'penegak', null, 'skk-132-1979', 19),
+  ('juru-layar', 'Juru Layar', 3, 'penegak', null, 'skk-132-1979', 20),
+  ('juru-selam', 'Juru Selam', 3, 'penegak', null, 'skk-132-1979', 21),
+  ('pendayung', 'Pendayung', 3, 'penegak', null, 'skk-132-1979', 22),
+  ('ski-air', 'Ski Air', 3, 'penegak', null, 'skk-132-1979', 23),
+  ('pencak-silat', 'Pencak Silat', 3, 'penegak', null, 'tambahan', 24),
+  ('peternak-ulat-sutera', 'Peternak Ulat Sutera', 4, 'penegak', null, 'skk-132-1979', 25),
+  ('peternak-kelinci', 'Peternak Kelinci', 4, 'penegak', null, 'skk-132-1979', 26),
+  ('peternak-lebah', 'Peternak Lebah', 4, 'penegak', null, 'skk-132-1979', 27),
+  ('juru-kebun', 'Juru Kebun', 4, 'penegak', null, 'skk-132-1979', 28),
+  ('penenun', 'Penenun', 4, 'penegak', null, 'skk-132-1979', 29),
+  ('juru-bambu', 'Juru Bambu', 4, 'penegak', null, 'skk-132-1979', 30),
+  ('juru-anyam', 'Juru Anyam', 4, 'penegak', null, 'skk-132-1979', 31),
+  ('juru-kayu', 'Juru Kayu', 4, 'penegak', null, 'skk-132-1979', 32),
+  ('juru-batu', 'Juru Batu', 4, 'penegak', null, 'skk-132-1979', 33),
+  ('juru-logam', 'Juru Logam', 4, 'penegak', null, 'skk-132-1979', 34),
+  ('juru-kulit', 'Juru Kulit', 4, 'penegak', null, 'skk-132-1979', 35),
+  ('penjilid-buku', 'Penjilid Buku', 4, 'penegak', null, 'skk-132-1979', 36),
+  ('juru-potret', 'Juru Potret', 4, 'penegak', null, 'skk-132-1979', 37),
+  ('penangkap-ikan', 'Penangkap Ikan', 4, 'penegak', null, 'skk-132-1979', 38),
+  ('peternak-itik', 'Peternak Itik', 4, 'penegak', null, 'skk-132-1979', 39),
+  ('peternak-ayam', 'Peternak Ayam', 4, 'penegak', null, 'skk-132-1979', 40),
+  ('pemelihara-ternak', 'Pemelihara Ternak', 4, 'penegak', null, 'skk-132-1979', 41),
+  ('pemelihara-merpati', 'Pemelihara Merpati', 4, 'penegak', null, 'skk-132-1979', 42),
+  ('pengumpul', 'Pengumpul (khusus Siaga)', 4, 'siaga', null, 'skk-132-1979', 43),
+  ('pengumpul-perangko', 'Pengumpul Perangko', 4, 'penegak', null, 'skk-132-1979', 44),
+  ('pengumpul-lencana', 'Pengumpul Lencana', 4, 'penegak', null, 'skk-132-1979', 45),
+  ('pengumpul-mata-uang', 'Pengumpul Mata Uang', 4, 'penegak', null, 'skk-132-1979', 46),
+  ('pengumpul-tanaman-kering', 'Pengumpul Tanaman Kering', 4, 'penegak', null, 'skk-132-1979', 47),
+  ('pengumpul-tanaman-hidup', 'Pengumpul Tanaman Hidup', 4, 'penegak', null, 'skk-132-1979', 48),
+  ('pengumpul-benda', 'Pengumpul Benda', 4, 'penegak', null, 'skk-132-1979', 49),
+  ('pengumpul-hewan', 'Pengumpul Hewan (Kering/Basah)', 4, 'penegak', null, 'skk-132-1979', 50),
+  ('juru-semboyan', 'Juru Semboyan', 4, 'penegak', null, 'skk-132-1979', 51),
+  ('menjahit', 'Menjahit', 4, 'penegak', null, 'skk-132-1979', 52),
+  ('pengendara-sepeda', 'Pengendara Sepeda', 4, 'penegak', null, 'skk-132-1979', 53),
+  ('juru-masak', 'Juru Masak', 4, 'penegak', null, 'skk-132-1979', 54),
+  ('pencinta-dirgantara', 'Pencinta Dirgantara', 4, 'penegak', null, 'skk-132-1979', 55),
+  ('pembuat-pesawat-model', 'Pembuat Pesawat Model', 4, 'penegak', null, 'skk-132-1979', 56),
+  ('pengenal-cuaca', 'Pengenal Cuaca', 4, 'penegak', null, 'skk-132-1979', 57),
+  ('komunikasi', 'Komunikasi', 4, 'penegak', null, 'skk-132-1979', 58),
+  ('konstruksi-pesawat-udara', 'Konstruksi Pesawat Udara', 4, 'penegak', null, 'skk-132-1979', 59),
+  ('juru-motor-pesawat-terbang', 'Juru Motor Pesawat Terbang', 4, 'penegak', null, 'skk-132-1979', 60),
+  ('navigasi-udara', 'Navigasi Udara', 4, 'penegak', null, 'skk-132-1979', 61),
+  ('evakuasi-medis-dirgantara', 'Evakuasi Medis Dirgantara', 4, 'penegak', null, 'skk-132-1979', 62),
+  ('pengenal-pesawat-terbang', 'Pengenal Pesawat Terbang', 4, 'penegak', null, 'skk-132-1979', 63),
+  ('petani-padi', 'Petani Padi', 4, 'penegak', null, 'skk-132-1979', 64),
+  ('juru-peta', 'Juru Peta', 4, 'penegak', null, 'skk-132-1979', 65),
+  ('navigasi-laut', 'Navigasi Laut', 4, 'penegak', null, 'skk-132-1979', 66),
+  ('juru-isyarat-bendera', 'Juru Isyarat Bendera', 4, 'penegak', null, 'skk-132-1979', 67),
+  ('pelaut', 'Pelaut', 4, 'penegak', null, 'skk-132-1979', 68),
+  ('juru-isyarat-listrik', 'Juru Isyarat Listrik', 4, 'penegak', null, 'skk-132-1979', 69),
+  ('juru-isyarat-optik', 'Juru Isyarat Optik', 4, 'penegak', null, 'skk-132-1979', 70),
+  ('perencana-kapal', 'Perencana Kapal', 4, 'penegak', null, 'skk-132-1979', 71),
+  ('perahu-motor', 'Perahu Motor', 4, 'penegak', null, 'skk-132-1979', 72),
+  ('berkemah', 'Berkemah', 4, 'penegak', null, 'tambahan', 73),
+  ('pengembara', 'Pengembara', 4, 'penegak', null, 'tambahan', 74),
+  ('penjelajah', 'Penjelajah', 4, 'penegak', null, 'tambahan', 75),
+  ('pemadam-kebakaran', 'Pemadam Kebakaran', 5, 'penegak', null, 'skk-132-1979', 76),
+  ('pengaman-lalu-lintas', 'Pengaman Lalu Lintas', 5, 'penegak', null, 'skk-132-1979', 77),
+  ('pengamanan-kampung', 'Pengamanan Kampung/Desa', 5, 'penegak', null, 'skk-132-1979', 78),
+  ('penunjuk-jalan', 'Penunjuk Jalan', 5, 'penegak', null, 'skk-132-1979', 79),
+  ('juru-bahasa', 'Juru Bahasa', 5, 'penegak', null, 'skk-132-1979', 80),
+  ('pembantu-ibu', 'Pembantu Ibu', 5, 'siaga', null, 'skk-132-1979', 81),
+  ('perawatan-anak', 'Perawatan Anak', 5, 'penegak', null, 'skk-132-1979', 82),
+  ('perawatan-keluarga', 'Perawatan Keluarga', 5, 'penegak', null, 'skk-132-1979', 83),
+  ('penerima-tamu', 'Penerima Tamu', 5, 'penegak', null, 'skk-132-1979', 84),
+  ('juru-penerang', 'Juru Penerang', 5, 'penegak', null, 'skk-132-1979', 85),
+  ('korespondensi', 'Korespondensi', 5, 'penegak', null, 'skk-132-1979', 86),
+  ('pppk', 'PPPK (Pertolongan Pertama Pada Kecelakaan)', 5, 'penegak', null, 'skk-132-1979', 87),
+  ('pembantu-penyuluh-padi', 'Pembantu Penyuluh Padi', 5, 'penegak', null, 'skk-132-1979', 88),
+  ('keadaan-darurat-penerbangan', 'Keadaan Darurat Penerbangan', 5, 'penegak', null, 'skk-132-1979', 89),
+  ('keadaan-darurat-laut', 'Keadaan Darurat Laut', 5, 'penegak', null, 'skk-132-1979', 90),
+  ('penghijauan', 'Penghijauan', 5, 'penegak', null, 'tambahan', 91);
 
 notify pgrst, 'reload schema';

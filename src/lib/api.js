@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaProfil, petaSidang, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPenugasan, susunPenugasanPeserta, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
+import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSpg, susunTanggalLahir, susunIsian, susunTemplatDokumen, susunSnapshot, susunSfh, susunGerbang, susunTimPenilai, susunGarudaTahap, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 /** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
@@ -178,6 +178,130 @@ export function buatApi(klien) {
       if (!r.ok) return r;
       return { ok: true, data: r.data?.ditemukan ? susunBerkasGaruda(r.data) : null };
     },
+
+    /* ------------------- Pelantikan dan Saka (Tahap 2, G1) ------------------- */
+    /** Pelantikan dan keanggotaan Saka yang boleh dilihat (Penegak: miliknya; pengurus: semua; dibatasi RLS). */
+    muatPelantikanSaka: () => muat(async () => {
+      const [p, s] = await Promise.all([ambilSemua('pelantikan', { urut: ['id'] }), ambilSemua('saka_anggota', { urut: ['id'] })]);
+      return { pelantikan: susunPelantikan(p), saka: susunSaka(s) };
+    }),
+    /** Mencatat pelantikan banyak Penegak sekaligus (Pembina dan Admin; semua atau tidak sama sekali). Mengembalikan jumlah yang dicatat. */
+    catatPelantikan: ({ tingkat, tanggal, tempat, pesertaIds, agendaId = null, catatan = '' }) =>
+      rpc('sg_pelantikan_catat', { p_tingkat: tingkat, p_tanggal: tanggal || null, p_tempat: tempat, p_peserta_ids: pesertaIds, p_agenda_id: agendaId, p_catatan: catatan }),
+    hapusPelantikan: (id) => rpc('sg_pelantikan_hapus', { p_id: id }),
+    /** Tambah (id kosong) atau ubah keanggotaan Saka. Mengembalikan id catatan. */
+    simpanSaka: ({ id = null, pesertaId, saka, tanggalMasuk, status = 'aktif', tanggalSelesai = null, suratUrl = '', catatan = '' }) =>
+      rpc('sg_saka_simpan', { p_id: id, p_peserta_id: pesertaId, p_saka: saka, p_tanggal_masuk: tanggalMasuk || null, p_status: status, p_tanggal_selesai: tanggalSelesai || null, p_surat_url: suratUrl, p_catatan: catatan }),
+    hapusSaka: (id) => rpc('sg_saka_hapus', { p_id: id }),
+
+    /* ------------------- TKK (Tahap 2, G2) ------------------- */
+    /** Capaian TKK, TKK Krida, dan ambang kesiapan Garuda yang boleh dilihat (Penegak: miliknya; pengurus: semua; dibatasi RLS). `bawaan` = ambang bila belum ada. */
+    muatTkk: (bawaan) => muat(async () => {
+      const [c, k, a, pj] = await Promise.all([
+        ambilSemua('tkk_capaian', { urut: ['id'] }), ambilSemua('tkk_krida', { urut: ['id'] }), ambilSemua('pengaturan', { filter: [['kunci', 'tkk.ambang']] }),
+        ambilSemua('tkk_pengajuan', { urut: ['id'] }).catch(() => []), // pengajuan (G2b): basis data yang belum dimigrasi tetap menampilkan halaman TKK
+      ]);
+      return { capaian: susunTkkCapaian(c), krida: susunTkkKrida(k), ambang: susunAmbangTkk(a[0]?.nilai, bawaan), pengajuan: susunTkkPengajuan(pj) };
+    }),
+    /** Mencatat atau mengoreksi satu capaian TKK (Pembina dan Admin). Mengembalikan id catatan. */
+    catatTkk: ({ pesertaId, tkkId, tingkat, tanggal, penguji1, penguji2, melatih, buktiUrl = '', catatan = '' }) =>
+      rpc('sg_tkk_catat', { p_peserta_id: pesertaId, p_tkk_id: tkkId, p_tingkat: tingkat, p_tanggal: tanggal || null, p_penguji1: penguji1, p_penguji2: penguji2, p_melatih: melatih, p_bukti_url: buktiUrl, p_catatan: catatan }),
+    hapusTkk: (id) => rpc('sg_tkk_hapus', { p_id: id }),
+
+    /* ------------------- Syarat Pramuka Garuda / SPG (Tahap 2, G3) ------------------- */
+    /** Penetapan SPG yang boleh dilihat (Penegak: miliknya; pengurus: semua; dibatasi RLS). */
+    muatSpg: () => muat(async () => susunSpg(await ambilSemua('spg_penetapan', { urut: ['peserta_id', 'butir'] }))),
+    /** Menetapkan satu butir SPG (Pembina dan Admin): nilai 100 (lengkap) atau 0; `timpa` = berbeda dari hasil aplikasi (alasan wajib di catatan). */
+    catatSpg: ({ pesertaId, butir, nilai, tanggal, catatan = '', timpa = false }) =>
+      rpc('sg_spg_catat', { p_peserta_id: pesertaId, p_butir: butir, p_nilai: nilai, p_tanggal: tanggal || null, p_catatan: catatan, p_timpa: timpa }),
+    hapusSpg: (pesertaId, butir) => rpc('sg_spg_hapus', { p_peserta_id: pesertaId, p_butir: butir }),
+
+    /* ------------------- Gerbang calon Garuda (Tahap 2, G4) ------------------- */
+    /** Tanggal lahir yang boleh dilihat (Penegak: miliknya; pengurus: semua; dibatasi RLS) dan aturan gerbang calon. `bawaan` = aturan bila belum ada. */
+    muatGerbang: (bawaan) => muat(async () => {
+      const [l, a] = await Promise.all([ambilSemua('tanggal_lahir', { urut: ['peserta_id'] }), ambilSemua('pengaturan', { filter: [['kunci', 'garuda.gerbang']] })]);
+      return { lahir: susunTanggalLahir(l), aturan: susunGerbang(a[0]?.nilai, bawaan) };
+    }),
+    /** Mengisi tanggal lahir satu Penegak (Pembina dan Admin); tanggal kosong = menghapus catatan. */
+    aturTanggalLahir: (pesertaId, tanggal) => rpc('sg_tanggal_lahir_atur', { p_peserta_id: pesertaId, p_tanggal: tanggal || null }),
+    simpanGerbang: (nilai) => rpc('sg_gerbang_simpan', { p_nilai: nilai }),
+    /** Mengisi tanggal lahir banyak Penegak sesudah impor (Pembina dan Admin). `daftar` = [{ username, tanggal 'YYYY-MM-DD' }]; semua atau tidak sama sekali. Mengembalikan jumlah yang diperbarui. */
+    imporTanggalLahir: (daftar) => rpc('sg_tanggal_lahir_impor', { p_data: daftar }),
+
+    /* ------------------- Isian data diri Penegak dan templat dokumen (Tahap 3, H1) ------------------- */
+    /** Isian data diri dan tanggal lahir satu Penegak: { isian: { kunci: nilai }, lahir }. Tanpa id = milik sendiri (RLS: Penegak hanya melihat miliknya; Pembina dan Admin semua). */
+    muatIsian: (pesertaId = null) => muat(async () => {
+      const filter = pesertaId ? [['peserta_id', pesertaId]] : [];
+      const [i, l] = await Promise.all([ambilSemua('penegak_isian', { filter, urut: ['kunci'] }), ambilSemua('tanggal_lahir', { filter })]);
+      return susunIsian(i, l);
+    }),
+    /** Penegak menyimpan isian data dirinya sendiri: objek datar { kunci: teks }, kunci profil (jk, agama, lahir, nta) hanya bila belum tercatat. Mengembalikan jumlah yang berubah. */
+    simpanIsianSaya: (data) => rpc('sg_isian_saya_simpan', { p_data: data }),
+    /** Templat isi dokumen (rubrik surat keterangan guru) per tahun ajaran; hanya Pembina dan Admin dapat membaca. */
+    muatTemplatDokumen: () => muat(async () => susunTemplatDokumen(await ambilSemua('dokumen_templat', { urut: ['tahun_ajaran', 'jenis'] }))),
+    simpanTemplatDokumen: ({ tahunAjaran, jenis, isi }) => rpc('sg_dokumen_templat_simpan', { p_tahun_ajaran: tahunAjaran, p_jenis: jenis, p_isi: isi }),
+    hapusTemplatDokumen: (id) => rpc('sg_dokumen_templat_hapus', { p_id: id }),
+    /** Salinan beku Portofolio format Kwarcab satu Penegak (Tahap 3, H3): hanya Pembina dan Admin. */
+    muatSnapshot: (pesertaId) => muat(async () => susunSnapshot(await ambilSemua('portofolio_snapshot', { filter: [['peserta_id', pesertaId]], urut: ['id'] }))),
+    simpanSnapshot: (pesertaId, catatan, isi) => rpc('sg_portofolio_snapshot_simpan', { p_peserta_id: pesertaId, p_catatan: catatan ?? '', p_isi: isi }),
+    hapusSnapshot: (id) => rpc('sg_portofolio_snapshot_hapus', { p_id: id }),
+
+    /* ------------------- Perlindungan anggota / Safe From Harm (Tahap 4) ------------------- */
+    /** Catatan Safe From Harm (Pembina dan Admin: semua; lainnya: miliknya sendiri, dibatasi RLS) dan penerima laporan gugus depan (pengaturan 'perlindungan.gudep', dibaca semua). */
+    muatSfh: () => muat(async () => {
+      const [c, g] = await Promise.all([ambilSemua('sfh_catatan', { urut: ['anggota_id', 'jenis'] }), ambilSemua('pengaturan', { filter: [['kunci', 'perlindungan.gudep']] })]);
+      return { catatan: susunSfh(c), gudep: g[0]?.nilai ?? null };
+    }),
+    simpanSfh: ({ anggotaId, jenis, tanggal, buktiUrl = '', catatan = '' }) => rpc('sg_sfh_catat', { p_anggota_id: anggotaId, p_jenis: jenis, p_tanggal: tanggal || null, p_bukti_url: buktiUrl, p_catatan: catatan }),
+    hapusSfh: (id) => rpc('sg_sfh_hapus', { p_id: id }),
+    simpanGudepSfh: (nilai) => rpc('sg_sfh_gudep_simpan', { p_nilai: nilai }),
+
+    /* ------------------- Tim penilai dan kalender Garuda (Tahap 2, G4b dan G4c) ------------------- */
+    /** Tim penilai (dengan anggotanya) dan kalender tahap Garuda; hanya pengurus yang dapat membaca (dibatasi RLS). */
+    muatTimKalender: () => muat(async () => {
+      const [t, a, k] = await Promise.all([ambilSemua('tim_penilai', { urut: ['id'] }), ambilSemua('tim_penilai_anggota', { urut: ['tim_id', 'urut'] }), ambilSemua('garuda_tahap', { urut: ['id'] })]);
+      return { tim: susunTimPenilai(t, a), tahap: susunGarudaTahap(k) };
+    }),
+    /** Menyimpan satu tim penilai beserta seluruh anggotanya (Pembina dan Admin; atomik). `id` kosong = tim baru. Mengembalikan id tim. */
+    simpanTimPenilai: ({ id = null, tahunAjaran, untuk, nomorSk = '', tanggalSk = null, skUrl = '', catatan = '', anggota }) =>
+      rpc('sg_tim_penilai_simpan', { p_id: id, p_tahun_ajaran: tahunAjaran, p_untuk: untuk, p_nomor_sk: nomorSk, p_tanggal_sk: tanggalSk || null, p_sk_url: skUrl, p_catatan: catatan, p_anggota: anggota }),
+    hapusTimPenilai: (id) => rpc('sg_tim_penilai_hapus', { p_id: id }),
+    /** Mengisi atau mengoreksi satu tahap kalender Garuda (Pembina dan Admin). Mengembalikan id. */
+    simpanTahapGaruda: ({ tahunAjaran, tahap, mulai, akhir = null, catatan = '' }) =>
+      rpc('sg_garuda_tahap_simpan', { p_tahun_ajaran: tahunAjaran, p_tahap: tahap, p_mulai: mulai || null, p_akhir: akhir || null, p_catatan: catatan }),
+    hapusTahapGaruda: (id) => rpc('sg_garuda_tahap_hapus', { p_id: id }),
+    simpanKrida: ({ id = null, pesertaId, nama, saka = '', tanggal, buktiUrl = '', catatan = '' }) =>
+      rpc('sg_tkk_krida_simpan', { p_id: id, p_peserta_id: pesertaId, p_nama: nama, p_saka: saka, p_tanggal: tanggal || null, p_bukti_url: buktiUrl, p_catatan: catatan }),
+    hapusKrida: (id) => rpc('sg_tkk_krida_hapus', { p_id: id }),
+    /** Penegak mengajukan capaian TKK-nya sendiri (menunggu ditinjau Pembina). Mengembalikan id pengajuan. */
+    ajukanTkk: ({ tkkId, tingkat, tanggal, penguji1Id, penguji2, melatih, buktiUrl = '', catatan = '' }) =>
+      rpc('sg_tkk_ajukan', { p_tkk_id: tkkId, p_tingkat: tingkat, p_tanggal: tanggal || null, p_penguji1_id: penguji1Id || null, p_penguji2: penguji2, p_melatih: melatih, p_bukti_url: buktiUrl, p_catatan: catatan }),
+    /** Pilihan Penguji 1 bagi Penegak yang masuk: [{ id, nama }] Pembina yang ditugaskan untuk kelasnya (semua Pembina aktif bila belum ada penugasan). */
+    pilihanPengujiTkk: () => rpc('sg_tkk_penguji_pilihan'),
+    batalkanPengajuanTkk: (id) => rpc('sg_tkk_ajukan_batal', { p_id: id }),
+    /** Pembina atau Admin meninjau pengajuan: keputusan 'disetujui' (menjadi capaian resmi; boleh mengganti nama penguji dengan alasan di catatan) atau 'ditolak' (catatan wajib). */
+    tinjauTkk: (id, keputusan, catatan = '', penguji1 = null, penguji2 = null) =>
+      rpc('sg_tkk_tinjau', { p_id: id, p_keputusan: keputusan, p_catatan: catatan, p_penguji1: penguji1 || null, p_penguji2: penguji2 || null }),
+    /** Mengubah ambang kesiapan Garuda: { total, madya, utamaWajib: [id TKK] } (Pembina dan Admin). */
+    simpanAmbangTkk: (nilai) => rpc('sg_tkk_ambang_simpan', { p_nilai: nilai }),
+
+    /* ------------------- Pra-uji berjenjang (fase D) ------------------- */
+    /** Sakelar pra-uji (pengaturan 'pra_uji.aktif', dapat dibaca semua yang sudah masuk); false bila belum pernah diatur atau basis data belum dimigrasi. */
+    muatPraUjiAktif: () => muat(async () => !!(await ambilSemua('pengaturan', { filter: [['kunci', 'pra_uji.aktif']] }))[0]?.nilai?.aktif),
+    /** Baris pra-uji satu Penegak (RLS: pemilik dan pengurus), urut nomor. */
+    muatPraUjiPeserta: (pesertaId) => muat(async () => (await ambilSemua('sku_pra_uji', { filter: [['peserta_id', pesertaId]], urut: ['id'] })).map(petaPraUji)),
+    /** Seluruh pra-uji yang sedang menunggu (pengurus). */
+    muatPraUjiMenunggu: () => muat(async () => (await ambilSemua('sku_pra_uji', { filter: [['status', 'menunggu']], urut: ['id'] })).map(petaPraUji)),
+    /** Antrian penilai yang sedang masuk (Pinsa atau Bina Damping): { aktif, menunggu, selesai }. */
+    muatAntrianPraUji: async () => { const r = await rpc('sg_pra_uji_antrian'); return r.ok ? { ok: true, data: susunAntrianPraUji(r.data) } : r; },
+    /** Keputusan penilai: hasil 'lulus' atau 'belum' (catatan wajib). Hasil: { hasil, tujuan } (tujuan: 'pinsa' | 'bina_damping' | 'pembina' | null). */
+    catatPraUji: (id, hasil, catatan = '') => rpc('sg_pra_uji_catat', { p_id: id, p_hasil: hasil, p_catatan: catatan }),
+    /** Pembina atau Admin melewati tahap yang macet (alasan wajib). Mengembalikan tahap tujuan. */
+    lewatiPraUji: (id, alasan) => rpc('sg_pra_uji_lewati', { p_id: id, p_alasan: alasan }),
+    /** Menghidupkan atau mematikan pra-uji (Pembina dan Admin). Hasil: { aktif, dialihkan }. */
+    aturSakelarPraUji: (aktif) => rpc('sg_pra_uji_sakelar', { p_aktif: aktif }),
+    /** Cakupan pra-uji p_hari hari terakhir (Pembina dan Admin): { aktif, hari, perRombel: [{ rombel, lewat, langsung, binaDamping }] }. */
+    muatCakupanPraUji: (hari = 30) => rpc('sg_pra_uji_cakupan', { p_hari: hari }),
 
     /** Catatan sidang (hanya pengurus yang menerima baris) dan pengaturan aplikasi. Dimuat saat halaman Sidang dibuka. */
     muatSidang: () => muat(async () => (await ambilSemua('sidang_dk', { urut: ['id'] })).map(petaSidang)),
@@ -348,6 +472,25 @@ export function buatApi(klien) {
     arsipkanDewanLama: (ids, aktifkan = false) => rpc('sg_dewan_lama_arsipkan', { p_ids: ids, p_aktifkan: aktifkan }),
     /** Riwayat kepengurusan Dewan Ambalan (pengurus), terbaru lebih dulu. */
     muatLogKepengurusan: () => muat(async () => susunLogKepengurusan(await ambilSemua('kepengurusan_log', { urut: ['id'] }))),
+    /* ------------------- Pinsa dan Bina Damping (fase B) ------------------- */
+    /** Peran pendampingan diri sendiri: { binaDamping: [rombel], pinsa }. Semua peran (Pembina/Admin/Dewan lama menerima daftar kosong). */
+    muatPendampinganSaya: async () => { const r = await rpc('sg_pendampingan_saya'); return r.ok ? { ok: true, data: susunPendampingan(r.data) } : r; },
+    /** Penunjukan Bina Damping satu tahun ajaran (pengurus) beserta calon yang dapat dipilih. Bawaan: tahun ajaran berjalan. */
+    muatBinaDamping: async (tahunAjaran = null) => { const r = await rpc('sg_bina_damping_daftar', { p_tahun_ajaran: tahunAjaran }); return r.ok ? { ok: true, data: susunBinaDamping(r.data) } : r; },
+    /** Menunjuk Bina Damping satu rombel (Dewan, Pembina, Admin). `ids` = daftar LENGKAP (maks 2; kosong = mengosongkan). Mengembalikan jumlah perubahan. */
+    aturBinaDamping: (tahunAjaran, rombel, ids) => rpc('sg_bina_damping_atur', { p_tahun_ajaran: tahunAjaran, p_rombel: rombel, p_penegak_ids: ids }),
+    /** Susunan sangga satu rombel (pengurus, Bina Damping rombel itu, anggota rombel itu). */
+    muatSanggaRombel: async (rombel) => { const r = await rpc('sg_sangga_rombel', { p_rombel: rombel }); return r.ok ? { ok: true, data: susunSanggaRombel(r.data) } : r; },
+    /** Membagi sangga dan menentukan Pinsa (Bina Damping rombel itu, Pembina, Admin). `daftar` = [{ id, sangga?, pinsa? }]. Hasil: { diubah, peringatan }. */
+    aturSangga: (rombel, daftar) => rpc('sg_sangga_atur', { p_rombel: rombel, p_data: daftar }),
+    /** Catatan pengukuhan Dewan Ambalan oleh Ketua Kwartir Ranting (pengurus), tahun ajaran terbaru lebih dulu. */
+    muatPengukuhanDewan: () => muat(async () => susunPengukuhanDewan(await ambilSemua('pengukuhan_dewan', { urut: ['tahun_ajaran'] }))),
+    /** Mencatat atau memperbarui pengukuhan satu tahun ajaran (Pembina dan Admin). `d` = { tahunAjaran, nomorSk, tanggalSk, rekomNomor, rekomTanggal, catatan }. */
+    simpanPengukuhanDewan: (d) => rpc('sg_pengukuhan_dewan_simpan', {
+      p_tahun_ajaran: d.tahunAjaran, p_nomor_sk: d.nomorSk, p_tanggal_sk: d.tanggalSk, p_rekomendasi_nomor: d.rekomNomor ?? '', p_rekomendasi_tanggal: d.rekomTanggal || null, p_catatan: d.catatan ?? '',
+    }),
+    /** Menghapus catatan pengukuhan satu tahun ajaran (Pembina dan Admin). */
+    hapusPengukuhanDewan: (tahunAjaran) => rpc('sg_pengukuhan_dewan_hapus', { p_tahun_ajaran: tahunAjaran }),
     /** Rombel banyak Penegak sekaligus (Admin). `daftar` = [{ username (NIS), rombel }]. Semua atau tidak sama sekali. Mengembalikan jumlah baris. */
     perbaruiRombel: (daftar) => rpc('sg_rombel_perbarui', { p_data: daftar }),
 

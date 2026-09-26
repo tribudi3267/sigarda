@@ -53,3 +53,10 @@ $$ begin
 end $$;
 -- ===== akhir peran usulan kegiatan =====
 
+
+-- ===== Pra-uji berjenjang (fase C): sakelar =====
+-- Sakelar pra-uji (pengaturan 'pra_uji.aktif' = {"aktif": true|false}), bawaan MATI agar peralihan dapat dipilih Pembina lewat sg_pra_uji_sakelar.
+-- Bila hidup: uji resmi hanya Pembina (sigarda.bisa_menguji) dan pengajuan Penegak lebih dulu melewati pra-uji Pinsa/Bina Damping.
+create function sigarda.pra_uji_aktif() returns boolean language sql stable security definer set search_path = public as
+$$ select coalesce((select (nilai ->> 'aktif')::boolean from public.pengaturan where kunci = 'pra_uji.aktif'), false) $$;
+-- ===== akhir sakelar pra-uji =====

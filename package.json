@@ -12,7 +12,10 @@
     "periksa": "node scripts/buat-periksa.mjs",
     "profil": "node scripts/profil-muat.mjs",
     "catatan-rilis": "node scripts/catatan-rilis.mjs",
-    "uji": "node uji/jalankan.mjs"
+    "periksa-peraturan": "node scripts/periksa-peraturan.mjs",
+    "uji": "node uji/jalankan.mjs",
+    "simulasi:pra-uji": "node scripts/jalankan-simulasi.mjs scripts/simulasi-pra-uji.mjs",
+    "simulasi:beban": "node scripts/jalankan-simulasi.mjs scripts/simulasi-beban-tahap3-4.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",

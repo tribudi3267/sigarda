@@ -29,6 +29,7 @@ begin
       'penugasan_log', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penugasan_log t),
       'penugasan_peserta', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penugasan_peserta t),
       'kepengurusan_log', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.kepengurusan_log t),
+      'pengukuhan_dewan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.pengukuhan_dewan t),
       'guru_agama', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.guru_agama t),
       'dokumen_terbit', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_terbit t),
       'dokumen_urut', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_urut t),
@@ -49,9 +50,27 @@ begin
       'sertifikat_tingkat', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sertifikat_tingkat t),
       'sesi_ujian', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian t),
       'sesi_ujian_butir', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian_butir t),
-      'sesi_ujian_peserta', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian_peserta t),
+      'sesi_ujian_peserta', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sesi_ujian_peserta t)
+    -- PostgreSQL membatasi 100 argumen per fungsi (50 pasang): daftar tabel dibagi dua objek yang digabung dengan ||
+    ) || jsonb_build_object(
       'agenda', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.agenda t),
-      'kegiatan_usulan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.kegiatan_usulan t)
+      'kegiatan_usulan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.kegiatan_usulan t),
+      'bina_damping', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.bina_damping t),
+      'sku_pra_uji', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sku_pra_uji t),
+      'pelantikan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.pelantikan t),
+      'saka_anggota', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.saka_anggota t),
+      'tkk_capaian', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tkk_capaian t),
+      'tkk_krida', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tkk_krida t),
+      'tkk_pengajuan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tkk_pengajuan t),
+      'spg_penetapan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.spg_penetapan t),
+      'tanggal_lahir', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tanggal_lahir t),
+      'tim_penilai', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tim_penilai t),
+      'tim_penilai_anggota', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tim_penilai_anggota t),
+      'garuda_tahap', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.garuda_tahap t),
+      'penegak_isian', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penegak_isian t),
+      'dokumen_templat', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_templat t),
+      'portofolio_snapshot', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.portofolio_snapshot t),
+      'sfh_catatan', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.sfh_catatan t)
     )
   ) into v_hasil;
   insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada)
@@ -88,7 +107,8 @@ end $$;
 -- Tangga eskalasi untuk Penegak yang "tidak bergerak", dijalankan dari sigarda.notif_pengingat() (pengingat harian 07.00 WIB, jadi otomatis
 -- di luar jam senyap 22.00-04.00 WIB tanpa logika tambahan). Tiga kejadian independen, masing-masing dihitung ULANG setiap hari dari data
 -- sumbernya (BUKAN status tersimpan) sehingga otomatis "reset" begitu ada tindak lanjut -- tanpa perlu tabel status terpisah:
---   sku      : tidak ada sku_progress/riwayat baru (peserta ATAU penguji) selama >= 7 hari.
+--   sku      : tidak ada sku_progress/riwayat baru (peserta ATAU penguji) selama >= 7 hari. TIDAK dihitung selama ada pra-uji yang menunggu penilai (Fase E):
+--              penghambatnya penilai, bukan Penegak; yang macet muncul di Periksa Data (praUjiMacet) dan diingatkan sigarda.pra_uji_pengingat.
 --   absensi  : 2 kali latihan Jumat TERAKHIR berturut-turut berstatus Alpa ('A'; izin/sakit tidak dihitung).
 --   iuran    : 2 kali latihan Jumat TERAKHIR berturut-turut tanpa baris iuran (terpisah dari status absensi, sesuai catatan tabel iuran).
 -- "mulai" = tanggal kejadian PERTAMA kali memenuhi syarat (tetap sejak itu selama belum ada tindak lanjut, tidak ikut mundur bila kejadian
@@ -98,6 +118,7 @@ create function sigarda.eskalasi_mulai_sku(p_peserta uuid) returns date language
 $$
 declare v_terakhir date;
 begin
+  if exists (select 1 from public.sku_pra_uji where peserta_id = p_peserta and status = 'menunggu') then return null; end if;
   select greatest(
     coalesce((select max(diubah)::date from public.sku_progress where peserta_id = p_peserta), (select dibuat from public.profiles where id = p_peserta)),
     coalesce((select max(waktu)::date from public.sku_riwayat where peserta_id = p_peserta), (select dibuat from public.profiles where id = p_peserta))

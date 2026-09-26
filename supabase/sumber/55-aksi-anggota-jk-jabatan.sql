@@ -27,9 +27,9 @@ begin
 
   v_kelas := sigarda.rapikan(p_kelas);
   v_sangga := sigarda.rapikan(p_sangga);
-  if v_kelas = '' or v_sangga = '' then raise exception 'Kelas dan sangga peserta wajib diisi.'; end if;
-  if p_agama is null or p_agama = '' then raise exception 'Agama wajib diisi. Butir 1 SKU menyesuaikan agama peserta.'; end if;
-  if p_agama not in ('Islam','Katolik','Protestan','Hindu','Buddha','Khonghucu') then raise exception 'Agama tidak dikenal.'; end if;
+  -- Hanya rombel yang wajib. Sangga boleh kosong (dibagi Pembina/Bina Damping). Agama: kosong = tidak diubah (Penegak mengisinya sendiri; agama yang sudah ada tidak dapat dikosongkan).
+  if v_kelas = '' then raise exception 'Kelas (rombel) peserta wajib diisi.'; end if;
+  if coalesce(p_agama, '') <> '' and p_agama not in ('Islam','Katolik','Protestan','Hindu','Buddha','Khonghucu') then raise exception 'Agama tidak dikenal.'; end if;
   -- Kelas berupa rombel baku (X-01..XII-10). Nilai lama yang tidak diubah (mis. "X") dibiarkan agar data lain tetap dapat diubah;
   -- rapikan massal lewat sg_rombel_perbarui.
   if lower(v_kelas) = lower(coalesce(v_t.kelas, '')) then
@@ -38,9 +38,9 @@ begin
     v_kelas := sigarda.rombel_baku(v_kelas);
     if not sigarda.rombel_sah(v_kelas) then raise exception 'Kelas harus berupa rombel: X-01 sampai X-10, XI-01 sampai XI-10, atau XII-01 sampai XII-10.'; end if;
   end if;
-  v_sangga := coalesce((select sangga from public.profiles where role = 'peserta' and lower(sangga) = lower(v_sangga) limit 1), v_sangga);
+  if v_sangga <> '' then v_sangga := coalesce((select sangga from public.profiles where role = 'peserta' and lower(sangga) = lower(v_sangga) limit 1), v_sangga); end if;
 
-  update public.profiles set nama = v_nama, kelas = v_kelas, sangga = v_sangga, agama = p_agama where id = p_id;
+  update public.profiles set nama = v_nama, kelas = v_kelas, sangga = nullif(v_sangga, ''), agama = coalesce(nullif(p_agama, ''), agama) where id = p_id;
 
   if p_calon_garuda is true then
     if v_t.calon_garuda is null then
@@ -130,10 +130,10 @@ end $$;
 -- ===== akhir fungsi jenis kelamin =====
 
 -- ===== Jabatan Dewan Ambalan: fungsi =====
--- Jabatan Dewan Ambalan pada akun PENEGAK (isian bebas, mis. Pradana, Pradani, Wakil Pradana, Sekretaris, Bendahara, Ketua Bidang Kegiatan), oleh Pembina atau Admin Gudep.
+-- Jabatan Dewan Ambalan pada akun PENEGAK (isian bebas, mis. Pradana, Pradani, Pemangku Adat, Wakil Pradana, Sekretaris, Bendahara, Ketua Bidang Kegiatan), oleh Pembina atau Admin Gudep.
 -- p_data = [{"username": "10231", "jabatan": "Pradana"}, ...] (username = NIS Penegak); jabatan kosong mencabut jabatan (penugasan penguji ikut dihapus). Jabatan hanya untuk
--- Penegak yang AKTIF. Pradana dan Pradani masing-masing hanya satu pemegang: pemegang lama harus dikosongkan lebih dulu (boleh pada permintaan yang sama,
--- mis. [{"username": "lama", "jabatan": ""}, {"username": "baru", "jabatan": "Pradana"}]). Semua atau tidak sama sekali. Pradana menjadi ketua sidang; Pradana dan Pradani
+-- Penegak yang AKTIF. Pradana, Pradani, dan Pemangku Adat masing-masing hanya satu pemegang (sigarda.jabatan_tunggal): pemegang lama harus dikosongkan lebih dulu (boleh pada permintaan yang sama,
+-- mis. [{"username": "lama", "jabatan": ""}, {"username": "baru", "jabatan": "Pradana"}]). Semua atau tidak sama sekali. Pemangku Adat menjadi ketua sidang (cadangannya Pradana); Pradana dan Pradani
 -- menandatangani Surat Tanda Lulus. Dewan Ambalan berupa atribut akun Penegak (bukan akun terpisah): pemegang jabatan dapat memakai tampilan Dewan.
 -- Tercatat di kepengurusan_log. Mengembalikan jumlah anggota yang berubah.
 create function public.sg_anggota_jabatan_dewan_atur(p_data jsonb) returns int
@@ -164,7 +164,7 @@ begin
     end if;
     if v_t.role <> 'peserta' then raise exception '% bukan Penegak. Jabatan Dewan Ambalan hanya untuk Penegak.', v_t.nama; end if;
     if v_t.status <> 'aktif' then raise exception '% berstatus % dan tidak dapat menjabat. Aktifkan kembali lebih dulu.', v_t.nama, v_t.status; end if;
-    if v_jab in ('Pradana', 'Pradani') then
+    if sigarda.jabatan_tunggal(v_jab) then
       select nama into v_lain from public.profiles where jabatan_dewan = v_jab and id <> v_t.id limit 1;
       if found then raise exception '% sudah dijabat oleh %. Kosongkan jabatan itu lebih dulu.', v_jab, v_lain; end if;
     end if;
@@ -179,7 +179,7 @@ end $$;
 
 -- Kepengurusan Dewan Ambalan lewat berkas (Pembina atau Admin Gudep). p_data = [{"username": "10231", "jabatan": "Pradana"}, ...] (username = NIS; jabatan bebas).
 -- p_ganti = true: SELURUH kepengurusan diganti (pemegang jabatan yang tidak ada di berkas dicabut; termasuk jabatan pada akun Dewan lama). false: hanya yang ada di berkas
--- diberi atau diubah (Pradana atau Pradani yang berpindah tangan tetap mencabut pemegang lamanya). p_terapkan = false: PRATINJAU (tidak mengubah apa pun); true: menerapkan
+-- diberi atau diubah (jabatan tunggal yang berpindah tangan, yaitu Pradana, Pradani, atau Pemangku Adat, tetap mencabut pemegang lamanya). p_terapkan = false: PRATINJAU (tidak mengubah apa pun); true: menerapkan
 -- SEMUA atau tidak sama sekali. Hasil { galat, ringkasan { beri, ganti, cabut, sama, galat }, baris: [{ no, id, username, nama, kelas, dari_jabatan, jabatan, hasil:
 -- 'beri' | 'ganti' | 'sama' | 'cabut' | 'galat', pesan: [...] }] }. Peringatan (bukan galat): belum menyelesaikan seluruh butir Bantara.
 create function public.sg_kepengurusan_terapkan(p_data jsonb, p_ganti boolean default true, p_terapkan boolean default false) returns jsonb
@@ -210,12 +210,12 @@ begin
       v_hasil := 'galat'; v_pesan := array['Jabatan Dewan Ambalan kosong.'];
     elsif char_length(v_jab) not between 2 and 60 or v_jab ~ '[[:cntrl:]<>]' then
       v_hasil := 'galat'; v_pesan := array['Jabatan harus 2 sampai 60 karakter tanpa tanda < atau >.'];
-    elsif v_jab in ('Pradana', 'Pradani') and v_jab = any (v_tunggal) then
+    elsif sigarda.jabatan_tunggal(v_jab) and v_jab = any (v_tunggal) then
       v_hasil := 'galat'; v_pesan := array[v_jab || ' hanya boleh satu orang, tetapi muncul lebih dari sekali dalam berkas.'];
     end if;
     if v_user <> '' then v_pakai := v_pakai || v_user; end if;
     if v_hasil = 'ubah' then
-      if v_jab in ('Pradana', 'Pradani') then v_tunggal := v_tunggal || v_jab; end if;
+      if sigarda.jabatan_tunggal(v_jab) then v_tunggal := v_tunggal || v_jab; end if;
       if v_t.jabatan_dewan is not distinct from v_jab then v_hasil := 'sama'; v_sama := v_sama + 1;
       elsif v_t.jabatan_dewan is null then v_hasil := 'beri'; v_beri := v_beri + 1;
       else v_hasil := 'ganti'; v_ganti := v_ganti + 1; v_pesan := v_pesan || ('Jabatan berubah dari ' || v_t.jabatan_dewan || '.'); end if;
@@ -228,11 +228,11 @@ begin
       'hasil', v_hasil, 'pesan', to_jsonb(v_pesan)));
   end loop;
 
-  -- Pemegang jabatan yang dicabut: semua yang tidak ada di berkas (p_ganti), atau pemegang Pradana/Pradani yang jabatannya berpindah ke orang lain di berkas.
+  -- Pemegang jabatan yang dicabut: semua yang tidak ada di berkas (p_ganti), atau pemegang jabatan tunggal (Pradana, Pradani, Pemangku Adat) yang jabatannya berpindah ke orang lain di berkas.
   for v_r in
     select p.id, p.username, p.nama, p.kelas, p.role, p.jabatan_dewan from public.profiles p
     where p.jabatan_dewan is not null and p.username <> all (v_pakai)
-      and (p_ganti or (p.jabatan_dewan in ('Pradana', 'Pradani') and p.jabatan_dewan = any (v_tunggal)))
+      and (p_ganti or (sigarda.jabatan_tunggal(p.jabatan_dewan) and p.jabatan_dewan = any (v_tunggal)))
     order by p.nama
   loop
     v_cabut := v_cabut + 1;
@@ -247,11 +247,11 @@ begin
     if v_galat > 0 then raise exception 'Ada % baris bermasalah, jadi tidak ada yang diubah. Periksa pratinjau, perbaiki berkas, lalu coba lagi.', v_galat; end if;
     if v_beri + v_ganti + v_cabut = 0 then raise exception 'Tidak ada perubahan yang perlu diterapkan.'; end if;
     select nama into v_oleh from public.profiles where id = auth.uid();
-    -- mencabut lebih dulu agar Pradana dan Pradani berpindah tangan tanpa bentrok
+    -- mencabut lebih dulu agar jabatan tunggal berpindah tangan tanpa bentrok
     for v_r in select id from public.profiles where id = any (v_ids) loop
       perform sigarda.jabatan_dewan_lepas(v_r.id, case when p_ganti then 'Kepengurusan diganti' else 'Jabatan berpindah' end);
     end loop;
-    -- yang berganti jabatan dikosongkan sebentar agar pertukaran Pradana dan Pradani tidak bentrok dengan indeks unik
+    -- yang berganti jabatan dikosongkan sebentar agar pertukaran jabatan tunggal tidak bentrok dengan indeks unik
     update public.profiles set jabatan_dewan = null
       where id in (select (x ->> 'id')::uuid from jsonb_array_elements(v_baris) x where x ->> 'hasil' = 'ganti');
     for v_e in select * from jsonb_array_elements(v_baris) loop
@@ -316,3 +316,43 @@ begin
 end $$;
 -- ===== akhir fungsi jabatan dewan =====
 
+
+-- ===== Pengukuhan Dewan Ambalan (Fase A): fungsi =====
+-- Mencatat pengukuhan kepengurusan Dewan Ambalan oleh Ketua Kwartir Ranting untuk satu tahun ajaran (Pembina atau Admin Gudep): nomor dan tanggal SK, dan (opsional, berpasangan)
+-- nomor dan tanggal rekomendasi Ketua Mabigus. Tanggal tidak boleh di masa depan (WIB) dan rekomendasi tidak boleh sesudah SK. Simpan ulang = perbarui.
+-- Aturan isian dicerminkan periksaPengukuhan di src/lib/dewanLogic.js (dijaga oleh pengujian).
+create function public.sg_pengukuhan_dewan_simpan(
+  p_tahun_ajaran text, p_nomor_sk text, p_tanggal_sk date, p_rekomendasi_nomor text default '', p_rekomendasi_tanggal date default null, p_catatan text default ''
+) returns void language plpgsql security definer set search_path = public as
+$$
+declare v_nomor text := sigarda.rapikan(p_nomor_sk); v_rn text := sigarda.rapikan(p_rekomendasi_nomor); v_cat text := sigarda.rapikan(p_catatan);
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat mencatat pengukuhan Dewan Ambalan.'; end if;
+  if not sigarda.tahun_ajaran_sah(p_tahun_ajaran) then raise exception 'Tahun ajaran tidak sah. Contoh: 2026/2027.'; end if;
+  if char_length(v_nomor) not between 1 and 80 or v_nomor ~ '[[:cntrl:]<>]' then raise exception 'Nomor SK pengukuhan wajib diisi (maksimal 80 karakter, tanpa tanda < atau >).'; end if;
+  if p_tanggal_sk is null then raise exception 'Tanggal SK pengukuhan wajib diisi.'; end if;
+  if p_tanggal_sk < date '2000-01-01' or p_tanggal_sk > sigarda.hari_ini() then raise exception 'Tanggal SK pengukuhan tidak boleh sebelum tahun 2000 atau di masa depan.'; end if;
+  if char_length(v_rn) > 80 or v_rn ~ '[[:cntrl:]<>]' then raise exception 'Nomor rekomendasi maksimal 80 karakter, tanpa tanda < atau >.'; end if;
+  if (v_rn = '') <> (p_rekomendasi_tanggal is null) then raise exception 'Isi nomor dan tanggal rekomendasi Ketua Mabigus sekaligus, atau kosongkan keduanya.'; end if;
+  if p_rekomendasi_tanggal is not null and (p_rekomendasi_tanggal < date '2000-01-01' or p_rekomendasi_tanggal > p_tanggal_sk) then
+    raise exception 'Tanggal rekomendasi tidak boleh sebelum tahun 2000 atau sesudah tanggal SK.';
+  end if;
+  if char_length(v_cat) > 200 then raise exception 'Catatan maksimal 200 karakter.'; end if;
+  insert into public.pengukuhan_dewan (tahun_ajaran, nomor_sk, tanggal_sk, rekomendasi_nomor, rekomendasi_tanggal, catatan, diubah_oleh, diubah_pada)
+  values (p_tahun_ajaran, v_nomor, p_tanggal_sk, v_rn, p_rekomendasi_tanggal, v_cat, auth.uid(), now())
+  on conflict (tahun_ajaran) do update
+    set nomor_sk = excluded.nomor_sk, tanggal_sk = excluded.tanggal_sk, rekomendasi_nomor = excluded.rekomendasi_nomor, rekomendasi_tanggal = excluded.rekomendasi_tanggal,
+        catatan = excluded.catatan, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
+end $$;
+
+-- Menghapus catatan pengukuhan satu tahun ajaran (Pembina atau Admin Gudep), mis. salah tahun ajaran.
+create function public.sg_pengukuhan_dewan_hapus(p_tahun_ajaran text) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan pengukuhan Dewan Ambalan.'; end if;
+  delete from public.pengukuhan_dewan where tahun_ajaran = p_tahun_ajaran;
+  if not found then raise exception 'Belum ada catatan pengukuhan untuk tahun ajaran itu.'; end if;
+end $$;
+-- ===== akhir fungsi pengukuhan dewan =====

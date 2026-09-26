@@ -42,7 +42,7 @@ export function useApp() {
   return ctx;
 }
 
-const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '', asisten: [], pengaturanIuran: PENGATURAN_IURAN_BAWAAN, penugasan: {}, penugasanPeserta: {}, guruAgama: [], dokumen: null, notifikasi: [] };
+const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '', asisten: [], pengaturanIuran: PENGATURAN_IURAN_BAWAAN, penugasan: {}, penugasanPeserta: {}, guruAgama: [], dokumen: null, notifikasi: [], pendampingan: { binaDamping: [], pinsa: false }, praUjiAktif: false, praUji: {} };
 const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi waktu Edge Function)
 const JEDA_SEGARKAN_MS = 30000;
 const JEDA_NOTIFIKASI_MS = 60000; // Kotak Notifikasi ditarik ulang tiap menit selama halaman terlihat
@@ -80,6 +80,7 @@ export function AppProvider({ children }) {
   const terakhirMuat = useRef(0);
   const semesterRef = useRef(new Set());        // salinan semesterSiap yang selalu mutakhir (untuk dipakai di dalam callback)
   const riwayatDimuat = useRef(new Set());      // id Penegak yang riwayat SKU-nya sudah dimuat (sku_riwayat besar, dimuat malas per Penegak)
+  const praUjiDimuat = useRef(new Set());       // id Penegak yang baris pra-ujinya sudah dimuat (dimuat malas per Penegak, dimuat ulang saat penyegaran)
   const semesterSedangMuat = useRef(new Map()); // kunci -> janji, agar permintaan yang sama tidak diulang bersamaan
   const generasi = useRef(0);                   // naik tiap keluar/sesi berakhir; hasil muat lama diabaikan
   const sesiRef = useRef({});                   // daftar sesi terkini (untuk dipakai di dalam callback)
@@ -134,6 +135,7 @@ export function AppProvider({ children }) {
     generasi.current += 1;
     semesterRef.current = new Set();
     riwayatDimuat.current = new Set();
+    praUjiDimuat.current = new Set();
     semesterSedangMuat.current = new Map();
     setSemesterSiap({});
     setInstrumenSiap(false);
@@ -177,16 +179,28 @@ export function AppProvider({ children }) {
     return { ok: true, data };
   }, []);
 
+  /** Sakelar pra-uji dan baris pra-uji para Penegak yang sudah pernah dibuka (fase D). Tidak wajib: basis data lama belum punya tabelnya. */
+  const muatPraUjiKini = useCallback(async () => {
+    const a = api();
+    const ids = [...praUjiDimuat.current];
+    const [aktif, ...rinci] = await Promise.all([a.muatPraUjiAktif(), ...ids.map((id) => a.muatPraUjiPeserta(id))]);
+    const baris = {};
+    ids.forEach((id, i) => { if (rinci[i].ok) baris[id] = rinci[i].data; });
+    return { aktif: aktif.ok ? aktif.data : null, baris };
+  }, []);
+
   const muatSemua = useCallback(async () => {
     const a = api();
     const mulaiGenerasi = generasi.current;
     const daftarKunci = [...new Set([semesterDari(hariIni()), ...semesterRef.current])];
-    const [u, p, sesi, pf, m, asisten, pengIuran, gudep, notif, ...hadir] = await Promise.all([
+    const [u, p, sesi, pf, m, asisten, pengIuran, gudep, notif, pend, praUjiKini, ...hadir] = await Promise.all([
       a.muatProfil(), muatProgressSemua(), a.muatSesiAbsen(), a.muatPortofolio(), a.muatMateri(),
       a.muatAsisten(), // penunjukan asisten bendahara: tidak wajib (basis data lama belum punya tabelnya), jadi tidak ikut pemeriksaan gagal
       a.muatPengaturanIuran(), // pengaturan iuran: bila fungsinya belum ada dipakai nilai bawaan
       a.muatGudep(), // data gudep: tidak wajib; belum tersimpan = nilai bawaan dari src/config.js
       a.muatNotifikasi(), // Kotak Notifikasi: tidak wajib (basis data lama belum punya tabelnya)
+      a.muatPendampinganSaya(), // peran Bina Damping/Pinsa (fase B): tidak wajib (basis data lama belum punya fungsinya)
+      muatPraUjiKini(), // sakelar pra-uji dan baris pra-uji yang sudah dibuka (fase D)
       ...daftarKunci.map((k) => { const r = rentangKunci(k); return a.muatHadirRentang(r.mulai, r.akhir); }),
     ]);
     const gagal = [u, p, sesi, pf, m, ...hadir].find((r) => !r.ok);
@@ -196,13 +210,13 @@ export function AppProvider({ children }) {
     if (gudep.ok) setGudep(gudep.data);
     setDb((d) => ({
       ...d, // sidang dan pengaturan dimuat terpisah (muatSidang) dan tidak boleh hilang saat penyegaran
-      users: u.data, progress: p.data, portofolio: pf.data, materi: m.data, asisten: asisten.ok ? asisten.data : [], notifikasi: notif.ok ? notif.data : d.notifikasi, pengaturanIuran: pengIuran.ok ? gabungPengaturanIuran(pengIuran.data) : PENGATURAN_IURAN_BAWAAN,
+      users: u.data, progress: p.data, portofolio: pf.data, materi: m.data, asisten: asisten.ok ? asisten.data : [], notifikasi: notif.ok ? notif.data : d.notifikasi, pendampingan: pend.ok ? pend.data : d.pendampingan, praUjiAktif: praUjiKini.aktif ?? d.praUjiAktif, praUji: { ...d.praUji, ...praUjiKini.baris }, pengaturanIuran: pengIuran.ok ? gabungPengaturanIuran(pengIuran.data) : PENGATURAN_IURAN_BAWAAN,
       absensi: gabungHadirSemester(d.absensi, sesi.data, daftarKunci, hadirGabung),
     }));
     tandaiSiap(daftarKunci);
     terakhirMuat.current = Date.now();
     return { ok: true };
-  }, []);
+  }, [muatPraUjiKini]);
 
   /**
    * Memastikan kehadiran untuk tahun ajaran dan periode ini sudah dimuat (permintaan berikutnya sesudah pilihan filter).
@@ -325,6 +339,12 @@ export function AppProvider({ children }) {
       portofolio: (pid) => terapkan(api().muatPortofolio(pid), (p) => (d) => ({ ...d, portofolio: pid ? { ...d.portofolio, [pid]: p[pid] ?? {} } : p })),
       hadir: (tanggal) => terapkan(api().muatHadirTanggal(tanggal), (h) => (d) => ({ ...d, absensi: { ...d.absensi, hadir: { ...d.absensi.hadir, [tanggal]: h } } })),
       materi: () => terapkan(api().muatMateri(), (materi) => (d) => ({ ...d, materi })),
+      pendampingan: () => terapkan(api().muatPendampinganSaya(), (pendampingan) => (d) => ({ ...d, pendampingan })),
+      praUji: async (pid) => {
+        if (pid) praUjiDimuat.current.add(pid);
+        const r = await muatPraUjiKini();
+        setDb((d) => ({ ...d, praUjiAktif: r.aktif ?? d.praUjiAktif, praUji: { ...d.praUji, ...r.baris } }));
+      },
       asisten: () => terapkan(api().muatAsisten(), (asisten) => (d) => ({ ...d, asisten })),
       pengaturanIuran: () => terapkan(api().muatPengaturanIuran(), (p) => (d) => ({ ...d, pengaturanIuran: gabungPengaturanIuran(p) })),
       sidang: async () => {
@@ -339,7 +359,7 @@ export function AppProvider({ children }) {
         terapkan(api().muatRaport(tahunAjaran, semester), (r) => (d) => ({ ...d, raport: { ...d.raport, [kunciSemester(tahunAjaran, semester)]: r } })),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notify, sesiBerakhir, muatProgressSemua]);
+  }, [notify, sesiBerakhir, muatProgressSemua, muatPraUjiKini]);
 
   /** Menjalankan aksi ke server; galat ditampilkan sebagai toast, keberhasilan menyegarkan data. */
   const aksi = async (janji, { sukses, sesudah } = {}) => {
@@ -398,11 +418,42 @@ export function AppProvider({ children }) {
   };
 
   /* ------------------------------ Progres SKU ------------------------------ */
+  const praUjiAktif = db.praUjiAktif;
   const ajukan = (data) =>
-    aksi(api().ajukan(data), { sukses: 'Pengajuan terkirim ke penguji.', sesudah: () => segarkan.progress(user.id) });
+    aksi(api().ajukan(data), { sukses: praUjiAktif ? 'Pengajuan terkirim untuk pra-uji.' : 'Pengajuan terkirim ke penguji.', sesudah: () => Promise.all([segarkan.progress(user.id), segarkan.praUji(user.id)]) });
 
   const batalkanAjuan = (skuId) =>
-    aksi(api().batalkanAjuan(skuId), { sukses: 'Pengajuan dibatalkan.', sesudah: () => segarkan.progress(user.id) });
+    aksi(api().batalkanAjuan(skuId), { sukses: 'Pengajuan dibatalkan.', sesudah: () => Promise.all([segarkan.progress(user.id), segarkan.praUji(user.id)]) });
+
+  /* ------------------------- Pra-uji berjenjang (fase D; hak ditegakkan server) ------------------------- */
+  /** Memastikan baris pra-uji satu Penegak sudah dimuat (dipanggil saat rincian SKU dibuka); sekali per Penegak per sesi masuk, lalu ikut penyegaran. */
+  const pastikanPraUji = (pesertaId) => (pesertaId && !praUjiDimuat.current.has(pesertaId) ? segarkan.praUji(pesertaId) : Promise.resolve());
+  const praUjiPeserta = (pesertaId) => db.praUji[pesertaId] ?? [];
+  /** Antrian penilai yang sedang masuk (Pinsa atau Bina Damping). */
+  const muatAntrianPraUji = useCallback(async () => {
+    const r = await api().muatAntrianPraUji();
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  }, [sesiBerakhir]);
+  /** Semua pra-uji yang menunggu (Pembina dan Admin). */
+  const muatPraUjiMenunggu = useCallback(async () => {
+    const r = await api().muatPraUjiMenunggu();
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  }, [sesiBerakhir]);
+  /** Penilai memutuskan satu pra-uji: hasil 'lulus' atau 'belum' (catatan wajib bila belum). */
+  const catatPraUji = (id, hasil, catatan) =>
+    aksi(api().catatPraUji(id, hasil, catatan), { sukses: hasil === 'lulus' ? 'Pra-uji lulus; pengajuan diteruskan.' : 'Pra-uji belum lulus; catatan dikirim ke Penegak.' });
+  /** Pembina atau Admin melewati tahap pra-uji yang macet. */
+  const lewatiPraUji = (id, alasan) =>
+    pembinaAtauAdmin(user)
+      ? aksi(api().lewatiPraUji(id, alasan), { sukses: 'Tahap pra-uji dilewati; pengajuan diteruskan.' })
+      : Promise.resolve(ditolak(notify, 'Hanya Pembina atau Admin Gudep yang dapat melewati tahap pra-uji.'));
+  /** Pembina atau Admin menghidupkan atau mematikan pra-uji. */
+  const aturSakelarPraUji = (aktif) =>
+    pembinaAtauAdmin(user)
+      ? aksi(api().aturSakelarPraUji(aktif), { sukses: aktif ? 'Pra-uji dihidupkan.' : 'Pra-uji dimatikan.', sesudah: () => Promise.all([segarkan.praUji(), segarkan.progress()]) })
+      : Promise.resolve(ditolak(notify, 'Hanya Pembina atau Admin Gudep yang dapat mengubah pengaturan pra-uji.'));
 
   /** Penguji yang sah untuk satu butir (dihitung server) beserta beban antriannya. Mengembalikan { ok, data } atau { ok: false, pesan }. */
   const pengujiPilihan = async (skuId, pesertaId = null) => {
@@ -771,9 +822,9 @@ export function AppProvider({ children }) {
       if (!baku && !(kelas && kelas.toLowerCase() === String(kelasLama ?? '').toLowerCase())) return { ok: false, pesan: PESAN_ROMBEL };
       data = { ...data, kelas: baku || kelas };
     }
-    // Jenis kelamin (semua peran): wajib untuk anggota baru; anggota lama boleh kosong sampai dilengkapi
+    // Jenis kelamin: wajib untuk anggota baru selain Penegak (Penegak baru hanya nama, NIS, rombel; sisanya diisi Penegak sendiri); anggota lama boleh kosong sampai dilengkapi
     const jk = normalisasiJenisKelamin(data.jenisKelamin);
-    if (!data.id && !jk) return { ok: false, pesan: `Jenis kelamin wajib dipilih. ${PESAN_JK}` };
+    if (!data.id && !jk && data.role !== 'peserta') return { ok: false, pesan: `Jenis kelamin wajib dipilih. ${PESAN_JK}` };
     if (data.jenisKelamin && !jk) return { ok: false, pesan: `Jenis kelamin tidak valid. ${PESAN_JK}` };
     // NTA (Penegak dan Dewan Ambalan) diperiksa sebelum apa pun disimpan, agar data lain tidak tersimpan sebagian
     const anggotaDewan = data.role === 'penguji' && data.jabatan === 'Dewan Ambalan';
@@ -930,6 +981,14 @@ export function AppProvider({ children }) {
         if (!n.ok) peringatan = `${peringatan ? `${peringatan} ` : ''}NTA ${daftarNta.length} anggota belum tersimpan: ${n.pesan}`;
       }
     }
+    if (kelompok === 'peserta' && daftar.length) {
+      const lahirPerBaris = new Map(siap.map(({ no, data }) => [no, data.lahir ?? '']));
+      const daftarLahir = daftar.map((h) => ({ username: h.username, tanggal: lahirPerBaris.get(h.no) ?? '' })).filter((x) => x.tanggal);
+      if (daftarLahir.length) {
+        const l = await api().imporTanggalLahir(daftarLahir);
+        if (!l.ok) peringatan = `${peringatan ? `${peringatan} ` : ''}Tanggal lahir ${daftarLahir.length} Penegak belum tersimpan (isi lewat menu Kelayakan): ${l.pesan}`;
+      }
+    }
     if (daftar.length) await segarkan.users();
     if (!daftar.length) return ditolak(notify, galatBerhenti ?? ditolakServer[0]?.pesan ?? 'Tidak ada akun yang berhasil dibuat.');
     notify(`${daftar.length} anggota berhasil diimpor.`);
@@ -1061,6 +1120,68 @@ export function AppProvider({ children }) {
     if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
     return r;
   };
+  /** Catatan pengukuhan Dewan Ambalan oleh Ketua Kwartir Ranting (dibaca pengurus; ditulis Pembina dan Admin). */
+  const muatPengukuhanDewan = async () => {
+    const r = await api().muatPengukuhanDewan();
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  };
+  const simpanPengukuhanDewan = async (d) => {
+    if (!bolehKepengurusan) return ditolak(notify, 'Hanya Pembina dan Admin Gudep yang dapat mencatat pengukuhan Dewan Ambalan.');
+    const r = await api().simpanPengukuhanDewan(d);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    notify('Pengukuhan Dewan Ambalan tersimpan.');
+    return r;
+  };
+  const hapusPengukuhanDewan = async (tahunAjaran) => {
+    if (!bolehKepengurusan) return ditolak(notify, 'Hanya Pembina dan Admin Gudep yang dapat menghapus catatan pengukuhan Dewan Ambalan.');
+    const r = await api().hapusPengukuhanDewan(tahunAjaran);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    notify('Catatan pengukuhan dihapus.');
+    return r;
+  };
+
+
+  /* ---------------- Pinsa dan Bina Damping (fase B; hak ditegakkan server, tampilan hanya mengikuti hasil server) ---------------- */
+  const pendampingan = db.pendampingan;
+  const muatBinaDamping = useCallback(async (tahunAjaran = null) => {
+    const r = await api().muatBinaDamping(tahunAjaran);
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  }, [sesiBerakhir]);
+  /** Menunjuk Bina Damping satu rombel (Dewan, Pembina, Admin; server memeriksa). ids = daftar lengkap (maks 2). */
+  const aturBinaDamping = async (tahunAjaran, rombel, ids) => {
+    const r = await api().aturBinaDamping(tahunAjaran, rombel, ids);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    await segarkan.pendampingan();
+    if (r.data > 0) notify(`Bina Damping rombel ${rombel} disimpan.`);
+    return r;
+  };
+  const muatSanggaRombel = useCallback(async (rombel) => {
+    const r = await api().muatSanggaRombel(rombel);
+    if (!r.ok && r.sesiBerakhir) await sesiBerakhir();
+    return r;
+  }, [sesiBerakhir]);
+  /** Membagi sangga dan menentukan Pinsa di satu rombel. daftar = [{ id, sangga?, pinsa? }]. Hasil: { diubah, peringatan }. */
+  const aturSangga = async (rombel, daftar) => {
+    const r = await api().aturSangga(rombel, daftar);
+    if (!r.ok) {
+      if (r.sesiBerakhir) await sesiBerakhir();
+      return { ok: false, pesan: r.pesan };
+    }
+    await Promise.all([segarkan.users(), segarkan.pendampingan()]);
+    if (r.data?.diubah > 0) notify('Susunan sangga disimpan.');
+    return r;
+  };
 
   /** Riwayat kenaikan kelas dan perubahan status (pengurus): { batch, log }. */
   const muatNaikKelas = async () => {
@@ -1110,6 +1231,10 @@ export function AppProvider({ children }) {
       sukses: nomor ? 'Nomor WhatsApp tersimpan.' : 'Nomor WhatsApp dikosongkan.',
       sesudah: async () => { setDb((d) => ({ ...d, users: d.users.map((u) => (u.id === sesiId ? { ...u, whatsapp: nomor || undefined } : u)) })); },
     });
+
+  /* ---------------- Isian data diri Penegak (Tahap 3, H1) ---------------- */
+  // Penegak menyimpan data dirinya sendiri; jenis kelamin, agama, dan NTA (bila baru terisi) ikut memperbarui profil di aplikasi.
+  const simpanIsianSaya = (data) => aksi(api().simpanIsianSaya(data), { sesudah: () => segarkan.users() });
 
   /* ---------------- Eskalasi: daftar Tindak Lanjut (Pembina, Dewan Ambalan, Admin) ---------------- */
   const muatEskalasi = async () => {
@@ -1218,10 +1343,12 @@ export function AppProvider({ children }) {
     buatSesiAbsen, setStatusAbsen, tandaiBanyakAbsen, hapusSesiAbsen, semesterSiap, pastikanAbsensi,
     gantiPin, resetPin,
     simpanAnggota, imporAnggota, hapusAnggota, perbaruiRombel, lengkapiJenisKelamin,
-    simpanGudep, simpanWhatsapp, muatEskalasi,
+    simpanGudep, simpanWhatsapp, simpanIsianSaya, muatEskalasi,
     dokumen: db.dokumen, muatDokumen, terbitkanSuratAgama, cabutDokumen, bolehSurat,
     penugasan: db.penugasan, penugasanPeserta: db.penugasanPeserta, guruAgama: db.guruAgama, muatPenugasan, muatLogPenugasan, aturPenugasan, aturPenugasanPeserta, salinPenugasan, simpanGuruAgama, hapusGuruAgama, bolehAturPenugasan,
-    bolehKepengurusan, terapkanKepengurusan, aturJabatanDewan, arsipkanDewanLama, muatLogKepengurusan,
+    praUjiAktif, pastikanPraUji, praUjiPeserta, muatAntrianPraUji, muatPraUjiMenunggu, catatPraUji, lewatiPraUji, aturSakelarPraUji,
+    pendampingan, muatBinaDamping, aturBinaDamping, muatSanggaRombel, aturSangga,
+    bolehKepengurusan, terapkanKepengurusan, aturJabatanDewan, arsipkanDewanLama, muatLogKepengurusan, muatPengukuhanDewan, simpanPengukuhanDewan, hapusPengukuhanDewan,
     muatUlang: muatSemua,
     notifikasi: db.notifikasi, belumDibaca: jumlahBelumDibaca(db.notifikasi), segarkanNotifikasi, tandaiNotifikasi, api,
     notify, toast,

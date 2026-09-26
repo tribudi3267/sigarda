@@ -51,6 +51,12 @@ export function teksWaAjakMasuk(nama, alamat = '') {
     + 'Kalau lupa PIN awal atau ada kendala, kabari kami ya, nanti dibantu. Terima kasih.';
 }
 
+/** Teks WhatsApp ajakan melengkapi data diri (Periksa Data): menyebut isian yang kurang dan tempat mengisinya. `kurang` = daftar label isian. */
+export function teksWaLengkapiDataDiri(nama, kurang = [], alamat = '') {
+  return `Halo ${nama}, ini dari pengurus SIGARDA. Data dirimu untuk portofolio Garuda masih perlu dilengkapi: ${kurang.join(', ')}. `
+    + `Silakan buka ${alamat || 'SIGARDA'}, masuk, lalu pilih menu Akun saya > Data diri (atau isi lewat jendela yang muncul sesudah masuk). Kalau ada kendala, kabari kami ya. Terima kasih.`;
+}
+
 /**
  * Siapa boleh menghubungi siapa lewat tombol WhatsApp di Periksa Data dan daftar perangkat notifikasi. `peran` = label peran pada baris server
  * ('Penegak', 'Pembina', 'Admin Gudep', selain itu Dewan Ambalan). Pembina dan Admin: Penegak, Dewan Ambalan, dan sesama Pembina; Dewan Ambalan:

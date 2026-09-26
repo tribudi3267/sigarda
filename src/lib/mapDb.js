@@ -4,7 +4,7 @@
  * Server menyimpan data dalam tabel (snake_case). Seluruh halaman aplikasi memakai bentuk data
  * bersarang berikut, sehingga lapisan ini menjembataninya:
  *
- *   users[]                        { id, username, role, nama, nis, kelas, sangga, agama, jabatan, jabatanDewan, calonGaruda, nta,
+ *   users[]                        { id, username, role, nama, nis, kelas, sangga, agama, jabatan, jabatanDewan, pinsa, calonGaruda, nta,
  *                                    wajibGantiPin, pinDireset:{oleh,waktu}, pinDiubah, dibuat }
  *   progress[pesertaId][skuId]     { status, jadwal, pengujiId, tanggalUji, nilai, catatan, catatanPeserta,
  *                                    verifikasi, diverifikasiPada, riwayat:[{waktu,teks,oleh}] }
@@ -29,6 +29,7 @@ export function petaProfil(r) {
     agama: atau(r.agama),
     jabatan: atau(r.jabatan),
     jabatanDewan: atau(r.jabatan_dewan),
+    pinsa: r.pinsa ? true : undefined,
     jenisKelamin: atau(r.jenis_kelamin),
     whatsapp: atau(r.whatsapp),
     status: r.status ?? 'aktif',
@@ -294,6 +295,103 @@ export const susunAgenda = (baris = []) =>
     pesertaTerkait: r.peserta_terkait ?? [], lewatiBatas: !!r.lewati_batas, dibuatOleh: r.dibuat_oleh ?? null, dibuatPada: r.dibuat_pada,
   })).sort((a, b) => a.tanggal.localeCompare(b.tanggal));
 
+/** Baris pelantikan -> [{ id, pesertaId, tingkat ('bantara'|'laksana'), tanggal, tempat, agendaId, catatan, dicatatOleh, dicatatPada }], tanggal terbaru dulu. */
+export const susunPelantikan = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), pesertaId: r.peserta_id, tingkat: r.tingkat, tanggal: tgl(r.tanggal), tempat: r.tempat, agendaId: r.agenda_id == null ? null : Number(r.agenda_id),
+    catatan: r.catatan ?? '', dicatatOleh: r.dicatat_oleh ?? null, dicatatPada: r.dicatat_pada,
+  })).sort((a, b) => b.tanggal.localeCompare(a.tanggal) || a.id - b.id);
+
+/** Baris saka_anggota -> [{ id, pesertaId, saka, tanggalMasuk, status ('aktif'|'selesai'), tanggalSelesai, suratUrl, catatan, dicatatPada }], nama Saka lalu tanggal masuk. */
+export const susunSaka = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), pesertaId: r.peserta_id, saka: r.saka, tanggalMasuk: tgl(r.tanggal_masuk), status: r.status, tanggalSelesai: r.tanggal_selesai ? tgl(r.tanggal_selesai) : null,
+    suratUrl: r.surat_url ?? '', catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada,
+  })).sort((a, b) => a.saka.localeCompare(b.saka, 'id') || a.tanggalMasuk.localeCompare(b.tanggalMasuk));
+
+/**
+ * Baris tim_penilai dan tim_penilai_anggota -> [{ id, tahunAjaran, untuk ('putra'|'putri'), nomorSk, tanggalSk, skUrl, catatan, dicatatPada,
+ * anggota: [{ id, urut, nama, unsur, jabatan, keterangan }] }], tahun ajaran terbaru lalu putra dahulu.
+ */
+export const susunTimPenilai = (tim = [], anggota = []) =>
+  tim.map((t) => ({
+    id: Number(t.id), tahunAjaran: t.tahun_ajaran, untuk: t.untuk, nomorSk: t.nomor_sk ?? '', tanggalSk: t.tanggal_sk ? tgl(t.tanggal_sk) : null, skUrl: t.sk_url ?? '', catatan: t.catatan ?? '',
+    dicatatPada: t.dicatat_pada,
+    anggota: anggota.filter((a) => Number(a.tim_id) === Number(t.id)).map((a) => ({ id: Number(a.id), urut: Number(a.urut), nama: a.nama, unsur: a.unsur, jabatan: a.jabatan, keterangan: a.keterangan ?? '' })).sort((a, b) => a.urut - b.urut),
+  })).sort((a, b) => b.tahunAjaran.localeCompare(a.tahunAjaran) || (a.untuk === b.untuk ? 0 : a.untuk === 'putra' ? -1 : 1));
+
+/** Baris garuda_tahap -> [{ id, tahunAjaran, tahap, mulai, akhir (atau null), catatan, dicatatPada }]. */
+export const susunGarudaTahap = (baris = []) =>
+  baris.map((r) => ({ id: Number(r.id), tahunAjaran: r.tahun_ajaran, tahap: r.tahap, mulai: tgl(r.mulai), akhir: r.akhir ? tgl(r.akhir) : null, catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada }));
+
+/** Baris tanggal_lahir -> [{ pesertaId, tanggal (YYYY-MM-DD), dicatatPada }]. */
+export const susunTanggalLahir = (baris = []) => baris.map((r) => ({ pesertaId: r.peserta_id, tanggal: tgl(r.tanggal), dicatatPada: r.dicatat_pada }));
+
+/** Baris penegak_isian dan tanggal_lahir (satu Penegak) -> { isian: { kunci: nilai }, lahir: 'YYYY-MM-DD' atau null }. */
+export const susunIsian = (baris = [], lahir = []) => ({
+  isian: Object.fromEntries(baris.map((r) => [r.kunci, r.nilai])),
+  lahir: lahir[0]?.tanggal ? tgl(lahir[0].tanggal) : null,
+});
+
+/** Baris sfh_catatan -> [{ id, anggotaId, jenis, tanggal, buktiUrl, catatan, dicatatPada }], urut anggota lalu jenis. */
+export const susunSfh = (baris = []) =>
+  baris.map((r) => ({ id: Number(r.id), anggotaId: r.anggota_id, jenis: r.jenis, tanggal: tgl(r.tanggal), buktiUrl: r.bukti_url ?? '', catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada }))
+    .sort((a, b) => a.anggotaId.localeCompare(b.anggotaId) || a.jenis.localeCompare(b.jenis));
+
+/** Baris portofolio_snapshot -> [{ id, pesertaId, tahunAjaran, catatan, isi, dibuatOlehNama, dibuatPada }], terbaru dulu. */
+export const susunSnapshot = (baris = []) =>
+  baris.map((r) => ({ id: Number(r.id), pesertaId: r.peserta_id, tahunAjaran: r.tahun_ajaran, catatan: r.catatan ?? '', isi: r.isi ?? {}, dibuatOlehNama: r.dibuat_oleh_nama ?? '', dibuatPada: r.dibuat_pada }))
+    .sort((a, b) => String(b.dibuatPada).localeCompare(String(a.dibuatPada)) || b.id - a.id);
+
+/** Baris dokumen_templat -> [{ id, tahunAjaran, jenis, isi: { uji, baris, pita } }], tahun ajaran terbaru dulu. */
+export const susunTemplatDokumen = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), tahunAjaran: r.tahun_ajaran, jenis: r.jenis,
+    isi: { uji: r.isi?.uji ?? '', baris: Array.isArray(r.isi?.baris) ? r.isi.baris : [], pita: Array.isArray(r.isi?.pita) ? r.isi.pita : null },
+  })).sort((a, b) => b.tahunAjaran.localeCompare(a.tahunAjaran) || a.jenis.localeCompare(b.jenis));
+
+/** Nilai pengaturan 'garuda.gerbang' -> { kelasMin, lahirDari, lahirSampai, kuotaPersen } yang aman (bentuk rusak atau belum ada = `bawaan`). */
+export const susunGerbang = (nilai, bawaan) =>
+  nilai && ['X', 'XI', 'XII'].includes(nilai.kelasMin) && /^\d{4}-\d{2}-\d{2}$/.test(nilai.lahirDari ?? '') && /^\d{4}-\d{2}-\d{2}$/.test(nilai.lahirSampai ?? '') && Number.isInteger(nilai.kuotaPersen)
+    ? { kelasMin: nilai.kelasMin, lahirDari: nilai.lahirDari, lahirSampai: nilai.lahirSampai, kuotaPersen: nilai.kuotaPersen }
+    : bawaan;
+
+/** Baris spg_penetapan -> [{ pesertaId, butir, nilai (100|0), tanggal, catatan, timpa, dicatatPada }], urut Penegak lalu butir. */
+export const susunSpg = (baris = []) =>
+  baris.map((r) => ({
+    pesertaId: r.peserta_id, butir: Number(r.butir), nilai: Number(r.nilai), tanggal: tgl(r.tanggal), catatan: r.catatan ?? '', timpa: !!r.timpa, dicatatPada: r.dicatat_pada,
+  })).sort((a, b) => a.pesertaId.localeCompare(b.pesertaId) || a.butir - b.butir);
+
+/** Baris tkk_capaian -> [{ id, pesertaId, tkkId, tingkat ('purwa'|'madya'|'utama'), tanggal, penguji1, penguji2, melatih, buktiUrl, catatan, dicatatPada }], tanggal terbaru dulu. */
+export const susunTkkCapaian = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), pesertaId: r.peserta_id, tkkId: r.tkk_id, tingkat: r.tingkat, tanggal: tgl(r.tanggal), penguji1: r.penguji1, penguji2: r.penguji2, melatih: r.melatih,
+    buktiUrl: r.bukti_url ?? '', catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada,
+  })).sort((a, b) => b.tanggal.localeCompare(a.tanggal) || a.id - b.id);
+
+/** Baris tkk_krida -> [{ id, pesertaId, nama, saka, tanggal, buktiUrl, catatan, dicatatPada }], tanggal terbaru dulu. */
+export const susunTkkKrida = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), pesertaId: r.peserta_id, nama: r.nama, saka: r.saka ?? '', tanggal: tgl(r.tanggal), buktiUrl: r.bukti_url ?? '', catatan: r.catatan ?? '', dicatatPada: r.dicatat_pada,
+  })).sort((a, b) => b.tanggal.localeCompare(a.tanggal) || a.id - b.id);
+
+/**
+ * Baris tkk_pengajuan -> [{ id, pesertaId, tkkId, tingkat, tanggal, penguji1, penguji2, melatih, buktiUrl, catatan, status ('menunggu'|'disetujui'|'ditolak'|'dibatalkan'),
+ * diajukanPada, ditinjauNama, ditinjauPada, catatanTinjauan, capaianId }], yang menunggu dan terbaru lebih dulu.
+ */
+export const susunTkkPengajuan = (baris = []) =>
+  baris.map((r) => ({
+    id: Number(r.id), pesertaId: r.peserta_id, tkkId: r.tkk_id, tingkat: r.tingkat, tanggal: tgl(r.tanggal), penguji1: r.penguji1, penguji1Id: r.penguji1_id ?? null, penguji2: r.penguji2, pengujiAwal: r.penguji_awal ?? '', melatih: r.melatih,
+    buktiUrl: r.bukti_url ?? '', catatan: r.catatan ?? '', status: r.status, diajukanPada: r.diajukan_pada, ditinjauNama: r.ditinjau_nama ?? null, ditinjauPada: r.ditinjau_pada ?? null,
+    catatanTinjauan: r.catatan_tinjauan ?? '', capaianId: r.capaian_id == null ? null : Number(r.capaian_id),
+  })).sort((a, b) => Number(b.status === 'menunggu') - Number(a.status === 'menunggu') || b.id - a.id);
+
+/** Nilai pengaturan 'tkk.ambang' -> { total, madya, utamaWajib } yang aman (bentuk rusak atau belum ada = `bawaan`). */
+export const susunAmbangTkk = (nilai, bawaan) =>
+  nilai && Number.isInteger(nilai.total) && Number.isInteger(nilai.madya) && Array.isArray(nilai.utamaWajib) && nilai.utamaWajib.every((x) => typeof x === 'string')
+    ? { total: nilai.total, madya: nilai.madya, utamaWajib: nilai.utamaWajib }
+    : bawaan;
+
 /** Baris raport satu semester -> { [pesertaId]: baris } */
 export const susunRaport = (baris = []) => Object.fromEntries(baris.map((r) => [r.peserta_id, petaRaport(r)]));
 
@@ -319,6 +417,13 @@ export const susunLogKepengurusan = (baris = []) =>
     id: Number(r.id), waktu: r.waktu, pesertaId: r.peserta_id ?? null, pesertaNama: r.peserta_nama, nis: r.nis ?? '', tindakan: r.tindakan,
     jabatanLama: r.jabatan_lama ?? null, jabatanBaru: r.jabatan_baru ?? null, alasan: r.alasan ?? '', olehNama: r.oleh_nama ?? '',
   })).sort((a, b) => b.id - a.id);
+
+/** Baris pengukuhan_dewan -> [{ tahunAjaran, nomorSk, tanggalSk, rekomNomor, rekomTanggal, catatan, diubahPada }] (tahun ajaran terbaru lebih dulu) */
+export const susunPengukuhanDewan = (baris = []) =>
+  baris.map((r) => ({
+    tahunAjaran: r.tahun_ajaran, nomorSk: r.nomor_sk, tanggalSk: String(r.tanggal_sk).slice(0, 10), rekomNomor: r.rekomendasi_nomor ?? '',
+    rekomTanggal: r.rekomendasi_tanggal ? String(r.rekomendasi_tanggal).slice(0, 10) : '', catatan: r.catatan ?? '', diubahPada: r.diubah_pada ?? null,
+  })).sort((a, b) => b.tahunAjaran.localeCompare(a.tahunAjaran));
 
 /** Baris naik_kelas_batch -> [{ id, waktu, tahunAjaran, ringkasan, olehNama, dibatalkanPada }] (terbaru lebih dulu) */
 export const susunBatchNaikKelas = (baris = []) =>
@@ -363,3 +468,64 @@ export const susunNotifikasi = (baris = []) =>
     id: Number(r.id), jenis: r.jenis, judul: r.judul, isi: r.isi ?? '', tautan: r.tautan ?? {}, dibuat: r.dibuat,
     dibaca: !!r.dibaca_pada, dibacaPada: r.dibaca_pada ?? null, pushStatus: r.push_status ?? null,
   }));
+
+/* ---------------- Pinsa dan Bina Damping (fase B) ---------------- */
+
+/** sg_pendampingan_saya -> { binaDamping: [rombel], pinsa } (rombel yang saya dampingi pada tahun ajaran berjalan, dan apakah saya Pinsa). */
+export const susunPendampingan = (d) => ({ binaDamping: Array.isArray(d?.bina_damping) ? d.bina_damping : [], pinsa: !!d?.pinsa });
+
+/** Baris sku_pra_uji -> { id, pesertaId, skuId, tahap, status, jadwal, catatanPeserta, penilaiId, penilaiNama, catatan, dibuat, diputuskanPada } (id = nomor urut). */
+export const petaPraUji = (r) => ({
+  id: Number(r.id),
+  pesertaId: r.peserta_id,
+  skuId: r.sku_id,
+  tahap: r.tahap,
+  status: r.status,
+  jadwal: r.jadwal ?? null,
+  catatanPeserta: r.catatan_peserta ?? '',
+  penilaiId: r.penilai_id ?? null,
+  penilaiNama: r.penilai_nama ?? null,
+  catatan: r.catatan ?? '',
+  dibuat: r.dibuat,
+  diputuskanPada: r.diputuskan_pada ?? null,
+});
+
+/**
+ * sg_pra_uji_antrian -> { aktif, menunggu: [{ id, pesertaId, pesertaNama, kelas, sangga, skuId, tahap, jadwal, catatanPeserta, dibuat }],
+ * selesai: [{ id, pesertaId, pesertaNama, kelas, sangga, skuId, tahap, status, catatan, diputuskanPada }] }.
+ */
+export const susunAntrianPraUji = (d) => ({
+  aktif: !!d?.aktif,
+  menunggu: (d?.menunggu ?? []).map((r) => ({
+    id: Number(r.id), pesertaId: r.peserta_id, pesertaNama: r.peserta_nama, kelas: r.kelas ?? '', sangga: r.sangga ?? '', skuId: r.sku_id,
+    tahap: r.tahap, jadwal: r.jadwal ?? null, catatanPeserta: r.catatan_peserta ?? '', dibuat: r.dibuat,
+  })),
+  selesai: (d?.selesai ?? []).map((r) => ({
+    id: Number(r.id), pesertaId: r.peserta_id, pesertaNama: r.peserta_nama, kelas: r.kelas ?? '', sangga: r.sangga ?? '', skuId: r.sku_id,
+    tahap: r.tahap, status: r.status, catatan: r.catatan ?? '', diputuskanPada: r.diputuskan_pada ?? null,
+  })),
+});
+
+/**
+ * sg_sangga_rombel -> { rombel, tahunAjaran, bisaAtur, binaDamping: [{ id, nama, tingkat }], anggota: [{ id, nama, sangga, pinsa, tingkat, layakPinsa }],
+ * peringatan: [{ sangga, teks }] }. tingkat = 'calon-bantara' | 'calon-laksana' | 'laksana' atau null (tidak boleh dilihat).
+ */
+export const susunSanggaRombel = (d) => ({
+  rombel: d.rombel,
+  tahunAjaran: d.tahun_ajaran,
+  bisaAtur: !!d.bisa_atur,
+  binaDamping: (d.bina_damping ?? []).map((b) => ({ id: b.id, nama: b.nama, tingkat: b.tingkat ?? null })),
+  anggota: (d.anggota ?? []).map((a) => ({ id: a.id, nama: a.nama, sangga: a.sangga, pinsa: !!a.pinsa, tingkat: a.tingkat ?? null, layakPinsa: !!a.layak_pinsa })),
+  peringatan: (d.peringatan ?? []).map((p) => ({ sangga: p.sangga ?? null, teks: p.teks })),
+});
+
+/**
+ * sg_bina_damping_daftar -> { tahunAjaran, bisaAtur, penugasan: [{ rombel, id, nama, kelas, jabatanDewan, tingkat }],
+ * calon: [{ id, nama, kelas, jabatanDewan, tingkat, rombel }] } (calon = Penegak berjabatan Dewan minimal Calon Laksana, yang sudah Laksana lebih dulu).
+ */
+export const susunBinaDamping = (d) => ({
+  tahunAjaran: d.tahun_ajaran,
+  bisaAtur: !!d.bisa_atur,
+  penugasan: (d.penugasan ?? []).map((p) => ({ rombel: p.rombel, id: p.penegak_id, nama: p.nama, kelas: p.kelas ?? null, jabatanDewan: p.jabatan_dewan ?? null, tingkat: p.tingkat })),
+  calon: (d.calon ?? []).map((c) => ({ id: c.id, nama: c.nama, kelas: c.kelas ?? null, jabatanDewan: c.jabatan_dewan ?? null, tingkat: c.tingkat, rombel: c.rombel ?? null })),
+});

@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
-import { periksaBaris, bacaExcelAnggota, buatTemplateAnggota, kolomTemplate } from '../src/lib/importAnggota.js';
+import { periksaBaris, kolomTemplate } from '../src/lib/importAnggota.js';
+import { bacaExcelAnggota, buatTemplateAnggota } from '../src/lib/importAnggotaExcel.js';
 import { formatPinSah, pinLemah, validasiPinBaru, buatPinAcak, bolehResetPin } from '../src/lib/pinLogic.js';
 import { bangunIndeks } from '../src/lib/cariNama.js';
 import { pinLemah as pinLemahServer, validasiPinBaru as valServer, bolehResetPin as resetServer, slugUsername } from '../supabase/functions/sigarda/index.ts';
@@ -46,7 +47,7 @@ p = periksaBaris([{ no: 2, nama: 'Rizky Dewan', ...kp }], users, 'pembina');
 ok(p[0].siap, 'nama sama pada jabatan berbeda (Pembina) boleh');
 
 // template
-ok(kolomTemplate('peserta').map((c) => c.key).join() === 'nama,jk,nis,kelas,sangga,agama,nta,pin' && kolomTemplate('dewan').map((c) => c.key).join() === 'nama,jk,username,jabatanDewan,nta,pin' && kolomTemplate('pembina').map((c) => c.key).join() === 'nama,jk,username,agama,pin', 'kolom template');
+ok(kolomTemplate('peserta').map((c) => c.key).join() === 'nama,jk,nis,kelas,sangga,agama,nta,pin,lahir' && kolomTemplate('dewan').map((c) => c.key).join() === 'nama,jk,username,jabatanDewan,nta,pin' && kolomTemplate('pembina').map((c) => c.key).join() === 'nama,jk,username,agama,pin', 'kolom template');
 {
   const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await buatTemplateAnggota('dewan'));
   const ws = wb.getWorksheet('Anggota');
@@ -65,7 +66,7 @@ ok(kolomTemplate('peserta').map((c) => c.key).join() === 'nama,jk,nis,kelas,sang
   const b = await bacaExcelAnggota(await wb.xlsx.writeBuffer(), 'peserta');
   ok(b.length === 1 && b[0].nis === '10301' && b[0].username === '', 'baca file Penegak');
   let petunjuk = ''; wb.getWorksheet('Petunjuk').eachRow((r) => r.eachCell((c) => { petunjuk += c.value + ' '; }));
-  ok(/NIS WAJIB/.test(petunjuk), 'petunjuk Penegak: NIS wajib');
+  ok(/HANYA tiga: Nama Lengkap, NIS, dan Rombel/.test(petunjuk) && /NIS tidak boleh sama/.test(petunjuk), 'petunjuk Penegak: hanya nama, NIS, rombel yang wajib; NIS unik');
 }
 
 // PIN: klien dan server sepakat

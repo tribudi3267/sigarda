@@ -5,7 +5,7 @@
 create table public.notifikasi (
   id bigint generated always as identity primary key,
   penerima_id uuid not null references public.profiles(id) on delete cascade,
-  jenis text not null check (jenis in ('ajukan','alih','mulai','hasil','pengingat','lama','sesi','surat','tes','eskalasi','agenda','musyawarah','kegiatan')),   -- 'tes' = notifikasi uji dari tombol di halaman Notifikasi; 'eskalasi' = tangga pengingat tahap L5; 'agenda' = pengingat H-30/H-7/H-1 tahap L6; 'musyawarah' = usulan/pengingat Musyawarah Ambalan tahap L6b; 'kegiatan' = usulan/pengingat 10 jenis kegiatan lain tahap L6b
+  jenis text not null check (jenis in ('ajukan','alih','mulai','hasil','pengingat','lama','sesi','surat','tes','eskalasi','agenda','musyawarah','kegiatan','pra_uji','tkk')),   -- 'tes' = notifikasi uji dari tombol di halaman Notifikasi; 'eskalasi' = tangga pengingat tahap L5; 'agenda' = pengingat H-30/H-7/H-1 tahap L6; 'musyawarah' = usulan/pengingat Musyawarah Ambalan tahap L6b; 'kegiatan' = usulan/pengingat 10 jenis kegiatan lain tahap L6b
   judul text not null check (char_length(judul) between 1 and 120),
   isi text not null default '' check (char_length(isi) <= 300),
   tautan jsonb not null default '{}'::jsonb,                        -- { tab: 'antrian' | 'sku' | 'beranda' | 'cetak' }

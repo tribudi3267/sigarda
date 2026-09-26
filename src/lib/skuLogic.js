@@ -110,11 +110,12 @@ export const PESAN_BUTIR_AGAMA = 'Butir agama hanya dapat dinilai oleh Pembina.'
 export const PESAN_BUTIR_LAKSANA = 'Butir Laksana hanya dapat dinilai oleh Pembina atau penguji yang ditugaskan untuk Penegak ini.';
 export const bolehMenilaiPoin = (user, poin, konteks) => {
   if (user?.role !== 'penguji') return false;
-  if (konteks) return pengujiPeranOk(konteks.users, konteks.peserta, user, poin, konteks.dokumen, { penugasan: konteks.penugasan, penugasanPeserta: konteks.penugasanPeserta });
+  if (konteks) return pengujiPeranOk(konteks.users, konteks.peserta, user, poin, konteks.dokumen, { penugasan: konteks.penugasan, penugasanPeserta: konteks.penugasanPeserta, praUji: konteks.praUji });
   return user.jabatan === 'Pembina' || (!poin?.agama && poin?.tingkat !== 'Laksana');
 };
-/** Pesan untuk penguji yang tidak boleh menilai butir ini (agama lebih dulu, lalu Laksana). */
-export const pesanTidakBolehMenilai = (poin) => (poin?.agama ? PESAN_BUTIR_AGAMA : PESAN_BUTIR_LAKSANA);
+export const PESAN_UJI_PEMBINA = 'Uji resmi hanya dilakukan Pembina; Dewan Ambalan berperan di pra-uji.';
+/** Pesan untuk penguji yang tidak boleh menilai butir ini (pra-uji hidup: uji resmi hanya Pembina; lalu agama, lalu Laksana). */
+export const pesanTidakBolehMenilai = (poin, praUji = false) => (praUji ? PESAN_UJI_PEMBINA : poin?.agama ? PESAN_BUTIR_AGAMA : PESAN_BUTIR_LAKSANA);
 
 /** Memenuhi syarat mencalonkan diri: seluruh SKU Bantara dan Laksana lulus. */
 export const layakGaruda = (progress, peserta) =>
@@ -262,7 +263,7 @@ export function catatHasilUji(progress, { peserta, skuId, pengujiId, hasil, tang
  * antrian bersama rombel (pengajuan tanpa penguji tujuan) yang sah dinilainya. Kesahan itu memakai `penugasan` (baris penugasan tahun
  * ajaran berjalan); tanpa `penugasan` semua antrian bersama ditampilkan (aturan lama). `bersama` = belum ada penguji tujuan.
  */
-export function antrianPengujian(progress, users, pengujiId = null, penugasan = null, dokumen = [], penugasanPeserta = []) {
+export function antrianPengujian(progress, users, pengujiId = null, penugasan = null, dokumen = [], penugasanPeserta = [], praUji = false) {
   const hasil = [];
   for (const u of users) {
     if (u.role !== 'peserta' || (u.status ?? 'aktif') !== 'aktif') continue;
@@ -273,7 +274,7 @@ export function antrianPengujian(progress, users, pengujiId = null, penugasan = 
       const poin = cariPoin(skuId);
       if (!poin) continue;
       const bersama = !entry.pengujiId;
-      if (pengujiId && bersama && penugasan && !pengujiSah({ users, penugasan, penugasanPeserta, peserta: u, poin, dokumen }).penguji.some((x) => x.id === pengujiId)) continue;
+      if (pengujiId && bersama && penugasan && !pengujiSah({ users, penugasan, penugasanPeserta, peserta: u, poin, dokumen, praUji }).penguji.some((x) => x.id === pengujiId)) continue;
       hasil.push({ peserta: u, poin, entry, bersama });
     }
   }

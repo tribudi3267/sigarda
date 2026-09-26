@@ -38,7 +38,7 @@ await pg.query(`insert into public.pengaturan (kunci, nilai) values ('sidang.nam
 let r = await K.peserta.k.from('sidang_dk').select('*');
 ok(!r.error && r.data.length === 0, 'Penegak membaca sidang_dk: 0 baris (dibatasi RLS)');
 r = await K.peserta.k.from('pengaturan').select('*');
-ok(!r.error && r.data.length === 1, 'Penegak boleh membaca pengaturan');
+ok(!r.error && r.data.some((x) => x.kunci === 'sidang.nama_ketua'), 'Penegak boleh membaca pengaturan (baris sidang.nama_ketua tampil; baris bawaan tkk.ambang juga ada)');
 r = await K.dewan.k.from('sidang_dk').select('*');
 ok(!r.error, 'Dewan boleh membaca sidang_dk');
 const tulisLangsung = async (who, sql) => { try { await pg.transaction(async (tx) => { await tx.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: K[who].id, role: 'authenticated' })]); await tx.query('set local role authenticated'); await tx.query(sql); }); return null; } catch (e) { return e.message; } };

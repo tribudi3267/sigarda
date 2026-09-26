@@ -56,6 +56,37 @@ create table public.kepengurusan_log (
 );
 create index kepengurusan_log_waktu_idx on public.kepengurusan_log (id);
 -- ===== akhir tabel dewan penegak =====
+-- ===== Pengukuhan Dewan Ambalan (Fase A): tabel =====
+-- Pengukuhan kepengurusan Dewan Ambalan (ketua dan wakil ketua) oleh Ketua Kwartir Ranting: satu catatan per tahun ajaran. Dasar: AD/ART Munas 2023, Anggaran Rumah Tangga
+-- Pasal 51 ayat (2) huruf a (ditetapkan berdasarkan rekomendasi Ketua Majelis Pembimbing Gugusdepan dan dikukuhkan dengan surat keputusan Ketua Kwartir Ranting).
+-- Nomor dan tanggal rekomendasi Ketua Mabigus opsional, tetapi harus diisi berpasangan.
+create table public.pengukuhan_dewan (
+  tahun_ajaran text primary key check (tahun_ajaran ~ '^[0-9]{4}/[0-9]{4}$'),
+  nomor_sk text not null check (char_length(nomor_sk) between 1 and 80 and nomor_sk !~ '[[:cntrl:]<>]'),
+  tanggal_sk date not null,
+  rekomendasi_nomor text not null default '' check (char_length(rekomendasi_nomor) <= 80 and rekomendasi_nomor !~ '[[:cntrl:]<>]'),
+  rekomendasi_tanggal date,
+  catatan text not null default '' check (char_length(catatan) <= 200),
+  diubah_oleh uuid references public.profiles(id) on delete set null,
+  diubah_pada timestamptz not null default now(),
+  constraint pengukuhan_rekomendasi_pasangan check ((rekomendasi_nomor = '') = (rekomendasi_tanggal is null))
+);
+-- ===== akhir tabel pengukuhan dewan =====
+-- ===== Pinsa dan Bina Damping (fase B): tabel =====
+-- Bina Damping: 2 orang per rombel per tahun ajaran, Penegak berjabatan Dewan Ambalan yang minimal Calon Laksana (utamakan yang sudah Laksana), ditunjuk lewat
+-- sg_bina_damping_atur. Satu orang hanya satu rombel per tahun ajaran (persediaan pendamping terbatas). Tanpa kebijakan baca: dibaca lewat fungsi sg_* saja.
+-- Baris hilang sendiri (pemicu profiles_bina_damping_bersih) bila Penegaknya nonaktif/alumni atau tidak lagi berjabatan Dewan.
+create table public.bina_damping (
+  tahun_ajaran text not null check (tahun_ajaran ~ '^[0-9]{4}/[0-9]{4}$'),
+  rombel text not null check (rombel ~ '^(X|XI|XII)-(0[1-9]|10)$'),
+  penegak_id uuid not null references public.profiles(id) on delete cascade,
+  ditetapkan_oleh uuid references public.profiles(id) on delete set null,
+  ditetapkan_pada timestamptz not null default now(),
+  primary key (tahun_ajaran, rombel, penegak_id)
+);
+create unique index bina_damping_satu_rombel_idx on public.bina_damping (tahun_ajaran, penegak_id);
+create index bina_damping_penegak_idx on public.bina_damping (penegak_id);
+-- ===== akhir tabel pinsa bina damping =====
 -- Guru agama di sekolah (per agama), rujukan surat pengantar bila tidak ada Pembina yang seagama dengan Penegak (dikelola Admin).
 create table public.guru_agama (
   id bigint generated always as identity primary key,
