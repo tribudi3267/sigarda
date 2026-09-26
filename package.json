@@ -14,7 +14,8 @@
     "catatan-rilis": "node scripts/catatan-rilis.mjs",
     "periksa-peraturan": "node scripts/periksa-peraturan.mjs",
     "uji": "node uji/jalankan.mjs",
-    "simulasi:pra-uji": "node scripts/jalankan-simulasi.mjs scripts/simulasi-pra-uji.mjs"
+    "simulasi:pra-uji": "node scripts/jalankan-simulasi.mjs scripts/simulasi-pra-uji.mjs",
+    "simulasi:beban": "node scripts/jalankan-simulasi.mjs scripts/simulasi-beban-tahap3-4.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",
