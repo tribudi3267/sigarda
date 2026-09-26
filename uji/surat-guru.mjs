@@ -68,7 +68,7 @@ ok(b.length === 2 && b[0].no === 1 && b[1].no === 2 && b[0].jenis === 'butir', '
 b = barisSurat({ baris: ['# Word', 'margin', 'spasi', '# Excel', 'rumus'] });
 ok(b.map((x) => `${x.jenis}:${x.no}`).join() === 'judul:1,butir:,butir:,judul:2,butir:' && b[0].teks === 'Word', 'dengan judul kelompok: judul bernomor, butir tidak');
 b = barisSurat(null);
-ok(b.length === 5 && b.every((x) => x.jenis === 'kosong') && b[4].no === 5, 'templat kosong: lima baris kosong bernomor');
+ok(b.length === 7 && b.every((x) => x.jenis === 'kosong') && b[6].no === 7, 'templat kosong: tujuh baris kosong bernomor (seperti lembar Kwarcab)');
 ok(pitaSurat(null).join() === PITA_BAWAAN.join() && pitaSurat({ pita: ['a', 'b', 'c'] }).join() === 'a,b,c' && pitaSurat({ pita: ['a'] }).join() === PITA_BAWAAN.join(), 'pita: bawaan bila tidak tiga');
 const isi = isiDariForm({ uji: '  topik  ', rubrik: 'a\n\n  b  \r\nc', pita: ['', '', ''] });
 ok(JSON.stringify(isi) === JSON.stringify({ baris: ['a', 'b', 'c'], uji: 'topik' }), 'isiDariForm: baris kosong dibuang, spasi dirapikan, pita kosong tidak dikirim');
@@ -85,7 +85,7 @@ ok(a.includes('Hafal pembukaan') && a.includes('Hafal pasal') && a.includes('San
 ok(a.includes('Kepala Sekolah') && !a.includes('Sangga Elang'), 'surat sekolah: tanda tangan Kepala Sekolah, tanpa sangga');
 a = surat('surat_uu_pramuka', null);
 ok(a.includes('Ketua Gugus Depan') && a.includes('Ka. Mabigus') && a.includes('Sangga Elang') && a.includes('Ambalan') && a.includes('GERAKAN PRAMUKA'), 'surat gudep: kop gudep, sangga dan ambalan, tanda tangan Ketua Gudep dan Ka. Mabigus');
-ok(a.includes('Rubrik surat ini belum diisi') && (a.match(/<tr class="h-7/g) ?? []).length === 5, 'templat kosong: lima baris kosong dan catatan (hanya di layar)');
+ok(a.includes('Rubrik surat ini belum diisi') && (a.match(/<tr class="h-7/g) ?? []).length === 7, 'templat kosong: tujuh baris kosong dan catatan (hanya di layar)');
 ok(a.includes('no-print') && a.includes('Cukup') && a.includes('Sangat Baik'), 'pita bawaan dipakai bila templat kosong');
 a = surat('surat_tik', { uji: 'penggunaan MS Word dan Excel', baris: ['# Word', 'Margin'] });
 ok(a.includes('penggunaan MS Word dan Excel') && a.includes('bg-pramuka-50 font-semibold'), 'topik dari templat dan baris judul kelompok');
