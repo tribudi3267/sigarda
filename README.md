@@ -687,6 +687,9 @@ pengguna melihat "Server sedang menerima terlalu banyak percobaan masuk" (bukan 
 **Data pribadi.** Nama, NIS, kelas, dan agama anggota (sebagian besar di bawah umur) tersimpan di server Supabase. Pastikan pihak sekolah atau Pembina mengetahui dan menyetujuinya.
 Paket gratis Supabase menonaktifkan proyek yang tidak dipakai sekitar 1 minggu (dapat dihidupkan lagi dari dashboard) dan tidak menyediakan cadangan harian otomatis: cadangkan sendiri (lihat bawah).
 
+### Cadangan mingguan otomatis (Sabtu, ke Google Drive sekolah)
+Tiap Sabtu 05.00 WIB GitHub membaca seluruh data lewat peran database **baca-saja**, mengenkripsi (AES-256-GCM, frasa sandi hanya dipegang pemilik), dan menyimpannya ke folder Google Drive akun sekolah lewat skrip Google Apps Script; 13 cadangan terbaru disimpan, dan bila cadangan terbaru lebih dari 9 hari Apps Script mengirim email. Repositori publik, jadi tidak ada cadangan yang disimpan di GitHub. **Pemasangan sekali (±30 menit) dan cara memulihkan: [`docs/cadangan-otomatis.md`](docs/cadangan-otomatis.md).** Kode: [`scripts/cadangan/`](scripts/cadangan), workflow [`cadangan-mingguan.yml`](.github/workflows/cadangan-mingguan.yml), peran baca-saja [`supabase/demo/peran_cadangan.sql`](supabase/demo/peran_cadangan.sql); dijaga `uji/cadangan-otomatis.mjs` (termasuk memulihkan cadangan ke database kosong dan membandingkan isinya).
+
 ### Cadangan data (satu klik)
 Klik dua kali [`Cadangkan-SIGARDA.bat`](Cadangkan-SIGARDA.bat) (tanpa Docker; hanya butuh Node). Saat pertama kali, tempel alamat **Session pooler**
 (Dashboard > **Connect** > tab Session pooler) dan ketik password database; alamat disimpan tanpa password, password tidak pernah disimpan.

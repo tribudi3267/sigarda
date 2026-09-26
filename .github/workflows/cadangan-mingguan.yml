@@ -1,0 +1,57 @@
+name: Cadangan mingguan
+# Tiap Sabtu 05.00 WIB (Jumat 22.00 UTC): membaca seluruh data lewat peran database BACA-SAJA, mengenkripsi (gzip + AES-256-GCM), lalu mengunggahnya ke
+# Google Drive akun sekolah lewat penerima Google Apps Script. Repositori ini PUBLIK: tidak ada berkas cadangan yang disimpan di GitHub (bukan artifact,
+# bukan commit), log hanya memuat nama tabel, jumlah baris, dan ukuran. Bila gagal, dibuka satu issue; Apps Script juga mengirim email bila cadangan
+# terbaru lebih dari 9 hari. Pemasangan langkah demi langkah: docs/cadangan-otomatis.md. Rahasia: Settings > Secrets and variables > Actions.
+on:
+  schedule:
+    - cron: '0 22 * * 5'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: cadangan-mingguan
+  cancel-in-progress: false
+jobs:
+  cadangan:
+    if: github.repository == 'tribudi3267/sigarda'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: scripts/cadangan/package-lock.json
+      - run: npm ci --prefix scripts/cadangan
+      - name: Cadangkan dan unggah ke Google Drive
+        env:
+          SIGARDA_DB_URL: ${{ secrets.SIGARDA_DB_URL }}
+          SIGARDA_KUNCI_ENKRIPSI: ${{ secrets.SIGARDA_KUNCI_ENKRIPSI }}
+          SIGARDA_UNGGAH_URL: ${{ secrets.SIGARDA_UNGGAH_URL }}
+          SIGARDA_UNGGAH_TOKEN: ${{ secrets.SIGARDA_UNGGAH_TOKEN }}
+        run: node scripts/cadangan/jalankan-mingguan.mjs
+      - name: Tutup issue kegagalan yang masih terbuka
+        if: success()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for n in $(gh issue list --repo "${{ github.repository }}" --state open --search "Cadangan mingguan GAGAL in:title" --json number --jq '.[].number'); do
+            gh issue close "$n" --repo "${{ github.repository }}" --comment "Cadangan berhasil pada ${{ github.run_id }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          done
+      - name: Buka issue bila gagal
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ada=$(gh issue list --repo "${{ github.repository }}" --state open --search "Cadangan mingguan GAGAL in:title" --json number --jq '.[0].number')
+          if [ -n "$ada" ]; then
+            gh issue comment "$ada" --repo "${{ github.repository }}" --body "Gagal lagi: $url"
+          else
+            gh issue create --repo "${{ github.repository }}" --title "Cadangan mingguan GAGAL" --body "Cadangan mingguan tidak berhasil. Lihat log (tanpa data pribadi): $url. Panduan pemulihan langkah: docs/cadangan-otomatis.md, bagian \"Bila gagal\"."
+          fi

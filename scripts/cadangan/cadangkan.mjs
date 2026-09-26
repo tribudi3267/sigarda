@@ -14,11 +14,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { bacaSemua, cadanganWajar, susunSql } from './dump.mjs';
 
 const FOLDER_UTAMA = process.env.SIGARDA_FOLDER_CADANGAN || path.join(os.homedir(), 'Cadangan-SIGARDA');
 const BERKAS_KONEKSI = path.join(FOLDER_UTAMA, 'koneksi.json');
-const TABEL_DILEWATI = new Set(['public.login_gagal']); // penghitung kunci sementara; tidak perlu dipulihkan
-const TABEL_AKUN = ['auth.users', 'auth.identities'];
 
 const cetak = (t = '') => console.log(t);
 const keluar = (pesan, kode = 1) => { console.error('\nGAGAL: ' + pesan + '\n'); process.exit(kode); };
@@ -104,72 +103,6 @@ async function ambilKoneksi() {
   }
 }
 
-// ---------- pembuatan SQL ----------
-
-const kutipId = (s) => '"' + String(s).replace(/"/g, '""') + '"';
-const kutipTeks = (s) => "'" + String(s).replace(/'/g, "''") + "'";
-const namaLengkap = (skema, tabel) => `${kutipId(skema)}.${kutipId(tabel)}`;
-
-async function daftarTabel(db) {
-  const { rows } = await db.query(
-    `select table_schema as skema, table_name as tabel
-       from information_schema.tables
-      where table_type = 'BASE TABLE' and table_schema = 'public'
-      order by table_name`,
-  );
-  const publik = rows.map((r) => `${r.skema}.${r.tabel}`).filter((n) => !TABEL_DILEWATI.has(n));
-  return [...TABEL_AKUN, ...publik];
-}
-
-/** Urutkan tabel supaya tabel induk (yang dirujuk foreign key) ditulis lebih dulu. */
-async function urutkan(db, tabel) {
-  const { rows } = await db.query(
-    `select cn.nspname || '.' || cl.relname as anak, pn.nspname || '.' || pl.relname as induk
-       from pg_constraint c
-       join pg_class cl on cl.oid = c.conrelid   join pg_namespace cn on cn.oid = cl.relnamespace
-       join pg_class pl on pl.oid = c.confrelid  join pg_namespace pn on pn.oid = pl.relnamespace
-      where c.contype = 'f'`,
-  );
-  const ada = new Set(tabel);
-  const induk = new Map(tabel.map((t) => [t, new Set()]));
-  for (const { anak, induk: i } of rows) if (anak !== i && ada.has(anak) && ada.has(i)) induk.get(anak).add(i);
-  const hasil = [];
-  const sisa = new Set(tabel);
-  while (sisa.size) {
-    const siap = [...sisa].filter((t) => [...induk.get(t)].every((i) => !sisa.has(i)));
-    const giliran = siap.length ? siap : [[...sisa][0]]; // siklus: lanjutkan saja, hindari macet
-    for (const t of giliran) { hasil.push(t); sisa.delete(t); }
-  }
-  return hasil;
-}
-
-async function kolomDapatDisisipkan(db, skema, tabel) {
-  const { rows } = await db.query(
-    `select column_name as nama, (is_identity = 'YES' and identity_generation = 'ALWAYS') as identitas_selalu
-       from information_schema.columns
-      where table_schema = $1 and table_name = $2 and is_generated = 'NEVER'
-      order by ordinal_position`,
-    [skema, tabel],
-  );
-  return rows;
-}
-
-async function buatBlok(db, nama) {
-  const [skema, tabel] = nama.split('.');
-  const kolom = await kolomDapatDisisipkan(db, skema, tabel);
-  const { rows } = await db.query(`select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb)::text as isi, count(*)::int as n from ${namaLengkap(skema, tabel)} t`);
-  const n = rows[0].n;
-  if (n === 0) return { nama, n, sql: `-- ${nama}: kosong\n` };
-  const daftar = kolom.map((k) => kutipId(k.nama)).join(', ');
-  const override = kolom.some((k) => k.identitas_selalu) ? ' overriding system value' : '';
-  const sql =
-    `-- ${nama}: ${n} baris\n` +
-    `insert into ${namaLengkap(skema, tabel)} (${daftar})${override}\n` +
-    `select ${daftar} from jsonb_populate_recordset(null::${namaLengkap(skema, tabel)}, ${kutipTeks(rows[0].isi)}::jsonb)\n` +
-    `on conflict do nothing;\n`;
-  return { nama, n, sql };
-}
-
 // ---------- utama ----------
 
 async function utama() {
@@ -204,31 +137,16 @@ async function utama() {
 
   let blok;
   try {
-    await db.query('begin isolation level repeatable read read only');
-    const tabel = await urutkan(db, await daftarTabel(db));
-    blok = [];
-    for (const nama of tabel) {
-      const b = await buatBlok(db, nama);
-      cetak(`  ${nama.padEnd(28)} ${String(b.n).padStart(6)} baris`);
-      blok.push(b);
-    }
-    await db.query('commit');
+    blok = await bacaSemua(db, { log: (nama, n) => cetak(`  ${nama.padEnd(28)} ${String(n).padStart(6)} baris`) });
   } catch (e) {
-    await db.query('rollback').catch(() => {});
     keluar('Gagal membaca data: ' + (e.message || e));
   } finally {
     await db.end().catch(() => {});
   }
 
-  const profil = blok.find((b) => b.nama === 'public.profiles');
-  if (!profil || profil.n === 0) keluar('Tabel profiles kosong atau tidak ditemukan; cadangan tidak disimpan supaya tidak menimpa dengan berkas kosong. Pastikan alamat sambungan mengarah ke proyek yang benar.');
+  if (!cadanganWajar(blok)) keluar('Tabel profiles kosong atau tidak ditemukan; cadangan tidak disimpan supaya tidak menimpa dengan berkas kosong. Pastikan alamat sambungan mengarah ke proyek yang benar.');
 
-  const kepala =
-    `-- Cadangan data SIGARDA, dibuat ${cap.toISOString()}\n` +
-    `-- Isi: akun login (termasuk hash PIN) dan seluruh data aplikasi. RAHASIA: jangan diunggah ke GitHub atau dibagikan.\n` +
-    `-- Pemulihan: lihat BACA-SAYA.txt di folder ini.\n\n` +
-    `set standard_conforming_strings = on;\nbegin;\n\n`;
-  const isi = kepala + blok.map((b) => b.sql).join('\n') + '\ncommit;\n';
+  const isi = susunSql(blok, cap);
 
   fs.mkdirSync(folder, { recursive: true });
   const berkas = path.join(folder, 'sigarda-cadangan.sql');
