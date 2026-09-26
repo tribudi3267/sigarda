@@ -8,6 +8,7 @@ import {
   tingkatBerikut, tingkatTertinggi, STATUS_PENGAJUAN, pengajuanMenunggu, pengajuanPeserta, periksaTinjau,
 } from '../lib/tkkLogic';
 import SumberPeraturan from '../components/SumberPeraturan';
+import PanelMelatih from '../components/PanelMelatih';
 import { Avatar, Field, Kosong, Modal, ProgressBar } from '../components/ui';
 
 const NAMA_TKK = Object.fromEntries(KATALOG_TKK.map((t) => [t.id, t.nama]));
@@ -612,7 +613,7 @@ function DaftarPenegak({ data, onPilih }) {
   );
 }
 
-const TAB = [{ id: 'penegak', label: 'Penegak' }, { id: 'pengajuan', label: 'Pengajuan' }, { id: 'ambang', label: 'Ambang Garuda' }];
+const TAB = [{ id: 'penegak', label: 'Penegak' }, { id: 'pengajuan', label: 'Pengajuan' }, { id: 'melatih', label: 'Melatih' }, { id: 'ambang', label: 'Ambang Garuda' }];
 
 /**
  * Tanda Kecakapan Khusus (Tahap 2, G2). Penegak melihat kemajuan dan capaian miliknya; Pembina dan Admin mencatat capaian bertingkat (Purwa, Madya, Utama), TKK Krida, dan mengatur
@@ -652,6 +653,7 @@ export default function Tkk() {
       )}
 
       {pengurus && tab === 'pengajuan' && <PanelPengajuan data={data} />}
+      {pengurus && tab === 'melatih' && <PanelMelatih data={data} />}
       {pengurus && tab === 'ambang' && <PanelAmbang key={JSON.stringify(data.ambang)} data={data} boleh={kelola} />}
       {(!pengurus || tab === 'penegak') && (
         pengurus && !peserta ? (
