@@ -56,6 +56,8 @@ const blok = await bacaSemua(sumber);
 ok(cadanganWajar(blok) && blok.length > 30, `cadangan memuat ${blok.length} tabel, profiles berisi`);
 ok(blok.some((b) => b.nama === 'auth.users' && b.n > 0) && !blok.some((b) => b.nama === 'public.login_gagal'), 'akun login ikut, tabel sementara login_gagal tidak');
 const sql = susunSql(blok, new Date('2026-09-26T05:00:00Z'));
+// Pengaturan yang dibawa skema baru (garuda.gerbang, tkk.ambang) sudah ada di database tujuan: isi cadangan harus MENIMPA, bukan dilewati.
+ok(/insert into "public"\."pengaturan"[\s\S]*?on conflict \("kunci"\) do update set/.test(sql), 'pengaturan dipulihkan dengan upsert (isi cadangan menang atas bawaan skema)');
 ok(sql.startsWith('-- Cadangan data SIGARDA, dibuat 2026-09-26T05:00:00.000Z') && sql.trimEnd().endsWith('commit;'), 'berkas SQL berkepala dan berakhir commit');
 
 const sidik = async (db) => {

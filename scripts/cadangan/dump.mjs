@@ -54,6 +54,19 @@ async function kolomDapatDisisipkan(db, skema, tabel) {
   return rows;
 }
 
+// Tabel yang sudah berisi baris bawaan dari skema (mis. pengaturan garuda.gerbang dan tkk.ambang): pada pemulihan isi CADANGAN harus menang atas bawaan skema, jadi
+// bentrokan kunci menimpa (upsert) alih-alih dilewati. Tabel lain memakai "on conflict do nothing" (kosong pada database baru, atau katalog yang identik).
+// Bila skema kelak membawa baris bawaan pada tabel lain, uji/cadangan-otomatis.mjs (perbandingan isi seluruh tabel sesudah pulih) yang menangkapnya.
+export const TABEL_TIMPA = { 'public.pengaturan': { kunci: ['kunci'] } };
+
+/** Akhiran pernyataan insert: upsert bagi tabel di TABEL_TIMPA, selain itu "on conflict do nothing". */
+function akhirInsert(nama, kolom) {
+  const timpa = TABEL_TIMPA[nama];
+  if (!timpa) return 'on conflict do nothing';
+  const lain = kolom.map((k) => k.nama).filter((k) => !timpa.kunci.includes(k));
+  return `on conflict (${timpa.kunci.map(kutipId).join(', ')}) do update set ${lain.map((k) => `${kutipId(k)} = excluded.${kutipId(k)}`).join(', ')}`;
+}
+
 async function buatBlok(db, nama) {
   const [skema, tabel] = nama.split('.');
   const kolom = await kolomDapatDisisipkan(db, skema, tabel);
@@ -66,7 +79,7 @@ async function buatBlok(db, nama) {
     `-- ${nama}: ${n} baris\n` +
     `insert into ${namaLengkap(skema, tabel)} (${daftar})${override}\n` +
     `select ${daftar} from jsonb_populate_recordset(null::${namaLengkap(skema, tabel)}, ${kutipTeks(rows[0].isi)}::jsonb)\n` +
-    `on conflict do nothing;\n`;
+    `${akhirInsert(nama, kolom)};\n`;
   return { nama, n, sql };
 }
 
