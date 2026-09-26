@@ -53,6 +53,9 @@ dan mencatat bukti kesamaannya. Diperbarui setiap ada cermin baru.
 | Jenis notifikasi | `notifikasiLogic.LABEL_JENIS` | batasan tabel `notifikasi` | tampilan | `notifikasi-klien` |
 | `bolehDihubungi` (tombol WhatsApp) | `eskalasiLogic.bolehDihubungi` | tidak ada (sengaja klien saja) | tampilan | aman: data profil sudah terbaca pengurus lewat RLS |
 | Menggabungkan pemeriksaan data | `pemeriksaanLogic` | `sg_pemeriksaan_data` | tampilan | `pemeriksaan-data` |
+| Isian data diri Penegak (78 kunci, batas panjang dan bentuk tiap kunci) dan kunci profil (jenis kelamin, agama, tanggal lahir, NTA) | `isianLogic.periksaIsian/periksaProfil` (+ daftar `SEMUA_KUNCI`) | `sigarda.isian_periksa`, `sigarda.isian_periksa_profil`, `sg_isian_saya_simpan` | tampilan (server menegakkan) | `isian-klien` (4680 pasangan kunci-nilai dan kisi profil dibandingkan langsung dengan SQL; daftar kunci klien dikenal server) |
+| Isian templat surat guru (topik, baris rubrik, pita nilai, tahun ajaran, jenis) dan daftar delapan jenis surat | `suratGuruLogic.periksaTemplat`, `data/suratGuruData.SURAT_GURU` | `sg_dokumen_templat_simpan` dan batasan check jenis pada `dokumen_templat` | tampilan (server menegakkan) | `surat-guru` (kombinasi tahun ajaran x jenis x isi dibandingkan langsung dengan SQL; daftar jenis = batasan tabel) |
+| Catatan salinan beku portofolio (maks 200 karakter, tanpa karakter khusus) | `snapshotLogic.periksaCatatanSnapshot` | `sg_portofolio_snapshot_simpan` | tampilan (server menegakkan) | `snapshot-portofolio` (catatan dibandingkan langsung dengan SQL) |
 
 ## Temuan audit dan tindakan
 

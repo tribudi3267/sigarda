@@ -9,7 +9,7 @@
  *
  * `klien` = klien supabase-js (atau klien lokal yang bentuknya sama, lihat src/lokal).
  */
-import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSpg, susunTanggalLahir, susunIsian, susunTemplatDokumen, susunGerbang, susunTimPenilai, susunGarudaTahap, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
+import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSpg, susunTanggalLahir, susunIsian, susunTemplatDokumen, susunSnapshot, susunGerbang, susunTimPenilai, susunGarudaTahap, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan } from './mapDb';
 
 export const UKURAN_HALAMAN = 1000;
 /** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
@@ -241,6 +241,10 @@ export function buatApi(klien) {
     muatTemplatDokumen: () => muat(async () => susunTemplatDokumen(await ambilSemua('dokumen_templat', { urut: ['tahun_ajaran', 'jenis'] }))),
     simpanTemplatDokumen: ({ tahunAjaran, jenis, isi }) => rpc('sg_dokumen_templat_simpan', { p_tahun_ajaran: tahunAjaran, p_jenis: jenis, p_isi: isi }),
     hapusTemplatDokumen: (id) => rpc('sg_dokumen_templat_hapus', { p_id: id }),
+    /** Salinan beku Portofolio format Kwarcab satu Penegak (Tahap 3, H3): hanya Pembina dan Admin. */
+    muatSnapshot: (pesertaId) => muat(async () => susunSnapshot(await ambilSemua('portofolio_snapshot', { filter: [['peserta_id', pesertaId]], urut: ['id'] }))),
+    simpanSnapshot: (pesertaId, catatan, isi) => rpc('sg_portofolio_snapshot_simpan', { p_peserta_id: pesertaId, p_catatan: catatan ?? '', p_isi: isi }),
+    hapusSnapshot: (id) => rpc('sg_portofolio_snapshot_hapus', { p_id: id }),
 
     /* ------------------- Tim penilai dan kalender Garuda (Tahap 2, G4b dan G4c) ------------------- */
     /** Tim penilai (dengan anggotanya) dan kalender tahap Garuda; hanya pengurus yang dapat membaca (dibatasi RLS). */

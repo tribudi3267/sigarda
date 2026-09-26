@@ -1,11 +1,12 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { useGudep } from '../lib/gudepStore';
+import { GudepBeku, useGudep } from '../lib/gudepStore';
 import { KopSurat } from './DokumenSku';
 import BlokTtd from './BlokTtd';
 import SumberPeraturan from './SumberPeraturan';
 import SuratKeteranganGuru from './SuratKeteranganGuru';
 import PanelTemplatSurat from './PanelTemplatSurat';
+import PanelSalinanBeku from './PanelSalinanBeku';
 import { Icon, Kosong } from './ui';
 import useTkk from '../hooks/useTkk';
 import useSpg from '../hooks/useSpg';
@@ -15,10 +16,11 @@ import useGerbang from '../hooks/useGerbang';
 import useTemplatDokumen from '../hooks/useTemplatDokumen';
 import { SURAT_GURU } from '../data/suratGuruData';
 import { templatBerlaku } from '../lib/suratGuruLogic';
+import { buatIsiSnapshot, dariSnapshot } from '../lib/snapshotLogic';
 import { JENJANG, ORANG, namaOrangTua } from '../lib/isianLogic';
 import { ITEM_PORTOFOLIO, STATUS_PF } from '../data/portofolioData';
 import { getItem } from '../lib/portofolioLogic';
-import { fmtTanggal, hariIni } from '../lib/format';
+import { fmtTanggal, fmtWaktu, hariIni } from '../lib/format';
 import { tahunAjaranKini } from '../lib/rombelLogic';
 import { capaianPeserta } from '../lib/tkkLogic';
 import { hitungSpg } from '../lib/spgLogic';
@@ -358,8 +360,11 @@ export default function TampilanPortofolioKwarcab({ peserta, onKembali }) {
   const tim = useTimKalender();
   const ger = useGerbang();
   const tpl = useTemplatDokumen();
+  const gudepKini = useGudep();
   const [isian, setIsian] = useState({ isian: {}, siap: false, galat: '' });
   const [sertakanSurat, setSertakanSurat] = useState(true);
+  const [salinan, setSalinan] = useState({ salinan: [], galat: '' });
+  const [dibuka, setDibuka] = useState(null); // salinan beku yang sedang ditampilkan (null = data terkini)
   const [hari] = useState(hariIni);
   const tahunAjaran = tahunAjaranKini(hari);
   useEffect(() => {
@@ -367,6 +372,11 @@ export default function TampilanPortofolioKwarcab({ peserta, onKembali }) {
     api().muatIsian(peserta.id).then((r) => { if (!batal) setIsian(r.ok ? { isian: r.data.isian, siap: true, galat: '' } : { isian: {}, siap: true, galat: r.pesan ?? '' }); });
     return () => { batal = true; };
   }, [api, peserta.id]);
+  const muatSalinan = useCallback(async () => {
+    const r = await api().muatSnapshot(peserta.id);
+    setSalinan(r.ok ? { salinan: r.data, galat: '' } : { salinan: [], galat: r.pesan ?? 'Salinan beku belum dapat dimuat.' });
+  }, [api, peserta.id]);
+  useEffect(() => { muatSalinan(); }, [muatSalinan]);
   const memuat = tkk.memuat || spg.memuat || pel.memuat || tim.memuat || ger.memuat || tpl.memuat || !isian.siap;
   const galat = tkk.galat || spg.galat || pel.galat || tim.galat || ger.galat;
   const namaOrangTuaKosong = isian.siap && !namaOrangTua(isian.isian);
@@ -376,6 +386,11 @@ export default function TampilanPortofolioKwarcab({ peserta, onKembali }) {
     () => hitungSpg({ peserta, progress, pelantikan: pel.pelantikan, saka: pel.saka, capaianTkk: tkk.capaian, ambang: tkk.ambang, portofolio, penetapan: spg.penetapan, hari }),
     [peserta, progress, pel.pelantikan, pel.saka, tkk.capaian, tkk.ambang, portofolio, spg.penetapan, hari],
   );
+
+  const buatIsi = () => buatIsiSnapshot({
+    peserta, gudep: gudepKini, tanggalLahir: tanggalLahirPeserta(ger.lahir, peserta.id), capaianTkk: tkk.capaian, krida: tkk.krida, ambang: tkk.ambang, pelantikan: pel.pelantikan, saka: pel.saka,
+    hasilSpg, tim: timUntukCalon(tim.tim, tahunAjaran, peserta.jenisKelamin), portofolio, isian: isian.isian, templat: tpl.templat, tahunAjaran, hari,
+  });
 
   return (
     <div className="animasi-naik">
@@ -396,11 +411,24 @@ export default function TampilanPortofolioKwarcab({ peserta, onKembali }) {
         <p>Surat keterangan guru memakai rubrik dari templat di bawah. Lampiran fisik (fotokopi piagam, buku tabungan, dan sebagainya) dilampirkan terpisah.</p>
         {namaOrangTuaKosong && <p className="font-semibold text-amber-900">Nama orang tua/wali belum diisi Penegak; kolom tanda tangan orang tua dicetak kosong.</p>}
       </div>
-      <PanelTemplatSurat daftar={tpl} tahunAjaran={tahunAjaran} />
+      {dibuka ? (
+        <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p>Menampilkan <strong>salinan beku</strong> {fmtWaktu(dibuka.dibuatPada)}{dibuka.catatan ? ` (${dibuka.catatan})` : ''}. Isinya tidak berubah walau data aplikasi berubah.</p>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => setDibuka(null)}>Kembali ke data terkini</button>
+        </div>
+      ) : <PanelTemplatSurat daftar={tpl} tahunAjaran={tahunAjaran} />}
+      <PanelSalinanBeku pesertaId={peserta.id} buatIsi={buatIsi} daftar={{ salinan: salinan.salinan, galat: salinan.galat, muat: muatSalinan }} dibuka={dibuka} onBuka={setDibuka} siap={!memuat && !galat} />
       {peringatan.map((p) => <p key={p} role="status" className="no-print mb-2 text-sm text-amber-900">{p}</p>)}
       {galat && <p role="alert" className="no-print mb-4 text-sm text-red-700">{galat}</p>}
       {memuat && !galat && <Kosong judul="Memuat data..." teks="Mengambil TKK, SPG, pelantikan, dan tim penilai dari server." />}
-      {!memuat && (
+      {dibuka && (
+        <div className="overflow-x-auto pb-4">
+          <GudepBeku.Provider value={dibuka.isi.gudep ?? null}>
+            <PortofolioKwarcabDokumen {...dariSnapshot(dibuka.isi, { sertakanSurat })} />
+          </GudepBeku.Provider>
+        </div>
+      )}
+      {!dibuka && !memuat && (
         <div className="overflow-x-auto pb-4">
           <PortofolioKwarcabDokumen
             peserta={peserta} tanggalLahir={tanggalLahirPeserta(ger.lahir, peserta.id)} capaianTkk={tkk.capaian} krida={tkk.krida} ambang={tkk.ambang}

@@ -6,7 +6,7 @@
  * dimuat dari pengaturan `gudep.data`. Halaman membaca lewat useGudep() (ikut tampil ulang bila data berubah); kode non-React (mis. ekspor
  * Excel) memakai ambilGudep().
  */
-import { useSyncExternalStore } from 'react';
+import { createContext, useContext, useSyncExternalStore } from 'react';
 import { GUDEP_BAWAAN, gabungGudep } from './gudepLogic';
 
 let sekarang = GUDEP_BAWAAN;
@@ -44,8 +44,18 @@ export function resetGudep() {
   umumkan();
 }
 
-/** Hook: data gudep terkini; komponen tampil ulang saat data berubah. */
-export const useGudep = () => useSyncExternalStore(langgan, ambilGudep, ambilGudep);
+/**
+ * Konteks penimpa data gudep: salinan beku dokumen (Tahap 3, H3) memasangnya dengan data gudep saat dibekukan, sehingga kop, kota, dan penanda tangan tetap seperti semula
+ * walau Data Gudep kemudian diubah. Tanpa penimpa (null), useGudep memakai data terkini.
+ */
+export const GudepBeku = createContext(null);
+
+/** Hook: data gudep terkini (atau data beku bila dipasang GudepBeku); komponen tampil ulang saat data berubah. */
+export const useGudep = () => {
+  const beku = useContext(GudepBeku);
+  const terkini = useSyncExternalStore(langgan, ambilGudep, ambilGudep);
+  return beku ?? terkini;
+};
 
 /** Hook: apakah data gudep sudah pernah disimpan Admin. */
 export const useGudepTersimpan = () => useSyncExternalStore(langgan, gudepTersimpan, gudepTersimpan);

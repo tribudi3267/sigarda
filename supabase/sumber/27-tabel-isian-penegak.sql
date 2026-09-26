@@ -24,3 +24,20 @@ create table public.dokumen_templat (
   unique (tahun_ajaran, jenis)
 );
 -- ===== akhir tabel isian penegak =====
+
+-- ===== Salinan beku portofolio (Tahap 3, H3): tabel =====
+-- Salinan beku Portofolio format Kwarcab satu Penegak pada saat dicetak atau dikirim ke Kwarcab: seluruh data yang membentuk dokumen (identitas, TKK, SPG, isian data diri,
+-- rubrik surat guru, data gudep) disimpan apa adanya, sehingga dokumen yang sama dapat dibuka lagi meski data aplikasi kemudian berubah. Dibuat dan dihapus Pembina atau Admin;
+-- dibaca Pembina dan Admin (memuat data pribadi Penegak).
+create table public.portofolio_snapshot (
+  id bigint generated always as identity primary key,
+  peserta_id uuid not null references public.profiles(id) on delete cascade,
+  tahun_ajaran text not null check (tahun_ajaran ~ '^\d{4}/\d{4}$'),
+  catatan text not null default '' check (char_length(catatan) <= 200 and catatan !~ '[[:cntrl:]<>]'),
+  isi jsonb not null check (jsonb_typeof(isi) = 'object'),
+  dibuat_oleh uuid references public.profiles(id) on delete set null,
+  dibuat_oleh_nama text not null default '',
+  dibuat_pada timestamptz not null default now()
+);
+create index portofolio_snapshot_peserta_idx on public.portofolio_snapshot (peserta_id, dibuat_pada desc);
+-- ===== akhir tabel salinan beku portofolio =====
