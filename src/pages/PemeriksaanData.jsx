@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { gabungHasilPemeriksaan, jumlahKategori, kategoriTampil, tabPerbaikan, totalMasalah } from '../lib/pemeriksaanLogic';
 import { namaTahap } from '../lib/praUjiLogic';
-import { bolehDihubungi, nomorWaAnggota, teksWaAjakMasuk } from '../lib/eskalasiLogic';
+import { bolehDihubungi, nomorWaAnggota, teksWaAjakMasuk, teksWaLengkapiDataDiri } from '../lib/eskalasiLogic';
+import { labelPokok } from '../lib/isianLogic';
 import { alamatDasar } from '../lib/verifikasiLogic';
 import RingkasanPerangkat from '../components/RingkasanPerangkat';
 import TombolWhatsapp from '../components/TombolWhatsapp';
@@ -74,6 +75,12 @@ const RENDER = (users, user) => ({
   sanggaTanpaPinsa: (x) => <Baris key={`${x.rombel}|${x.sangga}`} kiri={x.sangga} kanan={`${x.rombel}, ${x.jumlah} Penegak`} />,
   praUjiMacet: (x) => <Baris key={x.id} kiri={x.nama} kanan={`${x.butir}, tahap ${namaTahap(x.tahap)}, ${x.hari === 0 ? 'sejak hari ini' : `${x.hari} hari`}${x.tanpaPenilai ? ', tanpa penilai' : ''}`} />,
   pembinaTanpaAgama: (x) => <Baris key={x.id} kiri={x.nama} />,
+  dataDiriBelum: (x) => (
+    <Baris
+      key={x.id} kiri={x.nama} kanan={`${x.kelas || '-'}: ${x.kurang.map(labelPokok).join(', ')}`}
+      aksi={bolehDihubungi(user, { id: x.id, peran: 'Penegak' }) ? <TombolWhatsapp nomor={nomorWaAnggota(users, x.id)} nama={x.nama} teks={teksWaLengkapiDataDiri(x.nama, x.kurang.map(labelPokok), alamatDasar())} /> : null}
+    />
+  ),
   belumPernahMasuk: (x) => (
     <Baris
       key={x.id} kiri={x.nama} kanan={x.peran}

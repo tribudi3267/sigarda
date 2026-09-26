@@ -4957,6 +4957,26 @@ begin
       select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama) order by x.nama)
       from (select id, nama from public.profiles where role = 'penguji' and jabatan = 'Pembina' and status = 'aktif' and agama is null limit 300) x
     ), '[]'::jsonb),
+    -- Data diri Penegak yang belum lengkap (Tahap 3, H1): isian POKOK saja (WhatsApp, jenis kelamin, agama, tanggal lahir, tempat lahir, alamat, nama ayah/ibu/wali; cermin
+    -- isianLogic.POKOK). Hanya nama dan KODE isian yang kurang, tidak pernah nilainya (bukan data pribadi). Diisi Penegak sendiri, jadi tanpa tombol perbaiki.
+    'dataDiriBelum', coalesce((
+      select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'nis', x.nis, 'kelas', x.kelas, 'kurang', to_jsonb(x.kurang)) order by x.kelas, x.nama)
+      from (
+        select y.* from (
+          select p.id, p.nama, p.nis, p.kelas,
+            array_remove(array[
+              case when p.whatsapp is null or btrim(p.whatsapp) = '' then 'whatsapp' end,
+              case when p.jenis_kelamin is null then 'jk' end,
+              case when p.agama is null then 'agama' end,
+              case when not exists (select 1 from public.tanggal_lahir t where t.peserta_id = p.id) then 'lahir' end,
+              case when not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci = 'tempat_lahir') then 'tempat_lahir' end,
+              case when not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci = 'alamat') then 'alamat' end,
+              case when not exists (select 1 from public.penegak_isian i where i.peserta_id = p.id and i.kunci in ('ayah_nama', 'ibu_nama', 'wali_nama')) then 'ortu' end
+            ], null) as kurang
+          from public.profiles p where p.role = 'peserta' and p.status = 'aktif'
+        ) y where cardinality(y.kurang) > 0 order by y.kelas, y.nama limit 300
+      ) x
+    ), '[]'::jsonb),
     'belumPernahMasuk', coalesce((
       select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'peran', x.peran, 'dibuat', x.dibuat) order by x.dibuat)
       from (
