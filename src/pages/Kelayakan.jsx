@@ -10,6 +10,9 @@ import { pembinaAtauAdmin } from '../lib/hakLogic';
 import { STATUS_GERBANG, hitungGerbang, kuotaCalon, periksaGerbang, periksaTanggalLahir, tanggalLahirPeserta } from '../lib/gerbangLogic';
 import { hitungSpg, ringkasSpg } from '../lib/spgLogic';
 import { layakGaruda } from '../lib/skuLogic';
+import { unduhXlsx } from '../lib/exportXlsx';
+import { ambilGudep } from '../lib/gudepStore';
+import { barisPendataan, lembarPendataan } from '../lib/pendataanGarudaLogic';
 import { tahunAjaranKini } from '../lib/rombelLogic';
 import { labelUntuk, timUntukCalon } from '../lib/timLogic';
 import TimPenilaiPanel from '../components/TimPenilaiPanel';
@@ -117,6 +120,12 @@ function PanelCalon({ tim, tahunAjaran }) {
   const memuat = gerbang.memuat || spg.memuat || pel.memuat || tkk.memuat;
 
   const kuota = useMemo(() => kuotaCalon(daftarPeserta, gerbang.aturan), [daftarPeserta, gerbang.aturan]);
+  // Tabel Pendataan dan Verifikasi Syarat Awal Calon Garuda (Excel): seluruh Calon dan Penegak yang SKU-nya selesai, bukan hanya 100 baris yang tampil.
+  const unduhPendataan = async () => {
+    const calon = daftarPeserta.filter((u) => u.calonGaruda || layakGaruda(progress, u));
+    const baris = barisPendataan({ calon, aktif: daftarPeserta, progress, pelantikan: pel.pelantikan, lahir: gerbang.lahir, aturan: gerbang.aturan });
+    await unduhXlsx({ namaFile: `pendataan-calon-garuda-${hariIni()}`, sheets: [lembarPendataan({ baris, aturan: gerbang.aturan, gudep: ambilGudep() })] });
+  };
   const baris = useMemo(() => {
     const k = cari.trim().toLowerCase();
     return daftarPeserta
@@ -146,6 +155,7 @@ function PanelCalon({ tim, tahunAjaran }) {
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <input className="input max-w-xs flex-1" aria-label="Cari Penegak" placeholder="Cari nama atau kelas Penegak" value={cari} onChange={(e) => setCari(e.target.value)} />
         {kelola && <button className="btn btn-outline btn-sm" onClick={() => setLengkapi(true)}>Lengkapi tanggal lahir (Excel)</button>}
+        <button className="btn btn-outline btn-sm" disabled={memuat} onClick={unduhPendataan}>Unduh tabel pendataan (Excel)</button>
         <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={semua} onChange={(e) => setSemua(e.target.checked)} /> Tampilkan semua Penegak aktif</label>
       </div>
 

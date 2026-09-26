@@ -333,6 +333,11 @@ export const susunIsian = (baris = [], lahir = []) => ({
   lahir: lahir[0]?.tanggal ? tgl(lahir[0].tanggal) : null,
 });
 
+/** Baris portofolio_snapshot -> [{ id, pesertaId, tahunAjaran, catatan, isi, dibuatOlehNama, dibuatPada }], terbaru dulu. */
+export const susunSnapshot = (baris = []) =>
+  baris.map((r) => ({ id: Number(r.id), pesertaId: r.peserta_id, tahunAjaran: r.tahun_ajaran, catatan: r.catatan ?? '', isi: r.isi ?? {}, dibuatOlehNama: r.dibuat_oleh_nama ?? '', dibuatPada: r.dibuat_pada }))
+    .sort((a, b) => String(b.dibuatPada).localeCompare(String(a.dibuatPada)) || b.id - a.id);
+
 /** Baris dokumen_templat -> [{ id, tahunAjaran, jenis, isi: { uji, baris, pita } }], tahun ajaran terbaru dulu. */
 export const susunTemplatDokumen = (baris = []) =>
   baris.map((r) => ({

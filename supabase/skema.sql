@@ -19,7 +19,7 @@ set check_function_bodies = off;
 -- ---------------------------------------------------------------------------
 -- 0. Bersihkan versi lama
 -- ---------------------------------------------------------------------------
-drop table if exists public.dokumen_templat, public.penegak_isian, public.sku_pra_uji,public.pengukuhan_dewan, public.bina_damping, public.kepengurusan_log, public.penugasan_peserta, public.penugasan_log, public.penugasan_rombel, public.guru_agama,
+drop table if exists public.portofolio_snapshot, public.dokumen_templat, public.penegak_isian, public.sku_pra_uji,public.pengukuhan_dewan, public.bina_damping, public.kepengurusan_log, public.penugasan_peserta, public.penugasan_log, public.penugasan_rombel, public.guru_agama,
   public.naik_kelas_log, public.naik_kelas_batch, public.notifikasi, public.push_langganan, public.push_konfigurasi, public.keepalive_konfigurasi,
   public.dokumen_terbit, public.dokumen_urut, public.iuran_kas, public.iuran_log, public.iuran, public.asisten_iuran,
   public.sesi_ujian_peserta, public.sesi_ujian_butir, public.sesi_ujian, public.sertifikat_tingkat, public.sku_penilaian, public.instrumen_panduan, public.instrumen_penguji, public.instrumen_kriteria, public.instrumen,
@@ -1065,6 +1065,23 @@ create table public.dokumen_templat (
   unique (tahun_ajaran, jenis)
 );
 -- ===== akhir tabel isian penegak =====
+
+-- ===== Salinan beku portofolio (Tahap 3, H3): tabel =====
+-- Salinan beku Portofolio format Kwarcab satu Penegak pada saat dicetak atau dikirim ke Kwarcab: seluruh data yang membentuk dokumen (identitas, TKK, SPG, isian data diri,
+-- rubrik surat guru, data gudep) disimpan apa adanya, sehingga dokumen yang sama dapat dibuka lagi meski data aplikasi kemudian berubah. Dibuat dan dihapus Pembina atau Admin;
+-- dibaca Pembina dan Admin (memuat data pribadi Penegak).
+create table public.portofolio_snapshot (
+  id bigint generated always as identity primary key,
+  peserta_id uuid not null references public.profiles(id) on delete cascade,
+  tahun_ajaran text not null check (tahun_ajaran ~ '^\d{4}/\d{4}$'),
+  catatan text not null default '' check (char_length(catatan) <= 200 and catatan !~ '[[:cntrl:]<>]'),
+  isi jsonb not null check (jsonb_typeof(isi) = 'object'),
+  dibuat_oleh uuid references public.profiles(id) on delete set null,
+  dibuat_oleh_nama text not null default '',
+  dibuat_pada timestamptz not null default now()
+);
+create index portofolio_snapshot_peserta_idx on public.portofolio_snapshot (peserta_id, dibuat_pada desc);
+-- ===== akhir tabel salinan beku portofolio =====
 -- ---------------------------------------------------------------------------
 -- 2. Fungsi bantu (tidak diekspos lewat API)
 -- ---------------------------------------------------------------------------
@@ -2084,6 +2101,7 @@ alter table public.tim_penilai_anggota enable row level security;   -- baca: pen
 alter table public.garuda_tahap enable row level security;   -- baca: pengurus; tulis: hanya fungsi sg_garuda_tahap_*
 alter table public.penegak_isian enable row level security;   -- baca: pemilik, Pembina, dan Admin; tulis: hanya fungsi sg_isian_saya_simpan
 alter table public.dokumen_templat enable row level security;   -- baca: Pembina dan Admin; tulis: hanya fungsi sg_dokumen_templat_*
+alter table public.portofolio_snapshot enable row level security;   -- baca: Pembina dan Admin; tulis: hanya fungsi sg_portofolio_snapshot_*
 alter table public.tanggal_lahir enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tanggal_lahir_atur
 alter table public.spg_penetapan enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_spg_*
 alter table public.tkk_krida enable row level security;   -- baca: pemilik dan pengurus; tulis: hanya fungsi sg_tkk_krida_*
@@ -2233,6 +2251,7 @@ create policy baca_tanggal_lahir on public.tanggal_lahir for select to authentic
 create policy baca_penegak_isian on public.penegak_isian for select to authenticated
   using ((select sigarda.aktif()) and (peserta_id = (select auth.uid()) or (select sigarda.pembina_atau_admin())));
 create policy baca_dokumen_templat on public.dokumen_templat for select to authenticated using ((select sigarda.pembina_atau_admin()));
+create policy baca_portofolio_snapshot on public.portofolio_snapshot for select to authenticated using ((select sigarda.pembina_atau_admin()));
 -- ===== akhir kebijakan isian penegak =====
 
 -- ===== Tim penilai dan kalender Garuda (Tahap 2, G4b dan G4c): kebijakan =====
@@ -5021,7 +5040,8 @@ begin
       'tim_penilai_anggota', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.tim_penilai_anggota t),
       'garuda_tahap', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.garuda_tahap t),
       'penegak_isian', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.penegak_isian t),
-      'dokumen_templat', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_templat t)
+      'dokumen_templat', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.dokumen_templat t),
+      'portofolio_snapshot', (select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) from public.portofolio_snapshot t)
     )
   ) into v_hasil;
   insert into public.pengaturan (kunci, nilai, diubah_oleh, diubah_pada)
@@ -6495,6 +6515,41 @@ begin
   delete from public.dokumen_templat where id = p_id;
 end $$;
 -- ===== akhir aksi isian penegak =====
+
+-- ===== Salinan beku portofolio (Tahap 3, H3): aksi =====
+-- Menyimpan salinan beku Portofolio format Kwarcab satu Penegak (Pembina dan Admin). p_isi = objek yang memuat `peserta` (id harus sama dengan p_peserta_id) dan `hari`; paling
+-- banyak 600 kB dan 20 salinan per Penegak. Mengembalikan id salinan.
+create function public.sg_portofolio_snapshot_simpan(p_peserta_id uuid, p_catatan text, p_isi jsonb) returns bigint language plpgsql security definer set search_path = public as
+$$
+declare v_p public.profiles; v_cat text := sigarda.rapikan(p_catatan); v_id bigint; v_oleh text;
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat membuat salinan beku portofolio.'; end if;
+  select * into v_p from public.profiles where id = p_peserta_id and role = 'peserta';
+  if not found then raise exception 'Pilih Penegak.'; end if;
+  if char_length(v_cat) > 200 or v_cat ~ '[[:cntrl:]<>]' then raise exception 'Catatan maksimal 200 karakter dan tanpa karakter khusus.'; end if;
+  if p_isi is null or jsonb_typeof(p_isi) <> 'object' then raise exception 'Isi salinan tidak sah.'; end if;
+  if coalesce(jsonb_typeof(p_isi -> 'peserta'), '') <> 'object' or coalesce(p_isi #>> '{peserta,id}', '') <> p_peserta_id::text or coalesce(jsonb_typeof(p_isi -> 'hari'), '') <> 'string' then
+    raise exception 'Isi salinan tidak sesuai dengan Penegak yang dipilih.';
+  end if;
+  if octet_length(p_isi::text) > 600000 then raise exception 'Isi salinan terlalu besar (maksimal 600 kB).'; end if;
+  if (select count(*) from public.portofolio_snapshot where peserta_id = p_peserta_id) >= 20 then
+    raise exception 'Sudah ada 20 salinan beku untuk Penegak ini. Hapus yang tidak diperlukan lebih dulu.';
+  end if;
+  select nama into v_oleh from public.profiles where id = auth.uid();
+  insert into public.portofolio_snapshot (peserta_id, tahun_ajaran, catatan, isi, dibuat_oleh, dibuat_oleh_nama)
+  values (p_peserta_id, sigarda.tahun_ajaran_kini(), v_cat, p_isi, auth.uid(), coalesce(v_oleh, '')) returning id into v_id;
+  return v_id;
+end $$;
+
+create function public.sg_portofolio_snapshot_hapus(p_id bigint) returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  perform sigarda.wajib_aktif();
+  if not sigarda.pembina_atau_admin() then raise exception 'Hanya Pembina dan Admin Gudep yang dapat menghapus salinan beku portofolio.'; end if;
+  delete from public.portofolio_snapshot where id = p_id;
+end $$;
+-- ===== akhir aksi salinan beku portofolio =====
 -- ---------------------------------------------------------------------------
 -- 5. Hak akses: baca saja untuk pengguna; fungsi aksi hanya untuk pengguna masuk
 -- ---------------------------------------------------------------------------
@@ -6506,7 +6561,7 @@ grant select on public.profiles, public.sku_butir, public.sku_unit, public.pf_it
   public.sesi_ujian, public.sesi_ujian_butir, public.sesi_ujian_peserta,
   public.iuran, public.iuran_log, public.iuran_kas, public.asisten_iuran,
   public.penugasan_rombel, public.penugasan_log, public.guru_agama, public.dokumen_terbit, public.dokumen_urut, public.notifikasi,
-  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda, public.kegiatan_usulan, public.pengukuhan_dewan, public.sku_pra_uji, public.pelantikan, public.saka_anggota, public.tkk_katalog, public.tkk_capaian, public.tkk_krida, public.tkk_pengajuan, public.spg_penetapan, public.tanggal_lahir, public.tim_penilai, public.tim_penilai_anggota, public.garuda_tahap, public.penegak_isian, public.dokumen_templat to authenticated;
+  public.naik_kelas_batch, public.naik_kelas_log, public.penugasan_peserta, public.kepengurusan_log, public.agenda, public.kegiatan_usulan, public.pengukuhan_dewan, public.sku_pra_uji, public.pelantikan, public.saka_anggota, public.tkk_katalog, public.tkk_capaian, public.tkk_krida, public.tkk_pengajuan, public.spg_penetapan, public.tanggal_lahir, public.tim_penilai, public.tim_penilai_anggota, public.garuda_tahap, public.penegak_isian, public.dokumen_templat, public.portofolio_snapshot to authenticated;
 
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function
@@ -6559,7 +6614,8 @@ grant execute on function
   public.sg_tanggal_lahir_atur(uuid, date), public.sg_gerbang_simpan(jsonb), public.sg_tanggal_lahir_impor(jsonb),
   public.sg_tim_penilai_simpan(bigint, text, text, text, date, text, text, jsonb), public.sg_tim_penilai_hapus(bigint),
   public.sg_garuda_tahap_simpan(text, text, date, date, text), public.sg_garuda_tahap_hapus(bigint),
-  public.sg_isian_saya_simpan(jsonb), public.sg_dokumen_templat_simpan(text, text, jsonb), public.sg_dokumen_templat_hapus(bigint)
+  public.sg_isian_saya_simpan(jsonb), public.sg_dokumen_templat_simpan(text, text, jsonb), public.sg_dokumen_templat_hapus(bigint),
+  public.sg_portofolio_snapshot_simpan(uuid, text, jsonb), public.sg_portofolio_snapshot_hapus(bigint)
   to authenticated;
 -- Fungsi yang boleh dipanggil tanpa login (hanya membaca): verifikasi keaslian dokumen, identitas gudep di halaman masuk, dan
 -- tautan berbagi baca-saja Berkas Calon Garuda (tahap L7)
