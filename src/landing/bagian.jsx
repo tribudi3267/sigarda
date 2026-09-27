@@ -7,7 +7,7 @@ import LogoMark from '../components/LogoMark';
 import SumberPeraturan from '../components/SumberPeraturan';
 import { labelJenisAgenda } from '../lib/agendaLogic';
 import { namaAmbalan } from '../lib/gudepLogic';
-import { jaringanSosial, pecahParagraf, pecahTanggal, tautanPencarianPeta, tautanPeta, tautanWhatsapp } from '../lib/berandaLogic';
+import { jaringanSosial, pecahParagraf, pecahTanggal, tautanPencarianPeta, tautanPeta, tautanWhatsapp, urlGambar } from '../lib/berandaLogic';
 import { LABEL_KATEGORI_BERITA, LABEL_KELOMPOK_GALERI, LABEL_PLATFORM, LABEL_TINGKAT_PRESTASI } from '../lib/berandaKontenLogic';
 import { DASA_DARMA, MENU, PERJALANAN, PROGRAM, TANYA_JAWAB, TRI_SATYA } from './landingData';
 import { IkonBeranda, LanskapPerkemahan, PetaBergaya } from './ilustrasi';
@@ -117,8 +117,8 @@ export function Tentang({ G, kontak, pembina, kamabigus }) {
   ].filter((s) => s.teks.length);
   return (
     <section id="tentang" className="tepi-tenda scroll-mt-16 bg-pramuka-50 py-16 sm:py-24 [--atas:#2e1b10]">
-      <div className={`${wrap} grid gap-12 lg:grid-cols-[1.05fr_1fr]`}>
-        <div>
+      <div className={`${wrap} tentang-grid`}>
+        <div className="tentang-cerita">
           <KepalaBagian label="Tentang kami" judul="Berlatih setiap Jumat, bertumbuh sepanjang tahun" />
           <div className="space-y-4 text-base leading-relaxed text-pramuka-700 sm:text-lg">
             <p>
@@ -132,21 +132,21 @@ export function Tentang({ G, kontak, pembina, kamabigus }) {
               </p>
             )}
           </div>
-          {sambutan.map((s) => (
-            <figure key={s.bawaan} className="mt-8 border-t border-pramuka-200 pt-6">
-              <blockquote className="space-y-3 text-base italic leading-relaxed text-pramuka-800">
-                {s.teks.map((p, i) => <p key={i}>{p}</p>)}
-              </blockquote>
-              <figcaption className="mt-3 flex items-center gap-3 text-sm">
-                <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-emas bg-pramuka-800 font-display font-bold text-emas-light">
-                  {(s.orang.nama || s.bawaan).split(/\s+/).slice(0, 2).map((k) => k[0]).join('').toUpperCase()}
-                </span>
-                <span><b className="block font-display text-pramuka-900">{s.orang.nama || s.bawaan}</b><span className="text-pramuka-600">{s.orang.jabatan || s.bawaan}</span></span>
-              </figcaption>
-            </figure>
-          ))}
         </div>
-        <aside className="relative self-start overflow-hidden rounded-3xl bg-pramuka-800 p-7 text-pramuka-50 sm:p-8">
+        {sambutan.map((s, i) => (
+          <figure key={s.bawaan} className={`border-t border-pramuka-200 pt-6 ${i === 0 ? 'tentang-sambutan-a' : 'tentang-sambutan-b'}`}>
+            <blockquote className="space-y-3 text-base italic leading-relaxed text-pramuka-800">
+              {s.teks.map((p, i2) => <p key={i2}>{p}</p>)}
+            </blockquote>
+            <figcaption className="mt-3 flex items-center gap-3 text-sm">
+              <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-emas bg-pramuka-800 font-display font-bold text-emas-light">
+                {(s.orang.nama || s.bawaan).split(/\s+/).slice(0, 2).map((k) => k[0]).join('').toUpperCase()}
+              </span>
+              <span><b className="block font-display text-pramuka-900">{s.orang.nama || s.bawaan}</b><span className="text-pramuka-600">{s.orang.jabatan || s.bawaan}</span></span>
+            </figcaption>
+          </figure>
+        ))}
+        <aside className="tentang-trisatya relative self-start overflow-hidden rounded-3xl bg-pramuka-800 p-7 text-pramuka-50 sm:p-8">
           <h3 className="font-display text-2xl font-bold text-emas-light">Tri Satya</h3>
           <p className="mt-1 text-sm text-pramuka-200">Janji setiap Pramuka Penegak</p>
           <ol className="mt-5 list-decimal space-y-2.5 pl-5 text-[15.5px] leading-relaxed text-pramuka-100 marker:font-bold marker:text-emas-light">
@@ -206,13 +206,15 @@ export function Perjalanan() {
   );
 }
 
-/** Kartu berita: sampul (bila ada), kategori, judul, ringkasan, dan tanggal terbit. Belum ada halaman detail (menyusul), jadi bukan tautan. */
+/** Kartu berita: sampul (bila ada), kategori, judul, ringkasan, isi lengkap di balik "Baca selengkapnya" (tanpa JavaScript, elemen <details>), dan tanggal terbit. */
 function KartuBerita({ b, besar = false }) {
   const t = pecahTanggal(String(b.terbitPada ?? '').slice(0, 10));
+  const sampul = urlGambar(b.sampulUrl);
+  const isi = pecahParagraf(b.isi);
   return (
     <article className={`flex flex-col overflow-hidden rounded-2xl border border-pramuka-200 bg-white ${besar ? 'sm:col-span-2 sm:flex-row' : ''}`}>
-      {b.sampulUrl ? (
-        <img src={b.sampulUrl} alt="" loading="lazy" className={`w-full object-cover ${besar ? 'sm:w-2/5' : 'aspect-[16/10]'}`} />
+      {sampul ? (
+        <img src={sampul} alt="" loading="lazy" className={`w-full object-cover ${besar ? 'sm:w-2/5' : 'aspect-[16/10]'}`} />
       ) : (
         <div aria-hidden="true" className={`flex items-center justify-center bg-pramuka-800 text-emas-light ${besar ? 'aspect-[16/10] sm:aspect-auto sm:w-2/5' : 'aspect-[16/10]'}`}>
           <IkonBeranda nama="tenda" ukuran={besar ? 44 : 32} />
@@ -222,6 +224,17 @@ function KartuBerita({ b, besar = false }) {
         <span className="inline-block w-fit rounded-full bg-emas/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emas-dark">{LABEL_KATEGORI_BERITA[b.kategori] ?? b.kategori}</span>
         <h3 className={`font-display font-bold text-pramuka-900 ${besar ? 'text-2xl' : 'text-lg'}`}>{b.judul}</h3>
         {b.ringkasan && <p className="text-[15px] leading-relaxed text-pramuka-700">{b.ringkasan}</p>}
+        {isi.length > 0 && (
+          <details className="group">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-sm font-bold text-emas-dark [&::-webkit-details-marker]:hidden">
+              Baca selengkapnya
+              <span aria-hidden="true" className="transition group-open:rotate-180">▾</span>
+            </summary>
+            <div className="mt-2 space-y-2 text-[15px] leading-relaxed text-pramuka-700">
+              {isi.map((p, i) => <p key={i}>{p}</p>)}
+            </div>
+          </details>
+        )}
         {t && <p className="mt-auto pt-1 text-xs text-pramuka-500">{t.namaHari}, {t.hari} {t.bulan} {t.tahun}</p>}
       </div>
     </article>
@@ -285,8 +298,8 @@ export function Galeri({ galeri = [], memuat = false }) {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {galeri.map((g, i) => (
               <a key={`${g.judul}|${i}`} href={g.tautan} target="_blank" rel="noopener noreferrer" className="group overflow-hidden rounded-2xl border border-pramuka-200 bg-white no-underline">
-                {g.sampulUrl ? (
-                  <img src={g.sampulUrl} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover transition group-hover:scale-105" />
+                {urlGambar(g.sampulUrl) ? (
+                  <img src={urlGambar(g.sampulUrl)} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover transition group-hover:scale-105" />
                 ) : (
                   <div aria-hidden="true" className="flex aspect-[4/3] items-center justify-center bg-pramuka-800 text-emas-light"><IkonBeranda nama="tenda" ukuran={36} /></div>
                 )}
@@ -349,8 +362,8 @@ export function MediaSosial({ sosial = [] }) {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {sosial.map((s, i) => (
             <a key={`${s.tautan}|${i}`} href={s.tautan} target="_blank" rel="noopener noreferrer" className="flex flex-col overflow-hidden rounded-2xl bg-pramuka-50 text-pramuka-900 no-underline">
-              {s.gambarUrl ? (
-                <img src={s.gambarUrl} alt="" loading="lazy" className="aspect-square w-full object-cover" />
+              {urlGambar(s.gambarUrl) ? (
+                <img src={urlGambar(s.gambarUrl)} alt="" loading="lazy" className="aspect-square w-full object-cover" />
               ) : (
                 <div aria-hidden="true" className="flex aspect-square items-center justify-center bg-pramuka-700 text-emas-light"><IkonBeranda nama="kompas" ukuran={36} /></div>
               )}

@@ -53,7 +53,7 @@ end $$;
 --   kontak    : isian beranda.kontak; email dan telepon yang kosong dilengkapi dari Data Gudep
 --   agenda    : paling banyak 6 kegiatan mendatang (hari ini WIB dan sesudahnya) berisi jenis, judul, tanggal SAJA; keterangan dan
 --               peserta_terkait tidak pernah keluar
---   berita    : paling banyak 6 berita TERBIT dan sudah waktunya (terbit_pada <= sekarang), terbaru dulu; kategori, judul, ringkasan, sampul, tanggal SAJA
+--   berita    : paling banyak 6 berita TERBIT dan sudah waktunya (terbit_pada <= sekarang), terbaru dulu; kategori, judul, ringkasan, isi, sampul, tanggal SAJA
 --   prestasi  : semua prestasi TERBIT, tahun terbaru dulu; judul, tingkat, peringkat, tahun, diraih_oleh, foto SAJA
 --   galeri    : semua album TERBIT; judul, tautan, sampul, kelompok SAJA
 --   sosial    : paling banyak 6 kiriman media sosial yang tampil, terbaru dulu; platform, tautan, keterangan, gambar SAJA
@@ -78,8 +78,8 @@ begin
       from (select id, jenis, judul, tanggal from public.agenda where tanggal >= sigarda.hari_ini() order by tanggal, id limit 6) a
     ), '[]'::jsonb),
     'berita', coalesce((
-      select jsonb_agg(jsonb_build_object('kategori', b.kategori, 'judul', b.judul, 'ringkasan', b.ringkasan, 'sampulUrl', b.sampul_url, 'terbitPada', b.terbit_pada) order by b.terbit_pada desc, b.id desc)
-      from (select id, kategori, judul, ringkasan, sampul_url, terbit_pada from public.beranda_berita where status = 'terbit' and terbit_pada <= now() order by terbit_pada desc, id desc limit 6) b
+      select jsonb_agg(jsonb_build_object('kategori', b.kategori, 'judul', b.judul, 'ringkasan', b.ringkasan, 'isi', b.isi, 'sampulUrl', b.sampul_url, 'terbitPada', b.terbit_pada) order by b.terbit_pada desc, b.id desc)
+      from (select id, kategori, judul, ringkasan, isi, sampul_url, terbit_pada from public.beranda_berita where status = 'terbit' and terbit_pada <= now() order by terbit_pada desc, id desc limit 6) b
     ), '[]'::jsonb),
     'prestasi', coalesce((
       select jsonb_agg(jsonb_build_object('judul', p.judul, 'tingkat', p.tingkat, 'peringkat', p.peringkat, 'tahun', p.tahun, 'diraihOleh', p.diraih_oleh, 'fotoUrl', p.foto_url) order by p.tahun desc, p.id desc)

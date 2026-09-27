@@ -1393,7 +1393,7 @@ h_fungsi(skema, nama, args, isi, au, an, sv) as (values
     ('public', 'sg_anggota_ubah', 'p_id uuid, p_nama text, p_kelas text, p_sangga text, p_agama text, p_calon_garuda boolean', '76a95d4b51596c9bb4450bd2422121bc', true, false, true),
     ('public', 'sg_asisten_iuran_atur', 'p_peserta_id uuid, p_aktif boolean', 'b1d2078fe7e40b647c437c8506b692a2', true, false, true),
     ('public', 'sg_beranda_kontak_simpan', 'p_nilai jsonb', '67a557a46aff1109830e06b23ceeea18', true, false, true),
-    ('public', 'sg_beranda_publik', '', 'f74010d8845cadd0f832ad063fdb96a9', true, true, true),
+    ('public', 'sg_beranda_publik', '', '75f9d785f7dd12545437cac8d867e7c4', true, true, true),
     ('public', 'sg_berita_hapus', 'p_id bigint', '3cb8b16705e3fe8fd51788ea02f7134f', true, false, true),
     ('public', 'sg_berita_simpan', 'p_id bigint, p_kategori text, p_judul text, p_ringkasan text, p_isi text, p_sampul_url text, p_status text, p_terbit_pada timestamp with time zone', '70f24fa4fd1944f074613f5d3b6f2920', true, false, true),
     ('public', 'sg_berita_tinjau', 'p_id bigint, p_keputusan text, p_catatan text', '6801eadd4eaf440f31a4bb94f1bdbac8', true, false, true),

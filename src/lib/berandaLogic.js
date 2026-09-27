@@ -32,6 +32,27 @@ const POLA_TAUTAN = /^https:\/\/[A-Za-z0-9.-]+\.[A-Za-z]{2,}([/?#][^ ]*)?$/;
 /** Tautan https sah (dipakai juga oleh berandaKontenLogic.js untuk berita/prestasi/galeri/media sosial): kosong TIDAK dianggap sah di sini. */
 export const tautanSah = (s) => POLA_TAUTAN.test(String(s ?? ''));
 
+const HOST_DRIVE_GAMBAR = new Set(['drive.google.com', 'drive.usercontent.google.com']);
+
+/**
+ * Alamat gambar yang dapat dipasang langsung pada <img>, dari tautan yang ditempel pengurus pada sampulUrl/gambarUrl (Kelola Beranda).
+ * Tautan BERBAGI Google Drive (drive.google.com/file/d/ID/view, .../open?id=ID, .../uc?id=ID) hanya menuju HALAMAN, bukan berkas gambar,
+ * sehingga tampil kosong bila dipasang langsung; diubah ke alamat thumbnail Drive yang boleh dihotlink. Tautan lain (mis. Google Photos yang
+ * disalin lewat "Salin alamat gambar", berupa alamat googleusercontent.com) sudah berupa alamat gambar langsung, dipakai apa adanya.
+ * '' bila tautan tidak sah (kosong, bukan https, dsb.).
+ */
+export function urlGambar(mentah) {
+  const s = rapikan(mentah);
+  if (!tautanSah(s)) return '';
+  let url;
+  try { url = new URL(s); } catch { return s; }
+  if (HOST_DRIVE_GAMBAR.has(url.hostname.toLowerCase())) {
+    const id = url.pathname.match(/\/d\/([A-Za-z0-9_-]{15,120})/)?.[1] ?? url.searchParams.get('id') ?? '';
+    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w1000`;
+  }
+  return s;
+}
+
 /** Spasi ganda dan tepi dirapikan, sama dengan sigarda.rapikan di SQL. */
 export const rapikan = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
 
@@ -114,8 +135,9 @@ export function susunBerandaPublik(mentah) {
     .filter((a) => a.judul && /^\d{4}-\d{2}-\d{2}$/.test(a.tanggal))
     .slice(0, 6);
   const larik = (x) => (Array.isArray(x) ? x : []);
+  // isi = teks BERPARAGRAF (bukan lewat teks(), yang merapikan sebagai satu baris dan menghapus baris baru): server sudah merapikannya sendiri saat disimpan.
   const berita = larik(m.berita)
-    .map((b) => ({ kategori: teks(obj(b).kategori), judul: teks(obj(b).judul), ringkasan: teks(obj(b).ringkasan), sampulUrl: teks(obj(b).sampulUrl), terbitPada: teks(obj(b).terbitPada) }))
+    .map((b) => ({ kategori: teks(obj(b).kategori), judul: teks(obj(b).judul), ringkasan: teks(obj(b).ringkasan), isi: typeof obj(b).isi === 'string' ? obj(b).isi : '', sampulUrl: teks(obj(b).sampulUrl), terbitPada: teks(obj(b).terbitPada) }))
     .filter((b) => b.judul).slice(0, 6);
   const prestasi = larik(m.prestasi)
     .map((p) => ({ judul: teks(obj(p).judul), tingkat: teks(obj(p).tingkat), peringkat: teks(obj(p).peringkat), tahun: Number(obj(p).tahun) || 0, diraihOleh: teks(obj(p).diraihOleh), fotoUrl: teks(obj(p).fotoUrl) }))

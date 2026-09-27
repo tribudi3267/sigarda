@@ -218,3 +218,25 @@
     animation: none;
   }
 }
+
+/*
+ * Bagian "Tentang kami": di ponsel dan tablet potret, tumpukan satu kolom berurutan sesuai DOM (cerita, sambutan Pembina, sambutan Kepala
+ * Sekolah, kotak Tri Satya/Dasa Darma). Di layar lebar (lg), cerita dan kotak Tri Satya/Dasa Darma berdampingan pada baris pertama, lalu
+ * kedua sambutan menjadi baris kedua berdampingan di bawahnya (grid-template-areas, bukan urutan DOM, yang menyusun ulang tata letaknya).
+ */
+.tentang-grid {
+  display: grid;
+  gap: 2.5rem;
+}
+@media (min-width: 1024px) {
+  .tentang-grid {
+    grid-template-columns: 1.05fr 1fr;
+    grid-template-areas: 'cerita trisatya' 'sambutan-a sambutan-b';
+    column-gap: 3rem;
+    row-gap: 3rem;
+  }
+  .tentang-grid > .tentang-cerita { grid-area: cerita; }
+  .tentang-grid > .tentang-trisatya { grid-area: trisatya; }
+  .tentang-grid > .tentang-sambutan-a { grid-area: sambutan-a; }
+  .tentang-grid > .tentang-sambutan-b { grid-area: sambutan-b; }
+}
