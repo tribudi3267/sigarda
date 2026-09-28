@@ -121,10 +121,11 @@ console.log('\n--- Server (PGlite + data contoh) ---');
   for (const pid of pengurusIds) {
     ok(notifAgenda.filter((n) => n.penerima_id === pid).length === 3, `pengurus ${pid} menerima 3 pengingat (H-30, H-7, H-1)`);
   }
-  ok(notifAgenda.filter((n) => n.penerima_id === ahmad).length === 1 && notifAgenda.some((n) => n.penerima_id === ahmad && n.kunci.includes(String(idH30))),
+  ok(notifAgenda.filter((n) => n.penerima_id === ahmad).length === 1 && notifAgenda.some((n) => n.penerima_id === ahmad && n.kunci === `agenda:${idH30}:${hariIni}`),
     'Ahmad (peserta_terkait pada kegiatan H-30 saja) menerima TEPAT 1 pengingat, bukan untuk kegiatan lain');
-  ok(notifAgenda.find((n) => n.kunci.includes(String(idH1)))?.isi === 'Kumpul jam 7 pagi', 'isi notifikasi memakai keterangan agenda apa adanya');
-  ok(notifAgenda.find((n) => n.kunci.includes(String(idH7)))?.isi.includes('Dijadwalkan'), 'tanpa keterangan: isi bawaan "Dijadwalkan <tanggal>."');
+  // Kunci dicocokkan PERSIS (bukan .includes), karena bagian tanggal pada kunci (mis. "2026-09-28") dapat kebetulan memuat digit id lain sebagai substring.
+  ok(notifAgenda.find((n) => n.kunci === `agenda:${idH1}:${hariIni}`)?.isi === 'Kumpul jam 7 pagi', 'isi notifikasi memakai keterangan agenda apa adanya');
+  ok(notifAgenda.find((n) => n.kunci === `agenda:${idH7}:${hariIni}`)?.isi.includes('Dijadwalkan'), 'tanpa keterangan: isi bawaan "Dijadwalkan <tanggal>."');
 
   const totalSebelum = (await q(`select count(*)::int n from public.notifikasi`))[0].n;
   await q('select sigarda.agenda_proses()');
