@@ -297,3 +297,32 @@ begin
 end $$;
 -- ===== akhir faq =====
 -- ===== akhir aksi beranda konten =====
+
+-- ===== Kelola Beranda: notifikasi pengajuan (Fase 3) =====
+-- Berita, Prestasi, dan Galeri berbagi satu fungsi (tabel dibedakan lewat TG_TABLE_NAME, kolomnya sama): pengajuan baru atau diajukan ulang
+-- (status menjadi 'menunggu') memberi tahu semua Pembina dan Admin Gudep aktif (kecuali pelakunya sendiri, bila kebetulan pengurus); pengajuan
+-- yang ditinjau (dari 'menunggu' menjadi 'terbit' atau 'ditolak') memberi tahu penulisnya. Isi tanpa hasil (hanya "diterbitkan"/"ditolak";
+-- alasan penolakan dilihat di aplikasi), sama seperti kaidah notifikasi lain.
+create function sigarda.notif_beranda_konten() returns trigger language plpgsql security definer set search_path = public as
+$$
+declare v_x uuid; v_label text; v_kunci text;
+begin
+  v_label := case TG_TABLE_NAME when 'beranda_berita' then 'Berita' when 'beranda_prestasi' then 'Prestasi' else 'Galeri' end;
+  v_kunci := TG_TABLE_NAME || ':' || NEW.id || ':' || NEW.status || ':' || to_char(coalesce(NEW.diubah_pada, now()), 'YYYYMMDDHH24MISS');
+  if NEW.status = 'menunggu' and (TG_OP = 'INSERT' or OLD.status is distinct from 'menunggu') then
+    for v_x in select id from public.profiles where status = 'aktif' and (role = 'admin' or (role = 'penguji' and jabatan = 'Pembina')) and id is distinct from NEW.dibuat_oleh loop
+      perform sigarda.notif_buat(v_x, 'beranda', 'Pengajuan ' || v_label || ' baru',
+        coalesce(nullif(NEW.dibuat_oleh_nama, ''), 'Seseorang') || ' mengajukan ' || lower(v_label) || ' "' || NEW.judul || '" di Kelola Beranda.',
+        jsonb_build_object('tab', 'kelolaberanda'), v_kunci);
+    end loop;
+  elsif TG_OP = 'UPDATE' and OLD.status = 'menunggu' and NEW.status in ('terbit', 'ditolak') and NEW.dibuat_oleh is distinct from auth.uid() then
+    perform sigarda.notif_buat(NEW.dibuat_oleh, 'beranda', 'Pengajuan ' || v_label || ' ditinjau',
+      v_label || ' "' || NEW.judul || '" Anda sudah ' || (case when NEW.status = 'terbit' then 'diterbitkan' else 'ditolak (catatan ada di Kelola Beranda)' end) || '.',
+      jsonb_build_object('tab', 'kelolaberanda'), v_kunci);
+  end if;
+  return null;
+end $$;
+create trigger notif_berita_status after insert or update of status on public.beranda_berita for each row execute function sigarda.notif_beranda_konten();
+create trigger notif_prestasi_status after insert or update of status on public.beranda_prestasi for each row execute function sigarda.notif_beranda_konten();
+create trigger notif_galeri_status after insert or update of status on public.beranda_galeri for each row execute function sigarda.notif_beranda_konten();
+-- ===== akhir notifikasi beranda konten =====

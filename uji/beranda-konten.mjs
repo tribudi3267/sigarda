@@ -106,6 +106,33 @@ console.log('\n--- Galeri ---');
   ok((await publik()).galeri.some((g) => g.judul === 'Latihan Jumat'), 'album terbit muncul di sg_beranda_publik');
 }
 
+console.log('\n--- Notifikasi pengajuan (Fase 3) ---');
+{
+  const notif = async (id) => q('select jenis, judul, isi, tautan from public.notifikasi where penerima_id = $1 and jenis = $2 order by id desc', [id, 'beranda']);
+  let r = await sebagai(K.sekretaris.id, "select public.sg_prestasi_simpan(null, 'Notif prestasi', 'ranting', 'Juara 2', extract(year from sigarda.hari_ini())::int, 'Regu Putri', '', 'menunggu') as id");
+  const idPrestasi = r.rows[0].id;
+  ok((await notif(K.pembina.id))[0]?.judul === 'Pengajuan Prestasi baru', 'Pembina diberi tahu pengajuan Prestasi baru');
+  ok((await notif(K.admin.id))[0]?.judul === 'Pengajuan Prestasi baru', 'Admin Gudep juga diberi tahu (bukan hanya Pembina)');
+  ok(!(await notif(K.sekretaris.id)).some((n) => n.judul === 'Pengajuan Prestasi baru'), 'pengaju sendiri tidak menerima notifikasi pengajuannya sendiri');
+  ok(!(await notif(K.dewan.id)).some((n) => n.judul === 'Pengajuan Prestasi baru'), 'pengurus lain (bukan Pembina/Admin) tidak ikut diberi tahu pengajuan');
+  await sebagai(K.pembina.id, `select public.sg_prestasi_tinjau(${idPrestasi}, 'terbit', '') as x`);
+  const tinjauSekretaris = (await q('select jenis, judul, isi from public.notifikasi where penerima_id = $1 and jenis = $2 order by id desc', [K.sekretaris.id, 'beranda']))[0];
+  ok(tinjauSekretaris?.judul === 'Pengajuan Prestasi ditinjau' && /diterbitkan/.test(tinjauSekretaris.isi), 'pengaju diberi tahu prestasinya diterbitkan');
+
+  r = await sebagai(K.sekretaris.id, "select public.sg_galeri_simpan(null, 'Notif galeri', 'https://drive.google.com/notif', '', 'latihan', 'menunggu') as id");
+  const idGaleri = r.rows[0].id;
+  await sebagai(K.pembina.id, `select public.sg_galeri_tinjau(${idGaleri}, 'ditolak', 'Tautan belum bisa dibuka') as x`);
+  const tolakSekretaris = (await q('select judul, isi from public.notifikasi where penerima_id = $1 and jenis = $2 order by id desc', [K.sekretaris.id, 'beranda']))[0];
+  ok(tolakSekretaris.judul === 'Pengajuan Galeri ditinjau' && /ditolak/.test(tolakSekretaris.isi) && !/Tautan belum bisa dibuka/.test(tolakSekretaris.isi), 'penolakan diberi tahu tanpa menyalin alasan ke isi singkat (alasan dilihat di aplikasi)');
+
+  r = await sebagai(K.sekretaris.id, "select public.sg_berita_simpan(null, 'kegiatan', 'Notif berita ulang', '', 'Isi', '', 'menunggu', null) as id");
+  const idUlang = r.rows[0].id;
+  await sebagai(K.pembina.id, `select public.sg_berita_tinjau(${idUlang}, 'ditolak', 'Perlu revisi') as x`);
+  await sebagai(K.sekretaris.id, `select public.sg_berita_simpan(${idUlang}, 'kegiatan', 'Notif berita ulang (revisi)', '', 'Isi baru', '', 'menunggu', null) as id`);
+  const notifUlang = await notif(K.pembina.id);
+  ok(notifUlang.filter((n) => n.judul === 'Pengajuan Berita baru').length >= 2, 'diajukan ulang sesudah ditolak: Pembina diberi tahu lagi (bukan dianggap notifikasi ganda)');
+}
+
 console.log('\n--- Media sosial (tanpa alur tinjauan) ---');
 {
   let r = await sebagai(K.sekretaris.id, "select public.sg_sosial_simpan(null, 'instagram', 'https://instagram.com/x', 'Latihan perdana', '', true) as id");

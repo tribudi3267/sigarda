@@ -1348,6 +1348,9 @@ h_kebijakan(tabel, nama, potongan) as (values
 h_pemicu(tabel, nama) as (values
     ('absensi_hadir', 'tak_aktif_absensi_hadir'),
     ('asisten_iuran', 'tak_aktif_asisten_iuran'),
+    ('beranda_berita', 'notif_berita_status'),
+    ('beranda_galeri', 'notif_galeri_status'),
+    ('beranda_prestasi', 'notif_prestasi_status'),
     ('dokumen_terbit', 'notif_dokumen'),
     ('iuran', 'tak_aktif_iuran'),
     ('iuran_log', 'tak_aktif_iuran_log'),
@@ -1578,6 +1581,7 @@ h_fungsi(skema, nama, args, isi, au, an, sv) as (values
     ('sigarda', 'layak_garuda', 'p_peserta uuid', '50aab069d9b40a3511857d4c0cbb060e', true, false, true),
     ('sigarda', 'musyawarah_pengingat', '', '004adf0ae83d931a3439bd2a3b6916e9', true, false, true),
     ('sigarda', 'nama_saya', '', '4023ad9aa62bc80c19374a23989c744e', true, false, true),
+    ('sigarda', 'notif_beranda_konten', '', '581c5dd21e58e85dd7cfb573fa31b88d', true, false, true),
     ('sigarda', 'notif_buat', 'p_penerima uuid, p_jenis text, p_judul text, p_isi text, p_tautan jsonb, p_kunci text', '2d4b9c87664dbaef0e753394276e2111', true, false, true),
     ('sigarda', 'notif_dokumen', '', 'fcab8ec142a2bef4502e4c47c06362f2', true, false, true),
     ('sigarda', 'notif_label_butir', 'p_sku text', '8e1a6536ff0083300c43803bd070524d', true, false, true),

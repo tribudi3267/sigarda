@@ -35,7 +35,7 @@ const potret = async (db) => {
   };
 };
 
-const A = await baru('git:a0baf15'); // skema.sql terbaru kini sudah melewati migrasi berikutnya (2026-09-berita-isi-publik.sql yang menulis ulang sg_beranda_publik lagi); bandingkan dengan snapshot commit tepat sesudah migrasi ini
+const A = await baru('git:a0baf15'); // keadaan TEPAT sesudah migrasi ini (main sesudah PR #43); skema.sql terbaru kini juga memuat Fase 3 (beranda-notifikasi)
 const pa = await potret(A);
 
 console.log('--- Database berisi data: kesetaraan, data utuh, idempoten ---');

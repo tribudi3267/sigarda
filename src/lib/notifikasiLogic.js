@@ -5,7 +5,7 @@
 import { fmtTanggal, hariIni } from './format';
 
 export const LABEL_JENIS = {
-  ajukan: 'Pengajuan', alih: 'Dialihkan', mulai: 'Pengujian', hasil: 'Hasil', pengingat: 'Pengingat', lama: 'Menunggu lama', sesi: 'Sesi ujian', surat: 'Surat', tes: 'Uji', eskalasi: 'Eskalasi', agenda: 'Agenda', musyawarah: 'Musyawarah Ambalan', kegiatan: 'Usulan Kegiatan', tkk: 'TKK', pra_uji: 'Pra-uji',
+  ajukan: 'Pengajuan', alih: 'Dialihkan', mulai: 'Pengujian', hasil: 'Hasil', pengingat: 'Pengingat', lama: 'Menunggu lama', sesi: 'Sesi ujian', surat: 'Surat', tes: 'Uji', eskalasi: 'Eskalasi', agenda: 'Agenda', musyawarah: 'Musyawarah Ambalan', kegiatan: 'Usulan Kegiatan', tkk: 'TKK', pra_uji: 'Pra-uji', beranda: 'Kelola Beranda',
 };
 
 /**
@@ -38,6 +38,7 @@ export const KAPAN_NOTIFIKASI = {
     'Pengingat H-30/H-7/H-1 untuk kegiatan agenda yang menandai Anda sebagai Penegak terkait (mis. calon sidang atau pelantikan).',
     'Bila Anda Pradana/Pradani: keputusan Pembina (disetujui/ditolak) atas usulan kegiatan (Musyawarah Ambalan, pelantikan, dll) yang Anda ajukan.',
     'Bila Anda Penegak berjabatan Dewan: pengingat tahap seleksi Garuda dari Kwarcab (H-7, H-3, H-1, hari-H, dan sehari sebelum berakhir).',
+    'Bila Anda mengajukan Berita, Prestasi, atau Galeri di menu Kelola Beranda: pengajuan Anda diterbitkan atau ditolak (catatan penolakan ada di aplikasi).',
   ],
   penguji: [
     'Penegak mengajukan pengujian kepada Anda, atau ke antrian rombel yang Anda tangani.',
@@ -51,6 +52,7 @@ export const KAPAN_NOTIFIKASI = {
     'Bila Anda Pembina: usulan kegiatan baru diajukan (Musyawarah Ambalan atau 10 kegiatan lain), atau Pradana/Pradani mengingatkan usulan yang belum ditinjau.',
     'Pengingat tahap seleksi Garuda dari Kwarcab yang sudah diisi di menu Kelayakan, tab Kalender (H-7, H-3, H-1, hari-H mulai, dan sehari sebelum tahap berentang berakhir).',
     'Pengingat berkala ke semua pengurus dan Dewan Ambalan bila kegiatan tahunan (Musyawarah Ambalan atau 10 kegiatan lain) belum terjadwal menjelang bulan sasarannya.',
+    'Bila Anda Pembina atau Admin Gudep: Dewan Ambalan mengajukan Berita, Prestasi, atau Galeri baru di menu Kelola Beranda.',
   ],
 };
 

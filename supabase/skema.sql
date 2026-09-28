@@ -353,7 +353,7 @@ create table public.dokumen_urut (          -- penghitung nomor dokumen per jeni
 create table public.notifikasi (
   id bigint generated always as identity primary key,
   penerima_id uuid not null references public.profiles(id) on delete cascade,
-  jenis text not null check (jenis in ('ajukan','alih','mulai','hasil','pengingat','lama','sesi','surat','tes','eskalasi','agenda','musyawarah','kegiatan','pra_uji','tkk')),   -- 'tes' = notifikasi uji dari tombol di halaman Notifikasi; 'eskalasi' = tangga pengingat tahap L5; 'agenda' = pengingat H-30/H-7/H-1 tahap L6; 'musyawarah' = usulan/pengingat Musyawarah Ambalan tahap L6b; 'kegiatan' = usulan/pengingat 10 jenis kegiatan lain tahap L6b
+  jenis text not null check (jenis in ('ajukan','alih','mulai','hasil','pengingat','lama','sesi','surat','tes','eskalasi','agenda','musyawarah','kegiatan','pra_uji','tkk','beranda')),   -- 'tes' = notifikasi uji dari tombol di halaman Notifikasi; 'eskalasi' = tangga pengingat tahap L5; 'agenda' = pengingat H-30/H-7/H-1 tahap L6; 'musyawarah' = usulan/pengingat Musyawarah Ambalan tahap L6b; 'kegiatan' = usulan/pengingat 10 jenis kegiatan lain tahap L6b; 'beranda' = pengajuan/tinjauan Berita, Prestasi, Galeri di Kelola Beranda (Fase 2 landing page, Fase 3)
   judul text not null check (char_length(judul) between 1 and 120),
   isi text not null default '' check (char_length(isi) <= 300),
   tautan jsonb not null default '{}'::jsonb,                        -- { tab: 'antrian' | 'sku' | 'beranda' | 'cetak' }
@@ -5347,6 +5347,35 @@ begin
 end $$;
 -- ===== akhir faq =====
 -- ===== akhir aksi beranda konten =====
+
+-- ===== Kelola Beranda: notifikasi pengajuan (Fase 3) =====
+-- Berita, Prestasi, dan Galeri berbagi satu fungsi (tabel dibedakan lewat TG_TABLE_NAME, kolomnya sama): pengajuan baru atau diajukan ulang
+-- (status menjadi 'menunggu') memberi tahu semua Pembina dan Admin Gudep aktif (kecuali pelakunya sendiri, bila kebetulan pengurus); pengajuan
+-- yang ditinjau (dari 'menunggu' menjadi 'terbit' atau 'ditolak') memberi tahu penulisnya. Isi tanpa hasil (hanya "diterbitkan"/"ditolak";
+-- alasan penolakan dilihat di aplikasi), sama seperti kaidah notifikasi lain.
+create function sigarda.notif_beranda_konten() returns trigger language plpgsql security definer set search_path = public as
+$$
+declare v_x uuid; v_label text; v_kunci text;
+begin
+  v_label := case TG_TABLE_NAME when 'beranda_berita' then 'Berita' when 'beranda_prestasi' then 'Prestasi' else 'Galeri' end;
+  v_kunci := TG_TABLE_NAME || ':' || NEW.id || ':' || NEW.status || ':' || to_char(coalesce(NEW.diubah_pada, now()), 'YYYYMMDDHH24MISS');
+  if NEW.status = 'menunggu' and (TG_OP = 'INSERT' or OLD.status is distinct from 'menunggu') then
+    for v_x in select id from public.profiles where status = 'aktif' and (role = 'admin' or (role = 'penguji' and jabatan = 'Pembina')) and id is distinct from NEW.dibuat_oleh loop
+      perform sigarda.notif_buat(v_x, 'beranda', 'Pengajuan ' || v_label || ' baru',
+        coalesce(nullif(NEW.dibuat_oleh_nama, ''), 'Seseorang') || ' mengajukan ' || lower(v_label) || ' "' || NEW.judul || '" di Kelola Beranda.',
+        jsonb_build_object('tab', 'kelolaberanda'), v_kunci);
+    end loop;
+  elsif TG_OP = 'UPDATE' and OLD.status = 'menunggu' and NEW.status in ('terbit', 'ditolak') and NEW.dibuat_oleh is distinct from auth.uid() then
+    perform sigarda.notif_buat(NEW.dibuat_oleh, 'beranda', 'Pengajuan ' || v_label || ' ditinjau',
+      v_label || ' "' || NEW.judul || '" Anda sudah ' || (case when NEW.status = 'terbit' then 'diterbitkan' else 'ditolak (catatan ada di Kelola Beranda)' end) || '.',
+      jsonb_build_object('tab', 'kelolaberanda'), v_kunci);
+  end if;
+  return null;
+end $$;
+create trigger notif_berita_status after insert or update of status on public.beranda_berita for each row execute function sigarda.notif_beranda_konten();
+create trigger notif_prestasi_status after insert or update of status on public.beranda_prestasi for each row execute function sigarda.notif_beranda_konten();
+create trigger notif_galeri_status after insert or update of status on public.beranda_galeri for each row execute function sigarda.notif_beranda_konten();
+-- ===== akhir notifikasi beranda konten =====
 -- ===== Dokumen terbit: fungsi aksi =====
 -- Menerbitkan surat pengantar ke guru agama untuk butir agama Penegak yang tidak punya Pembina seagama (Pembina atau Admin Gudep).
 -- Surat dicetak untuk tanda tangan dan stempel basah; QR memuat token (sg_verifikasi_token). Selama surat berlaku, Pembina mana pun boleh
