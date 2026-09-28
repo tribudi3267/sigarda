@@ -3,6 +3,9 @@ import { useApp } from '../context/AppContext';
 import { pembinaAtauAdmin } from '../lib/hakLogic';
 import { LABEL_PLATFORM, PLATFORM_SOSIAL, periksaSosial, untukFormSosial } from '../lib/berandaKontenLogic';
 import { Field, Kosong } from './ui';
+import PratinjauSampul from './PratinjauSampul';
+
+const bantuanGambar = 'Cara termudah (juga dari ponsel): unggah fotonya ke Google Drive, ketuk titik tiga (⋮) > Bagikan > ubah akses menjadi "Siapa saja yang memiliki link" > Salin link, lalu tempel di sini. Tautan halaman Google Photos (photos.google.com, photos.app.goo.gl) dan folder Drive tidak dapat dipakai sebagai gambar. Pratinjau di bawah kolom ini menunjukkan apakah fotonya benar-benar tampil.';
 
 /** Tab Media Sosial pada Kelola Beranda: kartu tautan (bukan sematan resmi). Semua pengurus dapat menempel dan langsung tampil; `tampil` menyembunyikan tanpa menghapus. */
 export default function PanelSosial() {
@@ -106,9 +109,10 @@ export default function PanelSosial() {
           <input id="sosial-ket" className={`input ${galat.keterangan ? 'border-red-500' : ''}`} value={form.keterangan} placeholder="Satu kalimat untuk kartu di beranda" onChange={(e) => ubah('keterangan', e.target.value)} />
           {galat.keterangan && <p role="alert" className="mt-1 text-xs font-medium text-red-700">{galat.keterangan}</p>}
         </Field>
-        <Field label="Gambar pratinjau (tautan Drive atau Photos, opsional)" htmlFor="sosial-gambar">
+        <Field label="Gambar pratinjau (tautan file foto di Google Drive, opsional)" htmlFor="sosial-gambar" bantuan={bantuanGambar}>
           <input id="sosial-gambar" className={`input ${galat.gambarUrl ? 'border-red-500' : ''}`} value={form.gambarUrl} placeholder="https://..." onChange={(e) => ubah('gambarUrl', e.target.value)} />
           {galat.gambarUrl && <p role="alert" className="mt-1 text-xs font-medium text-red-700">{galat.gambarUrl}</p>}
+          <PratinjauSampul nilai={form.gambarUrl} rasio="sosial" />
         </Field>
         <button type="button" className="btn btn-gold" disabled={!!sibuk} onClick={simpan}>{sibuk === 'simpan' ? 'Menyimpan...' : 'Simpan kiriman'}</button>
         {dicoba && Object.keys(galat).length > 0 && <p role="alert" className="text-sm font-medium text-red-700">Perbaiki isian yang bertanda merah.</p>}

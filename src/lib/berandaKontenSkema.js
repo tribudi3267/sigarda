@@ -19,7 +19,7 @@ export const SKEMA_BERITA = {
     { kunci: 'judul', label: 'Judul' },
     { kunci: 'ringkasan', label: 'Ringkasan (tampil di kartu)' },
     { kunci: 'isi', label: 'Isi berita', jenis: 'textarea', baris: 6 },
-    { kunci: 'sampulUrl', label: 'Gambar sampul (tautan Google Drive atau Photos, opsional)', placeholder: 'https://...', bantuan: 'Google Drive: buka file foto, Bagikan > "Siapa saja yang memiliki link", salin tautannya. Google Photos: buka fotonya, klik kanan, "Salin alamat gambar" (bukan tautan Bagikan album). Bila gambar tidak dapat dimuat, beranda menampilkan gambar pengganti.' },
+    { kunci: 'sampulUrl', label: 'Gambar sampul (tautan file foto di Google Drive, opsional)', placeholder: 'https://...', bantuan: 'Cara termudah (juga dari ponsel): unggah fotonya ke Google Drive, ketuk titik tiga (⋮) > Bagikan > ubah akses menjadi "Siapa saja yang memiliki link" > Salin link, lalu tempel di sini. Tautan halaman Google Photos (photos.google.com, photos.app.goo.gl) dan folder Drive tidak dapat dipakai sebagai gambar. Pratinjau di bawah kolom ini menunjukkan apakah fotonya benar-benar tampil.', pratinjau: 'berita' },
   ],
 };
 
@@ -49,6 +49,6 @@ export const SKEMA_GALERI = {
     { kunci: 'judul', label: 'Nama album' },
     { kunci: 'tautan', label: 'Tautan album (Google Drive atau Google Photos)', placeholder: 'https://photos.app.goo.gl/... atau drive.google.com/...' },
     { kunci: 'kelompok', label: 'Tampilkan sebagai kelompok', jenis: 'select', opsi: KELOMPOK_GALERI.map((k) => [k, LABEL_KELOMPOK_GALERI[k]]) },
-    { kunci: 'sampulUrl', label: 'Gambar sampul album (satu foto dari album, opsional)', placeholder: 'https://...', bantuan: 'Google Drive: buka file foto, Bagikan > "Siapa saja yang memiliki link", salin tautannya. Google Photos: buka fotonya, klik kanan, "Salin alamat gambar" (bukan tautan Bagikan album). Bila gambar tidak dapat dimuat, beranda menampilkan gambar pengganti.' },
+    { kunci: 'sampulUrl', label: 'Gambar sampul album (tautan satu file foto di Google Drive, opsional)', placeholder: 'https://...', bantuan: 'Cara termudah (juga dari ponsel): unggah fotonya ke Google Drive, ketuk titik tiga (⋮) > Bagikan > ubah akses menjadi "Siapa saja yang memiliki link" > Salin link, lalu tempel di sini. Tautan halaman Google Photos (photos.google.com, photos.app.goo.gl) dan folder Drive tidak dapat dipakai sebagai gambar. Pratinjau di bawah kolom ini menunjukkan apakah fotonya benar-benar tampil.', pratinjau: 'galeri' },
   ],
 };

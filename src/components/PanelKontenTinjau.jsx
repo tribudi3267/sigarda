@@ -4,6 +4,7 @@ import { pembinaAtauAdmin } from '../lib/hakLogic';
 import { bolehUbah, LABEL_STATUS } from '../lib/berandaKontenLogic';
 import { waktuRelatif } from '../lib/notifikasiLogic';
 import { Field, Kosong } from './ui';
+import PratinjauSampul from './PratinjauSampul';
 
 const KELAS_STATUS = { draf: 'bg-pramuka-100 text-pramuka-700', menunggu: 'bg-amber-100 text-amber-800', terbit: 'bg-emerald-100 text-emerald-800', ditolak: 'bg-red-100 text-red-800' };
 
@@ -26,6 +27,7 @@ function Isian({ f, nilai, ubah, galat }) {
         : f.jenis === 'select' ? <select {...umum}>{f.opsi.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
         : <input type={f.jenis === 'number' ? 'number' : 'text'} {...umum} />}
       {galat && <p role="alert" className="mt-1 text-xs font-medium text-red-700">{galat}</p>}
+      {f.pratinjau && <PratinjauSampul nilai={nilai} rasio={f.pratinjau} />}
     </Field>
   );
 }

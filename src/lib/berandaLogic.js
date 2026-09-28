@@ -58,6 +58,33 @@ export function kandidatGambar(mentah) {
   return [s];
 }
 
+export const RUJUK_LANGKAH_DRIVE = 'Ikuti langkah Google Drive di bawah kolom ini.';
+
+/**
+ * Penilaian tautan gambar untuk formulir Kelola Beranda: { jenis, pesan }. `jenis`: 'kosong', 'tidak-sah' (galatnya ditampilkan validasi lain), 'halaman-photos',
+ * 'folder-drive', 'drive-tanpa-id' (ketiganya tidak mungkin tampil sebagai gambar; `pesan` menuntun langkahnya), 'drive' (berkas Drive: layak diuji pratinjau),
+ * atau 'langsung' (alamat gambar biasa). Sejalan dengan kandidatGambar: jenis yang tidak mungkin tampil = tanpa kandidat.
+ */
+export function diagnosaGambar(mentah) {
+  const s = rapikan(mentah);
+  if (!s) return { jenis: 'kosong', pesan: '' };
+  if (!tautanSah(s)) return { jenis: 'tidak-sah', pesan: '' };
+  let url;
+  try { url = new URL(s); } catch { return { jenis: 'tidak-sah', pesan: '' }; }
+  const host = url.hostname.toLowerCase();
+  if (HOST_HALAMAN_SAJA.has(host)) {
+    return { jenis: 'halaman-photos', pesan: `Ini tautan halaman Google Photos, bukan file gambar, sehingga tidak akan tampil di beranda. ${RUJUK_LANGKAH_DRIVE}` };
+  }
+  if (HOST_DRIVE_GAMBAR.has(host)) {
+    if (/\/folders\//.test(url.pathname) || /\/folderview/.test(url.pathname)) {
+      return { jenis: 'folder-drive', pesan: `Ini tautan folder Google Drive, bukan satu file foto, sehingga tidak akan tampil di beranda. Buka SATU file foto di dalamnya lalu bagikan file itu. ${RUJUK_LANGKAH_DRIVE}` };
+    }
+    if (kandidatGambar(s).length === 0) return { jenis: 'drive-tanpa-id', pesan: `Tautan Drive ini tidak memuat ID file foto. Salin tautan Bagikan dari SATU file foto. ${RUJUK_LANGKAH_DRIVE}` };
+    return { jenis: 'drive', pesan: '' };
+  }
+  return { jenis: 'langsung', pesan: '' };
+}
+
 /** Alamat gambar pertama dari kandidatGambar ('' bila tidak ada); dipakai halaman tanpa JavaScript (halaman berita statis, Open Graph). */
 export const urlGambar = (mentah) => kandidatGambar(mentah)[0] ?? '';
 
