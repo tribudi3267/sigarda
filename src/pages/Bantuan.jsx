@@ -2,10 +2,16 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { BAGIAN_UMUM, PANDUAN } from '../data/panduanData';
 import { panduanAwal, PERAN_PANDUAN } from '../lib/panduanLogic';
+import { KUNCI_MODE, LABEL_MODE, MODE_GAMBAR, modeSah } from '../lib/panduanGambarLogic';
 import { daftarRujukan } from '../lib/peraturanLogic';
 import { Icon } from '../components/ui';
+import FigurPanduan from '../components/FigurPanduan';
 
 const ID_RUJUKAN = 'rujukan-peraturan';
+
+/** Pilihan mode gambar tersimpan per perangkat (kenyamanan saja; gagal membaca/menulis penyimpanan tidak mengganggu). */
+const bacaMode = () => { try { return modeSah(window.localStorage.getItem(KUNCI_MODE)); } catch { return 'otomatis'; } };
+const simpanMode = (m) => { try { window.localStorage.setItem(KUNCI_MODE, m); } catch { /* penyimpanan diblokir: abaikan */ } };
 const gulirKe = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
 function DaftarIsi({ panduan, tocBuka, setTocBuka }) {
@@ -57,7 +63,9 @@ export default function Bantuan() {
   const { user } = useApp();
   const [aktif, setAktif] = useState(() => panduanAwal(user));
   const [tocBuka, setTocBuka] = useState(false);
+  const [modeGambar, setModeGambar] = useState(bacaMode);
   const panduan = useMemo(() => PANDUAN[aktif], [aktif]);
+  const pilihMode = (m) => { setModeGambar(m); simpanMode(m); };
 
   return (
     <div className="animasi-naik">
@@ -86,6 +94,23 @@ export default function Bantuan() {
         ))}
       </div>
 
+      <div className="no-print mb-4 flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-semibold text-pramuka-800" id="label-mode-gambar">Gambar contoh:</span>
+        <div role="group" aria-labelledby="label-mode-gambar" className="inline-flex flex-wrap rounded-lg bg-pramuka-100 p-1">
+          {MODE_GAMBAR.map((m) => (
+            <button
+              key={m}
+              aria-pressed={modeGambar === m}
+              onClick={() => pilihMode(m)}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold sm:text-sm ${modeGambar === m ? 'bg-pramuka-800 text-pramuka-50' : 'text-pramuka-700 hover:bg-pramuka-200'}`}
+            >
+              {LABEL_MODE[m]}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-pramuka-600">Gambar memakai data contoh. "Ikuti layar" menampilkan gambar ponsel di HP dan gambar laptop di layar lebar.</span>
+      </div>
+
       <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-6">
         <DaftarIsi panduan={panduan} tocBuka={tocBuka} setTocBuka={setTocBuka} />
 
@@ -98,6 +123,7 @@ export default function Bantuan() {
             <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-pramuka-800">
               {BAGIAN_UMUM.isi.map((baris, i) => <li key={i}>{baris}</li>)}
             </ul>
+            {(BAGIAN_UMUM.gambar || []).map((g) => <FigurPanduan key={g} id={g} mode={modeGambar} />)}
           </article>
 
           {panduan.bagian.map((b) => (
@@ -106,6 +132,7 @@ export default function Bantuan() {
               <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-pramuka-800">
                 {b.isi.map((baris, i) => <li key={i}>{baris}</li>)}
               </ul>
+              {(b.gambar || []).map((g) => <FigurPanduan key={g} id={g} mode={modeGambar} />)}
             </article>
           ))}
 

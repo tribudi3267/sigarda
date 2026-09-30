@@ -1,0 +1,1485 @@
+{
+ "figur": {
+  "umum-menu": {
+   "judul": "Mengenal tampilan SIGARDA",
+   "alt": "Halaman Beranda dengan menu, tombol Notifikasi, tombol Bantuan, dan nama akun diberi nomor.",
+   "keterangan": [
+    "Menu utama. Di laptop, PC, dan tablet menu ada di bilah kiri; di ponsel ada di baris paling bawah dan dapat digeser ke kiri atau kanan bila menunya banyak.",
+    "Notifikasi (ikon lonceng): kabar dari aplikasi, misalnya pengajuan uji, jadwal ujian, dan pengingat.",
+    "Bantuan (tanda tanya): panduan ini. Tersedia untuk semua peran.",
+    "Akun Anda. Sentuh nama untuk mengganti PIN atau keluar dari akun."
+   ],
+   "layar": {
+    "berkas": "panduan/umum-menu-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 0,
+      "y": 0,
+      "w": 23.44,
+      "h": 100
+     },
+     {
+      "x": 0.59,
+      "y": 18.72,
+      "w": 22.27,
+      "h": 5.79
+     },
+     {
+      "x": 0.59,
+      "y": 23.72,
+      "w": 22.27,
+      "h": 5.79
+     },
+     {
+      "x": 0.59,
+      "y": 87.11,
+      "w": 22.27,
+      "h": 7.89
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/umum-menu-ponsel.webp",
+    "l": 390,
+    "t": 844,
+    "kotak": [
+     {
+      "x": 0,
+      "y": 92.95,
+      "w": 100,
+      "h": 7.05
+     },
+     {
+      "x": 15.38,
+      "y": 92.59,
+      "w": 18.46,
+      "h": 7.41
+     },
+     {
+      "x": 31.79,
+      "y": 92.59,
+      "w": 18.46,
+      "h": 7.41
+     },
+     {
+      "x": 59.75,
+      "y": 0.71,
+      "w": 37.18,
+      "h": 5.69
+     }
+    ]
+   }
+  },
+  "umum-akun": {
+   "judul": "Menu akun: ganti PIN dan keluar",
+   "alt": "Menu akun terbuka menampilkan Pengaturan akun (ganti PIN) dan Keluar.",
+   "keterangan": [
+    "Pengaturan akun: ganti PIN dan isi nomor WhatsApp.",
+    "Keluar: akhiri sesi di perangkat ini. Selalu tekan Keluar bila memakai HP atau komputer bersama."
+   ],
+   "layar": {
+    "berkas": "panduan/umum-akun-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 1.27,
+      "y": 75.66,
+      "w": 27.54,
+      "h": 5.79
+     },
+     {
+      "x": 1.27,
+      "y": 80.39,
+      "w": 27.54,
+      "h": 5.79
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/umum-akun-ponsel.webp",
+    "l": 390,
+    "t": 844,
+    "kotak": [
+     {
+      "x": 22.82,
+      "y": 31.87,
+      "w": 72.31,
+      "h": 5.21
+     },
+     {
+      "x": 22.82,
+      "y": 36.14,
+      "w": 72.31,
+      "h": 5.21
+     }
+    ]
+   }
+  },
+  "penegak-beranda": {
+   "judul": "Beranda Penegak",
+   "alt": "Beranda Penegak menampilkan lingkaran progres, kartu SKU Bantara, kehadiran latihan Jumat, dan iuran.",
+   "keterangan": [
+    "Ringkasan Anda: nama, kelas, sangga, tingkat, dan lingkaran persen progres SKU.",
+    "Kartu SKU Bantara dan Laksana: jumlah butir lulus dan yang sedang diproses. Tombol \"Lihat butir\" membuka daftar lengkapnya.",
+    "Kehadiran latihan Jumat pada semester ini. Batas minimal 75% dipakai sebagai dasar penilaian SKU tentang kehadiran.",
+    "Iuran bumbung kepramukaan: total gudep dan iuran Anda sendiri."
+   ],
+   "layar": {
+    "berkas": "panduan/penegak-beranda-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 2.11,
+      "w": 74.22,
+      "h": 24.47
+     },
+     {
+      "x": 24.61,
+      "y": 28.16,
+      "w": 74.22,
+      "h": 31.45
+     },
+     {
+      "x": 24.61,
+      "y": 61.18,
+      "w": 74.22,
+      "h": 17.89
+     },
+     {
+      "x": 24.61,
+      "y": 80.66,
+      "w": 74.22,
+      "h": 19.34
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/penegak-beranda-ponsel.webp",
+    "l": 390,
+    "t": 1100,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 7.27,
+      "w": 93.85,
+      "h": 18.36
+     },
+     {
+      "x": 3.08,
+      "y": 26.73,
+      "w": 93.85,
+      "h": 23.55
+     },
+     {
+      "x": 3.08,
+      "y": 51.36,
+      "w": 93.85,
+      "h": 14.18
+     },
+     {
+      "x": 3.08,
+      "y": 66.64,
+      "w": 93.85,
+      "h": 26.91
+     }
+    ]
+   }
+  },
+  "penegak-sku": {
+   "judul": "Poin SKU",
+   "alt": "Halaman Poin SKU dengan tab Bantara dan Laksana, progres, peta butir, penyaring status, dan daftar butir.",
+   "keterangan": [
+    "Tab tingkat: Bantara dan Laksana. Laksana terkunci sampai seluruh butir Bantara lulus.",
+    "Progres: jumlah butir lulus, dalam proses, dan belum.",
+    "Peta butir: kotak bernomor tiap butir. Hijau = lulus, kuning = dalam proses, krem = belum. Sentuh untuk melompat ke butirnya.",
+    "Penyaring: tampilkan semua butir, yang belum, yang sedang diproses, atau yang lulus."
+   ],
+   "layar": {
+    "berkas": "panduan/penegak-sku-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 18.75,
+      "w": 20.18,
+      "h": 6.84
+     },
+     {
+      "x": 24.61,
+      "y": 26.64,
+      "w": 74.22,
+      "h": 11.84
+     },
+     {
+      "x": 24.61,
+      "y": 40.07,
+      "w": 74.22,
+      "h": 32.89
+     },
+     {
+      "x": 24.61,
+      "y": 74.01,
+      "w": 74.22,
+      "h": 5.26
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/penegak-sku-ponsel.webp",
+    "l": 390,
+    "t": 1000,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 28.5,
+      "w": 52.99,
+      "h": 5.2
+     },
+     {
+      "x": 3.08,
+      "y": 34.5,
+      "w": 93.85,
+      "h": 9
+     },
+     {
+      "x": 3.08,
+      "y": 44.7,
+      "w": 93.85,
+      "h": 33.4
+     },
+     {
+      "x": 3.08,
+      "y": 78.9,
+      "w": 93.85,
+      "h": 4
+     }
+    ]
+   }
+  },
+  "penegak-absensi": {
+   "judul": "Absensi latihan Jumat",
+   "alt": "Halaman Absensi dengan pilihan tahun ajaran dan semester, ringkasan hadir, izin, sakit, alpa, dan riwayat pertemuan.",
+   "keterangan": [
+    "Pilih tahun ajaran dan semester yang ingin dilihat.",
+    "Ringkasan: jumlah hadir, izin, sakit, alpa, dan persentase kehadiran.",
+    "Riwayat tiap pertemuan Jumat dan status kehadiran Anda."
+   ],
+   "layar": {
+    "berkas": "panduan/penegak-absensi-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 18.75,
+      "w": 38.67,
+      "h": 6.32
+     },
+     {
+      "x": 24.61,
+      "y": 26.12,
+      "w": 74.22,
+      "h": 15
+     },
+     {
+      "x": 24.8,
+      "y": 60.07,
+      "w": 73.83,
+      "h": 39.93
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/penegak-absensi-ponsel.webp",
+    "l": 390,
+    "t": 1100,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 25.91,
+      "w": 93.85,
+      "h": 8.73
+     },
+     {
+      "x": 3.08,
+      "y": 35.36,
+      "w": 93.85,
+      "h": 26.36
+     },
+     {
+      "x": 3.59,
+      "y": 79.18,
+      "w": 92.82,
+      "h": 20.82
+     }
+    ]
+   }
+  },
+  "penegak-iuran": {
+   "judul": "Iuran bumbung kepramukaan",
+   "alt": "Halaman Iuran dengan tombol Rekap, ringkasan gudep, dan iuran saya per pertemuan.",
+   "keterangan": [
+    "Rekap: pilih tahun ajaran dan semester untuk melihat ringkasan iuran gudep.",
+    "Ringkasan gudep: total iuran, jumlah pertemuan, dan rata-rata per pertemuan.",
+    "Iuran saya: riwayat beriuran tiap Jumat. Menyimpan iuran secara rutin dinilai pada butir SKU tentang iuran."
+   ],
+   "layar": {
+    "berkas": "panduan/penegak-iuran-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 25,
+      "y": 19.8,
+      "w": 7.95,
+      "h": 5.79
+     },
+     {
+      "x": 24.61,
+      "y": 44.01,
+      "w": 74.22,
+      "h": 15.53
+     },
+     {
+      "x": 24.61,
+      "y": 61.12,
+      "w": 74.22,
+      "h": 38.88
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/penegak-iuran-ponsel.webp",
+    "l": 390,
+    "t": 1100,
+    "kotak": [
+     {
+      "x": 4.1,
+      "y": 28.41,
+      "w": 20.88,
+      "h": 4
+     },
+     {
+      "x": 3.08,
+      "y": 51.32,
+      "w": 93.85,
+      "h": 19.45
+     },
+     {
+      "x": 3.08,
+      "y": 71.86,
+      "w": 93.85,
+      "h": 28.14
+     }
+    ]
+   }
+  },
+  "penegak-datadiri": {
+   "judul": "Melengkapi data diri",
+   "alt": "Jendela Lengkapi data dirimu dengan isian nomor WhatsApp, tanggal lahir, alamat, tombol Simpan data diri, dan Isi nanti.",
+   "keterangan": [
+    "Yang masih perlu dilengkapi disebutkan di sini. Boleh dilewati; akan ditanyakan lagi lain kali sampai lengkap.",
+    "Nomor WhatsApp: dipakai Pembina atau Dewan Ambalan untuk menghubungi Anda bila diperlukan.",
+    "Jenis kelamin dan agama yang sudah tercatat tidak dapat diubah sendiri; hubungi Pembina atau Admin bila keliru."
+   ],
+   "layar": {
+    "berkas": "panduan/penegak-datadiri-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 18.75,
+      "y": 13.61,
+      "w": 62.5,
+      "h": 6.32
+     },
+     {
+      "x": 20.02,
+      "y": 38.41,
+      "w": 59.96,
+      "h": 14.47
+     },
+     {
+      "x": 20.02,
+      "y": 53.41,
+      "w": 29.79,
+      "h": 14.47
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/penegak-datadiri-ponsel.webp",
+    "l": 390,
+    "t": 844,
+    "kotak": [
+     {
+      "x": 4.1,
+      "y": 16.65,
+      "w": 91.79,
+      "h": 10.43
+     },
+     {
+      "x": 7.44,
+      "y": 50.66,
+      "w": 85.13,
+      "h": 14.93
+     },
+     {
+      "x": 7.44,
+      "y": 66.06,
+      "w": 85.13,
+      "h": 13.03
+     }
+    ]
+   }
+  },
+  "dewan-tampilan": {
+   "judul": "Berpindah antara tampilan Penegak dan Dewan",
+   "alt": "Beranda dengan bilah pemilih tampilan Penegak dan Dewan di bagian atas.",
+   "keterangan": [
+    "Bilah pilihan tampilan. Hanya muncul bagi Penegak yang diberi jabatan Dewan Ambalan oleh Pembina atau Admin.",
+    "Tampilan Penegak: menu Anda sebagai Penegak biasa (SKU sendiri, absensi, iuran).",
+    "Tampilan Dewan: menu untuk mengurus ambalan (Dashboard, Absensi, Iuran, Tindak Lanjut, dan lainnya). Pilihan ini diingat per akun."
+   ],
+   "layar": {
+    "berkas": "panduan/dewan-tampilan-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 2.11,
+      "w": 74.22,
+      "h": 8.68
+     },
+     {
+      "x": 80.18,
+      "y": 3.82,
+      "w": 9.51,
+      "h": 5.26
+     },
+     {
+      "x": 88.91,
+      "y": 3.82,
+      "w": 8.26,
+      "h": 5.26
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/dewan-tampilan-ponsel.webp",
+    "l": 390,
+    "t": 844,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 9.48,
+      "w": 93.85,
+      "h": 11.14
+     },
+     {
+      "x": 7.44,
+      "y": 14.34,
+      "w": 24.97,
+      "h": 4.74
+     },
+     {
+      "x": 30.36,
+      "y": 14.34,
+      "w": 21.69,
+      "h": 4.74
+     }
+    ]
+   }
+  },
+  "dewan-dashboard": {
+   "judul": "Dashboard Dewan Ambalan",
+   "alt": "Dashboard Dewan Ambalan dengan kartu antrian pengujian dan progres per rombel.",
+   "keterangan": [
+    "Pilihan tampilan: pastikan di posisi Dewan.",
+    "Antrian pengujian SKU yang menunggu. Tombol \"Buka antrian\" membuka daftar pengajuan Penegak yang perlu dinilai.",
+    "Progres tiap rombel: rata-rata SKU Bantara dan Laksana, serta jumlah Penegak yang menunggu uji."
+   ],
+   "layar": {
+    "berkas": "panduan/dewan-dashboard-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 2.11,
+      "w": 74.22,
+      "h": 8.68
+     },
+     {
+      "x": 24.61,
+      "y": 20.79,
+      "w": 74.22,
+      "h": 11.32
+     },
+     {
+      "x": 24.61,
+      "y": 33.68,
+      "w": 29.95,
+      "h": 7.37
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/dewan-dashboard-ponsel.webp",
+    "l": 390,
+    "t": 844,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 9.48,
+      "w": 93.85,
+      "h": 11.14
+     },
+     {
+      "x": 3.08,
+      "y": 31.99,
+      "w": 93.85,
+      "h": 17.3
+     },
+     {
+      "x": 3.08,
+      "y": 50.71,
+      "w": 78.65,
+      "h": 6.64
+     }
+    ]
+   }
+  },
+  "dewan-absensi": {
+   "judul": "Rekap absensi latihan Jumat",
+   "alt": "Halaman Absensi tampilan Dewan dengan tab Rekap dan Catat absensi, penyaring, ringkasan kehadiran, dan tabel per Penegak.",
+   "keterangan": [
+    "Tab Rekap (melihat hasil) dan Catat absensi (mengisi kehadiran tiap Jumat).",
+    "Unduh Excel: rekap kehadiran untuk laporan atau arsip.",
+    "Ringkasan: jumlah pertemuan, rata-rata kehadiran, dan berapa Penegak yang di atas atau di bawah batas 75%.",
+    "Kehadiran tiap Penegak (H = hadir, I = izin, S = sakit, A = alpa). Baris merah muda = kehadiran di bawah batas minimal."
+   ],
+   "layar": {
+    "berkas": "panduan/dewan-absensi-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 21.32,
+      "w": 24.93,
+      "h": 6.84
+     },
+     {
+      "x": 82.81,
+      "y": 30,
+      "w": 16.02,
+      "h": 4.74
+     },
+     {
+      "x": 24.61,
+      "y": 50,
+      "w": 74.22,
+      "h": 15
+     },
+     {
+      "x": 24.9,
+      "y": 73.29,
+      "w": 73.63,
+      "h": 26.71
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/dewan-absensi-ponsel.webp",
+    "l": 390,
+    "t": 1500,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 18.27,
+      "w": 65.47,
+      "h": 3.47
+     },
+     {
+      "x": 3.08,
+      "y": 28.93,
+      "w": 42.07,
+      "h": 2.4
+     },
+     {
+      "x": 3.08,
+      "y": 51.47,
+      "w": 93.85,
+      "h": 15.87
+     },
+     {
+      "x": 3.85,
+      "y": 71.53,
+      "w": 96.15,
+      "h": 28.47
+     }
+    ]
+   }
+  },
+  "dewan-tindaklanjut": {
+   "judul": "Tindak Lanjut: Penegak yang lama tidak bergerak",
+   "alt": "Halaman Tindak Lanjut dengan daftar Penegak dan tombol Buka WhatsApp di tiap baris.",
+   "keterangan": [
+    "Penjelasan: daftar Penegak yang sudah lebih dari 8 hari tidak ada pergerakan (SKU, absensi, atau iuran).",
+    "Satu baris = satu Penegak, lengkap dengan kelas, sangga, dan alasan (mis. iuran, sudah berapa hari).",
+    "Buka WhatsApp: mengingatkan Penegak lewat pesan siap kirim. Anda memilih sendiri kontaknya dan menekan kirim."
+   ],
+   "layar": {
+    "berkas": "panduan/dewan-tindaklanjut-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 16.05,
+      "w": 74.22,
+      "h": 3.68
+     },
+     {
+      "x": 24.71,
+      "y": 20.92,
+      "w": 74.02,
+      "h": 8.95
+     },
+     {
+      "x": 85.42,
+      "y": 22.89,
+      "w": 12.14,
+      "h": 5
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/dewan-tindaklanjut-ponsel.webp",
+    "l": 390,
+    "t": 844,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 25.36,
+      "w": 93.85,
+      "h": 5.69
+     },
+     {
+      "x": 3.33,
+      "y": 32.11,
+      "w": 93.33,
+      "h": 8.06
+     },
+     {
+      "x": 61.71,
+      "y": 33.89,
+      "w": 31.88,
+      "h": 4.5
+     }
+    ]
+   }
+  },
+  "pembina-dashboard": {
+   "judul": "Dashboard Pembina",
+   "alt": "Dashboard Pembina dengan kartu antrian pengujian, pilihan tampilkan semua rombel, dan kartu progres tiap rombel.",
+   "keterangan": [
+    "Antrian pengujian: jumlah pengajuan yang menunggu Anda. Tombol \"Buka antrian\" membuka daftarnya.",
+    "Bawaannya hanya rombel yang Anda tangani tahun ajaran ini. Centang untuk menampilkan semua rombel.",
+    "Kartu tiap rombel: siapa pengujinya, rata-rata progres SKU, dan berapa yang menunggu atau sedang diuji."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-dashboard-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 11.05,
+      "w": 74.22,
+      "h": 11.32
+     },
+     {
+      "x": 79.7,
+      "y": 27.63,
+      "w": 19.13,
+      "h": 3.68
+     },
+     {
+      "x": 24.61,
+      "y": 31.32,
+      "w": 36.91,
+      "h": 33.42
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-dashboard-ponsel.webp",
+    "l": 390,
+    "t": 1100,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 15.27,
+      "w": 93.85,
+      "h": 13.27
+     },
+     {
+      "x": 3.08,
+      "y": 34.73,
+      "w": 50.22,
+      "h": 2.55
+     },
+     {
+      "x": 3.08,
+      "y": 37.27,
+      "w": 93.85,
+      "h": 23.09
+     }
+    ]
+   }
+  },
+  "pembina-antrian": {
+   "judul": "Antrian pengujian SKU",
+   "alt": "Halaman Antrian pengujian dengan daftar pengajuan Penegak, butir SKU, tanggal, dan tombol Nilai, Alihkan, Lihat peserta.",
+   "keterangan": [
+    "Bawaannya hanya pengajuan yang ditujukan kepada Anda atau antrian rombel Anda. Centang untuk melihat semua penguji.",
+    "Satu pengajuan: nama Penegak, butir SKU yang diuji, status \"Menunggu uji\", dan tanggal pengujian.",
+    "Nilai: membuka lembar penilaian butir itu. Hasil resmi dicatat dengan PIN Anda.",
+    "Alihkan: memindahkan pengajuan ke penguji lain yang berhak. Lihat peserta: membuka halaman SKU Penegak itu."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-antrian-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 79.48,
+      "y": 6.32,
+      "w": 19.35,
+      "h": 3.68
+     },
+     {
+      "x": 24.71,
+      "y": 11.18,
+      "w": 74.02,
+      "h": 20.2
+     },
+     {
+      "x": 73.39,
+      "y": 18.78,
+      "w": 5.66,
+      "h": 5
+     },
+     {
+      "x": 79.05,
+      "y": 18.78,
+      "w": 7.52,
+      "h": 5
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-antrian-ponsel.webp",
+    "l": 390,
+    "t": 844,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 17.06,
+      "w": 50.8,
+      "h": 3.32
+     },
+     {
+      "x": 3.33,
+      "y": 21.45,
+      "w": 93.33,
+      "h": 23.16
+     },
+     {
+      "x": 7.44,
+      "y": 38.21,
+      "w": 14.86,
+      "h": 4.5
+     },
+     {
+      "x": 22.3,
+      "y": 38.21,
+      "w": 19.74,
+      "h": 4.5
+     }
+    ]
+   }
+  },
+  "pembina-peserta": {
+   "judul": "Peserta: mencari dan melihat Penegak",
+   "alt": "Halaman Peserta dengan kotak cari, penyaring rombel dan status, serta daftar Penegak beserta progres SKU-nya.",
+   "keterangan": [
+    "Cari nama atau NIS.",
+    "Penyaring: rombel saya, status (aktif, nonaktif, alumni), sangga, kelas, peran, jenis kelamin, dan agama.",
+    "Satu Penegak: kelas, sangga, agama, tingkat, dan dua batang progres (Bantara dan Laksana). Ketuk untuk membuka detail SKU-nya."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-peserta-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.71,
+      "y": 11.71,
+      "w": 25.89,
+      "h": 6.32
+     },
+     {
+      "x": 50.69,
+      "y": 11.97,
+      "w": 30.17,
+      "h": 5.79
+     },
+     {
+      "x": 24.71,
+      "y": 31.97,
+      "w": 74.02,
+      "h": 15.79
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-peserta-ponsel.webp",
+    "l": 390,
+    "t": 844,
+    "kotak": [
+     {
+      "x": 3.33,
+      "y": 18.13,
+      "w": 93.33,
+      "h": 5.69
+     },
+     {
+      "x": 3.08,
+      "y": 23.93,
+      "w": 93.85,
+      "h": 5.21
+     },
+     {
+      "x": 3.33,
+      "y": 67.65,
+      "w": 93.33,
+      "h": 16.59
+     }
+    ]
+   }
+  },
+  "pembina-penugasan": {
+   "judul": "Penugasan penguji per rombel",
+   "alt": "Halaman Penugasan penguji dengan pilihan tahun ajaran, tab kelas, dan tabel penguji per rombel yang dicentang.",
+   "keterangan": [
+    "Pilih tahun ajaran. Tombol \"Salin dari ...\" di sebelahnya menyalin penugasan tahun sebelumnya.",
+    "Peringatan: rombel berisi Penegak tetapi belum punya penguji. Rombel itu memakai aturan bawaan sampai ditugaskan.",
+    "Tab kelas X, XI, dan XII.",
+    "Tabel penugasan: ketuk sel untuk menugaskan atau mencabut penguji pada rombel itu. Baris bawah menunjukkan jumlah Penegak dan penguji per rombel."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-penugasan-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 8.42,
+      "w": 19.14,
+      "h": 9.47
+     },
+     {
+      "x": 24.61,
+      "y": 33.42,
+      "w": 74.22,
+      "h": 11.58
+     },
+     {
+      "x": 24.61,
+      "y": 45.53,
+      "w": 26.76,
+      "h": 6.84
+     },
+     {
+      "x": 24.9,
+      "y": 53.29,
+      "w": 73.63,
+      "h": 39.21
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-penugasan-ponsel.webp",
+    "l": 390,
+    "t": 1150,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 11.13,
+      "w": 50.26,
+      "h": 6.26
+     },
+     {
+      "x": 3.08,
+      "y": 38.09,
+      "w": 93.85,
+      "h": 9.39
+     },
+     {
+      "x": 3.08,
+      "y": 47.83,
+      "w": 70.26,
+      "h": 4.52
+     },
+     {
+      "x": 3.85,
+      "y": 52.96,
+      "w": 96.15,
+      "h": 25.91
+     }
+    ]
+   }
+  },
+  "pembina-pengurus": {
+   "judul": "Kepengurusan Dewan Ambalan",
+   "alt": "Halaman Kepengurusan dengan daftar pengurus saat ini, tombol Tambah pengurus, dan ganti kepengurusan lewat berkas Excel.",
+   "keterangan": [
+    "Tambah pengurus: memberi jabatan Dewan (mis. Pradana, Sekretaris) kepada seorang Penegak aktif.",
+    "Pengurus saat ini. Pensil mengubah jabatan, tempat sampah mencabutnya. Jabatan dicabut otomatis bila Penegak nonaktif atau alumni.",
+    "Setelah Musyawarah Ambalan: unduh berkas Excel berisi pengurus saat ini, ubah, lalu unggah lagi untuk mengganti seluruh kepengurusan sekaligus."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-pengurus-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 83.27,
+      "y": 34.41,
+      "w": 15.55,
+      "h": 5
+     },
+     {
+      "x": 24.61,
+      "y": 34.41,
+      "w": 74.22,
+      "h": 23.29
+     },
+     {
+      "x": 24.61,
+      "y": 60.86,
+      "w": 74.22,
+      "h": 28.95
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-pengurus-ponsel.webp",
+    "l": 390,
+    "t": 1250,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 47.28,
+      "w": 40.84,
+      "h": 3.04
+     },
+     {
+      "x": 3.08,
+      "y": 44.4,
+      "w": 93.85,
+      "h": 17.04
+     },
+     {
+      "x": 3.08,
+      "y": 63.36,
+      "w": 93.85,
+      "h": 27.36
+     }
+    ]
+   }
+  },
+  "pembina-periksa": {
+   "judul": "Periksa Data",
+   "alt": "Halaman Periksa Data dengan kartu kategori masalah, tombol Perbaiki, dan tautan Lihat baris.",
+   "keterangan": [
+    "Ringkasan jumlah hal yang perlu diperiksa.",
+    "Kartu bercentang hijau = tidak ada masalah; kartu berjam = ada yang perlu dilengkapi, lengkap dengan jumlahnya.",
+    "Lihat baris: menampilkan siapa saja yang bermasalah. Perbaiki: pintasan ke menu yang tepat untuk memperbaikinya."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-periksa-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 6.32,
+      "w": 74.22,
+      "h": 3.68
+     },
+     {
+      "x": 61.91,
+      "y": 11.05,
+      "w": 36.91,
+      "h": 20.79
+     },
+     {
+      "x": 63.57,
+      "y": 25.66,
+      "w": 9.28,
+      "h": 3.68
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-periksa-ponsel.webp",
+    "l": 390,
+    "t": 844,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 13.27,
+      "w": 93.85,
+      "h": 3.32
+     },
+     {
+      "x": 3.08,
+      "y": 28.44,
+      "w": 93.85,
+      "h": 18.72
+     },
+     {
+      "x": 7.44,
+      "y": 41.59,
+      "w": 24.38,
+      "h": 3.32
+     }
+    ]
+   }
+  },
+  "pembina-agenda": {
+   "judul": "Agenda kegiatan tahunan",
+   "alt": "Halaman Agenda dengan tombol Tambah kegiatan dan pesan belum ada kegiatan.",
+   "keterangan": [
+    "Tambah kegiatan: Musyawarah Ambalan, pelantikan, perkemahan, dan kegiatan lain. Pengingat H-30, H-7, dan H-1 dikirim otomatis.",
+    "Bila belum ada kegiatan, halaman menampilkan pesan ini. Kegiatan yang ditambahkan tampil di sini dan di Beranda seluruh anggota."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-agenda-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 82.81,
+      "y": 2.11,
+      "w": 16.01,
+      "h": 6.32
+     },
+     {
+      "x": 24.61,
+      "y": 11.05,
+      "w": 74.22,
+      "h": 16.05
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-agenda-ponsel.webp",
+    "l": 390,
+    "t": 844,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 18.96,
+      "w": 42.05,
+      "h": 5.69
+     },
+     {
+      "x": 3.08,
+      "y": 25.59,
+      "w": 93.85,
+      "h": 16.82
+     }
+    ]
+   }
+  },
+  "pembina-kelolaberanda": {
+   "judul": "Kelola Beranda (halaman muka gudep)",
+   "alt": "Halaman Kelola Beranda dengan tab Kontak, Berita, Prestasi, Galeri, Media Sosial, Pertanyaan Umum, dan formulir kontak.",
+   "keterangan": [
+    "Lihat beranda publik: pratinjau halaman muka yang dapat dilihat siapa saja tanpa masuk.",
+    "Tab isi: Kontak, Berita, Prestasi, Galeri, Media Sosial, dan Pertanyaan Umum. Berita, Prestasi, dan Galeri dari Dewan menunggu persetujuan Pembina sebelum terbit.",
+    "Formulir tab yang dipilih. Semua tautan harus diawali https://."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-kelolaberanda-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 10.79,
+      "w": 13.97,
+      "h": 3.16
+     },
+     {
+      "x": 24.61,
+      "y": 15.79,
+      "w": 74.22,
+      "h": 6.32
+     },
+     {
+      "x": 26.27,
+      "y": 25.92,
+      "w": 70.9,
+      "h": 36.58
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-kelolaberanda-ponsel.webp",
+    "l": 390,
+    "t": 1000,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 16.6,
+      "w": 36.68,
+      "h": 2.4
+     },
+     {
+      "x": 3.08,
+      "y": 20.4,
+      "w": 93.85,
+      "h": 8.8
+     },
+     {
+      "x": 7.44,
+      "y": 32.1,
+      "w": 85.13,
+      "h": 45.8
+     }
+    ]
+   }
+  },
+  "admin-dashboard": {
+   "judul": "Dashboard Admin Gudep",
+   "alt": "Dashboard Admin dengan ringkasan jumlah anggota, absensi, dan kelulusan SKU.",
+   "keterangan": [
+    "Ringkasan jumlah anggota: Penegak, Calon Bantara, Calon Laksana, dan lainnya.",
+    "Ringkasan kehadiran latihan Jumat dan kelulusan SKU seluruh gudep."
+   ],
+   "layar": {
+    "berkas": "panduan/admin-dashboard-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 11.05,
+      "w": 74.22,
+      "h": 26.58
+     },
+     {
+      "x": 24.61,
+      "y": 39.21,
+      "w": 74.22,
+      "h": 40
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/admin-dashboard-ponsel.webp",
+    "l": 390,
+    "t": 1100,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 15.27,
+      "w": 93.85,
+      "h": 31.55
+     },
+     {
+      "x": 3.08,
+      "y": 47.91,
+      "w": 93.85,
+      "h": 41
+     }
+    ]
+   }
+  },
+  "admin-anggota": {
+   "judul": "Data anggota",
+   "alt": "Halaman Data anggota dengan tab Penegak, Dewan, Pembina, Admin Gudep, tombol Import Excel, Tambah anggota, dan daftar anggota.",
+   "keterangan": [
+    "Unduh template Excel: berkas kosong berisi kolom yang dibutuhkan untuk impor.",
+    "Import Excel: menambahkan banyak Penegak sekaligus dari berkas template yang sudah diisi.",
+    "Tambah anggota satu per satu. Admin cukup mengisi nama, NIS, dan rombel; data lainnya diisi Penegak sendiri.",
+    "Tab jenis anggota: Penegak, Dewan (akun lama), Pembina, Admin Gudep, dan Penugasan.",
+    "Status: mengubah anggota menjadi aktif, nonaktif, atau alumni. Pensil mengubah data, tempat sampah menghapus."
+   ],
+   "layar": {
+    "berkas": "panduan/admin-anggota-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 53.61,
+      "y": 2.37,
+      "w": 17.86,
+      "h": 5
+     },
+     {
+      "x": 71.48,
+      "y": 2.37,
+      "w": 12.68,
+      "h": 5
+     },
+     {
+      "x": 84.16,
+      "y": 2.37,
+      "w": 14.67,
+      "h": 5
+     },
+     {
+      "x": 24.61,
+      "y": 8.42,
+      "w": 52.51,
+      "h": 6.84
+     },
+     {
+      "x": 82.58,
+      "y": 44.08,
+      "w": 5.99,
+      "h": 4.74
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/admin-anggota-ponsel.webp",
+    "l": 390,
+    "t": 1150,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 10.78,
+      "w": 46.9,
+      "h": 3.3
+     },
+     {
+      "x": 49.97,
+      "y": 10.78,
+      "w": 33.3,
+      "h": 3.3
+     },
+     {
+      "x": 3.08,
+      "y": 14.09,
+      "w": 38.52,
+      "h": 3.13
+     },
+     {
+      "x": 3.08,
+      "y": 17.91,
+      "w": 93.85,
+      "h": 7.65
+     },
+     {
+      "x": 55.3,
+      "y": 69.83,
+      "w": 15.73,
+      "h": 3.13
+     }
+    ]
+   }
+  },
+  "admin-naikkelas": {
+   "judul": "Naik kelas",
+   "alt": "Halaman Naik kelas dengan jumlah aktif, nonaktif, alumni, pilihan tahun ajaran, tombol unduh dan unggah berkas Excel, dan tabel rombel baru serta aksi.",
+   "keterangan": [
+    "Jumlah anggota aktif, nonaktif (tidak melanjutkan Pramuka, masih siswa), dan alumni (lulus).",
+    "Tahun ajaran yang baru dimulai. Unduh berkas Excel, isi rombel baru dan aksi tiap Penegak, lalu unggah; atau pakai \"Isian bawaan\".",
+    "Tabel per Penegak: rombel baru dan aksi (Lanjut, Tidak lanjut, atau Lulus). Hasilnya dipratinjau lebih dulu sebelum diterapkan, dan dapat dibatalkan."
+   ],
+   "layar": {
+    "berkas": "panduan/admin-naikkelas-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 16.84,
+      "w": 44.53,
+      "h": 9.74
+     },
+     {
+      "x": 24.61,
+      "y": 27.63,
+      "w": 74.22,
+      "h": 19.21
+     },
+     {
+      "x": 24.9,
+      "y": 58.03,
+      "w": 73.63,
+      "h": 41.97
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/admin-naikkelas-ponsel.webp",
+    "l": 390,
+    "t": 1250,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 20.16,
+      "w": 93.85,
+      "h": 5.92
+     },
+     {
+      "x": 3.08,
+      "y": 26.72,
+      "w": 93.85,
+      "h": 20.96
+     },
+     {
+      "x": 3.85,
+      "y": 62.16,
+      "w": 96.15,
+      "h": 37.84
+     }
+    ]
+   }
+  },
+  "admin-gudep": {
+   "judul": "Data Gudep",
+   "alt": "Halaman Data Gudep dengan isian identitas gugus depan dan ambalan, serta alamat dan kwartir.",
+   "keterangan": [
+    "Fungsi halaman: isian ini dipakai pada kop surat, tanda tangan, nomor surat, dan semua dokumen cetak. Ubah di sini setiap ada pergantian pengurus atau pejabat.",
+    "Identitas gugus depan dan ambalan: nama gudep, ambalan, sekolah, nomor gudep, dan kode surat.",
+    "Alamat, kontak, dan kwartir yang tercetak pada kop surat."
+   ],
+   "layar": {
+    "berkas": "panduan/admin-gudep-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 6.32,
+      "w": 74.22,
+      "h": 11.58
+     },
+     {
+      "x": 24.61,
+      "y": 30.26,
+      "w": 74.22,
+      "h": 50
+     },
+     {
+      "x": 24.61,
+      "y": 81.84,
+      "w": 74.22,
+      "h": 18.16
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/admin-gudep-ponsel.webp",
+    "l": 390,
+    "t": 1250,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 8.96,
+      "w": 93.85,
+      "h": 15.04
+     },
+     {
+      "x": 3.08,
+      "y": 37.76,
+      "w": 93.85,
+      "h": 46.72
+     },
+     {
+      "x": 3.08,
+      "y": 85.44,
+      "w": 93.85,
+      "h": 14.56
+     }
+    ]
+   }
+  },
+  "admin-periksa": {
+   "judul": "Periksa Data (Admin)",
+   "alt": "Halaman Periksa Data dengan kartu kategori masalah dan tombol Perbaiki.",
+   "keterangan": [
+    "Tiap kartu = satu jenis masalah data, lengkap dengan jumlah temuannya.",
+    "Perbaiki: langsung menuju menu tempat Admin dapat memperbaikinya. Sebagian perbaikan hanya dapat dilakukan Admin.",
+    "Lihat baris: daftar rincian anggota yang bermasalah."
+   ],
+   "layar": {
+    "berkas": "panduan/admin-periksa-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 61.91,
+      "y": 11.05,
+      "w": 36.91,
+      "h": 25.79
+     },
+     {
+      "x": 63.57,
+      "y": 20.39,
+      "w": 7.84,
+      "h": 5
+     },
+     {
+      "x": 63.57,
+      "y": 30.66,
+      "w": 9.28,
+      "h": 3.68
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/admin-periksa-ponsel.webp",
+    "l": 390,
+    "t": 844,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 28.44,
+      "w": 93.85,
+      "h": 23.22
+     },
+     {
+      "x": 7.44,
+      "y": 36.85,
+      "w": 20.58,
+      "h": 4.5
+     },
+     {
+      "x": 7.44,
+      "y": 46.09,
+      "w": 24.38,
+      "h": 3.32
+     }
+    ]
+   }
+  }
+ }
+}

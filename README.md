@@ -455,6 +455,11 @@ untuk layar dan berkas -- tidak ada salinan terpisah yang bisa usang.
 jalankan `npm run uji -- panduan`, yang memeriksa setiap bagian punya judul dan isi, dan id bagian tidak bentrok (dipakai sebagai
 jangkar daftar isi). Kode: `src/lib/panduanLogic.js` (`panduanAwal`), halaman `src/pages/Bantuan.jsx`.
 
+**Panduan bergambar.** Bagian panduan menu utama tiap peran dilengkapi **gambar layar aplikasi bertanda** (kotak merah bernomor dan
+keterangan bernomor), dalam dua tampilan: **ponsel** dan **laptop/PC/tablet**. Di Bantuan, "Gambar contoh" memilih *Ikuti layar*
+(bawaan), *Ponsel*, atau *Laptop, PC, tablet*. Gambar memakai data contoh. Cara memperbarui gambar (alat pemotret, definisi layar,
+anggaran ukuran): [`docs/panduan-bergambar.md`](docs/panduan-bergambar.md).
+
 ### Instrumen penilaian SKU
 Tiap unit SKU (butir; butir agama per sub-butir, total 90 unit) dapat punya **instrumen**: cara uji, instruksi penguji, dan 1-15 kriteria (jenis Lisan/Praktik/Bukti kegiatan/Pengamatan, bobot 1-5, tanda **Wajib**, panduan penguji).
 - **Penilaian**: penguji memberi nilai 1-5 pada tiap kriteria di lembar penilaian. **Skor** (0-100) = 20 x jumlah(nilai x bobot) / jumlah(bobot), dibulatkan setengah ke atas. **Saran LULUS** bila skor mencapai ambang (bawaan 75) dan, bila "kriteria wajib menjadi syarat lulus" menyala (bawaan: menyala), setiap kriteria wajib bernilai minimal 3. Predikat: 90 ke atas Sangat baik, 75 ke atas Baik, selebihnya Cukup. Semua angka dapat diatur di tab Pengaturan.
