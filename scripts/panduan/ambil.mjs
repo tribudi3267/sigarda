@@ -90,7 +90,7 @@ async function jalankanLangkah(page, langkah, mode) {
   for (const l of langkah || []) {
     if (l.klikMenu) {
       const ok = await page.evaluate((t) => {
-        const e = [...document.querySelectorAll('aside button, aside a, nav button, nav a')].find((x) => (x.innerText || '').replace(/\s+/g, ' ').trim() === t || x.getAttribute('aria-label') === t);
+        const e = [...document.querySelectorAll('aside button, aside a, nav button, nav a')].find((x) => { const n = (x.innerText || '').replace(/\s+/g, ' ').trim(); return n === t || n.startsWith(t + ' ') || x.getAttribute('aria-label') === t; });
         if (!e) return false; e.click(); return true;
       }, l.klikMenu);
       if (!ok) throw new Error(`menu tidak ditemukan: ${l.klikMenu}`);
@@ -126,6 +126,7 @@ async function ambilSatu(browser, d, mode) {
     await page.evaluateOnNewDocument(pasangPembantu);
     await page.goto(`${url}/?${d.data ? `data=${encodeURIComponent(d.data)}&` : ''}masuk=${encodeURIComponent(d.akun)}`, { waitUntil: 'networkidle0', timeout: 120000 });
     await page.waitForFunction(() => !/Memuat SIGARDA/.test(document.body.innerText), { timeout: 180000 });
+    await page.addStyleTag({ content: 'iframe{visibility:hidden !important}' }); // pratinjau berkas Drive milik pihak ketiga tidak ikut dipotret
     await jeda(1500);
     // Jendela ajakan "Lengkapi data dirimu" muncul beberapa detik sesudah masuk (Penegak yang datanya belum lengkap): tunggu, lalu tutup kecuali memang itu yang dipotret.
     const adaDialog = await page.waitForSelector('[role=dialog]', { timeout: 7000 }).then(() => true, () => false);
