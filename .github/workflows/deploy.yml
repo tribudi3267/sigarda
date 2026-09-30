@@ -102,6 +102,9 @@ jobs:
           path: dist
   deploy:
     needs: build
+    # WAJIB eksplisit: tanpa `if`, GitHub melewati job ini bila job `migrasi` di hulu dilewati (push tanpa migrasi baru), padahal `build` berhasil,
+    # sehingga situs tidak pernah terbit. Terbit bila build berhasil (build sendiri sudah menahan diri bila migrasi gagal).
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
