@@ -8,7 +8,7 @@
  */
 import { sqlSebagai } from './klienFake';
 
-const nisPenegak = { ahmad: '10231', anisa: '10120', bagas: '10007', dimas: '10118', nadia: '10008', made: '10121' };
+const nisPenegak = { ahmad: '10231', anisa: '10120', bagas: '10007', dimas: '10118', nadia: '10008', made: '10121', wahyu: '10009' };
 
 async function konteks(pg) {
   const id = async (kolom, nilai) => (await pg.query(`select id from public.profiles where ${kolom} = $1`, [nilai])).rows[0]?.id;
@@ -107,6 +107,20 @@ async function absensiIuran({ pg, penegak, pembina, jalan }) {
   await jalan(penegak.nadia, 'iuran Jumat terakhir', 'select public.sg_iuran_set_banyak($1::date, $2::uuid[], 1000, true)', [tanggal, [penegak.bagas, penegak.anisa]]);
 }
 
+/** Pradani (Wahyu) dengan satu usulan kegiatan yang menunggu Pembina, dan Kelola Beranda: satu berita terbit (Pembina) dan satu pengajuan berita dari Dewan (Nadia). */
+async function pengurusBeranda({ penegak, pembina, ta, tgl, jalan }) {
+  await jalan(pembina, 'jabatan Pradani', 'select public.sg_anggota_jabatan_dewan_atur($1::jsonb)', [JSON.stringify([{ username: '10009', jabatan: 'Pradani' }])]);
+  await jalan(penegak.wahyu, 'usulan Pelantikan Laksana', 'select public.sg_kegiatan_usul($1, $2, $3::date, $4, $5)',
+    ['pelantikan_laksana', ta, await tgl(45), 'https://drive.google.com/file/d/1DeFgHiJkLmNoPqRsTuVwXyZ0123456789/view', 'Mohon persetujuan jadwal dan proposal pelantikan Penegak Laksana.']);
+  const berita = [
+    [pembina, 'kegiatan', 'Latihan gabungan Ambalan berlangsung meriah', 'Ambalan berlatih bersama gudep tetangga di lapangan sekolah.', 'Latihan gabungan diikuti seluruh Penegak dengan permainan, PBB, dan api unggun singkat.', 'terbit'],
+    [penegak.nadia, 'pengumuman', 'Jadwal ujian bersama SKU Bantara', 'Ujian bersama dijadwalkan Sabtu di Aula SMAN 1 Bukateja.', 'Penegak yang telah mengajukan diharapkan hadir tepat waktu dengan seragam lengkap.', 'menunggu'],
+  ];
+  for (const [siapa, kategori, judul, ringkasan, isi, status] of berita) {
+    await jalan(siapa, `berita ${status}`, 'select public.sg_berita_simpan(null, $1, $2, $3, $4, $5, $6, null)', [kategori, judul, ringkasan, isi, '', status]);
+  }
+}
+
 export const KELOMPOK = [
   ['agenda', agenda],
   ['materi', materi],
@@ -115,6 +129,7 @@ export const KELOMPOK = [
   ['sesi ujian', sesiUjian],
   ['pra-uji', praUji],
   ['absensi dan iuran', absensiIuran],
+  ['pengurus dan beranda', pengurusBeranda],
 ];
 
 /** Menambahkan data panduan ke database lokal yang SUDAH berisi data contoh dasar. Mengembalikan daftar kelompok yang diisi. */

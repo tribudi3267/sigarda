@@ -27,6 +27,10 @@ server; dijaga `uji/data-panduan.mjs`. Bila butuh data baru untuk gambar, tambah
 dataPanduan.js, hapus basis data panduan di peramban pemotret (folder profil `panduan-profil` di folder sementara) atau buka `/?data=panduan&ulang=1` agar dibuat ulang.
 Tanggal data panduan relatif terhadap hari pembuatan basis datanya (mis. "H-7"); ambil gambar dalam satu sesi supaya konsisten.
 
+Akun contoh tambahan untuk gambar (hanya di `?data=panduan`): `10118` Dimas (Pinsa tertugas; antrian pra-uji), `10007` Bagas (Calon Garuda), `10009` Wahyu (Pradani; usulan kegiatan). Halaman yang tetap kosong di mode lokal untuk akun Dewan (daftar Catat iuran) dipotong di atas bagian kosong dengan `tinggi`.
+
+Bagian panduan yang layarnya sama dengan bagian lain tidak diberi gambar ganda: tulis kalimat rujukan di `isi` bagian itu (contoh: bagian Admin yang "Sama dengan Pembina").
+
 ## Kapan gambar perlu diambil ulang
 Bila tampilan menu yang bergambar berubah (tata letak, tombol, teks). Gambar yang usang tidak menggagalkan uji, jadi periksa saat mengubah halaman yang ada di
 `scripts/panduan/definisi.mjs`. Bila hanya **teks keterangan** yang berubah: ubah di `definisi.mjs`, lalu jalankan `node scripts/panduan/ambil.mjs --teks`

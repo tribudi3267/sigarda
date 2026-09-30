@@ -45,6 +45,8 @@ ok(await n('select count(*) n from public.bina_damping') === 1 && await n('selec
 ok(await n("select count(*) n from public.sku_pra_uji where status = 'menunggu' and tahap = 'pinsa'") === 1, 'pengajuan Ahmad menunggu penilaian Pinsa (tahap pertama pra-uji)');
 
 ok(await n('select count(*) n from public.iuran where jumlah = 1000') === 2 && await n("select count(*) n from public.absensi_hadir h join public.profiles p on p.id = h.peserta_id where p.nis = '10008' and h.status = 'H'") >= 1, 'absensi dan iuran: Nadia hadir, 2 Penegak sudah beriuran Rp 1.000 pada Jumat terakhir');
+ok(await n("select count(*) n from public.profiles where nis = '10009' and jabatan_dewan = 'Pradani'") === 1 && await n("select count(*) n from public.kegiatan_usulan where status = 'menunggu' and jenis = 'pelantikan_laksana'") === 1, 'Pradani (Wahyu) dan 1 usulan kegiatan yang menunggu Pembina');
+ok(await n("select count(*) n from public.beranda_berita where status = 'terbit'") === 1 && await n("select count(*) n from public.beranda_berita where status = 'menunggu'") === 1, 'Kelola Beranda: 1 berita terbit dan 1 pengajuan berita menunggu');
 
 console.log('\n--- Tidak ada yang bocor ke pemakaian nyata ---');
 {
