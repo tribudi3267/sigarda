@@ -20,8 +20,8 @@ const penyimpan = () => { let v = null; return { ambil: () => v, simpan: (x) => 
 
 console.log('--- Parameter alamat ---');
 {
-  ok(JSON.stringify(bacaParameterUji('')) === JSON.stringify({ masuk: '', penuh: false, ulang: false }), 'tanpa parameter: tidak ada yang aktif');
-  ok(JSON.stringify(bacaParameterUji('?masuk=Pembina&data=penuh&ulang=1')) === JSON.stringify({ masuk: 'pembina', penuh: true, ulang: true }), '?masuk, ?data=penuh, dan ?ulang=1 terbaca (huruf kecil)');
+  ok(JSON.stringify(bacaParameterUji('')) === JSON.stringify({ masuk: '', penuh: false, panduan: false, ulang: false }), 'tanpa parameter: tidak ada yang aktif');
+  ok(JSON.stringify(bacaParameterUji('?masuk=Pembina&data=penuh&ulang=1')) === JSON.stringify({ masuk: 'pembina', penuh: true, panduan: false, ulang: true }), '?masuk, ?data=penuh, dan ?ulang=1 terbaca (huruf kecil)');
   ok(bacaParameterUji('?data=lain').penuh === false && bacaParameterUji('?ulang=0').ulang === false, 'nilai lain diabaikan');
   ok(alamatMasukCepat('pembina', '') === '?masuk=pembina' && alamatMasukCepat('10231', '?data=penuh') === '?data=penuh&masuk=10231' && alamatMasukCepat('admin', '?ulang=1&x=2') === '?masuk=admin', 'tautan mempertahankan ?data=penuh dan membuang parameter lain');
   ok(AKUN_CEPAT.length >= 5 && AKUN_CEPAT.every((a) => a.kunci && a.label && a.username) && AKUN_CEPAT.some((a) => a.username === '10008'), 'daftar akun cepat memuat semua peran termasuk Penegak berjabatan');
@@ -122,7 +122,7 @@ console.log('\n--- Build produksi: tanpa mode uji, dengan klien Supabase, dan ha
   ok(b.status === 0, 'build produksi berhasil' + (b.status === 0 ? '' : ': ' + (b.stdout + b.stderr).slice(-300)));
   const berkas = readdirSync(`${P}/${keluar}/assets`).filter((f) => f.endsWith('.js'));
   const semua = berkas.map((f) => readFileSync(`${P}/${keluar}/assets/${f}`, 'utf8')).join('\n');
-  const penanda = ['sigarda-lokal-penuh', 'Sangga Cendrawasih', '[masuk cepat]', 'Menyiapkan data sekolah penuh', 'Masuk cepat tanpa PIN', 'tidak ada pada data lokal ini', '?data=penuh'];
+  const penanda = ['sigarda-lokal-penuh', 'Sangga Cendrawasih', '[masuk cepat]', 'Menyiapkan data sekolah penuh', 'Masuk cepat tanpa PIN', 'tidak ada pada data lokal ini', '?data=penuh', 'sigarda-lokal-panduan', 'Data contoh panduan, langkah', 'Menyiapkan data contoh panduan', '?data=panduan'];
   for (const t of penanda) ok(!semua.includes(t), `build produksi tidak memuat "${t}"`);
   ok(memuatKlienProduksi(semua), 'build produksi memuat klien Supabase walau VITE_BACKEND=lokal ada di lingkungan (dibuang oleh vite.config.js)');
   // JS awal = index.html + modulepreload. Halaman publik dan dasbor per peran dimuat malas (Fase 0b), begitu pula pembuat kode QR.

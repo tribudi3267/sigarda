@@ -1070,10 +1070,12 @@
   },
   "pembina-agenda": {
    "judul": "Agenda kegiatan tahunan",
-   "alt": "Halaman Agenda dengan tombol Tambah kegiatan dan pesan belum ada kegiatan.",
+   "alt": "Halaman Agenda dengan tombol Tambah kegiatan dan daftar kegiatan lengkap dengan hitung mundur, tombol ubah dan hapus.",
    "keterangan": [
-    "Tambah kegiatan: Musyawarah Ambalan, pelantikan, perkemahan, dan kegiatan lain. Pengingat H-30, H-7, dan H-1 dikirim otomatis.",
-    "Bila belum ada kegiatan, halaman menampilkan pesan ini. Kegiatan yang ditambahkan tampil di sini dan di Beranda seluruh anggota."
+    "Tambah kegiatan: Musyawarah Ambalan, pelantikan, perkemahan, dan kegiatan lain. Pengingat H-30, H-7, dan H-1 dikirim otomatis kepada pengurus dan Penegak yang terkait.",
+    "Satu kegiatan: judul, jenis, tanggal, tahun ajaran, jumlah Penegak terkait, dan keterangan. Urutannya dari yang paling dekat.",
+    "Hitung mundur (mis. H-7 = tujuh hari lagi). Kegiatan yang sudah lewat tampil pudar.",
+    "Pensil mengubah kegiatan dan tempat sampah di sebelahnya menghapusnya. Hanya Pembina dan Admin Gudep yang dapat mengubah agenda."
    ],
    "layar": {
     "berkas": "panduan/pembina-agenda-layar.webp",
@@ -1090,26 +1092,50 @@
       "x": 24.61,
       "y": 11.05,
       "w": 74.22,
-      "h": 16.05
+      "h": 13.42
+     },
+     {
+      "x": 86.05,
+      "y": 15.92,
+      "w": 4.28,
+      "h": 3.68
+     },
+     {
+      "x": 90.04,
+      "y": 15,
+      "w": 4.1,
+      "h": 5.53
      }
     ]
    },
    "ponsel": {
     "berkas": "panduan/pembina-agenda-ponsel.webp",
     "l": 390,
-    "t": 844,
+    "t": 1000,
     "kotak": [
      {
       "x": 3.08,
-      "y": 18.96,
+      "y": 16,
       "w": 42.05,
-      "h": 5.69
+      "h": 4.8
      },
      {
       "x": 3.08,
-      "y": 25.59,
+      "y": 21.6,
       "w": 93.85,
-      "h": 16.82
+      "h": 13.8
+     },
+     {
+      "x": 6.92,
+      "y": 30.7,
+      "w": 11.25,
+      "h": 2.8
+     },
+     {
+      "x": 17.4,
+      "y": 30,
+      "w": 10.77,
+      "h": 4.2
      }
     ]
    }

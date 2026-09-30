@@ -13,10 +13,10 @@ export const AKUN_CEPAT = [
   { kunci: '10007', label: 'Calon Garuda (Bagas, XII-01)', username: '10007' },
 ];
 
-/** Membaca parameter uji dari `location.search`: { masuk, penuh, ulang }. */
+/** Membaca parameter uji dari `location.search`: { masuk, penuh, panduan, ulang }. `panduan` = ?data=panduan (data tambahan untuk gambar panduan; lihat dataPanduan.js). */
 export function bacaParameterUji(search = '') {
   const p = new URLSearchParams(search);
-  return { masuk: (p.get('masuk') ?? '').trim().toLowerCase(), penuh: p.get('data') === 'penuh', ulang: p.get('ulang') === '1' };
+  return { masuk: (p.get('masuk') ?? '').trim().toLowerCase(), penuh: p.get('data') === 'penuh', panduan: p.get('data') === 'panduan', ulang: p.get('ulang') === '1' };
 }
 
 /** Alamat tautan masuk cepat yang mempertahankan pilihan data (mis. ?data=penuh). */
