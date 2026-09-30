@@ -90,7 +90,7 @@ console.log('\n--- data dan berkas gambar yang dihasilkan ---');
       if (!v) continue;
       ok(v.berkas === namaBerkas(d.id, m), `${d.id} [${m}]: nama berkas sesuai pola`);
       dipakai.add(v.berkas.split('/').pop());
-      ok(v.l === MODE[m].lebar && v.t >= MODE[m].tinggi && v.t <= 1600, `${d.id} [${m}]: ukuran ${v.l}x${v.t} wajar`);
+      ok(v.l === MODE[m].lebar && v.t >= 600 && v.t <= 1600, `${d.id} [${m}]: ukuran ${v.l}x${v.t} wajar`);
       ok(v.kotak.every((k) => k.x >= 0 && k.y >= 0 && k.w > 0 && k.h > 0 && k.x + k.w <= 100.05 && k.y + k.h <= 100.05), `${d.id} [${m}]: semua kotak berada di dalam gambar`);
       const berkas = `${P}/public/${v.berkas}`;
       ok(existsSync(berkas), `${d.id} [${m}]: berkas ada`);

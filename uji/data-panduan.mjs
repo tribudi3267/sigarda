@@ -44,6 +44,8 @@ ok(await n("select count(*) n from public.pengaturan where kunci = 'pra_uji.akti
 ok(await n('select count(*) n from public.bina_damping') === 1 && await n('select count(*) n from public.pinsa_tugas') === 1, 'Bina Damping 1 orang dan Pinsa tertugas 1 orang');
 ok(await n("select count(*) n from public.sku_pra_uji where status = 'menunggu' and tahap = 'pinsa'") === 1, 'pengajuan Ahmad menunggu penilaian Pinsa (tahap pertama pra-uji)');
 
+ok(await n('select count(*) n from public.iuran where jumlah = 1000') === 2 && await n("select count(*) n from public.absensi_hadir h join public.profiles p on p.id = h.peserta_id where p.nis = '10008' and h.status = 'H'") >= 1, 'absensi dan iuran: Nadia hadir, 2 Penegak sudah beriuran Rp 1.000 pada Jumat terakhir');
+
 console.log('\n--- Tidak ada yang bocor ke pemakaian nyata ---');
 {
   ok(await n("select count(*) n from public.notifikasi where dibuat < now() - interval '1 day'") === 0, 'tidak ada notifikasi berumur (data dibuat sekarang)');

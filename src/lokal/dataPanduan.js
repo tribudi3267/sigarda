@@ -27,7 +27,7 @@ async function konteks(pg) {
   const jalan = async (sub, langkah, sql, params = []) => {
     try { return await sqlSebagai(pg, sub, sql, params); } catch (e) { throw new Error(`Data contoh panduan, langkah "${langkah}": ${e.message}`); }
   };
-  return { penegak, pembina, admin, ta, tgl, jalan };
+  return { pg, penegak, pembina, admin, ta, tgl, jalan };
 }
 
 /** Kegiatan agenda tahun ajaran berjalan (Pembina). */
@@ -98,6 +98,15 @@ async function praUji({ penegak, pembina, ta, tgl, jalan }) {
 }
 
 /** Urutan penting: pra-uji terakhir (mengubah aturan penguji untuk pengajuan sesudahnya). */
+/** Kehadiran dan iuran pada latihan Jumat terakhir yang sudah punya sesi: Dewan (Nadia) dan Penegak lain hadir, sebagian sudah beriuran. */
+async function absensiIuran({ pg, penegak, pembina, jalan }) {
+  const tanggal = (await pg.query('select max(tanggal)::text as t from public.absensi_sesi')).rows[0]?.t;
+  if (!tanggal) throw new Error('Data contoh panduan: tidak ada sesi absensi pada data contoh dasar.');
+  const hadir = [penegak.nadia, penegak.bagas, penegak.anisa, penegak.dimas, penegak.made];
+  await jalan(pembina, 'kehadiran Jumat terakhir', "select public.sg_absen_set_banyak($1::date, $2::uuid[], 'H', false)", [tanggal, hadir]);
+  await jalan(penegak.nadia, 'iuran Jumat terakhir', 'select public.sg_iuran_set_banyak($1::date, $2::uuid[], 1000, true)', [tanggal, [penegak.bagas, penegak.anisa]]);
+}
+
 export const KELOMPOK = [
   ['agenda', agenda],
   ['materi', materi],
@@ -105,6 +114,7 @@ export const KELOMPOK = [
   ['pelantikan dan Saka', pelantikanSaka],
   ['sesi ujian', sesiUjian],
   ['pra-uji', praUji],
+  ['absensi dan iuran', absensiIuran],
 ];
 
 /** Menambahkan data panduan ke database lokal yang SUDAH berisi data contoh dasar. Mengembalikan daftar kelompok yang diisi. */
