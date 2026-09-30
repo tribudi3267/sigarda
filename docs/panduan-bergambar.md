@@ -18,6 +18,15 @@ Gambar memakai **data contoh** (nama fiktif dari mode lokal). Jangan pernah meng
 | `src/components/FigurPanduan.jsx`, `src/lib/panduanGambarLogic.js` | Tampilan dan logika murninya. |
 | `uji/panduan-gambar.mjs` | Pengujian (data, berkas, anggaran ukuran, keterkaitan dengan panduan, render). |
 
+## Data contoh untuk gambar (`?data=panduan`)
+Data contoh bawaan membuat beberapa halaman kosong (Agenda, Materi, TKK, Pelantikan, Saka, Sesi ujian, Sangga, Pra-uji). Untuk gambar yang butuh isinya, beri
+`data: 'panduan'` di definisi gambar: alat memotret dengan alamat `/?data=panduan&masuk=<akun>`, yang memakai basis data lokal **terpisah**
+(`sigarda-lokal-panduan`; dibuat sekali dari data contoh + `src/lokal/dataPanduan.js`). Jadi data contoh bawaan dan pengujian lama tidak berubah, dan berkasnya tidak
+ikut build produksi (dijaga `uji/mode-uji.mjs`). Isinya ditulis lewat fungsi `sg_*` sebagai pengguna yang berhak (bukan insert langsung), sehingga sah menurut aturan
+server; dijaga `uji/data-panduan.mjs`. Bila butuh data baru untuk gambar, tambah **kelompok** di `KELOMPOK` (dataPanduan.js) dan perbarui ujinya. Setelah mengubah
+dataPanduan.js, hapus basis data panduan di peramban pemotret (folder profil `panduan-profil` di folder sementara) atau buka `/?data=panduan&ulang=1` agar dibuat ulang.
+Tanggal data panduan relatif terhadap hari pembuatan basis datanya (mis. "H-7"); ambil gambar dalam satu sesi supaya konsisten.
+
 ## Kapan gambar perlu diambil ulang
 Bila tampilan menu yang bergambar berubah (tata letak, tombol, teks). Gambar yang usang tidak menggagalkan uji, jadi periksa saat mengubah halaman yang ada di
 `scripts/panduan/definisi.mjs`. Bila hanya **teks keterangan** yang berubah: ubah di `definisi.mjs`, lalu jalankan `node scripts/panduan/ambil.mjs --teks`
@@ -50,7 +59,7 @@ Bila tampilan menu yang bergambar berubah (tata letak, tombol, teks). Gambar yan
 3. Tautkan di `src/data/panduanData.js` (`gambar: ['id']` pada bagian yang sesuai), lalu ambil gambarnya seperti di atas.
 
 ## Anggaran dan keamanan
-- Setiap gambar paling besar 260 kB dan seluruh gambar paling besar 4,5 MB (dijaga `uji/panduan-gambar.mjs`). Gambar disimpan permanen di riwayat Git, jadi
+- Setiap gambar paling besar 260 kB dan seluruh gambar paling besar 9 MB (dijaga `uji/panduan-gambar.mjs`). Gambar disimpan permanen di riwayat Git, jadi
   hindari mengambil ulang tanpa perlu.
 - Gambar dimuat malas dan hanya saat halaman Bantuan dibuka; tidak masuk JavaScript awal. Semua gambar dilayani GitHub Pages; tidak menyentuh Supabase.
 - Kotak dan nomor digambar oleh aplikasi di atas gambar (bukan menyatu dengan gambar), jadi tetap tajam dan teksnya dapat dibaca pembaca layar.

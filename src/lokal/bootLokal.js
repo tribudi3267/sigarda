@@ -11,6 +11,7 @@ import { isiSekolahPenuh } from './sekolahPenuh';
 
 const NAMA_DB_DASAR = 'sigarda-lokal';
 const NAMA_DB_PENUH = 'sigarda-lokal-penuh'; // ?data=penuh: data sekolah penuh (ratusan Penegak), terpisah dari data contoh biasa
+const NAMA_DB_PANDUAN = 'sigarda-lokal-panduan'; // ?data=panduan: data contoh + isian tambahan untuk gambar panduan (dataPanduan.js), terpisah juga
 const hapusDb = (nama) => new Promise((selesai) => {
   const req = indexedDB.deleteDatabase(`/pglite/${nama}`);
   req.onsuccess = req.onerror = req.onblocked = () => selesai();
@@ -28,7 +29,7 @@ const penyimpanSesi = {
 
 export async function bootLokal() {
   const uji = bacaParameterUji(window.location.search);
-  const NAMA_DB = uji.penuh ? NAMA_DB_PENUH : NAMA_DB_DASAR;
+  const NAMA_DB = uji.penuh ? NAMA_DB_PENUH : uji.panduan ? NAMA_DB_PANDUAN : NAMA_DB_DASAR;
   if (uji.ulang) await hapusDb(NAMA_DB);
   const [{ PGlite }, stub, skema] = await Promise.all([
     import('@electric-sql/pglite'),
@@ -50,6 +51,12 @@ export async function bootLokal() {
       console.info('[data penuh] selesai', ringkas);
       document.title = 'SIGARDA';
     }
+    if (uji.panduan) {
+      document.title = 'Menyiapkan data contoh panduan...';
+      const { isiDataPanduan } = await import('./dataPanduan');
+      await isiDataPanduan(pg, { kemajuan: (teks) => console.info('[data panduan]', teks) });
+      document.title = 'SIGARDA';
+    }
   }
 
   const klien = buatKlienFake(pg, penyimpanSesi);
@@ -58,7 +65,7 @@ export async function bootLokal() {
     const r = await masukCepat(pg, klien, uji.masuk);
     if (!r.ok) console.warn('[masuk cepat]', r.pesan);
   }
-  if (uji.masuk || uji.ulang) window.history.replaceState(null, '', window.location.pathname + (uji.penuh ? '?data=penuh' : ''));
+  if (uji.masuk || uji.ulang) window.history.replaceState(null, '', window.location.pathname + (uji.penuh ? '?data=penuh' : uji.panduan ? '?data=panduan' : ''));
 
   return {
     klien,

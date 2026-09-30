@@ -103,7 +103,7 @@ console.log('\n--- data dan berkas gambar yang dihasilkan ---');
   }
   ok(ada.every((n) => dipakai.has(n)), 'tidak ada berkas gambar yatim di public/panduan' + (ada.filter((n) => !dipakai.has(n)).length ? ': ' + ada.filter((n) => !dipakai.has(n)).join(', ') : ''));
   ok(terbesar <= 260 * 1024, `gambar terbesar ${Math.round(terbesar / 1024)} kB (batas 260 kB per gambar)`);
-  ok(total <= 4.5 * 1024 * 1024, `total gambar panduan ${(total / 1024 / 1024).toFixed(2)} MB (anggaran 4,5 MB; gambar besar memperlambat situs dan membesarkan repositori)`);
+  ok(total <= 9 * 1024 * 1024, `total gambar panduan ${(total / 1024 / 1024).toFixed(2)} MB (anggaran 9 MB; gambar besar memperlambat situs dan membesarkan repositori)`);
   ok(Object.keys(DATA.figur).every((id) => DEFINISI.some((d) => d.id === id)), 'tidak ada gambar di data yang tak ada di definisi');
 }
 

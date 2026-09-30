@@ -124,7 +124,7 @@ async function ambilSatu(browser, d, mode) {
   try {
     await page.setViewport({ width: ukuran.lebar, height: ukuran.tinggi, deviceScaleFactor: 1, isMobile: ukuran.seluler, hasTouch: ukuran.seluler });
     await page.evaluateOnNewDocument(pasangPembantu);
-    await page.goto(`${url}/?masuk=${encodeURIComponent(d.akun)}`, { waitUntil: 'networkidle0', timeout: 120000 });
+    await page.goto(`${url}/?${d.data ? `data=${encodeURIComponent(d.data)}&` : ''}masuk=${encodeURIComponent(d.akun)}`, { waitUntil: 'networkidle0', timeout: 120000 });
     await page.waitForFunction(() => !/Memuat SIGARDA/.test(document.body.innerText), { timeout: 180000 });
     await jeda(1500);
     // Jendela ajakan "Lengkapi data dirimu" muncul beberapa detik sesudah masuk (Penegak yang datanya belum lengkap): tunggu, lalu tutup kecuali memang itu yang dipotret.

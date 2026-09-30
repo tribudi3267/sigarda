@@ -3,6 +3,9 @@
 // Cara membaca cara menemukan elemen (`cari`, `layar`, `ponsel`, `klik`, `gulir`): lihat pembantu di ambil.mjs (selector, label, teks, tag, mengandung, dalam, nth, naik, pad).
 // Akun contoh mode lokal: 10231 (Penegak Ahmad Fauzi), 10008 (Penegak berjabatan Dewan), pembina, admin. Semua data adalah data contoh.
 // Awalan id = peran panduan: umum, penegak, dewan, pembina, admin. Setiap gambar dipotret dua kali: layar (laptop/PC/tablet) dan ponsel.
+// Opsi `data: 'panduan'` = memakai basis data lokal tambahan ?data=panduan (src/lokal/dataPanduan.js: agenda, materi, TKK, pelantikan, Saka, sesi ujian, Bina Damping,
+// Pinsa tertugas, pra-uji hidup dengan satu pengajuan). Tanpa opsi itu gambar memakai data contoh bawaan, di mana halaman-halaman tersebut masih kosong.
+// Opsi `tinggi: { ponsel: N }` = tinggi gambar ponsel (piksel) untuk halaman panjang; `dialog: true` = memotret jendela ajakan data diri (bukan menutupnya).
 
 const MENU = 'nav[aria-label="Menu utama"]'; // di laptop = bilah samping, di ponsel = menu bawah (hanya yang terlihat yang dipakai)
 
@@ -228,12 +231,16 @@ export const DEFINISI = [
   {
     id: 'pembina-agenda',
     akun: 'pembina',
+    data: 'panduan',
+    tinggi: { ponsel: 1000 },
     judul: 'Agenda kegiatan tahunan',
-    alt: 'Halaman Agenda dengan tombol Tambah kegiatan dan pesan belum ada kegiatan.',
+    alt: 'Halaman Agenda dengan tombol Tambah kegiatan dan daftar kegiatan lengkap dengan hitung mundur, tombol ubah dan hapus.',
     langkah: [{ klikMenu: 'Agenda' }],
     penanda: [
-      { teks: 'Tambah kegiatan: Musyawarah Ambalan, pelantikan, perkemahan, dan kegiatan lain. Pengingat H-30, H-7, dan H-1 dikirim otomatis.', cari: { teks: 'Tambah kegiatan', mengandung: true, tag: 'button' } },
-      { teks: 'Bila belum ada kegiatan, halaman menampilkan pesan ini. Kegiatan yang ditambahkan tampil di sini dan di Beranda seluruh anggota.', cari: { teks: 'Belum ada kegiatan agenda', mengandung: true, naik: 1 } },
+      { teks: 'Tambah kegiatan: Musyawarah Ambalan, pelantikan, perkemahan, dan kegiatan lain. Pengingat H-30, H-7, dan H-1 dikirim otomatis kepada pengurus dan Penegak yang terkait.', cari: { teks: '+ Tambah kegiatan', tag: 'button' } },
+      { teks: 'Satu kegiatan: judul, jenis, tanggal, tahun ajaran, jumlah Penegak terkait, dan keterangan. Urutannya dari yang paling dekat.', cari: { selector: 'main li', nth: 0 } },
+      { teks: 'Hitung mundur (mis. H-7 = tujuh hari lagi). Kegiatan yang sudah lewat tampil pudar.', cari: { selector: 'main li span.rounded-full', nth: 0 } },
+      { teks: 'Pensil mengubah kegiatan dan tempat sampah di sebelahnya menghapusnya. Hanya Pembina dan Admin Gudep yang dapat mengubah agenda.', cari: { selector: 'main li button[title="Ubah"]', nth: 0, pad: 7 } },
     ],
   },
   {
