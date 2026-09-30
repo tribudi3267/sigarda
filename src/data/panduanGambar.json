@@ -2915,6 +2915,615 @@
     ]
    }
   },
+  "pembina-tkk": {
+   "judul": "TKK: meninjau pengajuan Penegak",
+   "alt": "Halaman TKK untuk Pembina dengan tab Penegak, Pengajuan, Melatih, dan Ambang Garuda, serta satu pengajuan TKK yang menunggu ditinjau dengan tombol Setujui dan Tolak.",
+   "keterangan": [
+    "Tab: Penegak (mencatat capaian), Pengajuan (dari Penegak), Melatih, dan Ambang Garuda (mengatur ambang).",
+    "Satu pengajuan: Penegak, TKK, tingkat, tanggal lulus, tim penguji, dan bukti melatih. Penguji 1 adalah Pembina yang dipilih Penegak.",
+    "Setujui: TKK tercatat resmi. Nama penguji boleh diganti, dengan alasan di catatan.",
+    "Tolak: catatan alasan wajib; Penegak diberi tahu lewat Notifikasi."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-tkk-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 28.09,
+      "w": 43.59,
+      "h": 6.84
+     },
+     {
+      "x": 24.71,
+      "y": 40.86,
+      "w": 74.02,
+      "h": 21.84
+     },
+     {
+      "x": 26.27,
+      "y": 55.59,
+      "w": 7.05,
+      "h": 5
+     },
+     {
+      "x": 33.32,
+      "y": 55.59,
+      "w": 6.31,
+      "h": 5
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-tkk-ponsel.webp",
+    "l": 390,
+    "t": 1000,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 46.65,
+      "w": 93.85,
+      "h": 8.8
+     },
+     {
+      "x": 3.33,
+      "y": 59.95,
+      "w": 93.33,
+      "h": 20.6
+     },
+     {
+      "x": 7.44,
+      "y": 75.15,
+      "w": 18.51,
+      "h": 3.8
+     },
+     {
+      "x": 25.94,
+      "y": 75.15,
+      "w": 16.56,
+      "h": 3.8
+     }
+    ]
+   }
+  },
+  "pembina-melatih": {
+   "judul": "TKK: tab Melatih",
+   "alt": "Tab Melatih pada halaman TKK dengan penjelasan bukti melatih, kolom cari, kotak Hanya yang ditandai, dan daftar Penegak dengan jumlah capaian dan bukti.",
+   "keterangan": [
+    "Melatih: catatan \"bukti melatih\" tiap Penegak, yaitu siapa yang dilatih untuk TKK apa. Syarat melatih menurut petunjuk TKK.",
+    "Hanya yang ditandai: menyaring Penegak yang bukti melatihnya sama untuk tiga TKK berbeda atau lebih (mungkin wajar, mungkin salin tempel).",
+    "Satu Penegak: jumlah capaian, bukti yang berbeda, dan bukti yang dipakai berulang. Hanya bantuan pemeriksaan; tidak ada yang diblokir."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-melatih-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 35.99,
+      "w": 74.22,
+      "h": 8.95
+     },
+     {
+      "x": 57.03,
+      "y": 46.91,
+      "w": 17.49,
+      "h": 3.68
+     },
+     {
+      "x": 26.27,
+      "y": 54.28,
+      "w": 70.9,
+      "h": 4.21
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-melatih-ponsel.webp",
+    "l": 390,
+    "t": 1100,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 51.14,
+      "w": 93.85,
+      "h": 13.45
+     },
+     {
+      "x": 51.01,
+      "y": 65.95,
+      "w": 45.92,
+      "h": 2.55
+     },
+     {
+      "x": 7.44,
+      "y": 71.05,
+      "w": 85.13,
+      "h": 6.55
+     }
+    ]
+   }
+  },
+  "pembina-spg": {
+   "judul": "SPG: menetapkan butir Penegak",
+   "alt": "Halaman SPG satu Calon Garuda dengan ringkasan butir terpenuhi, peta 13 butir, dan daftar butir dengan tautan Tetapkan.",
+   "keterangan": [
+    "Kembali ke daftar Penegak.",
+    "Ringkasan: berapa dari 13 butir terpenuhi, dan berapa yang dokumennya lengkap tetapi menunggu ditetapkan Pembina.",
+    "Peta 13 butir: hijau terpenuhi, kuning proses, krem belum.",
+    "Tetapkan: Pembina menetapkan nilai butir (100 atau 0) dengan tanggal dan catatan. Butir yang dihitung otomatis dapat ditimpa dengan alasan."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-spg-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 20.66,
+      "w": 18.07,
+      "h": 3.68
+     },
+     {
+      "x": 24.61,
+      "y": 30.13,
+      "w": 74.22,
+      "h": 18.68
+     },
+     {
+      "x": 26.27,
+      "y": 63.16,
+      "w": 70.9,
+      "h": 11.84
+     },
+     {
+      "x": 91.29,
+      "y": 83.16,
+      "w": 5.88,
+      "h": 3.16
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-spg-ponsel.webp",
+    "l": 390,
+    "t": 1500,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 18.7,
+      "w": 47.45,
+      "h": 1.87
+     },
+     {
+      "x": 3.08,
+      "y": 23.5,
+      "w": 93.85,
+      "h": 10.53
+     },
+     {
+      "x": 7.44,
+      "y": 41.3,
+      "w": 85.13,
+      "h": 8.8
+     },
+     {
+      "x": 77.12,
+      "y": 54.23,
+      "w": 15.44,
+      "h": 1.6
+     }
+    ]
+   }
+  },
+  "pembina-kelayakan": {
+   "judul": "Kelayakan Calon Garuda",
+   "alt": "Halaman Kelayakan Calon Garuda dengan tab Calon, Tim penilai, dan Kalender, kuota calon, aturan gerbang, tombol tanggal lahir dan rekap Kwarran, serta daftar calon dengan lencana syarat.",
+   "keterangan": [
+    "Tab: Calon (syarat gerbang), Tim penilai (komposisi tim), dan Kalender (jadwal seleksi Kwarcab).",
+    "Kuota calon menurut persentase dari Penegak aktif. Hanya peringatan; keputusan akhir pada Pembina dan Kwarcab.",
+    "Lengkapi tanggal lahir (Excel) dan Unduh rekap untuk Kwarran (Excel, enam lembar).",
+    "Satu calon: lencana Kelas, Usia, dan SKU (Memenuhi atau Data belum ada), kemajuan SPG, dan tim penilai. Isi tanggal lahir bila belum ada."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-kelayakan-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 20.39,
+      "w": 27.5,
+      "h": 6.84
+     },
+     {
+      "x": 24.61,
+      "y": 28.29,
+      "w": 74.22,
+      "h": 15.53
+     },
+     {
+      "x": 52.65,
+      "y": 54.87,
+      "w": 22.76,
+      "h": 5
+     },
+     {
+      "x": 24.71,
+      "y": 61.32,
+      "w": 74.02,
+      "h": 15.26
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-kelayakan-ponsel.webp",
+    "l": 390,
+    "t": 1500,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 18.57,
+      "w": 72.2,
+      "h": 3.47
+     },
+     {
+      "x": 3.08,
+      "y": 22.57,
+      "w": 93.85,
+      "h": 7.87
+     },
+     {
+      "x": 3.08,
+      "y": 39.23,
+      "w": 59.77,
+      "h": 2.53
+     },
+     {
+      "x": 3.33,
+      "y": 44.23,
+      "w": 93.33,
+      "h": 13.6
+     }
+    ]
+   }
+  },
+  "pembina-berkas-garuda": {
+   "judul": "Detail Calon Garuda: berkas dan portofolio",
+   "alt": "Halaman detail satu Calon Garuda di menu Portofolio dengan tombol Lihat SKU, Cetak atau bagikan berkas, Portofolio format Kwarcab, kesiapan 26 dokumen, dan peta dokumen.",
+   "keterangan": [
+    "Lihat SKU: membuka halaman kemajuan SKU Penegak ini.",
+    "Cetak / bagikan berkas: Kartu SKU Bantara dan Laksana, cek list 26 dokumen, dan jurnal dalam satu dokumen; juga tautan baca-saja untuk pihak luar (hanya Pembina dan Admin).",
+    "Portofolio format Kwarcab: lembar resmi Kwarcab Purbalingga yang terisi dari data aplikasi.",
+    "Peta 26 dokumen: sentuh nomor untuk membuka dokumen, status, tautan Drive, dan catatan penilai."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-berkas-garuda-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 48.5,
+      "y": 15.79,
+      "w": 8.8,
+      "h": 5
+     },
+     {
+      "x": 58.07,
+      "y": 15.92,
+      "w": 18.14,
+      "h": 4.74
+     },
+     {
+      "x": 77,
+      "y": 15.79,
+      "w": 20.17,
+      "h": 5
+     },
+     {
+      "x": 26.27,
+      "y": 59.61,
+      "w": 34.9,
+      "h": 28.42
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-berkas-garuda-ponsel.webp",
+    "l": 390,
+    "t": 1300,
+    "kotak": [
+     {
+      "x": 69.46,
+      "y": 14.15,
+      "w": 23.1,
+      "h": 2.92
+     },
+     {
+      "x": 7.44,
+      "y": 21.92,
+      "w": 47.63,
+      "h": 2.77
+     },
+     {
+      "x": 7.44,
+      "y": 25.31,
+      "w": 52.96,
+      "h": 2.92
+     },
+     {
+      "x": 7.44,
+      "y": 46.69,
+      "w": 85.13,
+      "h": 16.62
+     }
+    ]
+   }
+  },
+  "pembina-portofolio-kwarcab": {
+   "judul": "Portofolio format Kwarcab: pratinjau cetak",
+   "alt": "Pratinjau Portofolio format Kwarcab dengan tombol Kembali, kotak Sertakan surat keterangan guru, tombol Cetak atau simpan PDF, panel templat surat dan salinan beku, dan surat rekomendasi.",
+   "keterangan": [
+    "Sertakan surat keterangan guru: lampiran delapan surat dari rubrik templat di bawah.",
+    "Cetak atau simpan PDF. Yang belum diisi Penegak dicetak kosong untuk ditulis tangan.",
+    "Templat surat keterangan guru per tahun ajaran (diisi Pembina atau Admin).",
+    "Salinan beku: membekukan dokumen ini apa adanya (termasuk kop dan penanda tangan saat itu) untuk arsip."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-portofolio-kwarcab-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 43.7,
+      "y": 3.42,
+      "w": 23.03,
+      "h": 3.68
+     },
+     {
+      "x": 77.62,
+      "y": 2.11,
+      "w": 21.21,
+      "h": 6.32
+     },
+     {
+      "x": 26.27,
+      "y": 37.76,
+      "w": 70.9,
+      "h": 3.68
+     },
+     {
+      "x": 26.27,
+      "y": 46.97,
+      "w": 70.9,
+      "h": 3.68
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-portofolio-kwarcab-ponsel.webp",
+    "l": 390,
+    "t": 1400,
+    "kotak": [
+     {
+      "x": 36.45,
+      "y": 5.71,
+      "w": 60.48,
+      "h": 2
+     },
+     {
+      "x": 3.08,
+      "y": 8,
+      "w": 55.7,
+      "h": 3.43
+     },
+     {
+      "x": 7.44,
+      "y": 37.36,
+      "w": 85.13,
+      "h": 2
+     },
+     {
+      "x": 7.44,
+      "y": 42.36,
+      "w": 85.13,
+      "h": 2
+     }
+    ]
+   }
+  },
+  "pembina-periksa-data-diri": {
+   "judul": "Periksa Data: data diri Penegak",
+   "alt": "Halaman Periksa Data dengan kategori Penegak belum melengkapi data diri dan tautan Lihat baris.",
+   "keterangan": [
+    "Kategori Penegak belum melengkapi data diri: hanya nama dan isian pokok yang kurang yang ditampilkan, bukan isinya.",
+    "Lihat baris: daftar Penegak beserta isian yang kurang, dengan tombol WhatsApp untuk mengingatkan."
+   ],
+   "layar": {
+    "berkas": "panduan/pembina-periksa-data-diri-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 28.61,
+      "y": 1.58,
+      "w": 27.55,
+      "h": 7.11
+     },
+     {
+      "x": 26.27,
+      "y": 22.37,
+      "w": 9.28,
+      "h": 3.68
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/pembina-periksa-data-diri-ponsel.webp",
+    "l": 390,
+    "t": 900,
+    "kotak": [
+     {
+      "x": 13.59,
+      "y": 8,
+      "w": 72.33,
+      "h": 6
+     },
+     {
+      "x": 7.44,
+      "y": 25.56,
+      "w": 24.38,
+      "h": 3.11
+     }
+    ]
+   }
+  },
+  "dewan-pradana": {
+   "judul": "Pradana atau Pradani: usulan kegiatan",
+   "alt": "Halaman Agenda tampilan Dewan dengan panel Usulan kegiatan, daftar jenis kegiatan dengan tombol Ajukan, dan satu usulan Pelantikan Laksana yang menunggu ditinjau dengan tombol Ingatkan Pembina.",
+   "keterangan": [
+    "Usulan kegiatan tahun ajaran berjalan: satu baris per jenis kegiatan. Hanya Pradana dan Pradani yang dapat mengajukan.",
+    "Ajukan: isi tanggal usulan, tautan dokumen proposal (https), dan catatan. Satu jenis hanya boleh punya satu usulan yang menunggu.",
+    "Usulan yang menunggu ditinjau Pembina, lengkap dengan tanggal, pengusul, dan tautan dokumen. Bila disetujui, kegiatannya masuk Agenda.",
+    "Ingatkan Pembina: mengirim pengingat ulang, paling banyak sekali sehari."
+   ],
+   "layar": {
+    "berkas": "panduan/dewan-pradana-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 26.27,
+      "y": 23.03,
+      "w": 70.9,
+      "h": 4.21
+     },
+     {
+      "x": 87.78,
+      "y": 29.47,
+      "w": 8.12,
+      "h": 5
+     },
+     {
+      "x": 27.54,
+      "y": 50.53,
+      "w": 68.36,
+      "h": 14.47
+     },
+     {
+      "x": 28.71,
+      "y": 58.42,
+      "w": 13.24,
+      "h": 5
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/dewan-pradana-ponsel.webp",
+    "l": 390,
+    "t": 1100,
+    "kotak": [
+     {
+      "x": 7.44,
+      "y": 26.09,
+      "w": 85.13,
+      "h": 2.91
+     },
+     {
+      "x": 67.9,
+      "y": 30.55,
+      "w": 21.33,
+      "h": 3.45
+     },
+     {
+      "x": 10.77,
+      "y": 48,
+      "w": 78.46,
+      "h": 11.82
+     },
+     {
+      "x": 13.85,
+      "y": 55.27,
+      "w": 34.77,
+      "h": 3.45
+     }
+    ]
+   }
+  },
+  "dewan-kelola-beranda": {
+   "judul": "Kelola Beranda untuk Dewan Ambalan",
+   "alt": "Halaman Kelola Beranda tampilan Dewan dengan tab Kontak, Berita, Prestasi, Galeri, dan Media Sosial, serta daftar berita dengan status terbitnya.",
+   "keterangan": [
+    "Lihat beranda publik: halaman muka yang dapat dilihat siapa saja tanpa masuk.",
+    "Tab isi beranda: Kontak, Berita, Prestasi, Galeri, dan Media Sosial. Dewan Ambalan tidak melihat tab Pertanyaan Umum (hanya Pembina dan Admin).",
+    "Berita yang sudah ada dan statusnya. Dewan Ambalan hanya dapat menyimpan draf atau mengajukan (Menunggu Pembina); Pembina atau Admin yang menerbitkan atau menolak dengan catatan.",
+    "Tambah berita: kategori, tanggal terbit, judul, ringkasan, isi, dan gambar sampul dari Google Drive. Kirim untuk diajukan ke Pembina."
+   ],
+   "layar": {
+    "berkas": "panduan/dewan-kelola-beranda-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 20.53,
+      "w": 13.97,
+      "h": 3.16
+     },
+     {
+      "x": 24.61,
+      "y": 25.53,
+      "w": 74.22,
+      "h": 6.32
+     },
+     {
+      "x": 27.54,
+      "y": 42.11,
+      "w": 32.13,
+      "h": 10.33
+     },
+     {
+      "x": 62.5,
+      "y": 35.66,
+      "w": 34.67,
+      "h": 64.34
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/dewan-kelola-beranda-ponsel.webp",
+    "l": 390,
+    "t": 1100,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 24.36,
+      "w": 36.68,
+      "h": 2.18
+     },
+     {
+      "x": 3.08,
+      "y": 27.82,
+      "w": 93.85,
+      "h": 8
+     },
+     {
+      "x": 10.77,
+      "y": 42.91,
+      "w": 78.46,
+      "h": 7.14
+     },
+     {
+      "x": 7.44,
+      "y": 69.18,
+      "w": 85.13,
+      "h": 30.82
+     }
+    ]
+   }
+  },
   "admin-dashboard": {
    "judul": "Dashboard Admin Gudep",
    "alt": "Dashboard Admin dengan ringkasan jumlah anggota, absensi, dan kelulusan SKU.",
@@ -3219,6 +3828,196 @@
       "y": 46.09,
       "w": 24.38,
       "h": 3.32
+     }
+    ]
+   }
+  },
+  "admin-resetpin": {
+   "judul": "Reset PIN anggota",
+   "alt": "Halaman Reset PIN dengan penjelasan, tab Penegak, Dewan Ambalan, dan Pembina, penyaring, dan daftar anggota dengan tombol Reset PIN.",
+   "keterangan": [
+    "Penjelasan: reset membuat PIN baru 6 angka secara otomatis dan membuka kunci akun. Pemilik akun wajib menggantinya saat masuk pertama.",
+    "Pilih kelompok anggota: Penegak, Dewan Ambalan (akun lama), atau Pembina. Admin tidak dapat mereset PIN Admin lain.",
+    "Cari nama atau NIS, lalu saring menurut status, sangga, kelas, atau peran.",
+    "Reset PIN: setelah konfirmasi, PIN baru ditampilkan untuk disampaikan langsung kepada pemilik akunnya. Jangan dikirim lewat grup."
+   ],
+   "layar": {
+    "berkas": "panduan/admin-resetpin-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 10,
+      "w": 74.22,
+      "h": 6.32
+     },
+     {
+      "x": 24.61,
+      "y": 17.37,
+      "w": 30.23,
+      "h": 6.84
+     },
+     {
+      "x": 24.61,
+      "y": 24.74,
+      "w": 23.44,
+      "h": 6.58
+     },
+     {
+      "x": 86.24,
+      "y": 42.89,
+      "w": 10.93,
+      "h": 5
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/admin-resetpin-ponsel.webp",
+    "l": 390,
+    "t": 1100,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 14.55,
+      "w": 93.85,
+      "h": 6.18
+     },
+     {
+      "x": 3.08,
+      "y": 21.45,
+      "w": 79.38,
+      "h": 4.73
+     },
+     {
+      "x": 3.08,
+      "y": 26.55,
+      "w": 93.85,
+      "h": 4.55
+     },
+     {
+      "x": 6.41,
+      "y": 61.73,
+      "w": 87.18,
+      "h": 3.45
+     }
+    ]
+   }
+  },
+  "admin-cadangan": {
+   "judul": "Cadangan data di Data Gudep",
+   "alt": "Halaman Data Gudep bagian bawah dengan panel Cadangan data yang menjelaskan isi cadangan dan tombol Unduh cadangan.",
+   "keterangan": [
+    "Cadangan data: satu berkas JSON berisi data aplikasi (tanpa akun login dan PIN). Simpan di tempat aman di luar Supabase, misalnya Google Drive pribadi.",
+    "Unduh cadangan. Bila sudah lebih dari 30 hari tidak diunduh, Admin diingatkan lewat Notifikasi."
+   ],
+   "layar": {
+    "berkas": "panduan/admin-cadangan-layar.webp",
+    "l": 1024,
+    "t": 900,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 30.44,
+      "w": 74.22,
+      "h": 22.22
+     },
+     {
+      "x": 26.27,
+      "y": 45.22,
+      "w": 14.92,
+      "h": 5.56
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/admin-cadangan-ponsel.webp",
+    "l": 390,
+    "t": 1000,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 5.5,
+      "w": 93.85,
+      "h": 26.4
+     },
+     {
+      "x": 7.44,
+      "y": 25.2,
+      "w": 39.17,
+      "h": 5
+     }
+    ]
+   }
+  },
+  "admin-kelola-beranda": {
+   "judul": "Kelola Beranda: meninjau pengajuan berita",
+   "alt": "Halaman Kelola Beranda tampilan Admin dengan tab Kontak sampai Pertanyaan Umum, panel status terbit ulang, dan daftar berita termasuk pengajuan Dewan Ambalan yang menunggu ditinjau.",
+   "keterangan": [
+    "Tab: Kontak, Berita, Prestasi, Galeri, Media Sosial, dan Pertanyaan Umum (FAQ, hanya Pembina dan Admin).",
+    "Status terbit ulang: berita yang terbit langsung tampil di beranda, tetapi halaman beritanya sendiri baru muncul setelah situs diterbitkan ulang (otomatis bila sudah dipasang pemilik proyek).",
+    "Pengajuan Dewan Ambalan: Setujui menerbitkan; Tolak wajib disertai catatan (minimal 5 karakter). Dewan diberi tahu lewat Notifikasi.",
+    "Berita yang sudah terbit dapat diubah atau dihapus oleh Pembina dan Admin."
+   ],
+   "layar": {
+    "berkas": "panduan/admin-kelola-beranda-layar.webp",
+    "l": 1024,
+    "t": 760,
+    "kotak": [
+     {
+      "x": 24.61,
+      "y": 15.79,
+      "w": 74.22,
+      "h": 6.32
+     },
+     {
+      "x": 26.27,
+      "y": 25.92,
+      "w": 70.9,
+      "h": 15.53
+     },
+     {
+      "x": 27.54,
+      "y": 59.28,
+      "w": 7.05,
+      "h": 5
+     },
+     {
+      "x": 27.54,
+      "y": 66.51,
+      "w": 32.13,
+      "h": 15.59
+     }
+    ]
+   },
+   "ponsel": {
+    "berkas": "panduan/admin-kelola-beranda-ponsel.webp",
+    "l": 390,
+    "t": 1300,
+    "kotak": [
+     {
+      "x": 3.08,
+      "y": 15.69,
+      "w": 93.85,
+      "h": 6.77
+     },
+     {
+      "x": 7.44,
+      "y": 24.69,
+      "w": 85.13,
+      "h": 12.15
+     },
+     {
+      "x": 10.77,
+      "y": 47.27,
+      "w": 18.51,
+      "h": 2.92
+     },
+     {
+      "x": 10.77,
+      "y": 51.5,
+      "w": 78.46,
+      "h": 9.12
      }
     ]
    }
