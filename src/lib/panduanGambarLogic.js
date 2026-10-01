@@ -11,11 +11,29 @@ export const KUNCI_MODE = 'sigarda_mode_gambar';
 /** Mode yang sah; nilai lain (mis. dari penyimpanan yang rusak) jatuh ke `otomatis`. */
 export const modeSah = (m) => (MODE_GAMBAR.includes(m) ? m : 'otomatis');
 
-/** Varian yang ditampilkan pada mode tertentu; `otomatis` mengembalikan kedua varian (dipilih CSS menurut lebar layar). */
-export function varianTampil(mode) {
-  if (mode === 'ponsel') return ['ponsel'];
-  if (mode === 'layar') return ['layar'];
-  return ['ponsel', 'layar'];
+/** Lebar (piksel) di bawahnya layar dianggap ponsel; sama dengan breakpoint `md` Tailwind (768). */
+export const BATAS_LEBAR_LAYAR = 768;
+export const layarSempit = (lebar) => Number.isFinite(lebar) && lebar < BATAS_LEBAR_LAYAR;
+
+/** Varian yang ditampilkan di layar: mode `ponsel`/`layar` dipaksa, `otomatis` mengikuti lebar layar (sempit = ponsel). Hanya SATU varian yang diunduh. */
+export function varianLayar(mode, sempit) {
+  if (mode === 'ponsel' || mode === 'layar') return mode;
+  return sempit ? 'ponsel' : 'layar';
+}
+
+/**
+ * Pilihan gambar saat dicetak: `tampilan` = gambar yang sedang tampil di layar (ponsel di HP, laptop di layar lebar; bawaan),
+ * `layar` = selalu gambar laptop. Lebar halaman cetak = lebar kertas, jadi CSS responsif tidak dapat dipakai untuk memilih: pilihan dihitung dari layar SEBELUM mencetak.
+ */
+export const CETAK_GAMBAR = ['tampilan', 'layar'];
+export const LABEL_CETAK = { tampilan: 'Sama dengan tampilan layar', layar: 'Selalu laptop' };
+export const KUNCI_CETAK = 'sigarda_cetak_gambar';
+export const cetakSah = (c) => (CETAK_GAMBAR.includes(c) ? c : 'tampilan');
+
+/** Varian yang tercetak menurut mode tampilan, pilihan cetak, dan lebar layar. */
+export function varianCetak(mode, cetak, sempit) {
+  if (cetakSah(cetak) === 'layar') return 'layar';
+  return varianLayar(mode, sempit);
 }
 
 /** Satu gambar lengkap dari data (atau null bila tidak ada/rusak), termasuk kotak yang jumlahnya sama dengan keterangan. */

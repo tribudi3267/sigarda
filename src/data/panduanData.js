@@ -17,7 +17,7 @@ const UMUM = {
     'Menu Bantuan (ikon tanda tanya) memuat panduan ini untuk semua peran; tombol cetak di halaman itu menghasilkan salinan yang dapat dibagikan.',
     'Perlindungan anggota (Safe From Harm): Akun saya menampilkan kepada siapa harus melapor bila mengalami atau mengetahui perundungan, pelecehan, kekerasan, atau penelantaran (penerima laporan gugus depan). Laporan kejadian TIDAK dicatat di SIGARDA karena bersifat rahasia; sampaikan langsung kepada penerima laporan.',
     'Dokumen cetak (kartu SKU, surat, laporan) dibuat lewat tombol "Cetak" di aplikasi, lalu pilih "Simpan sebagai PDF" pada kotak dialog cetak peramban.',
-    'Gambar contoh di panduan ini memakai data contoh (nama fiktif). Tersedia dua tampilan, ponsel dan laptop/PC/tablet; pilih di bagian "Gambar contoh" di atas, atau biarkan "Ikuti layar" agar otomatis menyesuaikan perangkat Anda. Angka merah pada gambar sesuai dengan keterangan bernomor di bawahnya.',
+    'Gambar contoh di panduan ini memakai data contoh (nama fiktif). Tersedia dua tampilan, ponsel dan laptop/PC/tablet; pilih di bagian "Gambar contoh" di atas, atau biarkan "Ikuti layar" agar otomatis menyesuaikan perangkat Anda. Saat dicetak, gambar yang tercetak mengikuti pilihan "Gambar saat dicetak": sama dengan tampilan layar (gambar ponsel bila Anda melihatnya di HP, gambar laptop bila di layar lebar) atau selalu gambar laptop. Angka merah pada gambar sesuai dengan keterangan bernomor di bawahnya.',
   ],
   gambar: ['umum-menu', 'umum-akun', 'umum-notifikasi', 'umum-bantuan'],
 };
