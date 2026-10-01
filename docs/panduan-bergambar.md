@@ -2,7 +2,9 @@
 
 Panduan di menu **Bantuan** memuat gambar layar aplikasi yang diberi kotak dan nomor merah, dengan keterangan bernomor di bawahnya. Setiap gambar ada dalam
 **dua tampilan**: ponsel (HP) dan laptop/PC/tablet. Di Bantuan, pembaca memilih **Ikuti layar** (bawaan; HP mendapat gambar ponsel, layar lebar mendapat gambar
-laptop, dan hanya satu yang diunduh), **Ponsel**, atau **Laptop, PC, tablet**. Saat dicetak selalu memakai gambar laptop.
+laptop, dan hanya satu yang diunduh), **Ponsel**, atau **Laptop, PC, tablet**. Pilihan terpisah **Gambar saat dicetak** menentukan gambar pada cetakan/PDF: **Sama dengan tampilan layar** (bawaan; yang tampil di HP tercetak ponsel, yang tampil di layar lebar tercetak laptop) atau **Selalu laptop**.
+
+Cara kerjanya (jangan dikembalikan ke CSS responsif): lebar halaman cetak adalah lebar kertas (lebih dari 768 px), jadi `md:` tidak dapat membedakan HP dan laptop saat mencetak. Karena itu Bantuan menghitung varian dari lebar layar (`window.innerWidth`, batas 768 = `md`) SEBELUM mencetak dan hanya memasang satu gambar per figur (`varianLayar`, `varianCetak` di `panduanGambarLogic.js`); perubahan ukuran selama mencetak (`beforeprint`/`afterprint`) diabaikan. Hanya bila varian cetak berbeda dari yang tampil (mis. HP dengan pilihan "Selalu laptop") dipasang gambar kedua khusus cetak, dimuat segera (`loading="eager"`) karena gambar lazy yang tersembunyi tidak pernah termuat. Pilihan tersimpan per perangkat (`sigarda_cetak_gambar`).
 
 Gambar memakai **data contoh** (nama fiktif dari mode lokal). Jangan pernah mengambil gambar dari server produksi.
 

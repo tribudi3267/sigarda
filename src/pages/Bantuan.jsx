@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { BAGIAN_UMUM, PANDUAN } from '../data/panduanData';
 import { panduanAwal, PERAN_PANDUAN } from '../lib/panduanLogic';
-import { KUNCI_MODE, LABEL_MODE, MODE_GAMBAR, modeSah } from '../lib/panduanGambarLogic';
+import { CETAK_GAMBAR, KUNCI_CETAK, KUNCI_MODE, LABEL_CETAK, LABEL_MODE, MODE_GAMBAR, cetakSah, layarSempit, modeSah, varianCetak, varianLayar } from '../lib/panduanGambarLogic';
 import { daftarRujukan } from '../lib/peraturanLogic';
 import { Icon } from '../components/ui';
 import FigurPanduan from '../components/FigurPanduan';
@@ -12,6 +12,25 @@ const ID_RUJUKAN = 'rujukan-peraturan';
 /** Pilihan mode gambar tersimpan per perangkat (kenyamanan saja; gagal membaca/menulis penyimpanan tidak mengganggu). */
 const bacaMode = () => { try { return modeSah(window.localStorage.getItem(KUNCI_MODE)); } catch { return 'otomatis'; } };
 const simpanMode = (m) => { try { window.localStorage.setItem(KUNCI_MODE, m); } catch { /* penyimpanan diblokir: abaikan */ } };
+const bacaCetak = () => { try { return cetakSah(window.localStorage.getItem(KUNCI_CETAK)); } catch { return 'tampilan'; } };
+const simpanCetak = (c) => { try { window.localStorage.setItem(KUNCI_CETAK, c); } catch { /* penyimpanan diblokir: abaikan */ } };
+
+/** Layar sempit (ponsel)? Perubahan ukuran diabaikan selama mencetak: halaman cetak berlebar kertas, bukan ukuran layar yang sebenarnya. */
+function useLayarSempit() {
+  const baca = () => layarSempit(window.innerWidth);
+  const [sempit, setSempit] = useState(() => (typeof window === 'undefined' ? false : baca()));
+  useEffect(() => {
+    let mencetak = false;
+    const ubah = () => { if (!mencetak) setSempit(baca()); };
+    const mulai = () => { mencetak = true; };
+    const selesai = () => { mencetak = false; setSempit(baca()); };
+    window.addEventListener('resize', ubah);
+    window.addEventListener('beforeprint', mulai);
+    window.addEventListener('afterprint', selesai);
+    return () => { window.removeEventListener('resize', ubah); window.removeEventListener('beforeprint', mulai); window.removeEventListener('afterprint', selesai); };
+  }, []);
+  return sempit;
+}
 const gulirKe = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
 function DaftarIsi({ panduan, tocBuka, setTocBuka }) {
@@ -66,6 +85,11 @@ export default function Bantuan() {
   const [modeGambar, setModeGambar] = useState(bacaMode);
   const panduan = useMemo(() => PANDUAN[aktif], [aktif]);
   const pilihMode = (m) => { setModeGambar(m); simpanMode(m); };
+  const [cetakGambar, setCetakGambar] = useState(bacaCetak);
+  const pilihCetak = (c) => { setCetakGambar(c); simpanCetak(c); };
+  const sempit = useLayarSempit();
+  const tampil = varianLayar(modeGambar, sempit);
+  const cetak = varianCetak(modeGambar, cetakGambar, sempit);
 
   return (
     <div className="animasi-naik">
@@ -111,6 +135,23 @@ export default function Bantuan() {
         <span className="text-xs text-pramuka-600">Gambar memakai data contoh. "Ikuti layar" menampilkan gambar ponsel di HP dan gambar laptop di layar lebar.</span>
       </div>
 
+      <div className="no-print mb-4 flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-semibold text-pramuka-800" id="label-cetak-gambar">Gambar saat dicetak:</span>
+        <div role="group" aria-labelledby="label-cetak-gambar" className="inline-flex flex-wrap rounded-lg bg-pramuka-100 p-1">
+          {CETAK_GAMBAR.map((c) => (
+            <button
+              key={c}
+              aria-pressed={cetakGambar === c}
+              onClick={() => pilihCetak(c)}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold sm:text-sm ${cetakGambar === c ? 'bg-pramuka-800 text-pramuka-50' : 'text-pramuka-700 hover:bg-pramuka-200'}`}
+            >
+              {LABEL_CETAK[c]}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-pramuka-600">"Sama dengan tampilan layar" mencetak gambar yang sedang Anda lihat (ponsel di HP, laptop di layar lebar); "Selalu laptop" mencetak gambar laptop.</span>
+      </div>
+
       <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-6">
         <DaftarIsi panduan={panduan} tocBuka={tocBuka} setTocBuka={setTocBuka} />
 
@@ -123,7 +164,7 @@ export default function Bantuan() {
             <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-pramuka-800">
               {BAGIAN_UMUM.isi.map((baris, i) => <li key={i}>{baris}</li>)}
             </ul>
-            {(BAGIAN_UMUM.gambar || []).map((g) => <FigurPanduan key={g} id={g} mode={modeGambar} />)}
+            {(BAGIAN_UMUM.gambar || []).map((g) => <FigurPanduan key={g} id={g} tampil={tampil} cetak={cetak} />)}
           </article>
 
           {panduan.bagian.map((b) => (
@@ -132,7 +173,7 @@ export default function Bantuan() {
               <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-pramuka-800">
                 {b.isi.map((baris, i) => <li key={i}>{baris}</li>)}
               </ul>
-              {(b.gambar || []).map((g) => <FigurPanduan key={g} id={g} mode={modeGambar} />)}
+              {(b.gambar || []).map((g) => <FigurPanduan key={g} id={g} tampil={tampil} cetak={cetak} />)}
             </article>
           ))}
 

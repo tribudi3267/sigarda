@@ -6,7 +6,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { DEFINISI } from '../scripts/panduan/definisi.mjs';
 import { FOLDER_GAMBAR, MAKS_PENANDA, MODE, NAMA_MODE, PERAN_GAMBAR, gabungTeks, kotakKePersen, namaBerkas, pencariUntuk, periksaDefinisi, susunData } from '../scripts/panduan/logika.mjs';
 import { BAGIAN_UMUM, PANDUAN, PERAN_PANDUAN } from '../src/data/panduanData.js';
-import { KUNCI_MODE, LABEL_MODE, MODE_GAMBAR, alamatGambar, ambilFigur, gayaKotak, gayaLencana, modeSah, varianTampil } from '../src/lib/panduanGambarLogic.js';
+import { BATAS_LEBAR_LAYAR, CETAK_GAMBAR, KUNCI_CETAK, KUNCI_MODE, LABEL_CETAK, LABEL_MODE, MODE_GAMBAR, alamatGambar, ambilFigur, cetakSah, gayaKotak, gayaLencana, layarSempit, modeSah, varianCetak, varianLayar } from '../src/lib/panduanGambarLogic.js';
 import FigurPanduan from '../src/components/FigurPanduan.jsx';
 import Bantuan from '../src/pages/Bantuan.jsx';
 import { KonteksApp } from '../src/context/AppContext.jsx';
@@ -126,7 +126,21 @@ console.log('\n--- keterkaitan dengan panduanData.js ---');
 
 console.log('\n--- panduanGambarLogic ---');
 {
-  ok(varianTampil('ponsel').join() === 'ponsel' && varianTampil('layar').join() === 'layar' && varianTampil('otomatis').join() === 'ponsel,layar', 'varianTampil menurut mode');
+  ok(varianLayar('ponsel', false) === 'ponsel' && varianLayar('layar', true) === 'layar', 'varianLayar: mode ponsel/laptop dipaksa, tidak peduli lebar layar');
+  ok(varianLayar('otomatis', true) === 'ponsel' && varianLayar('otomatis', false) === 'layar', 'varianLayar: otomatis mengikuti lebar layar (sempit = ponsel)');
+  ok(layarSempit(BATAS_LEBAR_LAYAR - 1) === true && layarSempit(BATAS_LEBAR_LAYAR) === false && layarSempit(390) === true && layarSempit(1280) === false && layarSempit(NaN) === false, 'layarSempit: batas 768 (sama dengan breakpoint md)');
+  ok(CETAK_GAMBAR.join() === 'tampilan,layar' && CETAK_GAMBAR.every((c) => LABEL_CETAK[c]), 'dua pilihan cetak punya label');
+  ok(cetakSah('layar') === 'layar' && cetakSah('tampilan') === 'tampilan' && cetakSah('ngawur') === 'tampilan' && cetakSah(null) === 'tampilan', 'cetakSah: nilai rusak jatuh ke tampilan');
+  ok(typeof KUNCI_CETAK === 'string' && KUNCI_CETAK.startsWith('sigarda_') && KUNCI_CETAK !== KUNCI_MODE, 'kunci penyimpanan pilihan cetak bernama sigarda_* dan berbeda dari kunci mode');
+  {
+    // Semua kombinasi mode x pilihan cetak x lebar layar: cetak "tampilan" = persis yang tampil di layar; "layar" = selalu laptop.
+    let semua = true;
+    for (const mode of MODE_GAMBAR) for (const sempit of [true, false]) {
+      semua = semua && varianCetak(mode, 'tampilan', sempit) === varianLayar(mode, sempit) && varianCetak(mode, 'layar', sempit) === 'layar' && varianCetak(mode, 'ngawur', sempit) === varianLayar(mode, sempit);
+    }
+    ok(semua, 'varianCetak: "sama dengan tampilan" = gambar yang tampil (ponsel di HP, laptop di layar lebar); "selalu laptop" = laptop; nilai rusak = sama dengan tampilan');
+    ok(varianCetak('otomatis', 'tampilan', true) === 'ponsel' && varianCetak('otomatis', 'tampilan', false) === 'layar', 'cetak dari HP memakai gambar ponsel, dari laptop memakai gambar laptop');
+  }
   ok(MODE_GAMBAR.join() === 'otomatis,ponsel,layar' && MODE_GAMBAR.every((m) => LABEL_MODE[m]), 'tiga mode punya label');
   ok(modeSah('ponsel') === 'ponsel' && modeSah('ngawur') === 'otomatis' && modeSah(null) === 'otomatis', 'modeSah: nilai rusak jatuh ke otomatis');
   ok(ambilFigur(DATA, 'tidak-ada') === null && ambilFigur(null, 'x') === null, 'ambilFigur: tidak ada -> null');
@@ -143,29 +157,35 @@ console.log('\n--- komponen FigurPanduan (render) ---');
   const id = DEFINISI[0].id;
   const f = DATA.figur[id];
   const n = f.keterangan.length;
-  const oto = renderToStaticMarkup(h(FigurPanduan, { id, mode: 'otomatis' }));
-  ok(hitung(oto, /<img /g) === 2 && /md:hidden/.test(oto) && /hidden md:block/.test(oto), 'otomatis: dua varian, ponsel di layar sempit dan laptop di layar lebar');
-  ok(hitung(oto, /loading="lazy"/g) === 2, 'gambar dimuat malas (lazy)');
-  ok(hitung(oto, /width="\d+" height="\d+"/g) === 2, 'lebar dan tinggi ditetapkan (tanpa lompatan tata letak)');
+  const oto = renderToStaticMarkup(h(FigurPanduan, { id, tampil: 'layar' }));
+  ok(hitung(oto, /<img /g) === 1 && oto.includes(f.layar.berkas) && !oto.includes(f.ponsel.berkas), 'satu varian saja diunduh (varian lain tidak dimuat)');
+  ok(!/md:hidden|md:block/.test(oto), 'pemilihan varian tidak lagi bergantung pada CSS responsif (yang salah ukur saat dicetak)');
+  ok(hitung(oto, /loading="lazy"/g) === 1, 'gambar dimuat malas (lazy)');
+  ok(hitung(oto, /width="\d+" height="\d+"/g) === 1, 'lebar dan tinggi ditetapkan (tanpa lompatan tata letak)');
   ok(oto.includes(f.judul) && oto.includes(f.keterangan[0]), 'judul dan keterangan tampil');
-  ok(hitung(oto, /rounded-full bg-red-600/g) === 2 * n + n, `nomor penunjuk: ${n} per varian (x2) + ${n} di legenda`);
-  ok(hitung(oto, /alt="[^"]{20,}"/g) === 2, 'setiap gambar punya teks alternatif yang bermakna');
-  ok(/tampilan ponsel/.test(oto) && /tampilan laptop, PC, atau tablet/.test(oto), 'teks alternatif menyebut mode');
-  ok(hitung(oto, /<a href="\/panduan\/[^"]+\.webp" target="_blank" rel="noopener noreferrer"/g) === 2 && /aria-label="Buka gambar /.test(oto), 'gambar dapat dibuka ukuran penuh di tab baru (rel noopener, ada label)');
-  ok(/print:hidden/.test(oto) && /print:block/.test(oto), 'dicetak: hanya varian laptop');
-  const po = renderToStaticMarkup(h(FigurPanduan, { id, mode: 'ponsel' }));
-  ok(po.includes(f.ponsel.berkas) && hitung(po, /data-varian="ponsel"/g) === 1, 'mode ponsel: varian ponsel');
-  const la = renderToStaticMarkup(h(FigurPanduan, { id, mode: 'layar' }));
-  ok(la.includes(f.layar.berkas) && !la.includes(f.ponsel.berkas), 'mode laptop: hanya varian laptop (ponsel tidak diunduh)');
-  ok(renderToStaticMarkup(h(FigurPanduan, { id: 'tidak-ada', mode: 'otomatis' })) === '', 'id tak dikenal: tidak menampilkan apa pun');
-  ok(hitung(la, /<ol /g) === 1 && hitung(la, /<li /g) === n, 'legenda: satu daftar bernomor');
+  ok(hitung(oto, /rounded-full bg-red-600/g) === n + n, `nomor penunjuk: ${n} pada gambar + ${n} di legenda`);
+  ok(hitung(oto, /alt="[^"]{20,}"/g) === 1, 'setiap gambar punya teks alternatif yang bermakna');
+  ok(/tampilan laptop, PC, atau tablet/.test(oto), 'teks alternatif menyebut mode');
+  ok(hitung(oto, /<a href="\/panduan\/[^"]+\.webp" target="_blank" rel="noopener noreferrer"/g) === 1 && /aria-label="Buka gambar /.test(oto), 'gambar dapat dibuka ukuran penuh di tab baru (rel noopener, ada label)');
+  ok(!/print:hidden|print:block/.test(oto), 'cetak sama dengan tampilan: tidak ada gambar kedua, gambar yang tampil itulah yang dicetak (sudah termuat, tidak menunggu pemuatan)');
+  const po = renderToStaticMarkup(h(FigurPanduan, { id, tampil: 'ponsel' }));
+  ok(po.includes(f.ponsel.berkas) && !po.includes(f.layar.berkas) && hitung(po, /data-varian="ponsel"/g) === 1, 'tampil ponsel (cetak ikut ponsel): hanya gambar ponsel, ponsel juga yang tercetak');
+  const poLa = renderToStaticMarkup(h(FigurPanduan, { id, tampil: 'ponsel', cetak: 'layar' }));
+  ok(poLa.includes(f.ponsel.berkas) && poLa.includes(f.layar.berkas) && /print:hidden/.test(poLa) && /hidden print:block/.test(poLa), 'tampil ponsel tetapi cetak laptop: gambar laptop tersembunyi di layar dan hanya tampil saat dicetak, gambar ponsel disembunyikan saat dicetak');
+  ok(hitung(poLa, /loading="eager"/g) === 1 && hitung(poLa, /loading="lazy"/g) === 1, 'gambar khusus cetak dimuat segera (lazy pada elemen tersembunyi tidak pernah termuat) dan gambar layar tetap lazy');
+  const laPo = renderToStaticMarkup(h(FigurPanduan, { id, tampil: 'layar', cetak: 'ponsel' }));
+  ok(laPo.includes(f.ponsel.berkas) && /print:hidden/.test(laPo) && /hidden print:block/.test(laPo), 'tampil laptop tetapi cetak ponsel: gambar ponsel khusus cetak');
+  ok(renderToStaticMarkup(h(FigurPanduan, { id: 'tidak-ada', tampil: 'layar' })) === '', 'id tak dikenal: tidak menampilkan apa pun');
+  ok(hitung(oto, /<ol /g) === 1 && hitung(oto, /<li /g) === n, 'legenda: satu daftar bernomor');
 }
 
 console.log('\n--- halaman Bantuan (render) ---');
 {
   const dasar = { user: { role: 'peserta' } };
   const html = renderToStaticMarkup(h(KonteksApp.Provider, { value: dasar }, h(Bantuan)));
-  ok(/Gambar contoh:/.test(html) && hitung(html, /aria-pressed/g) === 3, 'ada pilihan mode gambar (3 tombol)');
+  ok(/Gambar contoh:/.test(html) && hitung(html, /aria-pressed/g) === 5, 'ada pilihan mode gambar (3 tombol) dan pilihan gambar cetak (2 tombol)');
+  ok(/Gambar saat dicetak:/.test(html) && CETAK_GAMBAR.every((c) => html.includes(LABEL_CETAK[c])), 'pilihan gambar saat dicetak dengan labelnya');
+  ok(/no-print/.test(html.slice(html.indexOf('Gambar saat dicetak:') - 400, html.indexOf('Gambar saat dicetak:'))), 'pilihan gambar cetak tidak ikut dicetak');
   ok(MODE_GAMBAR.every((m) => html.includes(LABEL_MODE[m])), 'label mode: ' + MODE_GAMBAR.map((m) => LABEL_MODE[m]).join(' / '));
   const idPenegak = PANDUAN.penegak.bagian.flatMap((b) => b.gambar || []);
   ok(idPenegak.length > 0 && idPenegak.every((g) => html.includes(`data-figur="${g}"`)), `panduan Penegak menampilkan ${idPenegak.length} gambar bagiannya`);
