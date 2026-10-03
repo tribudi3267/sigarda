@@ -1,30 +1,30 @@
--- ===== Terbit ulang situs saat berita terbit: tabel =====
--- Halaman berita statis (berita/<id>-<judul>/ dan sitemap) dibuat saat build di GitHub Actions. Supaya berita yang baru diterbitkan (atau yang jadwal terbitnya tiba)
--- ikut terbit tanpa deploy harian, basis data meminta GitHub menjalankan alur deploy lewat pg_net. Satu baris; diisi pemilik proyek SEKALI lewat
--- sigarda.terbit_ulang_atur di SQL Editor dengan kunci akses GitHub (fine-grained token, HANYA izin Actions: Read and write pada repositori ini). Kunci itu RAHASIA:
--- tanpa kebijakan RLS dan tanpa hak baca (hanya fungsi), tidak ikut sg_cadangan_admin, dan tidak ikut cadangan otomatis (scripts/cadangan/dump.mjs).
-create table public.terbit_ulang_konfigurasi (
-  id boolean primary key default true check (id),
-  repo text not null check (repo ~ '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'),
-  alur text not null default 'deploy.yml' check (alur ~ '^[A-Za-z0-9_.-]+\.ya?ml$'),
-  cabang text not null default 'main' check (cabang ~ '^[A-Za-z0-9_./-]{1,100}$'),
-  token text not null check (char_length(token) between 20 and 400),
-  diubah timestamptz not null default now(),
-  perlu boolean not null default false,      -- ada perubahan berita terbit yang belum diminta terbit ulang
-  perlu_sejak timestamptz,
-  kirim_terakhir timestamptz,
-  kirim_id bigint,                           -- id permintaan pg_net yang jawabannya belum dicatat
-  status_terakhir int,
-  pesan_terakhir text,
-  gagal_beruntun int not null default 0      -- 3 kali gagal beruntun = berhenti mencoba sampai ada perubahan baru atau tindakan pemilik
-);
--- ===== akhir tabel terbit ulang =====
+-- ============================================================================
+-- MIGRASI: perbaikan "UPDATE requires a WHERE clause" saat menerbitkan berita. AMAN untuk database berisi data.
+--
+-- Jalankan SETELAH migrasi sebelumnya (sampai 2026-09-bersih-riwayat-cron.sql; lihat README). Isi:
+--   * Penyebab: Supabase memakai pengaman yang menolak UPDATE tanpa WHERE. Pemicu terbit ulang (sigarda.terbit_ulang_tandai) dan fungsi pendampingnya
+--     mengubah tabel konfigurasi satu-baris tanpa WHERE, sehingga menerbitkan/mengubah berita gagal dan berita tidak tampil di beranda.
+--   * Semua UPDATE pada terbit_ulang_konfigurasi dan keepalive_konfigurasi diberi "where true" (fungsi ditulis ulang, tanda tangan sama).
+-- TIDAK mengubah tabel maupun data. Edge Function TIDAK berubah. Aman diulang.
+--
+-- Cara: Supabase > SQL Editor > New query > tempel seluruh isi berkas ini > Run.
+-- Isi sama dengan bagian yang sama di supabase/sumber/*.sql (dijaga oleh pengujian kesetaraan).
+-- ============================================================================
+set check_function_bodies = off;
+begin;
+
+do $$
+begin
+  if to_regprocedure('sigarda.terbit_ulang_tandai()') is null or to_regprocedure('sigarda.keepalive_ping()') is null then
+    raise exception 'Jalankan lebih dulu skema dan migrasi sebelumnya (sampai 2026-09-bersih-riwayat-cron.sql; lihat README), baru migrasi ini.';
+  end if;
+end $$;
 
 -- ===== Terbit ulang situs saat berita terbit: fungsi =====
 -- Pemilik proyek menjalankan SEKALI di SQL Editor: select sigarda.terbit_ulang_atur('pemilik/repositori', '<kunci akses GitHub>');
 -- Menyimpan repositori dan kunci lalu menjadwalkan satu pekerjaan pg_cron (tiap 5 menit): ia hanya mengirim permintaan bila ada berita terbit yang berubah atau yang
 -- jadwalnya baru tiba, jadi tanpa perubahan tidak ada deploy sama sekali.
-create function sigarda.terbit_ulang_atur(p_repo text, p_token text, p_alur text default 'deploy.yml', p_cabang text default 'main') returns text
+create or replace function sigarda.terbit_ulang_atur(p_repo text, p_token text, p_alur text default 'deploy.yml', p_cabang text default 'main') returns text
 language plpgsql security definer set search_path = public as
 $$
 declare v_repo text := btrim(coalesce(p_repo, '')); v_token text := btrim(coalesce(p_token, '')); v_alur text := btrim(coalesce(p_alur, '')); v_cabang text := btrim(coalesce(p_cabang, '')); v_catatan text := '';
@@ -50,7 +50,7 @@ end $$;
 
 -- Meminta GitHub menjalankan alur deploy (POST .../actions/workflows/<alur>/dispatches, jawaban sukses = HTTP 204), asinkron lewat pg_net. Mengembalikan id permintaan,
 -- atau null tanpa konfigurasi atau tanpa pg_net. Galat tidak dilempar: dicatat, dan perubahan tetap ditandai "perlu" agar dicoba lagi.
-create function sigarda.terbit_ulang_kirim_sekarang() returns bigint language plpgsql security definer set search_path = public as
+create or replace function sigarda.terbit_ulang_kirim_sekarang() returns bigint language plpgsql security definer set search_path = public as
 $$
 declare v public.terbit_ulang_konfigurasi; v_id bigint;
 begin
@@ -72,7 +72,7 @@ begin
 end $$;
 
 -- Mencatat jawaban GitHub atas permintaan terakhir dari net._http_response. Sukses (204) menutup permintaan; selain itu perubahan ditandai "perlu" lagi dan pesannya menuntun.
-create function sigarda.terbit_ulang_catat() returns void language plpgsql security definer set search_path = public as
+create or replace function sigarda.terbit_ulang_catat() returns void language plpgsql security definer set search_path = public as
 $$
 declare v public.terbit_ulang_konfigurasi; v_n int; v_status int; v_galat text;
 begin
@@ -100,7 +100,7 @@ end $$;
 
 -- Dipanggil pg_cron tiap 5 menit: mencatat jawaban terakhir, lalu meminta terbit ulang HANYA bila ada berita terbit yang berubah (penanda "perlu" dari pemicu) atau
 -- yang jadwal terbitnya tiba sejak permintaan terakhir. Berhenti mencoba sesudah 3 kegagalan beruntun; jeda minimal 4 menit antar permintaan.
-create function sigarda.terbit_ulang_periksa() returns bigint language plpgsql security definer set search_path = public as
+create or replace function sigarda.terbit_ulang_periksa() returns bigint language plpgsql security definer set search_path = public as
 $$
 declare v public.terbit_ulang_konfigurasi; v_jadwal boolean;
 begin
@@ -114,7 +114,7 @@ begin
 end $$;
 
 -- Keadaan terbit ulang TANPA kunci dan repositori (untuk layar Kelola Beranda dan untuk pemilik di SQL Editor): { diatur, perlu, kirimTerakhir, status, pesan, gagalBeruntun, menyerah }.
-create function sigarda.terbit_ulang_keadaan() returns jsonb language plpgsql security definer set search_path = public as
+create or replace function sigarda.terbit_ulang_keadaan() returns jsonb language plpgsql security definer set search_path = public as
 $$
 declare v public.terbit_ulang_konfigurasi;
 begin
@@ -125,7 +125,7 @@ begin
 end $$;
 
 -- Untuk pemilik di SQL Editor: mengirim permintaan terbit ulang sekarang (untuk mencoba pengaturan) dan menghapus hitungan gagal.
-create function sigarda.terbit_ulang_kirim() returns text language plpgsql security definer set search_path = public as
+create or replace function sigarda.terbit_ulang_kirim() returns text language plpgsql security definer set search_path = public as
 $$
 begin
   if auth.uid() is not null then raise exception 'Perintah ini hanya dari SQL Editor Supabase.'; end if;
@@ -137,7 +137,7 @@ begin
 end $$;
 
 -- Mematikan terbit ulang otomatis: menghapus pekerjaan pg_cron dan konfigurasi (termasuk kunci akses).
-create function sigarda.terbit_ulang_matikan() returns void language plpgsql security definer set search_path = public as
+create or replace function sigarda.terbit_ulang_matikan() returns void language plpgsql security definer set search_path = public as
 $$
 begin
   if auth.uid() is not null then raise exception 'Perintah ini hanya dari SQL Editor Supabase.'; end if;
@@ -151,7 +151,7 @@ end $$;
 
 -- Pemicu: setiap perubahan yang menyentuh berita TERBIT (diterbitkan, diubah, dibatalkan/ditolak dari terbit, atau dihapus) menandai bahwa halaman berita perlu terbit ulang
 -- (pekerjaan pg_cron yang mengirim permintaannya, sehingga banyak perubahan dalam 5 menit menjadi satu deploy). Tanpa konfigurasi tidak melakukan apa pun.
-create function sigarda.terbit_ulang_tandai() returns trigger language plpgsql security definer set search_path = public as
+create or replace function sigarda.terbit_ulang_tandai() returns trigger language plpgsql security definer set search_path = public as
 $$
 begin
   if (TG_OP = 'INSERT' and NEW.status = 'terbit') or (TG_OP = 'DELETE' and OLD.status = 'terbit') or (TG_OP = 'UPDATE' and (OLD.status = 'terbit' or NEW.status = 'terbit')) then
@@ -159,10 +159,9 @@ begin
   end if;
   return null;
 end $$;
-create trigger terbit_ulang_berita after insert or update or delete on public.beranda_berita for each row execute function sigarda.terbit_ulang_tandai();
 
 -- Untuk Pembina dan Admin Gudep (layar Kelola Beranda > Berita): keadaan terbit ulang terbaru (jawaban GitHub dicatat dulu).
-create function public.sg_terbit_ulang_status() returns jsonb language plpgsql security definer set search_path = public as
+create or replace function public.sg_terbit_ulang_status() returns jsonb language plpgsql security definer set search_path = public as
 $$
 begin
   perform sigarda.wajib_aktif();
@@ -172,7 +171,7 @@ begin
 end $$;
 
 -- Tombol "Terbitkan ulang halaman berita sekarang" (Pembina dan Admin Gudep): meminta deploy segera, paling cepat tiap 2 menit; menghapus hitungan gagal (mencoba lagi).
-create function public.sg_terbit_ulang_minta() returns jsonb language plpgsql security definer set search_path = public as
+create or replace function public.sg_terbit_ulang_minta() returns jsonb language plpgsql security definer set search_path = public as
 $$
 declare v_terakhir timestamptz;
 begin
@@ -186,4 +185,113 @@ begin
   perform sigarda.terbit_ulang_kirim_sekarang();
   return sigarda.terbit_ulang_keadaan();
 end $$;
--- ===== akhir fungsi terbit ulang =====
+
+-- ===== Keep-alive Supabase (dari dalam database): fungsi =====
+-- Pemilik proyek menjalankan SEKALI di SQL Editor: select sigarda.keepalive_atur('https://<ref>.supabase.co', '<kunci anon atau publishable>');
+-- Menyimpan alamat dan kunci, menjadwalkan dua pekerjaan pg_cron (ping 01.30 UTC = 08.30 WIB, pencatatan hasil 01.35 UTC), lalu langsung mengirim ping pertama.
+create or replace function sigarda.keepalive_atur(p_url text, p_kunci text) returns text language plpgsql security definer set search_path = public as
+$$
+declare v_url text := regexp_replace(btrim(coalesce(p_url, '')), '/+$', ''); v_kunci text := btrim(coalesce(p_kunci, '')); v_catatan text := '';
+begin
+  if auth.uid() is not null then raise exception 'Pengaturan keep-alive hanya dari SQL Editor Supabase.'; end if;
+  if v_url !~ '^https://[a-z0-9.-]+\.[a-z]{2,}$' then raise exception 'Alamat proyek harus berbentuk https://<ref>.supabase.co (tanpa garis miring dan tanpa /rest/v1).'; end if;
+  if char_length(v_kunci) not between 20 and 500 then raise exception 'Kunci anon/publishable tampak tidak sah (Project Settings > API Keys). Jangan isi kunci service_role.'; end if;
+  insert into public.keepalive_konfigurasi (id, url, kunci) values (true, v_url, v_kunci)
+  on conflict (id) do update set url = excluded.url, kunci = excluded.kunci, diubah = now(), ping_id = null, status_terakhir = null, pesan_terakhir = null;
+  if to_regnamespace('cron') is null then
+    v_catatan := v_catatan || ' pg_cron belum aktif: aktifkan di Dashboard > Integrations lalu jalankan perintah ini lagi (jadwal harian belum dibuat).';
+  else
+    perform cron.schedule('sigarda-keepalive', '30 1 * * *', 'select sigarda.keepalive_ping()');
+    perform cron.schedule('sigarda-keepalive-catat', '35 1 * * *', 'select sigarda.keepalive_catat()');
+  end if;
+  if to_regnamespace('net') is null then
+    v_catatan := v_catatan || ' pg_net belum aktif: aktifkan di Dashboard > Integrations lalu jalankan perintah ini lagi (permintaan belum dapat dikirim).';
+  else
+    perform sigarda.keepalive_ping();
+  end if;
+  return 'Keep-alive tersimpan.' || case when v_catatan = '' then ' Ping pertama dikirim; beberapa detik lagi jalankan: select sigarda.keepalive_periksa();' else v_catatan end;
+end $$;
+
+-- Satu ping: permintaan HTTP ke API proyek sendiri lewat pg_net (asinkron). Tanpa konfigurasi atau tanpa pg_net tidak melakukan apa pun. Galat tidak dilempar.
+create or replace function sigarda.keepalive_ping() returns bigint language plpgsql security definer set search_path = public as
+$$
+declare v_k public.keepalive_konfigurasi; v_id bigint;
+begin
+  select * into v_k from public.keepalive_konfigurasi;
+  if not found or to_regnamespace('net') is null then return null; end if;
+  begin
+    execute 'select net.http_post(url := $1, body := $2, headers := $3, timeout_milliseconds := $4)'
+      into v_id
+      using v_k.url || '/rest/v1/rpc/sg_gudep_publik', '{}'::jsonb,
+            jsonb_build_object('Content-Type', 'application/json', 'apikey', v_k.kunci, 'Authorization', 'Bearer ' || v_k.kunci), 10000;
+  exception when others then
+    update public.keepalive_konfigurasi set ping_terakhir = now(), ping_id = null, status_terakhir = 0, pesan_terakhir = 'Gagal mengantre permintaan: ' || sqlerrm where true;
+    return null;
+  end;
+  update public.keepalive_konfigurasi set ping_terakhir = now(), ping_id = v_id, status_terakhir = null, pesan_terakhir = 'Menunggu jawaban' where true;
+  return v_id;
+end $$;
+
+-- Mencatat jawaban ping terakhir dari net._http_response (pg_net hanya menyimpannya beberapa jam, maka dicatat 5 menit sesudah ping).
+create or replace function sigarda.keepalive_catat() returns void language plpgsql security definer set search_path = public as
+$$
+declare v_k public.keepalive_konfigurasi; v_n int; v_status int; v_galat text;
+begin
+  select * into v_k from public.keepalive_konfigurasi;
+  if not found or v_k.ping_id is null or to_regnamespace('net') is null then return; end if;
+  begin
+    execute 'select count(*)::int, max(status_code), max(error_msg) from net._http_response where id = $1' into v_n, v_status, v_galat using v_k.ping_id;
+  exception when others then
+    return;
+  end;
+  if v_n = 0 then
+    update public.keepalive_konfigurasi set pesan_terakhir = 'Jawaban belum atau tidak lagi tercatat di pg_net.' where true;
+  elsif v_status between 200 and 299 then
+    update public.keepalive_konfigurasi set status_terakhir = v_status, pesan_terakhir = 'Database menjawab (HTTP ' || v_status || ').' where true;
+  else
+    update public.keepalive_konfigurasi set status_terakhir = coalesce(v_status, 0),
+      pesan_terakhir = coalesce(v_galat, 'HTTP ' || v_status || (case when v_status in (401, 403) then ': kunci anon salah atau dicabut' when v_status = 404 then ': alamat proyek salah atau fungsi sg_gudep_publik tidak ada' else '' end)) where true;
+  end if;
+end $$;
+
+-- Untuk pemilik di SQL Editor: mencatat jawaban terbaru lalu menampilkan keadaan (terkonfigurasi, ping terakhir, hasilnya, dan jadwal pg_cron aktif).
+create or replace function sigarda.keepalive_periksa() returns jsonb language plpgsql security definer set search_path = public as
+$$
+declare v_k public.keepalive_konfigurasi; v_jadwal int := 0; v_ada boolean;
+begin
+  perform sigarda.keepalive_catat();
+  select * into v_k from public.keepalive_konfigurasi;
+  v_ada := found;
+  if to_regnamespace('cron') is not null then
+    begin
+      execute 'select count(*)::int from cron.job where jobname in ($1, $2) and active' into v_jadwal using 'sigarda-keepalive', 'sigarda-keepalive-catat';
+    exception when others then v_jadwal := 0; end;
+  end if;
+  return jsonb_build_object(
+    'terkonfigurasi', v_ada, 'alamat', v_k.url, 'ping_terakhir', v_k.ping_terakhir, 'status', v_k.status_terakhir, 'pesan', v_k.pesan_terakhir,
+    'pekerjaan_cron_aktif', v_jadwal, 'sehat', coalesce(v_k.status_terakhir between 200 and 299, false) and v_jadwal = 2
+  );
+end $$;
+
+-- Mematikan keep-alive: menghapus dua pekerjaan pg_cron dan konfigurasinya (mis. saat pindah ke paket berbayar).
+create or replace function sigarda.keepalive_matikan() returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  if auth.uid() is not null then raise exception 'Pengaturan keep-alive hanya dari SQL Editor Supabase.'; end if;
+  if to_regnamespace('cron') is not null then
+    begin
+      perform cron.unschedule('sigarda-keepalive');
+    exception when others then null; end;
+    begin
+      perform cron.unschedule('sigarda-keepalive-catat');
+    exception when others then null; end;
+  end if;
+  delete from public.keepalive_konfigurasi;
+end $$;
+
+-- Fungsi sigarda.* diperbarui: hak dijalankan ulang di sini.
+revoke all on all functions in schema sigarda from public, anon;
+grant execute on all functions in schema sigarda to authenticated, service_role;
+
+commit;
+notify pgrst, 'reload schema';

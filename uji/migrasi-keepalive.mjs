@@ -37,7 +37,7 @@ const bandingkan = (nama, pa, pb) => {
 };
 
 // Skema "sesudah" = skema.sql terbaru; sebelum = commit TEPAT sebelum migrasi ini (indeks kunci asing sudah ada).
-const A = await baru(`${P}/supabase/skema.sql`);
+const A = await baru('git:b7880bf'); // skema sesudah migrasi ini (main sesudah PR #68); migrasi 2026-10-update-where menulis ulang fungsi keepalive
 const pa = await potret(A);
 ok(pa.fungsi.length === 5 && pa.kolom.length === 8 && pa.hakTabel[0].rls && !pa.hakTabel[0].sel && !pa.hakTabel[0].anon && pa.hakTabel[0].kebijakan === 0, 'skema baru memuat 5 fungsi dan tabel 8 kolom, RLS aktif tanpa kebijakan dan tanpa hak baca');
 
