@@ -45,8 +45,11 @@ export function useApp() {
 
 const DB_KOSONG = { users: [], progress: {}, absensi: { sesi: {}, hadir: {} }, portofolio: {}, materi: [], sidang: [], sidangUrut: {}, pengaturan: {}, raport: {}, instrumen: {}, instrumenGalat: '', sesiUjian: [], sesiUjianGalat: '', asisten: [], pengaturanIuran: PENGATURAN_IURAN_BAWAAN, penugasan: {}, penugasanPeserta: {}, guruAgama: [], dokumen: null, notifikasi: [], pendampingan: { binaDamping: [], pinsa: false }, praUjiAktif: false, praUji: {} };
 const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi waktu Edge Function)
-const JEDA_SEGARKAN_MS = 30000;
-const JEDA_NOTIFIKASI_MS = 60000; // Kotak Notifikasi ditarik ulang tiap menit selama halaman terlihat
+// Hemat log Supabase (paket Free: 1 GB/bulan; tiap permintaan API = satu baris log): muat ulang penuh (~15 permintaan) jarang, notifikasi (1 permintaan) lebih sering.
+const JEDA_SEGARKAN_MS = 300000;       // kembali ke halaman: muat ulang SEMUA bila sudah lebih dari 5 menit
+const JEDA_SEGARKAN_RINGAN_MS = 60000; // kembali ke halaman: cukup tarik notifikasi bila sudah lebih dari 1 menit
+const JEDA_NOTIFIKASI_MS = 180000;     // Kotak Notifikasi ditarik ulang tiap 3 menit selama halaman terlihat (Web Push memberi tahu lebih cepat)
+const BATAS_GAGAL_NOTIFIKASI = 3;      // gagal berturut-turut (mis. sesi habis): berhenti menarik berkala sampai ada pemuatan yang berhasil
 
 const ditolak = (notify, pesan) => {
   notify(pesan, 'err');
@@ -79,6 +82,9 @@ export function AppProvider({ children }) {
   const apiRef = useRef(null);
   const lokalRef = useRef(null);
   const terakhirMuat = useRef(0);
+  const terakhirNotif = useRef(0);              // waktu notifikasi terakhir ditarik (muat penuh juga memuatnya)
+  const gagalNotif = useRef(0);                 // penarikan notifikasi gagal berturut-turut
+  const wajibGantiPinRef = useRef(false);       // akun yang wajib ganti PIN belum memakai aplikasi: tidak perlu penyegaran berkala
   const semesterRef = useRef(new Set());        // salinan semesterSiap yang selalu mutakhir (untuk dipakai di dalam callback)
   const riwayatDimuat = useRef(new Set());      // id Penegak yang riwayat SKU-nya sudah dimuat (sku_riwayat besar, dimuat malas per Penegak)
   const praUjiDimuat = useRef(new Set());       // id Penegak yang baris pra-ujinya sudah dimuat (dimuat malas per Penegak, dimuat ulang saat penyegaran)
@@ -96,6 +102,7 @@ export function AppProvider({ children }) {
 
   /** Akun yang masuk, apa adanya (Penegak berjabatan Dewan tetap berperan 'peserta'). */
   const akun = useMemo(() => db.users.find((u) => u.id === sesiId) ?? null, [db.users, sesiId]);
+  wajibGantiPinRef.current = !!akun?.wajibGantiPin;
   /**
    * Dewan Ambalan = atribut akun Penegak. Penegak aktif berjabatan Dewan memilih tampilan: 'penegak' (Penegak biasa) atau 'dewan' (pengurus dan penguji).
    * `user` = pengguna menurut tampilan yang dipilih: dalam tampilan Dewan ia berperan 'penguji' berjabatan Dewan Ambalan, sehingga seluruh menu dan aturan
@@ -217,6 +224,8 @@ export function AppProvider({ children }) {
     }));
     tandaiSiap(daftarKunci);
     terakhirMuat.current = Date.now();
+    terakhirNotif.current = terakhirMuat.current;
+    gagalNotif.current = 0;
     return { ok: true };
   }, [muatPraUjiKini]);
 
@@ -288,11 +297,25 @@ export function AppProvider({ children }) {
     return () => { batal = true; };
   }, [mulaiSesi, notify]);
 
-  // Data pengguna lain berubah tanpa sepengetahuan kita: muat ulang saat kembali ke halaman ini.
+  /** Menarik Kotak Notifikasi tanpa toast bila gagal (dipakai pewaktu, saat halaman dibuka, dan pesan dari service worker). */
+  const segarkanNotifikasi = useCallback(async () => {
+    const g = generasi.current;
+    terakhirNotif.current = Date.now();
+    const r = await api()?.muatNotifikasi();
+    if (r?.ok) gagalNotif.current = 0;
+    else gagalNotif.current += 1;
+    if (r?.ok && g === generasi.current) setDb((d) => ({ ...d, notifikasi: r.data }));
+    return r?.ok ?? false;
+  }, []);
+
+  // Data pengguna lain berubah tanpa sepengetahuan kita: saat kembali ke halaman ini, muat ulang penuh bila sudah lama, atau cukup notifikasi bila agak lama.
   useEffect(() => {
     if (!sesiId) return undefined;
     const saatTampil = () => {
-      if (document.visibilityState === 'visible' && Date.now() - terakhirMuat.current > JEDA_SEGARKAN_MS) muatSemua();
+      if (document.visibilityState !== 'visible' || wajibGantiPinRef.current) return;
+      const sekarang = Date.now();
+      if (sekarang - terakhirMuat.current > JEDA_SEGARKAN_MS) muatSemua();
+      else if (sekarang - terakhirNotif.current > JEDA_SEGARKAN_RINGAN_MS) { gagalNotif.current = 0; segarkanNotifikasi(); }
     };
     document.addEventListener('visibilitychange', saatTampil);
     window.addEventListener('focus', saatTampil);
@@ -300,18 +323,13 @@ export function AppProvider({ children }) {
       document.removeEventListener('visibilitychange', saatTampil);
       window.removeEventListener('focus', saatTampil);
     };
-  }, [sesiId, muatSemua]);
+  }, [sesiId, muatSemua, segarkanNotifikasi]);
 
-  /** Menarik Kotak Notifikasi tanpa toast bila gagal (dipakai pewaktu, saat halaman dibuka, dan pesan dari service worker). */
-  const segarkanNotifikasi = useCallback(async () => {
-    const g = generasi.current;
-    const r = await api()?.muatNotifikasi();
-    if (r?.ok && g === generasi.current) setDb((d) => ({ ...d, notifikasi: r.data }));
-    return r?.ok ?? false;
-  }, []);
   useEffect(() => {
     if (!sesiId) return undefined;
-    const t = setInterval(() => { if (document.visibilityState === 'visible') segarkanNotifikasi(); }, JEDA_NOTIFIKASI_MS);
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible' && !wajibGantiPinRef.current && gagalNotif.current < BATAS_GAGAL_NOTIFIKASI) segarkanNotifikasi();
+    }, JEDA_NOTIFIKASI_MS);
     return () => clearInterval(t);
   }, [sesiId, segarkanNotifikasi]);
 
