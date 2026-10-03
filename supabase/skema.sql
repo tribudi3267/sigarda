@@ -742,10 +742,10 @@ begin
       using v_k.url || '/rest/v1/rpc/sg_gudep_publik', '{}'::jsonb,
             jsonb_build_object('Content-Type', 'application/json', 'apikey', v_k.kunci, 'Authorization', 'Bearer ' || v_k.kunci), 10000;
   exception when others then
-    update public.keepalive_konfigurasi set ping_terakhir = now(), ping_id = null, status_terakhir = 0, pesan_terakhir = 'Gagal mengantre permintaan: ' || sqlerrm;
+    update public.keepalive_konfigurasi set ping_terakhir = now(), ping_id = null, status_terakhir = 0, pesan_terakhir = 'Gagal mengantre permintaan: ' || sqlerrm where true;
     return null;
   end;
-  update public.keepalive_konfigurasi set ping_terakhir = now(), ping_id = v_id, status_terakhir = null, pesan_terakhir = 'Menunggu jawaban';
+  update public.keepalive_konfigurasi set ping_terakhir = now(), ping_id = v_id, status_terakhir = null, pesan_terakhir = 'Menunggu jawaban' where true;
   return v_id;
 end $$;
 
@@ -762,12 +762,12 @@ begin
     return;
   end;
   if v_n = 0 then
-    update public.keepalive_konfigurasi set pesan_terakhir = 'Jawaban belum atau tidak lagi tercatat di pg_net.';
+    update public.keepalive_konfigurasi set pesan_terakhir = 'Jawaban belum atau tidak lagi tercatat di pg_net.' where true;
   elsif v_status between 200 and 299 then
-    update public.keepalive_konfigurasi set status_terakhir = v_status, pesan_terakhir = 'Database menjawab (HTTP ' || v_status || ').';
+    update public.keepalive_konfigurasi set status_terakhir = v_status, pesan_terakhir = 'Database menjawab (HTTP ' || v_status || ').' where true;
   else
     update public.keepalive_konfigurasi set status_terakhir = coalesce(v_status, 0),
-      pesan_terakhir = coalesce(v_galat, 'HTTP ' || v_status || (case when v_status in (401, 403) then ': kunci anon salah atau dicabut' when v_status = 404 then ': alamat proyek salah atau fungsi sg_gudep_publik tidak ada' else '' end));
+      pesan_terakhir = coalesce(v_galat, 'HTTP ' || v_status || (case when v_status in (401, 403) then ': kunci anon salah atau dicabut' when v_status = 404 then ': alamat proyek salah atau fungsi sg_gudep_publik tidak ada' else '' end)) where true;
   end if;
 end $$;
 
@@ -1281,10 +1281,10 @@ begin
               'User-Agent', 'sigarda-terbit-ulang', 'Content-Type', 'application/json'), 10000;
   exception when others then
     update public.terbit_ulang_konfigurasi set kirim_terakhir = now(), kirim_id = null, status_terakhir = 0, pesan_terakhir = 'Gagal mengantre permintaan ke GitHub.',
-      perlu = true, perlu_sejak = coalesce(perlu_sejak, now()), gagal_beruntun = gagal_beruntun + 1;
+      perlu = true, perlu_sejak = coalesce(perlu_sejak, now()), gagal_beruntun = gagal_beruntun + 1 where true;
     return null;
   end;
-  update public.terbit_ulang_konfigurasi set kirim_terakhir = now(), kirim_id = v_id, status_terakhir = null, pesan_terakhir = 'Menunggu jawaban GitHub', perlu = false, perlu_sejak = null;
+  update public.terbit_ulang_konfigurasi set kirim_terakhir = now(), kirim_id = v_id, status_terakhir = null, pesan_terakhir = 'Menunggu jawaban GitHub', perlu = false, perlu_sejak = null where true;
   return v_id;
 end $$;
 
@@ -1303,7 +1303,7 @@ begin
   if v_n = 0 then return; end if;
   if v_status = 204 then
     update public.terbit_ulang_konfigurasi set status_terakhir = 204, kirim_id = null, gagal_beruntun = 0,
-      pesan_terakhir = 'Deploy diminta ke GitHub (HTTP 204); halaman berita siap sekitar 2 sampai 3 menit lagi.';
+      pesan_terakhir = 'Deploy diminta ke GitHub (HTTP 204); halaman berita siap sekitar 2 sampai 3 menit lagi.' where true;
   else
     update public.terbit_ulang_konfigurasi set status_terakhir = coalesce(v_status, 0), kirim_id = null, perlu = true, perlu_sejak = coalesce(perlu_sejak, now()), gagal_beruntun = gagal_beruntun + 1,
       pesan_terakhir = coalesce(v_galat, 'HTTP ' || v_status || (case
@@ -1311,7 +1311,7 @@ begin
         when v_status = 403 then ': kunci tidak punya izin Actions (Read and write) pada repositori ini'
         when v_status = 404 then ': repositori, berkas alur, atau akses kunci tidak cocok'
         when v_status = 422 then ': cabang atau berkas alur tidak ditemukan, atau alur belum mengizinkan dijalankan manual (workflow_dispatch)'
-        else '' end));
+        else '' end)) where true;
   end if;
 end $$;
 
@@ -1348,7 +1348,7 @@ begin
   if auth.uid() is not null then raise exception 'Perintah ini hanya dari SQL Editor Supabase.'; end if;
   if not exists (select 1 from public.terbit_ulang_konfigurasi) then raise exception 'Belum diatur: jalankan sigarda.terbit_ulang_atur lebih dulu.'; end if;
   if to_regnamespace('net') is null then raise exception 'pg_net belum aktif (Dashboard > Integrations).'; end if;
-  update public.terbit_ulang_konfigurasi set gagal_beruntun = 0;
+  update public.terbit_ulang_konfigurasi set gagal_beruntun = 0 where true;
   perform sigarda.terbit_ulang_kirim_sekarang();
   return 'Permintaan terbit ulang dikirim. Beberapa detik lagi jalankan: select sigarda.terbit_ulang_periksa(); select sigarda.terbit_ulang_keadaan();';
 end $$;
@@ -1372,7 +1372,7 @@ create function sigarda.terbit_ulang_tandai() returns trigger language plpgsql s
 $$
 begin
   if (TG_OP = 'INSERT' and NEW.status = 'terbit') or (TG_OP = 'DELETE' and OLD.status = 'terbit') or (TG_OP = 'UPDATE' and (OLD.status = 'terbit' or NEW.status = 'terbit')) then
-    update public.terbit_ulang_konfigurasi set perlu = true, perlu_sejak = coalesce(perlu_sejak, now()), gagal_beruntun = 0;
+    update public.terbit_ulang_konfigurasi set perlu = true, perlu_sejak = coalesce(perlu_sejak, now()), gagal_beruntun = 0 where true;
   end if;
   return null;
 end $$;
@@ -1399,7 +1399,7 @@ begin
   perform sigarda.terbit_ulang_catat();
   select kirim_terakhir into v_terakhir from public.terbit_ulang_konfigurasi;
   if v_terakhir is not null and v_terakhir > now() - interval '2 minutes' then raise exception 'Permintaan baru saja dikirim. Tunggu beberapa menit sebelum meminta lagi.'; end if;
-  update public.terbit_ulang_konfigurasi set gagal_beruntun = 0;
+  update public.terbit_ulang_konfigurasi set gagal_beruntun = 0 where true;
   perform sigarda.terbit_ulang_kirim_sekarang();
   return sigarda.terbit_ulang_keadaan();
 end $$;

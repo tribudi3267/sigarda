@@ -53,10 +53,10 @@ begin
       using v_k.url || '/rest/v1/rpc/sg_gudep_publik', '{}'::jsonb,
             jsonb_build_object('Content-Type', 'application/json', 'apikey', v_k.kunci, 'Authorization', 'Bearer ' || v_k.kunci), 10000;
   exception when others then
-    update public.keepalive_konfigurasi set ping_terakhir = now(), ping_id = null, status_terakhir = 0, pesan_terakhir = 'Gagal mengantre permintaan: ' || sqlerrm;
+    update public.keepalive_konfigurasi set ping_terakhir = now(), ping_id = null, status_terakhir = 0, pesan_terakhir = 'Gagal mengantre permintaan: ' || sqlerrm where true;
     return null;
   end;
-  update public.keepalive_konfigurasi set ping_terakhir = now(), ping_id = v_id, status_terakhir = null, pesan_terakhir = 'Menunggu jawaban';
+  update public.keepalive_konfigurasi set ping_terakhir = now(), ping_id = v_id, status_terakhir = null, pesan_terakhir = 'Menunggu jawaban' where true;
   return v_id;
 end $$;
 
@@ -73,12 +73,12 @@ begin
     return;
   end;
   if v_n = 0 then
-    update public.keepalive_konfigurasi set pesan_terakhir = 'Jawaban belum atau tidak lagi tercatat di pg_net.';
+    update public.keepalive_konfigurasi set pesan_terakhir = 'Jawaban belum atau tidak lagi tercatat di pg_net.' where true;
   elsif v_status between 200 and 299 then
-    update public.keepalive_konfigurasi set status_terakhir = v_status, pesan_terakhir = 'Database menjawab (HTTP ' || v_status || ').';
+    update public.keepalive_konfigurasi set status_terakhir = v_status, pesan_terakhir = 'Database menjawab (HTTP ' || v_status || ').' where true;
   else
     update public.keepalive_konfigurasi set status_terakhir = coalesce(v_status, 0),
-      pesan_terakhir = coalesce(v_galat, 'HTTP ' || v_status || (case when v_status in (401, 403) then ': kunci anon salah atau dicabut' when v_status = 404 then ': alamat proyek salah atau fungsi sg_gudep_publik tidak ada' else '' end));
+      pesan_terakhir = coalesce(v_galat, 'HTTP ' || v_status || (case when v_status in (401, 403) then ': kunci anon salah atau dicabut' when v_status = 404 then ': alamat proyek salah atau fungsi sg_gudep_publik tidak ada' else '' end)) where true;
   end if;
 end $$;
 
