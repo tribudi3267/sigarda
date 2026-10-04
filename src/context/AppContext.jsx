@@ -16,7 +16,7 @@ import { hariIni } from '../lib/format';
 import { resetGudep, setGudep, tambahGudep } from '../lib/gudepStore';
 import { PENGATURAN_IURAN_BAWAAN, gabungPengaturanIuran } from '../lib/iuranLogic';
 import { jumlahBelumDibaca, tandaiLokal } from '../lib/notifikasiLogic';
-import { berhentiPushPerangkat, pulihkanPush } from '../lib/pushClient';
+import { berhentiPushPerangkat, pulihkanPush, sudahBerlangganan } from '../lib/pushClient';
 import { simpanPetunjuk } from '../lib/suntingLogic';
 
 /**
@@ -49,7 +49,9 @@ const UKURAN_ROMBONGAN = 25; // jumlah akun per permintaan buat-akun (dibatasi w
 const JEDA_SEGARKAN_MS = 300000;       // kembali ke halaman: muat ulang SEMUA bila sudah lebih dari 5 menit
 const JEDA_SEGARKAN_RINGAN_MS = 60000; // kembali ke halaman: cukup tarik notifikasi bila sudah lebih dari 1 menit
 const JEDA_NOTIFIKASI_MS = 180000;     // Kotak Notifikasi ditarik ulang tiap 3 menit selama halaman terlihat (Web Push memberi tahu lebih cepat)
-const BATAS_GAGAL_NOTIFIKASI = 3;      // gagal berturut-turut (mis. sesi habis): berhenti menarik berkala sampai ada pemuatan yang berhasil
+const JEDA_DATA_JARANG_MS = 1800000;   // materi, asisten, pengaturan iuran, gudep, pendampingan: dimuat ulang paling sering tiap 30 menit saat penyegaran
+const JEDA_NOTIFIKASI_PUSH_MS = 900000; // perangkat yang sudah berlangganan Web Push: ditarik tiap 15 menit saja (push memberi tahu seketika)
+const BATAS_GAGAL_NOTIFIKASI = 3;     // gagal berturut-turut (mis. sesi habis): berhenti menarik berkala sampai ada pemuatan yang berhasil
 
 const ditolak = (notify, pesan) => {
   notify(pesan, 'err');
@@ -82,7 +84,8 @@ export function AppProvider({ children }) {
   const apiRef = useRef(null);
   const lokalRef = useRef(null);
   const terakhirMuat = useRef(0);
-  const terakhirNotif = useRef(0);              // waktu notifikasi terakhir ditarik (muat penuh juga memuatnya)
+  const terakhirPenuh = useRef(0);              // waktu pemuatan penuh (termasuk data yang jarang berubah) terakhir
+  const terakhirNotif = useRef(0);             // waktu notifikasi terakhir ditarik (muat penuh juga memuatnya)
   const gagalNotif = useRef(0);                 // penarikan notifikasi gagal berturut-turut
   const wajibGantiPinRef = useRef(false);       // akun yang wajib ganti PIN belum memakai aplikasi: tidak perlu penyegaran berkala
   const semesterRef = useRef(new Set());        // salinan semesterSiap yang selalu mutakhir (untuk dipakai di dalam callback)
@@ -198,32 +201,42 @@ export function AppProvider({ children }) {
     return { aktif: aktif.ok ? aktif.data : null, baris };
   }, []);
 
-  const muatSemua = useCallback(async () => {
+  /**
+   * Memuat seluruh data. `ringan` (penyegaran saat kembali ke halaman) melewatkan data yang jarang berubah (materi, asisten, pengaturan iuran,
+   * data gudep, peran pendampingan) selama pemuatan penuh terakhir belum lewat JEDA_DATA_JARANG_MS; nilai lama dipertahankan.
+   */
+  const muatSemua = useCallback(async ({ ringan = false } = {}) => {
     const a = api();
     const mulaiGenerasi = generasi.current;
     const daftarKunci = [...new Set([semesterDari(hariIni()), ...semesterRef.current])];
+    const lewati = ringan && Date.now() - terakhirPenuh.current < JEDA_DATA_JARANG_MS;
+    const dilewati = Promise.resolve({ ok: false, dilewati: true });
     const [u, p, sesi, pf, m, asisten, pengIuran, gudep, notif, pend, praUjiKini, ...hadir] = await Promise.all([
-      a.muatProfil(), muatProgressSemua(), a.muatSesiAbsen(), a.muatPortofolio(), a.muatMateri(),
-      a.muatAsisten(), // penunjukan asisten bendahara: tidak wajib (basis data lama belum punya tabelnya), jadi tidak ikut pemeriksaan gagal
-      a.muatPengaturanIuran(), // pengaturan iuran: bila fungsinya belum ada dipakai nilai bawaan
-      a.muatGudep(), // data gudep: tidak wajib; belum tersimpan = nilai bawaan dari src/config.js
+      a.muatProfil(), muatProgressSemua(), a.muatSesiAbsen(), a.muatPortofolio(), lewati ? dilewati : a.muatMateri(),
+      lewati ? dilewati : a.muatAsisten(), // penunjukan asisten bendahara: tidak wajib (basis data lama belum punya tabelnya), jadi tidak ikut pemeriksaan gagal
+      lewati ? dilewati : a.muatPengaturanIuran(), // pengaturan iuran: bila fungsinya belum ada dipakai nilai bawaan
+      lewati ? dilewati : a.muatGudep(), // data gudep: tidak wajib; belum tersimpan = nilai bawaan dari src/config.js
       a.muatNotifikasi(), // Kotak Notifikasi: tidak wajib (basis data lama belum punya tabelnya)
-      a.muatPendampinganSaya(), // peran Bina Damping/Pinsa (fase B): tidak wajib (basis data lama belum punya fungsinya)
+      lewati ? dilewati : a.muatPendampinganSaya(), // peran Bina Damping/Pinsa (fase B): tidak wajib (basis data lama belum punya fungsinya)
       muatPraUjiKini(), // sakelar pra-uji dan baris pra-uji yang sudah dibuka (fase D)
       ...daftarKunci.map((k) => { const r = rentangKunci(k); return a.muatHadirRentang(r.mulai, r.akhir); }),
     ]);
-    const gagal = [u, p, sesi, pf, m, ...hadir].find((r) => !r.ok);
+    const gagal = [u, p, sesi, pf, m, ...hadir].find((r) => !r.ok && !r.dilewati);
     if (gagal) return gagal;
     if (mulaiGenerasi !== generasi.current) return { ok: true }; // pengguna sudah keluar selagi memuat
     const hadirGabung = Object.assign({}, ...hadir.map((h) => h.data));
     if (gudep.ok) setGudep(gudep.data);
     setDb((d) => ({
       ...d, // sidang dan pengaturan dimuat terpisah (muatSidang) dan tidak boleh hilang saat penyegaran
-      users: u.data, progress: p.data, portofolio: pf.data, materi: m.data, asisten: asisten.ok ? asisten.data : [], notifikasi: notif.ok ? notif.data : d.notifikasi, pendampingan: pend.ok ? pend.data : d.pendampingan, praUjiAktif: praUjiKini.aktif ?? d.praUjiAktif, praUji: { ...d.praUji, ...praUjiKini.baris }, pengaturanIuran: pengIuran.ok ? gabungPengaturanIuran(pengIuran.data) : PENGATURAN_IURAN_BAWAAN,
+      users: u.data, progress: p.data, portofolio: pf.data, materi: m.dilewati ? d.materi : m.data,
+      asisten: asisten.dilewati ? d.asisten : asisten.ok ? asisten.data : [],
+      notifikasi: notif.ok ? notif.data : d.notifikasi, pendampingan: pend.ok ? pend.data : d.pendampingan, praUjiAktif: praUjiKini.aktif ?? d.praUjiAktif, praUji: { ...d.praUji, ...praUjiKini.baris },
+      pengaturanIuran: pengIuran.dilewati ? d.pengaturanIuran : pengIuran.ok ? gabungPengaturanIuran(pengIuran.data) : PENGATURAN_IURAN_BAWAAN,
       absensi: gabungHadirSemester(d.absensi, sesi.data, daftarKunci, hadirGabung),
     }));
     tandaiSiap(daftarKunci);
     terakhirMuat.current = Date.now();
+    if (!lewati) terakhirPenuh.current = terakhirMuat.current;
     terakhirNotif.current = terakhirMuat.current;
     gagalNotif.current = 0;
     return { ok: true };
@@ -314,7 +327,7 @@ export function AppProvider({ children }) {
     const saatTampil = () => {
       if (document.visibilityState !== 'visible' || wajibGantiPinRef.current) return;
       const sekarang = Date.now();
-      if (sekarang - terakhirMuat.current > JEDA_SEGARKAN_MS) muatSemua();
+      if (sekarang - terakhirMuat.current > JEDA_SEGARKAN_MS) muatSemua({ ringan: true });
       else if (sekarang - terakhirNotif.current > JEDA_SEGARKAN_RINGAN_MS) { gagalNotif.current = 0; segarkanNotifikasi(); }
     };
     document.addEventListener('visibilitychange', saatTampil);
@@ -327,8 +340,11 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     if (!sesiId) return undefined;
-    const t = setInterval(() => {
-      if (document.visibilityState === 'visible' && !wajibGantiPinRef.current && gagalNotif.current < BATAS_GAGAL_NOTIFIKASI) segarkanNotifikasi();
+    const t = setInterval(async () => {
+      if (document.visibilityState !== 'visible' || wajibGantiPinRef.current || gagalNotif.current >= BATAS_GAGAL_NOTIFIKASI) return;
+      // Perangkat yang sudah berlangganan Web Push diberi tahu seketika oleh push: penarikan berkala cukup jarang.
+      if (Date.now() - terakhirNotif.current < JEDA_NOTIFIKASI_PUSH_MS && await sudahBerlangganan()) return;
+      segarkanNotifikasi();
     }, JEDA_NOTIFIKASI_MS);
     return () => clearInterval(t);
   }, [sesiId, segarkanNotifikasi]);
