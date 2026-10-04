@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp, usePastikanPortofolio } from '../context/AppContext';
 import useSpg from '../hooks/useSpg';
 import usePelantikanSaka from '../hooks/usePelantikanSaka';
 import useTkk from '../hooks/useTkk';
@@ -139,6 +139,7 @@ function PanelSpg({ peserta, baris, boleh, data }) {
  */
 export default function Spg() {
   const { user, daftarPesertaSemua, progress, portofolio } = useApp();
+  usePastikanPortofolio();
   const spg = useSpg();
   const pel = usePelantikanSaka();
   const tkk = useTkk();

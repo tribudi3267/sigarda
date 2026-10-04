@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp, usePastikanPortofolio } from '../context/AppContext';
 import { AMBANG_HADIR } from '../config';
 import { PERAN, URUTAN_PERAN } from '../lib/skuLogic';
 import {
@@ -19,6 +19,7 @@ import KartuIuran from './KartuIuran';
  */
 export default function RingkasanGudep({ onNav }) {
   const { daftarPeserta, daftarPesertaSemua, absensi, portofolio } = useApp();
+  usePastikanPortofolio();
 
   const ta = tahunAjaranDari(hariIni());
   const periode = periodeDari(hariIni());

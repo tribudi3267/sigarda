@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp, usePastikanPortofolio } from '../context/AppContext';
 import { GudepBeku, useGudep } from '../lib/gudepStore';
 import { KopSurat } from './DokumenSku';
 import BlokTtd from './BlokTtd';
@@ -388,6 +388,7 @@ export function PortofolioKwarcabDokumen({ peserta, tanggalLahir = null, capaian
  */
 export default function TampilanPortofolioKwarcab({ peserta, onKembali }) {
   const { progress, portofolio, api, absensi } = useApp();
+  usePastikanPortofolio();
   const tkk = useTkk();
   const spg = useSpg();
   const pel = usePelantikanSaka();

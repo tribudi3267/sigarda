@@ -1,5 +1,5 @@
 import { lazy, useMemo, useState } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp, usePastikanPortofolio } from '../context/AppContext';
 import { layakGaruda } from '../lib/skuLogic';
 import { rekapPortofolio, ringkasPortofolio } from '../lib/portofolioLogic';
 import { unduhPortofolioXlsx } from '../lib/exportLaporan';
@@ -74,6 +74,7 @@ function Detail({ pesertaId, onKembali, onBukaSku }) {
 
 export default function PortofolioPengurus({ fokusId, onBuka, onKembali, onBukaSku }) {
   const { daftarPeserta, portofolio, progress, notify } = useApp();
+  usePastikanPortofolio();
   const { filter, setFilter, efektif, rombelSaya } = useFilterRombel();
   const [mengunduh, setMengunduh] = useState(false);
 

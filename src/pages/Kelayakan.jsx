@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp, usePastikanPortofolio } from '../context/AppContext';
 import useGerbang from '../hooks/useGerbang';
 import useSpg from '../hooks/useSpg';
 import usePelantikanSaka from '../hooks/usePelantikanSaka';
@@ -107,6 +107,7 @@ function PanelAturan({ data, boleh }) {
 /** Daftar Calon Garuda dengan syarat gerbang, kuota, dan aturan. `tim` = tim penilai pada tahun ajaran terpilih (untuk menampilkan tim yang menilai tiap calon). */
 function PanelCalon({ tim, tahap, tahunAjaran }) {
   const { user, daftarPeserta, progress, portofolio } = useApp();
+  usePastikanPortofolio();
   const gerbang = useGerbang();
   const spg = useSpg();
   const pel = usePelantikanSaka();
