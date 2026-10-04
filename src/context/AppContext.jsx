@@ -18,7 +18,7 @@ import { PENGATURAN_IURAN_BAWAAN, gabungPengaturanIuran } from '../lib/iuranLogi
 import { jumlahBelumDibaca, tandaiLokal } from '../lib/notifikasiLogic';
 import { berhentiPushPerangkat, pulihkanPush, sudahBerlangganan } from '../lib/pushClient';
 import { bacaCache, hapusCache, simpanCache } from '../lib/cacheStatis';
-import { simpanPetunjuk } from '../lib/suntingLogic';
+import { bacaPetunjuk, simpanPetunjuk } from '../lib/suntingLogic';
 
 /**
  * STATE APLIKASI
@@ -37,6 +37,12 @@ import { simpanPetunjuk } from '../lib/suntingLogic';
 const Ctx = createContext(null);
 /** Konteks mentah, hanya untuk pengujian tampilan (uji/halaman-6b.mjs) yang memasang nilai palsu. */
 export const KonteksApp = Ctx;
+
+/** Halaman atau komponen yang membaca `portofolio` memanggil ini: portofolio dimuat malas bagi Penegak (lihat pastikanPortofolio). Aman dipakai pada konteks uji tanpa fungsi itu. */
+export function usePastikanPortofolio() {
+  const { pastikanPortofolio } = useApp();
+  useEffect(() => { pastikanPortofolio?.(); }, [pastikanPortofolio]);
+}
 
 export function useApp() {
   const ctx = useContext(Ctx);
@@ -85,6 +91,9 @@ export function AppProvider({ children }) {
   const apiRef = useRef(null);
   const lokalRef = useRef(null);
   const terakhirMuat = useRef(0);
+  const portofolioDimuat = useRef(false);       // portofolio (dan jurnal) sudah dimuat pada sesi ini
+  const portofolioMemuat = useRef(null);        // janji pemuatan malas yang sedang berjalan
+  const [portofolioSiap, setPortofolioSiap] = useState(false);
   const terakhirPenuh = useRef(0);              // waktu pemuatan penuh (termasuk data yang jarang berubah) terakhir
   const terakhirNotif = useRef(0);             // waktu notifikasi terakhir ditarik (muat penuh juga memuatnya)
   const gagalNotif = useRef(0);                 // penarikan notifikasi gagal berturut-turut
@@ -148,6 +157,9 @@ export function AppProvider({ children }) {
     semesterRef.current = new Set();
     riwayatDimuat.current = new Set();
     praUjiDimuat.current = new Set();
+    portofolioDimuat.current = false;
+    portofolioMemuat.current = null;
+    setPortofolioSiap(false);
     semesterSedangMuat.current = new Map();
     setSemesterSiap({});
     setInstrumenSiap(false);
@@ -217,6 +229,9 @@ export function AppProvider({ children }) {
     const daftarKunci = [...new Set([semesterDari(hariIni()), ...semesterRef.current])];
     const lewati = ringan && Date.now() - terakhirPenuh.current < JEDA_DATA_JARANG_MS;
     const dilewati = Promise.resolve({ ok: false, dilewati: true });
+    // Portofolio (dua permintaan) hanya diperlukan halaman tertentu: Penegak biasa tidak memuatnya saat masuk (dimuat malas lewat pastikanPortofolio). Perangkat pengurus (petunjuk
+    // dari aplikasi) memuatnya langsung karena dasbornya membacanya; tanpa petunjuk (perangkat baru) tetap benar, hanya dimuat saat halaman yang membutuhkan dibuka.
+    const segeraPortofolio = portofolioDimuat.current || bacaPetunjuk(true) !== '';
     // Materi jarang berubah dan bukan data pribadi: dipakai dari salinan di peramban selama masih berlaku (mode lokal selalu membaca langsung).
     const dariCache = (nama, ambil) => {
       if (lokalRef.current) return ambil();
@@ -225,7 +240,7 @@ export function AppProvider({ children }) {
       return ambil().then((r) => { if (r.ok) simpanCache(nama, r.data); return r; });
     };
     const [u, p, sesi, pf, m, awal, praUjiKini, ...hadir] = await Promise.all([
-      a.muatProfil(), muatProgressSemua(), a.muatSesiAbsen(), a.muatPortofolio(), lewati ? dilewati : dariCache('materi', () => a.muatMateri()),
+      a.muatProfil(), muatProgressSemua(), a.muatSesiAbsen(), segeraPortofolio ? a.muatPortofolio() : dilewati, lewati ? dilewati : dariCache('materi', () => a.muatMateri()),
       a.muatAwal(), // gudep, pengaturan iuran, pendampingan, sakelar pra-uji, asisten, notifikasi: semuanya tidak wajib (bagian yang gagal memakai nilai bawaan)
       muatPraUjiKini({ denganAktif: false }), // baris pra-uji yang sudah dibuka (fase D)
       ...daftarKunci.map((k) => { const r = rentangKunci(k); return a.muatHadirRentang(r.mulai, r.akhir); }),
@@ -252,13 +267,14 @@ export function AppProvider({ children }) {
     if (kecil.gudep.ok) setGudep(kecil.gudep.data);
     setDb((d) => ({
       ...d, // sidang dan pengaturan dimuat terpisah (muatSidang) dan tidak boleh hilang saat penyegaran
-      users: u.data, progress: p.data, portofolio: pf.data, materi: m.dilewati ? d.materi : m.data,
+      users: u.data, progress: p.data, portofolio: pf.dilewati ? d.portofolio : pf.data, materi: m.dilewati ? d.materi : m.data,
       asisten: kecil.asisten.ok ? kecil.asisten.data : d.asisten,
       notifikasi: kecil.notif.ok ? kecil.notif.data : d.notifikasi, pendampingan: kecil.pend.ok ? kecil.pend.data : d.pendampingan, praUjiAktif: kecil.aktif ?? d.praUjiAktif, praUji: { ...d.praUji, ...praUjiKini.baris },
       pengaturanIuran: kecil.pengIuran.ok ? gabungPengaturanIuran(kecil.pengIuran.data) : PENGATURAN_IURAN_BAWAAN,
       absensi: gabungHadirSemester(d.absensi, sesi.data, daftarKunci, hadirGabung),
     }));
     tandaiSiap(daftarKunci);
+    if (!pf.dilewati) { portofolioDimuat.current = true; setPortofolioSiap(true); }
     terakhirMuat.current = Date.now();
     if (!lewati) terakhirPenuh.current = terakhirMuat.current;
     terakhirNotif.current = terakhirMuat.current;
@@ -422,6 +438,25 @@ export function AppProvider({ children }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notify, sesiBerakhir, muatProgressSemua, muatPraUjiKini]);
+
+  /**
+   * Memuat portofolio dan jurnal (seluruh yang boleh dilihat akun ini) bila belum: Penegak biasa tidak memuatnya saat masuk (hemat log). Idempoten, permintaan yang
+   * sedang berjalan dipakai bersama; yang gagal dicoba lagi pada pemanggilan berikutnya. Komponen pembaca `portofolio` memanggilnya lewat usePastikanPortofolio.
+   */
+  const pastikanPortofolio = useCallback(() => {
+    if (portofolioDimuat.current) return Promise.resolve();
+    if (!portofolioMemuat.current) {
+      const g = generasi.current;
+      portofolioMemuat.current = (async () => {
+        const r = await api().muatPortofolio();
+        if (g !== generasi.current) return;
+        if (r.ok) { setDb((d) => ({ ...d, portofolio: r.data })); portofolioDimuat.current = true; setPortofolioSiap(true); }
+        else if (r.sesiBerakhir) await sesiBerakhir();
+        else notify(r.pesan, 'err');
+      })().finally(() => { portofolioMemuat.current = null; });
+    }
+    return portofolioMemuat.current;
+  }, [notify, sesiBerakhir]);
 
   /** Menjalankan aksi ke server; galat ditampilkan sebagai toast, keberhasilan menyegarkan data. */
   const aksi = async (janji, { sukses, sesudah } = {}) => {
@@ -1414,7 +1449,7 @@ export function AppProvider({ children }) {
 
   const value = {
     status, galatMuat, lokal: LOKAL ? { aktif: true, reset: () => lokalRef.current?.reset() } : { aktif: false },
-    db, user, akun, mode, punyaDewan, ubahMode, users: db.users, progress: db.progress, absensi: db.absensi, portofolio: db.portofolio,
+    db, user, akun, mode, punyaDewan, ubahMode, users: db.users, progress: db.progress, absensi: db.absensi, portofolio: db.portofolio, portofolioSiap, pastikanPortofolio,
     materi: db.materi, bolehKelolaMateri: izinMateri, simpanMateri, hapusMateri, geserUrutanMateri,
     sidang: db.sidang, sidangUrut: db.sidangUrut, pengaturan: db.pengaturan, bolehSidang, bolehHapusSidang, muatSidang, simpanSidang, hapusSidang,
     simpanPengaturan, aturUrutSidang,

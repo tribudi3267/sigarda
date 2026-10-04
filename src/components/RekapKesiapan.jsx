@@ -1,5 +1,5 @@
 import { ITEM_PORTOFOLIO } from '../data/portofolioData';
-import { useApp } from '../context/AppContext';
+import { useApp, usePastikanPortofolio } from '../context/AppContext';
 import { getItem, hitungPortofolio, jurnalTerbaru } from '../lib/portofolioLogic';
 import { fmtWaktu } from '../lib/format';
 import { KotakBar, TombolKeAtas, gulirDanSorot } from './ProgresKotak';
@@ -16,6 +16,7 @@ const ID_RINGKASAN = 'portofolio-progres-kotak';
  */
 export default function RekapKesiapan({ pesertaId, setFilter }) {
   const { portofolio } = useApp();
+  usePastikanPortofolio();
   const h = hitungPortofolio(portofolio, pesertaId);
 
   const kotak = ITEM_PORTOFOLIO.map((it) => {
@@ -74,6 +75,7 @@ export default function RekapKesiapan({ pesertaId, setFilter }) {
 /** Jurnal kesiapan: aktivitas terbaru lintas dokumen. */
 export function JurnalTerbaru({ pesertaId, batas = 6 }) {
   const { portofolio, users } = useApp();
+  usePastikanPortofolio();
   const daftar = jurnalTerbaru(portofolio, pesertaId, batas);
   const namaOrang = (id) => users.find((u) => u.id === id)?.nama ?? '-';
 

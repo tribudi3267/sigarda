@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ITEM_PORTOFOLIO, STATUS_PF } from '../data/portofolioData';
-import { useApp } from '../context/AppContext';
+import { useApp, usePastikanPortofolio } from '../context/AppContext';
 import { getItem } from '../lib/portofolioLogic';
 import { fmtWaktu } from '../lib/format';
 import { NomorButir } from './ProgresKotak';
@@ -26,6 +26,7 @@ const STATUS_KOTAK = { siap: 'selesai', proses: 'proses', belum: 'belum' };
  */
 export default function PortofolioChecklist({ pesertaId, mode, filter: filterLuar, setFilter: setFilterLuar }) {
   const { portofolio, user, users, ubahPortofolio, catatPortofolioPenguji, hanyaLihatSaya } = useApp();
+  usePastikanPortofolio();
   const [filterDalam, setFilterDalam] = useState('semua');
   const filter = filterLuar ?? filterDalam;
   const setFilter = setFilterLuar ?? setFilterDalam;

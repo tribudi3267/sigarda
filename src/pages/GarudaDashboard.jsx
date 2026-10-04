@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp, usePastikanPortofolio } from '../context/AppContext';
 import { PERAN } from '../lib/skuLogic';
 import { hitungPortofolio } from '../lib/portofolioLogic';
 import { fmtTanggal } from '../lib/format';
@@ -11,11 +11,15 @@ import KartuIuran from '../components/KartuIuran';
 
 /** Dashboard Penegak Calon Garuda: jurnal kesiapan dan cek list 26 dokumen portofolio. */
 export default function GarudaDashboard({ setTab }) {
-  const { user, portofolio, peranUser } = useApp();
+  const { user, portofolio, portofolioSiap, peranUser } = useApp();
+  usePastikanPortofolio();
   const h = hitungPortofolio(portofolio, user.id);
   // Dikontrol di sini (bukan di dalam PortofolioChecklist) supaya kotak peta dokumen pada RekapKesiapan dapat
   // mereset filter ke "semua" sebelum menyorot dokumen yang diklik.
   const [filter, setFilter] = useState('semua');
+
+  // Portofolio dimuat malas (hemat log): selama belum ada, jangan menampilkan 0% yang keliru.
+  if (portofolioSiap === false) return <div className="card p-6 text-sm text-pramuka-600" role="status">Memuat portofolio... Bila tidak kunjung tampil, muat ulang halaman.</div>;
 
   return (
     <div className="space-y-5 animasi-naik">
