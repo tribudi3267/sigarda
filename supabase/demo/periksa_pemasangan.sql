@@ -1476,6 +1476,7 @@ h_fungsi(skema, nama, args, isi, au, an, sv) as (values
     ('public', 'sg_materi_geser', 'p_id uuid, p_arah integer', 'fc17d272c5015ee19a7ab2607604973a', true, false, true),
     ('public', 'sg_materi_hapus', 'p_id uuid', '8e7283663719bbc9e1671657101d9fc8', true, false, true),
     ('public', 'sg_materi_simpan', 'p_id uuid, p_judul text, p_deskripsi text, p_tautan text, p_file_id text, p_resource_key text, p_butir text[], p_bagian jsonb', '58134aed5484fc20f98fb8ffd69af81a', true, false, true),
+    ('public', 'sg_muat_awal', '', '6b93455b55ace473a1f3a22c03bfde3c', true, false, true),
     ('public', 'sg_naik_kelas', 'p_tahun_ajaran text, p_data jsonb, p_terapkan boolean', 'edd8f68b65ebbf13e31cb7de1018422f', true, false, true),
     ('public', 'sg_naik_kelas_batalkan', 'p_batch bigint', 'dfb062d886126d7262dd450afd780a7e', true, false, true),
     ('public', 'sg_notifikasi_tandai', 'p_ids bigint[]', 'aebf3598eee6126fb4287e021c928d45', true, false, true),

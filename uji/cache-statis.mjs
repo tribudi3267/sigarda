@@ -60,10 +60,10 @@ console.log('--- Salinan di peramban ---');
 console.log('\n--- Pemakaian di AppContext ---');
 {
   const ctx = sumber('src/context/AppContext.jsx');
-  ok(/dariCache\('materi'/.test(ctx) && /dariCache\('iuran-pengaturan'/.test(ctx) && /dariCache\('gudep'/.test(ctx), 'pemuatan penuh memakai salinan untuk materi, pengaturan iuran, dan gudep');
-  ok(!/dariCache\('(asisten|profil|progress|portofolio|notifikasi|pendampingan)/.test(ctx), 'data pribadi dan yang sering berubah TIDAK disalin');
+  ok(/dariCache\('materi'/.test(ctx), 'pemuatan penuh memakai salinan untuk materi');
+  ok(!/dariCache\('(asisten|profil|progress|portofolio|notifikasi|pendampingan|gudep|iuran-pengaturan)/.test(ctx), 'data pribadi dan yang sering berubah TIDAK disalin (gudep dan pengaturan iuran datang dari muat awal)');
   ok(/if \(lokalRef\.current\) return ambil\(\)/.test(ctx), 'mode lokal (basis data di peramban) selalu membaca langsung');
-  ok(/simpanBilaOk\('materi'\)/.test(ctx) && /simpanBilaOk\('iuran-pengaturan'\)/.test(ctx) && /simpanCache\('gudep', r\.data\)/.test(ctx), 'setiap jalur tulis memperbarui salinannya (materi, pengaturan iuran, gudep)');
+  ok(/simpanBilaOk\('materi'\)/.test(ctx) && !/simpanCache\('gudep'/.test(ctx) && !/simpanBilaOk\('iuran-pengaturan'\)/.test(ctx), 'jalur tulis memperbarui salinan materi; tidak ada salinan basi untuk gudep dan pengaturan iuran');
   const iKosong = ctx.indexOf('const kosongkan = useCallback');
   ok(iKosong > 0 && ctx.slice(iKosong, iKosong + 900).includes('hapusCache()'), 'keluar/sesi berakhir membuang semua salinan');
   ok(/if \(!id\) apiRef\.current\.muatGudepPublik\(\)/.test(ctx), 'identitas gudep publik hanya diminta bila tidak ada sesi tersimpan');
