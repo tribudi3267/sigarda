@@ -616,6 +616,33 @@ export function buatApi(klien) {
 
     /* ---------------------- Notifikasi dan Web Push ---------------------- */
     /** Notifikasi milik sendiri (RLS), terbaru lebih dulu, maksimal `batas`. */
+    /**
+     * Hemat log: satu permintaan (sg_muat_awal) menggantikan muatGudep, muatPengaturanIuran, muatPendampinganSaya, sakelar pra-uji, muatAsisten, dan muatNotifikasi.
+     * Bagian yang gagal di server bernilai null (iuran, pendampingan) dan dipakai nilai bawaan seperti permintaan terpisah yang gagal. `tidakAda` = basis data belum
+     * dimigrasi (fungsi belum ada): pemanggil kembali ke permintaan terpisah.
+     */
+    muatAwal: async () => {
+      try {
+        const { data, error } = await klien.rpc('sg_muat_awal');
+        if (error) {
+          const tidakAda = error.code === 'PGRST202' || /could not find the function|function [\w.]+\(.*\) does not exist/i.test(String(error.message ?? ''));
+          return { ok: false, pesan: pesanGalat(error), sesiBerakhir: sesiBerakhir(error), tidakAda };
+        }
+        return {
+          ok: true,
+          data: {
+            gudep: data?.gudep ?? null,
+            iuran: data?.iuran ?? null,
+            pendampingan: data?.pendampingan != null ? susunPendampingan(data.pendampingan) : null,
+            praUjiAktif: !!data?.praUjiAktif,
+            asisten: susunAsisten(data?.asisten ?? []),
+            notifikasi: susunNotifikasi(data?.notifikasi ?? []),
+          },
+        };
+      } catch (e) {
+        return { ok: false, pesan: pesanGalat(e) };
+      }
+    },
     muatNotifikasi: (batas = 60) =>
       muat(async () => {
         const { data, error } = await klien.from('notifikasi').select('*').order('id', { ascending: false }).limit(batas);

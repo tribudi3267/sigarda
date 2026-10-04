@@ -193,19 +193,23 @@ export function AppProvider({ children }) {
     return { ok: true, data };
   }, []);
 
-  /** Sakelar pra-uji dan baris pra-uji para Penegak yang sudah pernah dibuka (fase D). Tidak wajib: basis data lama belum punya tabelnya. */
-  const muatPraUjiKini = useCallback(async () => {
+  /**
+   * Baris pra-uji para Penegak yang sudah pernah dibuka (fase D) dan, bila `denganAktif`, sakelar pra-uji (satu permintaan sendiri).
+   * Tidak wajib: basis data lama belum punya tabelnya. Pemuatan penuh mengambil sakelarnya dari muat awal (muatAwal), jadi memanggil dengan denganAktif: false.
+   */
+  const muatPraUjiKini = useCallback(async ({ denganAktif = true } = {}) => {
     const a = api();
     const ids = [...praUjiDimuat.current];
-    const [aktif, ...rinci] = await Promise.all([a.muatPraUjiAktif(), ...ids.map((id) => a.muatPraUjiPeserta(id))]);
+    const [aktif, ...rinci] = await Promise.all([denganAktif ? a.muatPraUjiAktif() : Promise.resolve({ ok: false }), ...ids.map((id) => a.muatPraUjiPeserta(id))]);
     const baris = {};
     ids.forEach((id, i) => { if (rinci[i].ok) baris[id] = rinci[i].data; });
     return { aktif: aktif.ok ? aktif.data : null, baris };
   }, []);
 
   /**
-   * Memuat seluruh data. `ringan` (penyegaran saat kembali ke halaman) melewatkan data yang jarang berubah (materi, asisten, pengaturan iuran,
-   * data gudep, peran pendampingan) selama pemuatan penuh terakhir belum lewat JEDA_DATA_JARANG_MS; nilai lama dipertahankan.
+   * Memuat seluruh data. Hemat log: data kecil (gudep, pengaturan iuran, pendampingan, sakelar pra-uji, asisten, notifikasi) diminta SEKALI lewat sg_muat_awal;
+   * basis data yang belum dimigrasi (fungsi belum ada) kembali ke permintaan terpisah. `ringan` (penyegaran saat kembali ke halaman) juga melewatkan materi,
+   * yang jarang berubah, selama pemuatan penuh terakhir belum lewat JEDA_DATA_JARANG_MS; nilai lama dipertahankan.
    */
   const muatSemua = useCallback(async ({ ringan = false } = {}) => {
     const a = api();
@@ -213,34 +217,45 @@ export function AppProvider({ children }) {
     const daftarKunci = [...new Set([semesterDari(hariIni()), ...semesterRef.current])];
     const lewati = ringan && Date.now() - terakhirPenuh.current < JEDA_DATA_JARANG_MS;
     const dilewati = Promise.resolve({ ok: false, dilewati: true });
-    // Data yang jarang berubah dan bukan data pribadi: dipakai dari salinan di peramban selama masih berlaku (mode lokal selalu membaca langsung).
+    // Materi jarang berubah dan bukan data pribadi: dipakai dari salinan di peramban selama masih berlaku (mode lokal selalu membaca langsung).
     const dariCache = (nama, ambil) => {
       if (lokalRef.current) return ambil();
       const c = bacaCache(nama, JEDA_DATA_JARANG_MS);
       if (c) return Promise.resolve({ ok: true, data: c.nilai });
       return ambil().then((r) => { if (r.ok) simpanCache(nama, r.data); return r; });
     };
-    const [u, p, sesi, pf, m, asisten, pengIuran, gudep, notif, pend, praUjiKini, ...hadir] = await Promise.all([
+    const [u, p, sesi, pf, m, awal, praUjiKini, ...hadir] = await Promise.all([
       a.muatProfil(), muatProgressSemua(), a.muatSesiAbsen(), a.muatPortofolio(), lewati ? dilewati : dariCache('materi', () => a.muatMateri()),
-      lewati ? dilewati : a.muatAsisten(), // penunjukan asisten bendahara: tidak wajib (basis data lama belum punya tabelnya), jadi tidak ikut pemeriksaan gagal
-      lewati ? dilewati : dariCache('iuran-pengaturan', () => a.muatPengaturanIuran()), // pengaturan iuran: bila fungsinya belum ada dipakai nilai bawaan
-      lewati ? dilewati : dariCache('gudep', () => a.muatGudep()), // data gudep: tidak wajib; belum tersimpan = nilai bawaan dari src/config.js
-      a.muatNotifikasi(), // Kotak Notifikasi: tidak wajib (basis data lama belum punya tabelnya)
-      lewati ? dilewati : a.muatPendampinganSaya(), // peran Bina Damping/Pinsa (fase B): tidak wajib (basis data lama belum punya fungsinya)
-      muatPraUjiKini(), // sakelar pra-uji dan baris pra-uji yang sudah dibuka (fase D)
+      a.muatAwal(), // gudep, pengaturan iuran, pendampingan, sakelar pra-uji, asisten, notifikasi: semuanya tidak wajib (bagian yang gagal memakai nilai bawaan)
+      muatPraUjiKini({ denganAktif: false }), // baris pra-uji yang sudah dibuka (fase D)
       ...daftarKunci.map((k) => { const r = rentangKunci(k); return a.muatHadirRentang(r.mulai, r.akhir); }),
     ]);
     const gagal = [u, p, sesi, pf, m, ...hadir].find((r) => !r.ok && !r.dilewati);
     if (gagal) return gagal;
     if (mulaiGenerasi !== generasi.current) return { ok: true }; // pengguna sudah keluar selagi memuat
+    const gagalKecil = { ok: false };
+    let kecil;
+    if (awal.ok) {
+      const x = awal.data;
+      kecil = {
+        asisten: { ok: true, data: x.asisten }, gudep: { ok: true, data: x.gudep }, notif: { ok: true, data: x.notifikasi },
+        pengIuran: x.iuran != null ? { ok: true, data: x.iuran } : gagalKecil, pend: x.pendampingan != null ? { ok: true, data: x.pendampingan } : gagalKecil, aktif: x.praUjiAktif,
+      };
+    } else if (awal.tidakAda) {
+      const [asisten, pengIuran, gudep, notif, pend, aktif] = await Promise.all([a.muatAsisten(), a.muatPengaturanIuran(), a.muatGudep(), a.muatNotifikasi(), a.muatPendampinganSaya(), a.muatPraUjiAktif()]);
+      kecil = { asisten, pengIuran, gudep, notif, pend, aktif: aktif.ok ? aktif.data : null };
+    } else {
+      kecil = { asisten: gagalKecil, pengIuran: gagalKecil, gudep: gagalKecil, notif: gagalKecil, pend: gagalKecil, aktif: null };
+    }
+    if (mulaiGenerasi !== generasi.current) return { ok: true };
     const hadirGabung = Object.assign({}, ...hadir.map((h) => h.data));
-    if (gudep.ok) setGudep(gudep.data);
+    if (kecil.gudep.ok) setGudep(kecil.gudep.data);
     setDb((d) => ({
       ...d, // sidang dan pengaturan dimuat terpisah (muatSidang) dan tidak boleh hilang saat penyegaran
       users: u.data, progress: p.data, portofolio: pf.data, materi: m.dilewati ? d.materi : m.data,
-      asisten: asisten.dilewati ? d.asisten : asisten.ok ? asisten.data : [],
-      notifikasi: notif.ok ? notif.data : d.notifikasi, pendampingan: pend.ok ? pend.data : d.pendampingan, praUjiAktif: praUjiKini.aktif ?? d.praUjiAktif, praUji: { ...d.praUji, ...praUjiKini.baris },
-      pengaturanIuran: pengIuran.dilewati ? d.pengaturanIuran : pengIuran.ok ? gabungPengaturanIuran(pengIuran.data) : PENGATURAN_IURAN_BAWAAN,
+      asisten: kecil.asisten.ok ? kecil.asisten.data : d.asisten,
+      notifikasi: kecil.notif.ok ? kecil.notif.data : d.notifikasi, pendampingan: kecil.pend.ok ? kecil.pend.data : d.pendampingan, praUjiAktif: kecil.aktif ?? d.praUjiAktif, praUji: { ...d.praUji, ...praUjiKini.baris },
+      pengaturanIuran: kecil.pengIuran.ok ? gabungPengaturanIuran(kecil.pengIuran.data) : PENGATURAN_IURAN_BAWAAN,
       absensi: gabungHadirSemester(d.absensi, sesi.data, daftarKunci, hadirGabung),
     }));
     tandaiSiap(daftarKunci);
@@ -393,7 +408,7 @@ export function AppProvider({ children }) {
         setDb((d) => ({ ...d, praUjiAktif: r.aktif ?? d.praUjiAktif, praUji: { ...d.praUji, ...r.baris } }));
       },
       asisten: () => terapkan(api().muatAsisten(), (asisten) => (d) => ({ ...d, asisten })),
-      pengaturanIuran: () => terapkan(api().muatPengaturanIuran().then(simpanBilaOk('iuran-pengaturan')), (p) => (d) => ({ ...d, pengaturanIuran: gabungPengaturanIuran(p) })),
+      pengaturanIuran: () => terapkan(api().muatPengaturanIuran(), (p) => (d) => ({ ...d, pengaturanIuran: gabungPengaturanIuran(p) })),
       sidang: async () => {
         const [s, u] = await Promise.all([api().muatSidang(), api().muatSidangUrut()]);
         const gagal = [s, u].find((r) => !r.ok);
@@ -1294,7 +1309,7 @@ export function AppProvider({ children }) {
     user?.role === 'admin'
       ? aksi(api().simpanGudep(nilai), {
         sukses: 'Data gudep tersimpan.',
-        sesudah: async () => { const r = await api().muatGudep(); if (r.ok) { setGudep(r.data); if (!lokalRef.current) simpanCache('gudep', r.data); } },
+        sesudah: async () => { const r = await api().muatGudep(); if (r.ok) setGudep(r.data); },
       })
       : Promise.resolve(ditolak(notify, 'Hanya Admin Gudep yang dapat mengubah data gudep.'));
 

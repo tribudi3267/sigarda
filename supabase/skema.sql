@@ -7654,6 +7654,28 @@ begin
   on conflict (kunci) do update set nilai = excluded.nilai, diubah_oleh = excluded.diubah_oleh, diubah_pada = excluded.diubah_pada;
 end $$;
 -- ===== akhir aksi perlindungan anggota =====
+-- ===== Muat awal (hemat log, Fase 2): aksi =====
+-- Satu panggilan menggantikan enam permintaan kecil saat masuk dan saat penyegaran (tiap permintaan API = satu baris log Supabase):
+-- data gudep, pengaturan iuran, peran pendampingan, sakelar pra-uji, penunjukan asisten bendahara, dan Kotak Notifikasi (60 terbaru).
+-- HANYA MEMBACA dan berjalan sebagai pemanggil (bukan security definer): pembacaan tabel tetap tunduk pada RLS seperti permintaan terpisah sebelumnya.
+-- Bagian yang bergantung pada fungsi sg_* (pengaturan iuran, pendampingan) berdiri sendiri: galat salah satunya (mis. PIN awal belum diganti) menghasilkan null
+-- untuk bagian itu, sama seperti saat diminta terpisah dan gagal (klien memakai nilai bawaan), dan tidak menggagalkan bagian lain.
+create function public.sg_muat_awal() returns jsonb
+language plpgsql stable set search_path = public as
+$$
+declare v_iuran jsonb; v_pend jsonb;
+begin
+  begin v_iuran := public.sg_iuran_pengaturan(); exception when others then v_iuran := null; end;
+  begin v_pend := public.sg_pendampingan_saya(); exception when others then v_pend := null; end;
+  return jsonb_build_object(
+    'gudep', (select p.nilai from public.pengaturan p where p.kunci = 'gudep.data'),
+    'iuran', v_iuran,
+    'pendampingan', v_pend,
+    'praUjiAktif', coalesce((select (p.nilai ->> 'aktif')::boolean from public.pengaturan p where p.kunci = 'pra_uji.aktif'), false),
+    'asisten', coalesce((select jsonb_agg(to_jsonb(a) order by a.peserta_id) from public.asisten_iuran a), '[]'::jsonb),
+    'notifikasi', coalesce((select jsonb_agg(to_jsonb(n) order by n.id desc) from (select * from public.notifikasi order by id desc limit 60) n), '[]'::jsonb));
+end $$;
+-- ===== akhir muat awal =====
 -- ---------------------------------------------------------------------------
 -- 5. Hak akses: baca saja untuk pengguna; fungsi aksi hanya untuk pengguna masuk
 -- ---------------------------------------------------------------------------
@@ -7707,7 +7729,7 @@ grant execute on function
   public.sg_agenda_simpan(bigint, text, text, text, date, text, uuid[], boolean), public.sg_agenda_hapus(bigint),
   public.sg_kegiatan_usul(text, text, date, text, text), public.sg_kegiatan_tinjau(bigint, text, text), public.sg_kegiatan_ping(bigint),
   public.sg_garuda_berkas_baca(uuid), public.sg_garuda_token_buat(uuid), public.sg_garuda_token_cabut(uuid),
-  public.sg_bina_damping_atur(text, text, uuid[]), public.sg_bina_damping_daftar(text), public.sg_sangga_rombel(text), public.sg_sangga_atur(text, jsonb), public.sg_pendampingan_saya(),
+  public.sg_bina_damping_atur(text, text, uuid[]), public.sg_bina_damping_daftar(text), public.sg_sangga_rombel(text), public.sg_sangga_atur(text, jsonb), public.sg_pendampingan_saya(), public.sg_muat_awal(),
   public.sg_pinsa_calon(text), public.sg_pinsa_tugaskan(text, text, uuid), public.sg_pinsa_cabut(text, uuid),
   public.sg_pra_uji_antrian(), public.sg_pra_uji_catat(bigint, text, text), public.sg_pra_uji_lewati(bigint, text), public.sg_pra_uji_sakelar(boolean), public.sg_pra_uji_cakupan(integer),
   public.sg_pelantikan_catat(text, date, text, uuid[], bigint, text), public.sg_pelantikan_hapus(bigint),
