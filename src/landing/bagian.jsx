@@ -241,21 +241,17 @@ export function Perjalanan() {
   );
 }
 
-/** Kartu berita: sampul (bila ada), kategori, judul, ringkasan, isi lengkap di balik "Baca selengkapnya" (tanpa JavaScript, elemen <details>), dan tanggal terbit. */
-function KartuBerita({ b, besar = false, halaman = '' }) {
+/** Kartu berita (semua berukuran sama: sampul rasio tetap di atas, isi di bawah; satu baris grid = tinggi sama): sampul (bila ada), kategori, judul, ringkasan, isi lengkap di balik "Baca selengkapnya" (tanpa JavaScript, elemen <details>), dan tanggal terbit. */
+function KartuBerita({ b, halaman = '' }) {
   const t = pecahTanggal(tanggalWib(b.terbitPada));
   const sampul = kandidatGambar(b.sampulUrl);
   const isi = pecahParagraf(b.isi);
   return (
-    <article className={`flex flex-col overflow-hidden rounded-2xl border border-pramuka-200 bg-white ${besar ? 'sm:col-span-2 sm:flex-row' : ''}`}>
-      {besar ? (
-        <GambarSampul sumber={sampul} kelas="aspect-[16/10] w-full object-cover sm:w-2/5 sm:shrink-0 sm:self-start" kelasPengganti="aspect-[16/10] w-full bg-pramuka-800 sm:w-2/5 sm:shrink-0 sm:self-start" ukuranIkon={44} />
-      ) : (
-        <GambarSampul sumber={sampul} kelas="aspect-[16/10] w-full object-cover" kelasPengganti="aspect-[16/10] w-full bg-pramuka-800" />
-      )}
+    <article className={`flex flex-col overflow-hidden rounded-2xl border border-pramuka-200 bg-white`}>
+      <GambarSampul sumber={sampul} kelas="aspect-[16/10] w-full object-cover" kelasPengganti="aspect-[16/10] w-full bg-pramuka-800" />
       <div className="flex flex-1 flex-col gap-2 p-5">
         <span className="inline-block w-fit rounded-full bg-emas/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emas-dark">{LABEL_KATEGORI_BERITA[b.kategori] ?? b.kategori}</span>
-        <h3 className={`font-display font-bold text-pramuka-900 ${besar ? 'text-2xl' : 'text-lg'}`}>{b.judul}</h3>
+        <h3 className={`font-display text-lg font-bold text-pramuka-900`}>{b.judul}</h3>
         {b.ringkasan && <p className="text-[15px] leading-relaxed text-pramuka-700">{b.ringkasan}</p>}
         {isi.length > 0 && (
           <details className="group">
@@ -307,8 +303,8 @@ export function Berita({ berita = [], memuat = false, sunting = '', halaman = {}
         {berita.length === 0 ? (
           <p role="status" className="rounded-2xl border border-pramuka-200 bg-white p-6 text-pramuka-600">{memuat ? 'Memuat berita...' : 'Belum ada berita. Tengok lagi nanti.'}</p>
         ) : (
-          <div className="grid items-start gap-5 sm:grid-cols-2">
-            {berita.map((b, i) => <KartuBerita key={`${b.judul}|${i}`} b={b} besar={i === 0} halaman={halamanBerita(halaman, b)} />)}
+          <div className="grid gap-5 sm:grid-cols-2">
+            {berita.map((b, i) => <KartuBerita key={`${b.judul}|${i}`} b={b} halaman={halamanBerita(halaman, b)} />)}
           </div>
         )}
         {berita.length > 0 && onMuatLagi && (adaLagi ? (
