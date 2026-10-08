@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import LogoMark from '../components/LogoMark';
-import { pecahParagraf, pecahTanggal, tanggalWib, tautanBagikanWa, urlGambar } from '../lib/berandaLogic';
+import TeksKaya from '../components/TeksKaya';
+import { pecahTanggal, tanggalWib, tautanBagikanWa, urlGambar } from '../lib/berandaLogic';
 import { LABEL_KATEGORI_BERITA } from '../lib/berandaKontenLogic';
 import { susunDokumenBerita, urlBerita } from '../lib/beritaStatisLogic';
 
@@ -15,7 +16,6 @@ export default function HalamanBerita({ b, namaGudep, alamatSitus }) {
   const dasar = `${String(alamatSitus).replace(/\/+$/, '')}/`;
   const t = pecahTanggal(tanggalWib(b.terbitPada));
   const sampul = urlGambar(b.sampulUrl);
-  const isi = pecahParagraf(b.isi);
   return (
     <div id="atas" className="min-h-screen bg-pramuka-50 text-pramuka-900">
       <div className="sticky top-0 z-40">
@@ -41,9 +41,7 @@ export default function HalamanBerita({ b, namaGudep, alamatSitus }) {
           {t && <p className="mt-2 text-sm text-pramuka-500"><time dateTime={b.terbitPada}>{t.namaHari}, {t.hari} {t.bulan} {t.tahun}</time></p>}
           {sampul && <img src={sampul} alt="" className="mt-6 w-full rounded-2xl object-cover" />}
           {b.ringkasan && <p className="mt-6 text-lg leading-relaxed text-pramuka-700">{b.ringkasan}</p>}
-          <div className="mt-5 space-y-4 text-base leading-relaxed text-pramuka-800">
-            {isi.map((p, i) => <p key={i}>{p}</p>)}
-          </div>
+          <TeksKaya isi={b.isi} kelas="mt-5 space-y-4 text-base leading-relaxed text-pramuka-800" />
           <p className="mt-8 border-t border-pramuka-200 pt-4">
             <a href={tautanBagikanWa(b.judul, urlBerita(dasar, b))} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-emas-dark">Bagikan lewat WhatsApp ↗</a>
           </p>

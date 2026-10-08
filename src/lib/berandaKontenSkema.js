@@ -31,7 +31,7 @@ export const SKEMA_BERITA = {
     { kunci: 'terbitTanggal', label: 'Tanggal terbit', jenis: 'date', bantuan: 'Pilih tanggal berita ini dianggap terbit, tidak harus hari ini: berita yang terlambat ditulis memakai tanggal kejadiannya, dan beberapa berita sekaligus dapat diberi tanggal berbeda. Tanggal yang akan datang = terjadwal (baru tampil pada tanggal itu). Bagi Dewan Ambalan, tanggal ini dipakai saat Pembina menyetujui.' },
     { kunci: 'judul', label: 'Judul' },
     { kunci: 'ringkasan', label: 'Ringkasan (tampil di kartu)' },
-    { kunci: 'isi', label: 'Isi berita', jenis: 'textarea', baris: 6 },
+    { kunci: 'isi', label: 'Isi berita', jenis: 'teks-kaya', baris: 10, bantuan: 'Gunakan tombol di atas kolom (tebal, miring, judul bagian, daftar, kutipan, tautan) agar berita rapi di beranda. Tab Pratinjau menampilkan hasilnya persis seperti di beranda.' },
     { kunci: 'sampulUrl', label: 'Gambar sampul (tautan file foto di Google Drive, opsional)', placeholder: 'https://...', bantuan: 'Cara termudah (juga dari ponsel): unggah fotonya ke Google Drive, ketuk titik tiga (⋮) > Bagikan > ubah akses menjadi "Siapa saja yang memiliki link" > Salin link, lalu tempel di sini. Tautan halaman Google Photos (photos.google.com, photos.app.goo.gl) dan folder Drive tidak dapat dipakai sebagai gambar. Pratinjau di bawah kolom ini menunjukkan apakah fotonya benar-benar tampil.', pratinjau: 'berita' },
   ],
 };

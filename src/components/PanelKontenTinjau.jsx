@@ -6,6 +6,7 @@ import { albumGooglePhotos, perluAmbilSampul } from '../lib/galeriSampulLogic';
 import { waktuRelatif } from '../lib/notifikasiLogic';
 import { Field, Kosong } from './ui';
 import PratinjauSampul from './PratinjauSampul';
+import EditorTeksKaya from './EditorTeksKaya';
 
 const KELAS_STATUS = { draf: 'bg-pramuka-100 text-pramuka-700', menunggu: 'bg-amber-100 text-amber-800', terbit: 'bg-emerald-100 text-emerald-800', ditolak: 'bg-red-100 text-red-800' };
 
@@ -24,7 +25,8 @@ function Isian({ f, nilai, ubah, galat, aksi = null }) {
   };
   return (
     <Field label={f.label} htmlFor={id} bantuan={f.bantuan}>
-      {f.jenis === 'textarea' ? <textarea rows={f.baris ?? 4} {...umum} />
+      {f.jenis === 'teks-kaya' ? <EditorTeksKaya id={id} value={nilai} onChange={(v) => ubah(f.kunci, v)} galat={galat} baris={f.baris} placeholder={f.placeholder} />
+        : f.jenis === 'textarea' ? <textarea rows={f.baris ?? 4} {...umum} />
         : f.jenis === 'select' ? <select {...umum}>{f.opsi.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
         : <input type={f.jenis === 'number' ? 'number' : f.jenis === 'date' ? 'date' : 'text'} {...umum} />}
       {galat && <p role="alert" className="mt-1 text-xs font-medium text-red-700">{galat}</p>}

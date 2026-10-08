@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import LogoMark from '../components/LogoMark';
 import SumberPeraturan from '../components/SumberPeraturan';
+import TeksKaya from '../components/TeksKaya';
 import { labelJenisAgenda } from '../lib/agendaLogic';
 import { namaAmbalan } from '../lib/gudepLogic';
 import { jaringanSosial, pecahParagraf, pecahTanggal, tautanBagikanWa, tautanPencarianPeta, tautanPeta, tanggalWib, tautanWhatsapp, kandidatGambar } from '../lib/berandaLogic';
@@ -245,7 +246,7 @@ export function Perjalanan() {
 function KartuBerita({ b, halaman = '' }) {
   const t = pecahTanggal(tanggalWib(b.terbitPada));
   const sampul = kandidatGambar(b.sampulUrl);
-  const isi = pecahParagraf(b.isi);
+  const adaIsi = String(b.isi ?? '').trim() !== '';
   return (
     <article className={`flex flex-col overflow-hidden rounded-2xl border border-pramuka-200 bg-white`}>
       <GambarSampul sumber={sampul} kelas="aspect-[16/10] w-full object-cover" kelasPengganti="aspect-[16/10] w-full bg-pramuka-800" />
@@ -253,15 +254,13 @@ function KartuBerita({ b, halaman = '' }) {
         <span className="inline-block w-fit rounded-full bg-emas/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emas-dark">{LABEL_KATEGORI_BERITA[b.kategori] ?? b.kategori}</span>
         <h3 className={`font-display text-lg font-bold text-pramuka-900`}>{b.judul}</h3>
         {b.ringkasan && <p className="text-[15px] leading-relaxed text-pramuka-700">{b.ringkasan}</p>}
-        {isi.length > 0 && (
+        {adaIsi && (
           <details className="group">
             <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-sm font-bold text-emas-dark [&::-webkit-details-marker]:hidden">
               Baca selengkapnya
               <span aria-hidden="true" className="transition group-open:rotate-180">▾</span>
             </summary>
-            <div className="mt-2 space-y-2 text-[15px] leading-relaxed text-pramuka-700">
-              {isi.map((p, i) => <p key={i}>{p}</p>)}
-            </div>
+            <TeksKaya isi={b.isi} kelas="mt-2 space-y-2 text-[15px] leading-relaxed text-pramuka-700" />
           </details>
         )}
         <div className="mt-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pt-1">
