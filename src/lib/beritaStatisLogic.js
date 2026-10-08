@@ -3,7 +3,8 @@
  * punya alamat tetap yang dapat dibuka, dibagikan, dan dibaca mesin pencari tanpa menunggu JavaScript. Data dari sg_berita_publik (tanpa login).
  * Alamat = berita/<id>-<slug>/ : id membuat alamat stabil walau judul diubah (slug hanya penyedap). Tanpa nama penulis atau data anggota.
  */
-import { pecahParagraf, rapikan, tautanSah, urlGambar } from './berandaLogic';
+import { rapikan, tautanSah, urlGambar } from './berandaLogic';
+import { paragrafPolos } from './teksKayaLogic';
 import { KATEGORI_BERITA, LABEL_KATEGORI_BERITA } from './berandaKontenLogic';
 
 export const BATAS_BERITA_ARSIP = 200;
@@ -48,7 +49,7 @@ export function susunBeritaArsip(mentah) {
 
 /** Deskripsi untuk mesin pencari dan pratinjau tautan: ringkasan, atau awal isi; paling panjang 160 karakter. */
 export function deskripsiBerita(b) {
-  const dasar = rapikan(b.ringkasan) || rapikan(pecahParagraf(b.isi)[0] ?? '') || rapikan(b.judul);
+  const dasar = rapikan(b.ringkasan) || rapikan(paragrafPolos(b.isi)[0] ?? '') || rapikan(b.judul);
   return dasar.length <= 160 ? dasar : `${dasar.slice(0, 157).replace(/\s+\S*$/, '')}...`;
 }
 
