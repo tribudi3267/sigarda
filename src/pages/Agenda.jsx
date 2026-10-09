@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { JENIS_AGENDA, batasMusyawarah, hariMenuju, judulBawaanJenis, labelJenisAgenda, periksaAgenda } from '../lib/agendaLogic';
+import { JENIS_AGENDA, MAKS_ULANG, POLA_ULANG, SATUAN_ULANG, ULANG_BAWAAN, bangunSeri, batasMusyawarah, hariMenuju, judulBawaanJenis, labelJenisAgenda, periksaAgenda, periksaUlang, ringkasUlang } from '../lib/agendaLogic';
 import { JENIS_USULAN, bolehIngatkan, labelJenisUsulan, periksaTinjauan, periksaUsulan, usulanMenunggu, usulanTerakhir } from '../lib/kegiatanLogic';
 import { adalahPembina, tahunAjaranKini } from '../lib/rombelLogic';
 import { pembinaAtauAdmin, pembinaSaja, pradanaAtauPradani } from '../lib/hakLogic';
@@ -47,17 +47,77 @@ function PilihPesertaTerkait({ nilai, onUbah }) {
   );
 }
 
-function EditorAgenda({ awal, onTutup, onSimpan }) {
+/** Pilihan pengulangan (hanya untuk kegiatan baru): pola, selang kustom, dan akhir (jumlah kegiatan atau tanggal akhir). */
+function PilihUlang({ ulang, onUbah, tanggal, galat, dicoba }) {
+  const u = (k, v) => onUbah({ ...ulang, [k]: v });
+  const berulang = ulang.pola !== 'sekali';
+  const ringkas = berulang ? ringkasUlang(ulang, tanggal) : '';
+  const merah = (k) => (dicoba && galat[k] ? 'border-red-500' : '');
+  const pesan = (k) => dicoba && galat[k] && <p className="mt-1 text-xs font-medium text-red-700">{galat[k]}</p>;
+  return (
+    <div className="mb-3 space-y-1">
+      <Field label="Pengulangan" htmlFor="ag-ulang" bantuan={berulang ? 'Tiap tanggal disimpan sebagai kegiatan tersendiri (dapat diubah atau dihapus satu per satu). Tahun ajaran mengikuti tanggalnya.' : undefined}>
+        <select id="ag-ulang" className="input" value={ulang.pola} onChange={(e) => u('pola', e.target.value)}>
+          {POLA_ULANG.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+        </select>
+      </Field>
+      {ulang.pola === 'kustom' && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span>Setiap</span>
+          <input aria-label="Selang pengulangan" type="number" min={1} max={365} className={`input w-20 ${merah('interval')}`} value={ulang.interval} onChange={(e) => u('interval', e.target.value)} />
+          <select aria-label="Satuan pengulangan" className="input w-auto" value={ulang.satuan} onChange={(e) => u('satuan', e.target.value)}>
+            {SATUAN_ULANG.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+          {pesan('interval')}
+        </div>
+      )}
+      {berulang && (
+        <>
+          <Field label="Berakhir" htmlFor="ag-akhir">
+            <select id="ag-akhir" className="input" value={ulang.akhir} onChange={(e) => u('akhir', e.target.value)}>
+              <option value="kali">Setelah sejumlah kegiatan</option>
+              <option value="tanggal">Pada tanggal tertentu</option>
+            </select>
+          </Field>
+          {ulang.akhir === 'kali' ? (
+            <Field label={`Jumlah kegiatan (termasuk yang pertama, maks ${MAKS_ULANG})`} htmlFor="ag-jumlah">
+              <input id="ag-jumlah" type="number" min={2} max={MAKS_ULANG} className={`input ${merah('jumlah')}`} value={ulang.jumlah} onChange={(e) => u('jumlah', e.target.value)} />
+              {pesan('jumlah')}
+            </Field>
+          ) : (
+            <Field label="Tanggal akhir" htmlFor="ag-sampai">
+              <input id="ag-sampai" type="date" className={`input ${merah('sampai')}`} value={ulang.sampai} onChange={(e) => u('sampai', e.target.value)} />
+              {pesan('sampai')}
+            </Field>
+          )}
+          {ringkas && <p className="text-xs font-medium text-pramuka-700" aria-live="polite">{ringkas}</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * `awal` = kegiatan yang diubah (punya id) ATAU salinan untuk dipakai lagi (tanpa id, ditambahkan sebagai kegiatan baru);
+ * `onSimpan(a, ulang)` menyimpan satu kegiatan atau deretan hasil pengulangan.
+ */
+function EditorAgenda({ awal, judulModal, onTutup, onSimpan }) {
   const { user } = useApp();
+  const ubahAda = !!awal?.id;
   const [a, setA] = useState(awal ?? BARU);
+  const [ulang, setUlang] = useState(ULANG_BAWAAN);
   const [dicoba, setDicoba] = useState(false);
   const [sibuk, setSibuk] = useState(false);
   const [galatKirim, setGalatKirim] = useState('');
   const pembina = pembinaSaja(user); // hanya Pembina (bukan Admin) yang boleh melewati batas Musyawarah: sigarda.pembina_saja
 
   const ubah = (k, v) => setA((x) => ({ ...x, [k]: v }));
+  const galatUlang = ubahAda ? {} : periksaUlang(ulang, a.tanggal);
   const galat = periksaAgenda(a, pembina);
-  const adaGalat = Object.keys(galat).length > 0;
+  // Pada deretan berulang tahun ajaran tiap kegiatan mengikuti tanggalnya, jadi galat tahun ajaran isian tidak relevan; seri diperiksa utuh oleh bangunSeri.
+  const seri = !ubahAda && ulang.pola !== 'sekali' ? bangunSeri(a, ulang, pembina) : null;
+  const galatSeri = seri?.galat ?? '';
+  const adaGalat = seri ? !!galatSeri : Object.keys(galat).length > 0;
   const batas = batasMusyawarah(a.tahunAjaran);
 
   const kirim = async (e) => {
@@ -66,13 +126,13 @@ function EditorAgenda({ awal, onTutup, onSimpan }) {
     if (adaGalat || sibuk) return;
     setSibuk(true);
     setGalatKirim('');
-    const r = await onSimpan(a);
+    const r = await onSimpan(a, ubahAda ? ULANG_BAWAAN : ulang);
     setSibuk(false);
     if (r.ok) onTutup(); else setGalatKirim(r.pesan);
   };
 
   return (
-    <Modal buka judul={awal ? 'Ubah kegiatan agenda' : 'Tambah kegiatan agenda'} tutup={onTutup} aksi={
+    <Modal buka judul={judulModal ?? (ubahAda ? 'Ubah kegiatan agenda' : 'Tambah kegiatan agenda')} tutup={onTutup} aksi={
       <>
         <button type="button" className="btn btn-outline" onClick={onTutup} disabled={sibuk}>Batal</button>
         <button type="submit" form="form-agenda" className="btn btn-primary" disabled={sibuk}>{sibuk ? 'Menyimpan...' : 'Simpan'}</button>
@@ -96,6 +156,8 @@ function EditorAgenda({ awal, onTutup, onSimpan }) {
           <input id="ag-tanggal" type="date" className={`input ${dicoba && galat.tanggal ? 'border-red-500' : ''}`} value={a.tanggal ?? ''} onChange={(e) => ubah('tanggal', e.target.value)} />
           {dicoba && galat.tanggal && <p className="mt-1 text-xs font-medium text-red-700">{galat.tanggal}</p>}
         </Field>
+        {!ubahAda && <PilihUlang ulang={ulang} onUbah={setUlang} tanggal={a.tanggal} galat={galatUlang} dicoba={dicoba} />}
+        {dicoba && galatSeri && <p role="alert" className="mb-3 text-sm font-medium text-red-700">{galatSeri}</p>}
         {a.jenis === 'musyawarah' && pembina && (
           <label className="mb-3 flex cursor-pointer items-start gap-2 text-sm text-pramuka-700">
             <input type="checkbox" className="mt-0.5 h-4 w-4 accent-pramuka-800" checked={a.lewatiBatas} onChange={(e) => ubah('lewatiBatas', e.target.checked)} />
@@ -296,8 +358,18 @@ export default function Agenda() {
   const { user, api, notify } = useApp();
   const [daftar, setDaftar] = useState(null);
   const [galat, setGalat] = useState('');
-  const [editor, setEditor] = useState(null); // null = tertutup, {} = baru, objek = ubah
+  const [editor, setEditor] = useState(null); // null = tertutup, { awal: null } = baru, { awal: kegiatan } = ubah, { awal: salinan tanpa id, judulModal } = pakai lagi
   const bolehKelola = pembinaAtauAdmin(user);
+  const { users } = useApp();
+
+  /** Salinan kegiatan lama sebagai kegiatan BARU: tanggal dikosongkan, tahun ajaran berjalan, batas dikembalikan, Penegak yang tak aktif dibuang. */
+  const pakaiLagi = (a) => {
+    const aktif = new Set(users.filter((u) => (u.status ?? 'aktif') === 'aktif').map((u) => u.id));
+    setEditor({
+      judulModal: 'Pakai lagi kegiatan agenda',
+      awal: { tahunAjaran: tahunAjaranKini(), jenis: a.jenis, judul: a.judul, tanggal: '', keterangan: a.keterangan ?? '', pesertaTerkait: a.pesertaTerkait.filter((id) => aktif.has(id)), lewatiBatas: false },
+    });
+  };
 
   const muat = useCallback(async () => {
     const r = await api().muatAgenda();
@@ -305,10 +377,31 @@ export default function Agenda() {
   }, [api]);
   useEffect(() => { muat(); }, [muat]);
 
-  const simpan = async (a) => {
-    const r = await api().simpanAgenda(a);
-    if (r.ok) { notify('Agenda tersimpan.'); await muat(); }
-    return r;
+  const simpan = async (a, ulang) => {
+    const { daftar, terpotong, galat: g } = bangunSeri(a, ulang, pembinaSaja(user));
+    if (g) return { ok: false, pesan: g };
+    if (daftar.length <= 1 && !a.id) {
+      const r = await api().simpanAgenda(daftar[0]);
+      if (r.ok) { notify('Agenda tersimpan.'); await muat(); }
+      return r;
+    }
+    if (a.id) { // mengubah satu kegiatan
+      const r = await api().simpanAgenda(a);
+      if (r.ok) { notify('Agenda tersimpan.'); await muat(); }
+      return r;
+    }
+    let tersimpan = 0;
+    for (const k of daftar) {
+      const r = await api().simpanAgenda(k);
+      if (!r.ok) {
+        if (tersimpan > 0) await muat();
+        return { ok: false, pesan: `${r.pesan} (${tersimpan} dari ${daftar.length} kegiatan sudah tersimpan; periksa daftar sebelum mencoba lagi, agar tidak ganda.)` };
+      }
+      tersimpan++;
+    }
+    notify(`${tersimpan} kegiatan tersimpan${terpotong ? ` (dibatasi ${MAKS_ULANG} kegiatan)` : ''}.`);
+    await muat();
+    return { ok: true };
   };
   const hapus = async (id) => {
     if (!window.confirm('Hapus kegiatan agenda ini?')) return;
@@ -325,7 +418,7 @@ export default function Agenda() {
           <h1 className="text-2xl font-bold">Agenda</h1>
           <p className="text-sm text-pramuka-600">Kegiatan tahunan Ambalan, dengan pengingat otomatis H-30, H-7, dan H-1.</p>
         </div>
-        {bolehKelola && <button className="btn btn-primary" onClick={() => setEditor({})}>+ Tambah kegiatan</button>}
+        {bolehKelola && <button className="btn btn-primary" onClick={() => setEditor({ awal: null })}>+ Tambah kegiatan</button>}
       </div>
       <UsulanKegiatan onDisetujui={muat} />
       {galat && <p className="mb-4 text-sm text-red-700" role="alert">{galat}</p>}
@@ -349,7 +442,8 @@ export default function Agenda() {
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${lewat ? 'bg-pramuka-100 text-pramuka-600' : 'bg-emas/30 text-pramuka-900'}`}>{hariMenuju(a.tanggal, hari)}</span>
                   {bolehKelola && (
                     <>
-                      <button className="rounded-md p-1.5 text-pramuka-600 hover:bg-pramuka-100" title="Ubah" onClick={() => setEditor(a)}><Icon nama="ubah" className="h-4 w-4" /></button>
+                      {lewat && <button className="btn btn-outline btn-sm" title="Jadwalkan kegiatan ini lagi: buka formulir dengan isi yang sama, tanggal dan pengulangan dapat disesuaikan" onClick={() => pakaiLagi(a)}>Pakai lagi</button>}
+                      <button className="rounded-md p-1.5 text-pramuka-600 hover:bg-pramuka-100" title="Ubah" onClick={() => setEditor({ awal: a })}><Icon nama="ubah" className="h-4 w-4" /></button>
                       <button className="rounded-md p-1.5 text-red-700 hover:bg-red-50" title="Hapus" onClick={() => hapus(a.id)}><Icon nama="hapus" className="h-4 w-4" /></button>
                     </>
                   )}
@@ -359,7 +453,7 @@ export default function Agenda() {
           })}
         </ul>
       )}
-      {editor && <EditorAgenda awal={editor.id ? editor : null} onTutup={() => setEditor(null)} onSimpan={simpan} />}
+      {editor && <EditorAgenda awal={editor.awal} judulModal={editor.judulModal} onTutup={() => setEditor(null)} onSimpan={simpan} />}
     </div>
   );
 }
