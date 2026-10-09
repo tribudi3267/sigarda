@@ -65,10 +65,10 @@ console.log('\n--- Menerapkan migrasi terbaru pada basis data lama ---');
   const hakPelacak = (await db.query(`select grantee from information_schema.role_table_grants where table_schema = 'sigarda' and table_name = 'migrasi_terapan' and grantee in ('anon', 'authenticated', 'public')`)).rows;
   ok(hakPelacak.length === 0, 'pelacak tanpa hak untuk anon/authenticated (bukan bagian API aplikasi)');
   ok(/Pelacak masih kosong/.test(await galat(() => terapkanTertunda({ db: a, migrasi, log })) ?? ''), 'pelacak kosong: penerapan menolak (tidak menjalankan seluruh riwayat migrasi)');
-  for (const m of migrasi.slice(0, -4)) await db.query(`insert into sigarda.migrasi_terapan (nama, cara) values ($1, 'ditandai')`, [m.nama]); // seolah sudah dijalankan tangan
+  for (const m of migrasi.slice(0, -5)) await db.query(`insert into sigarda.migrasi_terapan (nama, cara) values ($1, 'ditandai')`, [m.nama]); // seolah sudah dijalankan tangan
   const lama = (await db.query(`select md5(prosrc) m from pg_proc where proname = 'notif_pengingat'`)).rows[0].m;
   const hasil = await terapkanTertunda({ db: a, migrasi, log });
-  ok(hasil.diterapkan.join() === '2026-09-bersih-riwayat-cron,2026-10-update-where,2026-10-muat-awal,2026-10-penulis-berita', 'hanya migrasi tertunda yang dijalankan: ' + hasil.diterapkan.join());
+  ok(hasil.diterapkan.join() === '2026-09-bersih-riwayat-cron,2026-10-update-where,2026-10-muat-awal,2026-10-pinsa-bebas,2026-10-penulis-berita', 'hanya migrasi tertunda yang dijalankan: ' + hasil.diterapkan.join());
   ok((await db.query(`select md5(prosrc) m from pg_proc where proname = 'notif_pengingat'`)).rows[0].m !== lama, 'isi fungsi benar-benar berubah');
   ok((await db.query(`select cara from sigarda.migrasi_terapan where nama = '2026-10-penulis-berita'`)).rows[0].cara === 'dijalankan', 'tercatat sebagai "dijalankan"');
   const sesudah = await jalankanPeriksa({ db: a, sql: sqlPeriksa, log: () => {} });

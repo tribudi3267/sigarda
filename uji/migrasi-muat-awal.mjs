@@ -26,7 +26,7 @@ const potret = async (db) => {
   };
 };
 
-const A = await baru('git:ec23136'); // skema tepat SESUDAH migrasi ini (main sesudah PR #76); migrasi penulis-berita menulis ulang fungsi berita
+const A = await baru('git:ec23136'); // skema tepat SESUDAH migrasi ini (migrasi berikutnya, pinsa-bebas, menulis ulang fungsi lain)
 const pa = await potret(A);
 
 console.log('--- Database berisi data: kesetaraan, data utuh, idempoten ---');

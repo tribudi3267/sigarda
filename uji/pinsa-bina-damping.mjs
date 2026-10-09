@@ -117,8 +117,6 @@ r = await sangga(dimas, 'X-01', [{ id: siti, pinsa: true }]);
 ok(cocok(r, /Hanya Bina Damping rombel ini/), 'Bina Damping rombel LAIN (Dimas, X-02) tidak dapat mengatur X-01');
 r = await sangga(bagas, 'X-02', [{ id: rizky, pinsa: true }]);
 ok(cocok(r, /Hanya Bina Damping rombel ini/), 'Bagas (Bina Damping X-01) tidak dapat mengatur X-02');
-r = await sangga(bagas, 'X-01', [{ id: ahmad, pinsa: true }]);
-ok(cocok(r, /belum menyelesaikan SKU Bantara/), 'Pinsa harus minimal Calon Laksana: Ahmad ditolak');
 r = await sangga(bagas, 'X-01', [{ id: rizky, sangga: 'Sangga Elang' }]);
 ok(cocok(r, /tidak ditemukan di rombel X-01/), 'Penegak dari rombel lain tidak dapat dimasukkan');
 r = await sangga(bagas, 'X-01', [{ id: siti, sangga: '' }]);

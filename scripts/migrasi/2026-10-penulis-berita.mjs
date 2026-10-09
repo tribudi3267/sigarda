@@ -10,7 +10,7 @@ const lagi = gantiFungsi(ambil('-- ===== Kelola Beranda: berita lebih lama (tomb
 const kepala = `-- ============================================================================
 -- MIGRASI: nama penulis pada berita yang terbit di beranda. AMAN untuk database berisi data.
 --
--- Jalankan SETELAH migrasi sebelumnya (sampai 2026-10-muat-awal.sql; lihat README). Isi:
+-- Jalankan SETELAH migrasi sebelumnya (sampai 2026-10-pinsa-bebas.sql; lihat README). Isi:
 --   * sg_beranda_publik(), sg_berita_publik(), dan sg_berita_lagi(p_lewati int) ditulis ulang (tanda tangan sama): tiap berita kini membawa kolom
 --     'penulis' = NAMA TAMPILAN penulis (kolom beranda_berita.dibuat_oleh_nama, disalin dari profiles.nama saat berita ditulis; BUKAN nama pengguna/NIS
 --     akun). Berlaku untuk SEMUA berita yang sudah terbit (kolomnya sudah terisi sejak berita ditulis) dan yang terbit kemudian.
@@ -27,7 +27,7 @@ do $$
 begin
   if to_regprocedure('public.sg_berita_lagi(integer)') is null or to_regprocedure('public.sg_berita_publik()') is null
      or to_regprocedure('public.sg_beranda_publik()') is null then
-    raise exception 'Jalankan lebih dulu skema dan migrasi sebelumnya (sampai 2026-10-muat-awal.sql; lihat README), baru migrasi ini.';
+    raise exception 'Jalankan lebih dulu skema dan migrasi sebelumnya (sampai 2026-10-pinsa-bebas.sql; lihat README), baru migrasi ini.';
   end if;
 end $$;
 
