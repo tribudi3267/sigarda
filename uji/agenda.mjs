@@ -5,7 +5,7 @@ import { siapkanPg, buatKlienFake, sqlSebagai } from '../src/lokal/klienFake.js'
 import { isiDataContoh } from '../src/lokal/seedLokal.js';
 import { PIN_DEMO } from '../src/lokal/pinDemo.js';
 import { buatApi } from '../src/lib/api.js';
-import { JENIS_AGENDA, agendaMendatang, batasMusyawarah, hariMenuju, judulBawaanJenis, labelJenisAgenda, periksaAgenda } from '../src/lib/agendaLogic.js';
+import { JENIS_AGENDA, MAKS_ULANG, ULANG_BAWAAN, agendaMendatang, bangunSeri, batasMusyawarah, hariMenuju, judulBawaanJenis, labelJenisAgenda, periksaAgenda, periksaUlang, ringkasUlang, susunTanggalUlang } from '../src/lib/agendaLogic.js';
 
 const P = process.cwd().replace(/\\/g, '/');
 let gagal = 0, lulus = 0;
@@ -36,6 +36,42 @@ console.log('--- agendaLogic.js (murni) ---');
 
   const daftar = [{ id: 1, tanggal: '2026-08-01' }, { id: 2, tanggal: '2026-10-01' }, { id: 3, tanggal: '2026-09-01' }];
   ok(agendaMendatang(daftar, '2026-09-01').map((a) => a.id).join(',') === '3,2', 'agendaMendatang: hanya >= hari ini, terurut terdekat: ' + agendaMendatang(daftar, '2026-09-01').map((a) => a.id).join(','));
+}
+
+console.log('--- penjadwalan berulang (murni) ---');
+{
+  const U = (o) => ({ ...ULANG_BAWAAN, ...o });
+  const t = (mulai, o) => susunTanggalUlang(mulai, U(o)).tanggal.join(',');
+  ok(t('2026-10-12', { pola: 'sekali' }) === '2026-10-12', 'sekali: satu tanggal');
+  ok(t('2026-10-12', { pola: 'harian', jumlah: 3 }) === '2026-10-12,2026-10-13,2026-10-14', 'harian 3 kali');
+  ok(t('2026-10-12', { pola: 'mingguan', jumlah: 3 }) === '2026-10-12,2026-10-19,2026-10-26', 'mingguan 3 kali');
+  ok(t('2026-10-15', { pola: 'hari_kerja', jumlah: 4 }) === '2026-10-15,2026-10-16,2026-10-19,2026-10-20', 'hari kerja melewati akhir pekan (Kamis, Jumat, Senin, Selasa)');
+  ok(t('2026-10-15', { pola: 'akhir_pekan', jumlah: 4 }) === '2026-10-15,2026-10-17,2026-10-18,2026-10-24', 'akhir pekan: Sabtu dan Minggu');
+  ok(t('2026-01-31', { pola: 'bulanan', jumlah: 4 }) === '2026-01-31,2026-02-28,2026-03-31,2026-04-30', 'bulanan: tanggal 31 dipotong ke akhir bulan tanpa bergeser');
+  ok(t('2028-02-29', { pola: 'tahunan', jumlah: 3 }) === '2028-02-29,2029-02-28,2030-02-28', 'tahunan: 29 Februari menjadi 28 pada tahun biasa');
+  ok(t('2026-10-01', { pola: 'kustom', interval: 2, satuan: 'minggu', jumlah: 3 }) === '2026-10-01,2026-10-15,2026-10-29', 'kustom setiap 2 minggu');
+  ok(t('2026-10-01', { pola: 'kustom', interval: 3, satuan: 'bulan', jumlah: 3 }) === '2026-10-01,2027-01-01,2027-04-01', 'kustom setiap 3 bulan');
+  ok(t('2026-10-01', { pola: 'mingguan', akhir: 'tanggal', sampai: '2026-10-22' }) === '2026-10-01,2026-10-08,2026-10-15,2026-10-22', 'berakhir pada tanggal (tanggal akhir ikut)');
+  const besar = susunTanggalUlang('2026-10-01', U({ pola: 'harian', akhir: 'tanggal', sampai: '2027-12-31' }));
+  ok(besar.tanggal.length === MAKS_ULANG && besar.terpotong, 'dibatasi MAKS_ULANG dan ditandai terpotong');
+  ok(susunTanggalUlang('2026-10-01', U({ pola: 'harian', jumlah: 999 })).tanggal.length === 1, 'jumlah di luar batas: dianggap tidak sah (satu tanggal)');
+  ok(periksaUlang(U({ pola: 'harian', jumlah: 1 }), '2026-10-01').jumlah, 'jumlah 1 ditolak');
+  ok(periksaUlang(U({ pola: 'kustom', interval: 0 }), '2026-10-01').interval, 'selang kustom 0 ditolak');
+  ok(periksaUlang(U({ pola: 'harian', akhir: 'tanggal', sampai: '2026-10-01' }), '2026-10-01').sampai, 'tanggal akhir tidak sesudah awal ditolak');
+  ok(Object.keys(periksaUlang(U({ pola: 'sekali', jumlah: 0 }), '2026-10-01')).length === 0, 'sekali: aturan lain diabaikan');
+
+  const dasar = { tahunAjaran: '2026/2027', jenis: 'lainnya', judul: 'Latihan rutin', tanggal: '2027-06-18', keterangan: '', pesertaTerkait: [] };
+  const seri = bangunSeri(dasar, U({ pola: 'mingguan', jumlah: 3 }));
+  ok(seri.daftar.length === 3 && !seri.galat, 'bangunSeri: 3 kegiatan');
+  ok(seri.daftar.map((k) => k.tahunAjaran).join(',') === '2026/2027,2026/2027,2027/2028', 'tahun ajaran mengikuti tanggal (melintasi 1 Juli): ' + seri.daftar.map((k) => k.tahunAjaran).join(','));
+  ok(bangunSeri({ ...dasar, judul: '' }, U({ pola: 'mingguan', jumlah: 3 })).galat, 'bangunSeri: judul kosong ditolak');
+  const mus = bangunSeri({ ...dasar, jenis: 'musyawarah', judul: 'M', tanggal: '2027-06-20' }, U({ pola: 'mingguan', jumlah: 3 }));
+  ok(mus.galat === '' && mus.daftar.length === 3, 'musyawarah berulang: tiap tanggal memakai tahun ajarannya sendiri (27 Juni sebelum batas 2026/2027; 4 Juli masuk 2027/2028)');
+  const musLewat = bangunSeri({ ...dasar, jenis: 'musyawarah', judul: 'M', tanggal: '2027-06-20' }, U({ pola: 'harian', jumlah: 20 }));
+  ok(musLewat.galat === '' && musLewat.daftar.length === 20, 'musyawarah harian lintas 1 Juli: tahun ajaran baru, tidak melanggar batas');
+  const sekali = bangunSeri(dasar, U({ pola: 'sekali' }));
+  ok(sekali.daftar.length === 1 && sekali.daftar[0].tahunAjaran === '2026/2027', 'sekali: kegiatan apa adanya');
+  ok(ringkasUlang(U({ pola: 'harian', jumlah: 3 }), '2026-10-12').startsWith('3 kegiatan'), 'ringkasUlang');
 }
 
 console.log('\n--- Server (PGlite + data contoh) ---');
