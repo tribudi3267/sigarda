@@ -87,7 +87,7 @@ function SanggaAtur({ data, rombel, onSimpan }) {
     <div>
       <p className="mb-3 rounded-md bg-pramuka-50 px-3 py-2 text-xs leading-relaxed text-pramuka-700">
         Ubah nama sangga di kolom Sangga (pilih dari saran atau ketik nama baru), dan centang Pinsa (Pimpinan Sangga) untuk satu Penegak per sangga.
-        Pinsa dipilih dari Penegak yang sudah menyelesaikan SKU Bantara (Calon Laksana ke atas). Pindah sangga otomatis melepas Pinsa lamanya.
+        Pinsa boleh Penegak mana pun di rombel ini, tanpa syarat tingkat SKU. Untuk Pinsa dari rombel lain, pakai kotak "Pinsa dari rombel lain" di bawah. Pindah sangga otomatis melepas Pinsa lamanya.
       </p>
       <datalist id="saran-sangga">{saran.map((n) => <option key={n} value={n} />)}</datalist>
       <div className="panel overflow-x-auto">
@@ -121,7 +121,7 @@ function SanggaAtur({ data, rombel, onSimpan }) {
                       aria-label={`Pinsa ${a.nama}`}
                       checked={!!d.pinsa}
                       disabled={!a.layakPinsa}
-                      title={a.layakPinsa ? '' : 'Belum menyelesaikan SKU Bantara'}
+                      title={a.layakPinsa ? '' : 'Belum dapat dipilih'}
                       onChange={(e) => setDraf((s) => ubahDraf(s, data.anggota, a.id, { pinsa: e.target.checked }))}
                     />
                   </td>

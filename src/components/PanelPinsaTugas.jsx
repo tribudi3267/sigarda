@@ -4,7 +4,7 @@ import { BATAS_PINSA_TUGAS, KELAS_TINGKAT, cariCalonPinsa, jumlahPinsaTugas, lab
 const CHIP = 'inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset';
 
 /**
- * Pinsa dari rombel lain (persiapan uji coba 2 Okt 2026): Penegak Calon Laksana yang ditugaskan menjadi Pinsa sebuah sangga di rombel ini (mis. kakak kelas untuk
+ * Pinsa dari rombel lain (persiapan uji coba 2 Okt 2026): Penegak aktif (tingkat SKU apa pun) yang ditugaskan menjadi Pinsa sebuah sangga di rombel ini (mis. kakak kelas untuk
  * sangga Calon Bantara). Hanya untuk yang boleh mengatur sangga (Bina Damping rombel itu, Pembina, Admin); hak ditegakkan server.
  * Props: `tugas` = [{ id, nama, sangga, kelas, tingkat }] (Pinsa tertugas rombel ini), `sangga` = nama sangga yang ada, `muatCalon()` -> { ok, data: { calon } | pesan },
  * `onTugaskan(sangga, pesertaId)` dan `onCabut(pesertaId)` -> { ok, pesan }. Daftar calon dimuat saat panel dibuka (bukan saat halaman dibuka).
@@ -58,7 +58,7 @@ export default function PanelPinsaTugas({ rombel, tugas = [], sangga = [], muatC
     <section className="panel mt-5 p-4" aria-label="Pinsa dari rombel lain">
       <h3 className="font-display text-base font-semibold text-pramuka-900">Pinsa dari rombel lain</h3>
       <p className="mt-1 text-xs leading-relaxed text-pramuka-700">
-        Penegak Calon Laksana dari rombel lain dapat ditugaskan menjadi Pinsa sebuah sangga di rombel {rombel}. Pada tahap Pinsa ia menilai anggota sangga itu untuk butir Bantara yang sudah ia
+        Penegak aktif dari rombel lain (kelas X, XI, atau XII) dapat ditugaskan menjadi Pinsa sebuah sangga di rombel {rombel}. Pada tahap Pinsa ia menilai anggota sangga itu untuk butir Bantara yang sudah ia
         lulus sendiri. Satu orang untuk satu sangga, paling banyak {BATAS_PINSA_TUGAS} Pinsa tertugas per sangga.
       </p>
       {tugas.length === 0 ? (
@@ -98,7 +98,7 @@ export default function PanelPinsaTugas({ rombel, tugas = [], sangga = [], muatC
                 </select>
               </div>
               <div>
-                <label htmlFor="pt-calon" className="label">Penegak Calon Laksana</label>
+                <label htmlFor="pt-calon" className="label">Penegak (rombel lain)</label>
                 <input id="pt-calon" className="input" list="pt-daftar-calon" value={cari} placeholder="Ketik nama, lalu pilih" onChange={(e) => setCari(e.target.value)} autoComplete="off" />
                 <datalist id="pt-daftar-calon">{(calon ?? []).map((c) => <option key={c.id} value={labelCalonPinsa(c)} />)}</datalist>
                 <p className="mt-1 text-xs text-pramuka-600">{calon ? `${calon.length} calon tersedia.` : ''}</p>
