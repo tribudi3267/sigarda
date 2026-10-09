@@ -94,7 +94,7 @@ let x01;
   let r = await N['10007'].a.muatSanggaRombel('X-01');
   x01 = r.data;
   ok(r.ok && x01.bisaAtur && x01.tahunAjaran === ta && x01.binaDamping.length === 1 && x01.anggota.length === 2 && x01.anggota.every((a) => typeof a.layakPinsa === 'boolean' && a.tingkat), 'muatSanggaRombel: Bina Damping melihat dan boleh mengatur, layakPinsa terisi');
-  ok(x01.anggota.every((a) => a.layakPinsa === (a.tingkat !== 'calon-bantara')), 'layakPinsa dari server = tingkat bukan Calon Bantara');
+  ok(x01.anggota.every((a) => a.layakPinsa === true), 'layakPinsa dari server = semua Penegak aktif (tanpa syarat tingkat SKU)');
   ok(x01.peringatan.some((p) => p.sangga === null && /baru 1 dari 2/.test(p.teks)), 'peringatan berbentuk { sangga, teks }');
   r = await N['10233'].a.muatSanggaRombel('X-01');
   ok(!r.ok && /hanya dapat dilihat/.test(r.pesan), 'Penegak rombel lain ditolak');

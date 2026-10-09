@@ -256,7 +256,7 @@ end $$;
 -- Susunan sangga sebuah rombel beserta Bina Damping dan peringatannya. Boleh dibaca: pengurus, Bina Damping rombel itu, dan Penegak aktif rombel itu.
 -- { rombel, tahun_ajaran, bisa_atur, bina_damping: [{ id, nama, tingkat }], anggota: [{ id, nama, sangga, pinsa, tingkat, layak_pinsa }],
 --   pinsa_tugas: [{ id, nama, sangga, kelas (asal), tingkat }] (Pinsa yang ditugaskan dari rombel lain), peringatan: [{ sangga, teks }] }
--- `tingkat` (kemajuan SKU sesama Penegak) dan `layak_pinsa` (Bantara selesai) hanya diperlihatkan kepada yang boleh mengatur dan pengurus; Penegak biasa menerima null/false.
+-- `tingkat` (kemajuan SKU sesama Penegak) dan `layak_pinsa` (semua Penegak aktif boleh menjadi Pinsa) hanya diperlihatkan kepada yang boleh mengatur dan pengurus; Penegak biasa menerima null/false.
 create function public.sg_sangga_rombel(p_rombel text) returns jsonb
 language plpgsql stable security definer set search_path = public as
 $$
@@ -279,7 +279,7 @@ begin
       where b.rombel = p_rombel and b.tahun_ajaran = sigarda.tahun_ajaran_kini()), '[]'::jsonb),
     'anggota', coalesce((
       select jsonb_agg(jsonb_build_object('id', x.id, 'nama', x.nama, 'sangga', x.sangga, 'pinsa', x.pinsa, 'tingkat', x.tingkat,
-                                          'layak_pinsa', x.tingkat is not null and x.tingkat <> 'calon-bantara') order by lower(x.sangga), x.pinsa desc, x.nama)
+                                          'layak_pinsa', x.tingkat is not null) order by lower(x.sangga), x.pinsa desc, x.nama)
       from (select p.id, p.nama, p.sangga, p.pinsa, case when v_lihat then sigarda.tingkat_penegak(p.id) end as tingkat
             from public.profiles p where p.role = 'peserta' and p.status = 'aktif' and p.kelas = p_rombel) x), '[]'::jsonb),
     'pinsa_tugas', coalesce((
@@ -292,7 +292,7 @@ begin
 end $$;
 
 -- Membagi sangga dan menentukan Pinsa di satu rombel (Bina Damping rombel itu, Pembina, dan Admin). p_data = [{ id, sangga?, pinsa? }] untuk Penegak aktif
--- rombel itu; kunci yang tidak ada = tidak diubah. Semua atau tidak sama sekali. Pinsa minimal Calon Laksana, satu per sangga; pindah sangga otomatis melepas
+-- rombel itu; kunci yang tidak ada = tidak diubah. Semua atau tidak sama sekali. Pinsa boleh Penegak mana pun yang aktif (tanpa syarat tingkat SKU), satu per sangga; pindah sangga otomatis melepas
 -- Pinsa-nya. Mengembalikan { diubah, peringatan } (peringatan tidak memblokir).
 create function public.sg_sangga_atur(p_rombel text, p_data jsonb) returns jsonb
 language plpgsql security definer set search_path = public as
@@ -334,9 +334,6 @@ begin
       if v_pinsa is not distinct from v_t.pinsa then continue; end if;
       if v_pinsa then
         if btrim(coalesce(v_t.sangga, '')) = '' then raise exception '% belum punya sangga. Bagi sangga lebih dulu, baru pilih Pinsa.', v_t.nama; end if;
-        if not sigarda.tingkat_selesai(v_id, 'Bantara') then
-          raise exception '% belum menyelesaikan SKU Bantara. Pinsa dipilih dari Penegak Calon Laksana.', v_t.nama;
-        end if;
         select nama into v_lain from public.profiles where role = 'peserta' and status = 'aktif' and kelas = v_t.kelas and lower(sangga) = lower(v_t.sangga) and pinsa and id <> v_id limit 1;
         if v_lain is not null then raise exception 'Sangga % sudah punya Pinsa (%). Cabut dulu Pinsa yang lama.', v_t.sangga, v_lain; end if;
       end if;
@@ -364,7 +361,7 @@ end $$;
 -- ===== akhir aksi pinsa bina damping =====
 
 -- ===== Pinsa tertugas lintas rombel: aksi =====
--- Penegak yang dapat ditugaskan menjadi Pinsa sebuah sangga di rombel p_rombel: aktif, sudah menyelesaikan SKU Bantara, belum bertugas sebagai Pinsa tahun ajaran ini
+-- Penegak yang dapat ditugaskan menjadi Pinsa sebuah sangga di rombel p_rombel: aktif (tingkat SKU apa pun), belum bertugas sebagai Pinsa tahun ajaran ini
 -- (dan bukan Pinsa sangga sendiri). Dibaca hanya oleh yang boleh mengatur sangga rombel itu (Bina Damping rombel itu, Pembina, Admin); dipanggil saat panel penugasan dibuka.
 -- { tahun_ajaran, calon: [{ id, nama, kelas, tingkat }] } urut kelas lalu nama.
 create function public.sg_pinsa_calon(p_rombel text) returns jsonb
@@ -385,13 +382,12 @@ begin
         from public.profiles p
         where p.role = 'peserta' and p.status = 'aktif' and not p.pinsa
           and not exists (select 1 from public.pinsa_tugas t where t.penegak_id = p.id and t.tahun_ajaran = sigarda.tahun_ajaran_kini())
-          and exists (select 1 from public.sku_progress s join public.sku_unit u on u.id = s.sku_id where s.peserta_id = p.id and s.status = 'lulus' and u.tingkat = 'Bantara')
-          and sigarda.tingkat_selesai(p.id, 'Bantara')
-        limit 400
+        order by p.kelas, p.nama
+        limit 800
       ) x), '[]'::jsonb));
 end $$;
 
--- Menugaskan satu Penegak Calon Laksana menjadi Pinsa sebuah sangga (p_sangga) di rombel p_rombel (Bina Damping rombel itu, Pembina, Admin). Sangga harus sudah ada di rombel itu.
+-- Menugaskan satu Penegak aktif (kelas X, XI, atau XII, tanpa syarat tingkat SKU) menjadi Pinsa sebuah sangga (p_sangga) di rombel p_rombel (Bina Damping rombel itu, Pembina, Admin). Sangga harus sudah ada di rombel itu.
 -- Satu orang satu sangga per tahun ajaran; paling banyak 2 Pinsa tertugas per sangga. Mengembalikan { peringatan } (sama dengan sg_sangga_atur).
 create function public.sg_pinsa_tugaskan(p_rombel text, p_sangga text, p_penegak_id uuid) returns jsonb
 language plpgsql security definer set search_path = public as
@@ -410,9 +406,6 @@ begin
   end if;
   select * into v_p from public.profiles where id = p_penegak_id and role = 'peserta' and status = 'aktif';
   if not found then raise exception 'Penegak tidak ditemukan atau tidak aktif.'; end if;
-  if not sigarda.tingkat_selesai(p_penegak_id, 'Bantara') then
-    raise exception '% belum menyelesaikan SKU Bantara. Pinsa dipilih dari Penegak Calon Laksana.', v_p.nama;
-  end if;
   if v_p.pinsa then raise exception '% sudah menjadi Pinsa di sangga sendiri. Cabut dulu Pinsa-nya di rombelnya.', v_p.nama; end if;
   select * into v_t from public.pinsa_tugas where tahun_ajaran = v_ta and penegak_id = p_penegak_id;
   if found then

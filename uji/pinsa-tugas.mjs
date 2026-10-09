@@ -78,8 +78,6 @@ r = await tugaskan(K.pembina.id, 'X-02', 'Sangga Tidak Ada', kevin);
 ok(cocok(r, /belum ada di rombel X-02/), 'sangga yang belum ada di rombel ditolak');
 r = await tugaskan(K.pembina.id, 'X-02', '', kevin);
 ok(cocok(r, /belum ada di rombel X-02/), 'sangga kosong ditolak');
-r = await tugaskan(K.pembina.id, 'X-02', 'Sangga Rajawali', ahmad);
-ok(cocok(r, /belum menyelesaikan SKU Bantara/), 'Penegak yang belum menyelesaikan Bantara tidak dapat menjadi Pinsa');
 r = await tugaskan(K.pembina.id, 'X-02', 'Sangga Rajawali', K.pembina.id);
 ok(cocok(r, /tidak ditemukan atau tidak aktif/), 'bukan Penegak ditolak');
 r = await tugaskan(K.pembina.id, 'X-02', 'Sangga Rajawali', siti);
@@ -93,7 +91,7 @@ r = await sebagai(siti, 'select public.sg_pinsa_calon($1) as d', ['X-02']);
 ok(cocok(r, /Hanya Bina Damping rombel ini/), 'Penegak biasa tidak dapat membuka daftar calon');
 r = await sebagai(K.pembina.id, 'select public.sg_pinsa_calon($1) as d', ['X-02']);
 const calon = r.rows?.[0]?.d?.calon ?? [];
-ok(r.ok && calon.some((c) => c.id === kevin && c.kelas === 'X-01') && !calon.some((c) => c.id === ahmad) && !calon.some((c) => c.id === siti), 'calon: Kevin ada (dari X-01); Ahmad (belum Bantara) dan Siti (sudah Pinsa) tidak');
+ok(r.ok && calon.some((c) => c.id === kevin && c.kelas === 'X-01') && calon.some((c) => c.id === ahmad) && !calon.some((c) => c.id === siti), 'calon: Kevin (X-01) dan Ahmad (belum Bantara) ada, tanpa syarat tingkat SKU; Siti (sudah Pinsa) tidak');
 r = await sebagai(dimas, 'select public.sg_pinsa_calon($1) as d', ['X-02']);
 ok(r.ok, 'Bina Damping rombel itu (Dimas) dapat membuka daftar calon');
 
