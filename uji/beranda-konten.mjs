@@ -170,6 +170,26 @@ console.log('\n--- FAQ (hanya Pembina dan Admin Gudep) ---');
   ok((await publik()).faq.length === 2, 'hapus FAQ mengurangi daftar publik');
 }
 
+console.log('\n--- Nama penulis berita (nama tampilan, bukan nama pengguna akun) ---');
+{
+  const nama = async (id) => (await q('select nama from public.profiles where id = $1', [id]))[0].nama;
+  const pengguna = async (id) => (await q('select username from public.profiles where id = $1', [id]))[0]?.username ?? null;
+  const rP = await sebagai(K.pembina.id, "select public.sg_berita_simpan(null, 'kegiatan', 'Berita Pembina', '', 'Isi', '', 'terbit', null) as id");
+  const rD = await sebagai(K.sekretaris.id, "select public.sg_berita_simpan(null, 'kegiatan', 'Berita Dewan', '', 'Isi', '', 'menunggu', null) as id");
+  await sebagai(K.pembina.id, `select public.sg_berita_tinjau(${rD.rows[0].id}, 'terbit', '') as x`);
+  const pub = (await publik()).berita;
+  const bP = pub.find((b) => b.judul === 'Berita Pembina'), bD = pub.find((b) => b.judul === 'Berita Dewan');
+  ok(bP?.penulis === await nama(K.pembina.id) && bP.penulis.length > 0, 'berita Pembina: penulis = nama tampilan Pembina (' + bP?.penulis + ')');
+  ok(bD?.penulis === await nama(K.sekretaris.id), 'berita Dewan yang disetujui Pembina: penulis tetap Dewan yang menulis, bukan peninjau (' + bD?.penulis + ')');
+  const pengenal = await pengguna(K.pembina.id).catch(() => null);
+  ok(!pengenal || bP.penulis !== pengenal, 'penulis bukan nama pengguna akun');
+  await sebagai(K.pembina.id, `select public.sg_berita_simpan(${rD.rows[0].id}, 'kegiatan', 'Berita Dewan (diubah)', '', 'Isi', '', 'terbit', null) as id`);
+  ok((await publik()).berita.find((b) => b.judul === 'Berita Dewan (diubah)')?.penulis === await nama(K.sekretaris.id), 'Pembina mengubah berita Dewan: penulis asli tidak berganti');
+  const arsip = (await sebagai(null, 'select public.sg_berita_publik() as d')).rows[0].d;
+  ok(arsip.find((b) => b.judul === 'Berita Pembina')?.penulis === bP.penulis, 'arsip publik (halaman berita statis) membawa penulis yang sama');
+  ok(!/dibuat_oleh|dibuatOleh|ditinjau/.test(JSON.stringify(await publik())) && !JSON.stringify(arsip).includes(K.pembina.id), 'tetap tanpa id akun, peninjau, atau catatan tinjauan');
+}
+
 console.log('\n--- sg_beranda_publik: whitelist ketat (tidak membocorkan data internal) ---');
 {
   await sebagai(K.pembina.id, "select public.sg_berita_simpan(null, 'kegiatan', 'RAHASIA-JUDUL', 'RAHASIA-RINGKASAN', 'RAHASIA-ISI', '', 'draf', null) as id");
@@ -254,7 +274,7 @@ console.log('\n--- sg_berita_lagi: berita lebih lama (tombol "Muat berita lebih 
   ok(r.ok && judul(r).length === 0 && r.rows[0].d.adaLagi === false, 'p_lewati sangat besar dibatasi (tidak galat, tidak memindai tanpa batas)');
   const semua = JSON.stringify([await lagi(0), await lagi(6), await lagi(12)].map((x) => x.rows[0].d));
   ok(!semua.includes('DRAF-RAHASIA') && !semua.includes('JADWAL-DEPAN'), 'draf dan berita terjadwal (belum waktunya) tidak pernah keluar');
-  ok((await lagi(0)).rows[0].d.berita.every((b) => Object.keys(b).sort().join() === 'isi,judul,kategori,ringkasan,sampulUrl,terbitPada'), 'hanya kolom yang diizinkan (tanpa id, penulis, peninjau, catatan tinjauan)');
+  ok((await lagi(0)).rows[0].d.berita.every((b) => Object.keys(b).sort().join() === 'isi,judul,kategori,penulis,ringkasan,sampulUrl,terbitPada'), 'hanya kolom yang diizinkan (nama penulis ikut; tanpa id, peninjau, catatan tinjauan)');
   ok((await lagi(0)).rows[0].d.berita[0].isi === 'Isi B1', 'isi lengkap ikut dikirim (untuk "Baca selengkapnya")');
   const dijalankanAnon = await sebagai(null, 'select public.sg_berita_lagi(0) as d');
   ok(dijalankanAnon.ok, 'anon boleh memanggil sg_berita_lagi (hanya membaca)');

@@ -333,31 +333,31 @@ create trigger notif_galeri_status after insert or update of status on public.be
 -- ===== Kelola Beranda: arsip berita publik (Fase 4): aksi =====
 -- Semua berita TERBIT yang sudah waktunya (terbit_pada <= sekarang), terbaru dulu, paling banyak 200, TANPA login (hanya membaca). Dipakai build situs untuk
 -- membuat satu halaman statis per berita (alamat tetap berdasarkan id, terbaca mesin pencari) dan sitemap; sg_beranda_publik hanya memuat 6 terbaru tanpa id.
--- Kolom: id, kategori, judul, ringkasan, isi, sampulUrl, terbitPada, diubahPada SAJA (tanpa penulis, peninjau, catatan tinjauan, atau status).
+-- Kolom: id, kategori, judul, ringkasan, isi, sampulUrl, penulis (nama tampilan), terbitPada, diubahPada SAJA (tanpa peninjau, catatan tinjauan, atau status).
 create function public.sg_berita_publik() returns jsonb
 language sql stable security definer set search_path = public as
 $$
   select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'kategori', b.kategori, 'judul', b.judul, 'ringkasan', b.ringkasan, 'isi', b.isi, 'sampulUrl', b.sampul_url,
-    'terbitPada', b.terbit_pada, 'diubahPada', b.diubah_pada) order by b.terbit_pada desc, b.id desc), '[]'::jsonb)
-  from (select id, kategori, judul, ringkasan, isi, sampul_url, terbit_pada, diubah_pada from public.beranda_berita
+    'penulis', b.dibuat_oleh_nama, 'terbitPada', b.terbit_pada, 'diubahPada', b.diubah_pada) order by b.terbit_pada desc, b.id desc), '[]'::jsonb)
+  from (select id, kategori, judul, ringkasan, isi, sampul_url, terbit_pada, diubah_pada, dibuat_oleh_nama from public.beranda_berita
         where status = 'terbit' and terbit_pada <= now() order by terbit_pada desc, id desc limit 200) b
 $$;
 -- ===== akhir arsip berita publik =====
 
 -- ===== Kelola Beranda: berita lebih lama (tombol "Muat berita lebih lama"): aksi =====
 -- Halaman muka menampilkan 6 berita terbaru (sg_beranda_publik). Fungsi ini memberi 6 berita TERBIT berikutnya sesudah p_lewati berita terbaru (yang sudah
--- tampil), TANPA login (hanya membaca), bentuk kolom sama dengan berita pada sg_beranda_publik (tanpa id, penulis, peninjau, atau catatan tinjauan).
+-- tampil), TANPA login (hanya membaca), bentuk kolom sama dengan berita pada sg_beranda_publik (dengan nama penulis; tanpa id, peninjau, atau catatan tinjauan).
 -- 'adaLagi' = masih ada berita yang lebih lama lagi (dibaca 7 baris, yang ke-7 tidak dikirim). p_lewati dibatasi 0..1000 supaya tak dapat dipakai memindai tanpa batas.
 create function public.sg_berita_lagi(p_lewati int) returns jsonb
 language sql stable security definer set search_path = public as
 $$
   select jsonb_build_object(
     'berita', coalesce(jsonb_agg(jsonb_build_object('kategori', x.kategori, 'judul', x.judul, 'ringkasan', x.ringkasan, 'isi', x.isi, 'sampulUrl', x.sampul_url,
-      'terbitPada', x.terbit_pada) order by x.urut) filter (where x.urut <= 6), '[]'::jsonb),
+      'terbitPada', x.terbit_pada, 'penulis', x.dibuat_oleh_nama) order by x.urut) filter (where x.urut <= 6), '[]'::jsonb),
     'adaLagi', coalesce(bool_or(x.urut > 6), false))
   from (
-    select b.kategori, b.judul, b.ringkasan, b.isi, b.sampul_url, b.terbit_pada, row_number() over (order by b.terbit_pada desc, b.id desc) as urut
-    from (select id, kategori, judul, ringkasan, isi, sampul_url, terbit_pada from public.beranda_berita
+    select b.kategori, b.judul, b.ringkasan, b.isi, b.sampul_url, b.terbit_pada, b.dibuat_oleh_nama, row_number() over (order by b.terbit_pada desc, b.id desc) as urut
+    from (select id, kategori, judul, ringkasan, isi, sampul_url, terbit_pada, dibuat_oleh_nama from public.beranda_berita
           where status = 'terbit' and terbit_pada <= now() order by terbit_pada desc, id desc
           offset least(greatest(coalesce(p_lewati, 0), 0), 1000) limit 7) b
   ) x
