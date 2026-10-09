@@ -40,6 +40,7 @@ export function susunBeritaArsip(mentah) {
       kategori: KATEGORI_BERITA.includes(x?.kategori) ? x.kategori : 'lainnya',
       ringkasan: rapikan(typeof x?.ringkasan === 'string' ? x.ringkasan : ''),
       isi: typeof x?.isi === 'string' ? x.isi : '',
+      penulis: rapikan(typeof x?.penulis === 'string' ? x.penulis : '').slice(0, 100),
       sampulUrl: tautanSah(sampul) ? sampul : '',
     });
     if (hasil.length >= BATAS_BERITA_ARSIP) break;

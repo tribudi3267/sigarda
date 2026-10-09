@@ -9,7 +9,7 @@ import { DASA_DARMA, MENU, menuTampil, PERJALANAN, PROGRAM, TANYA_JAWAB, TRI_SAT
 import { renderBeranda } from '../src/landing/prarender.jsx';
 import { alamatRpc, panggilRpcPublik } from '../src/lib/publikClient.js';
 import { GUDEP_BAWAAN } from '../src/config.js';
-import { untukForm } from '../src/lib/berandaLogic.js';
+import { susunBerita, untukForm } from '../src/lib/berandaLogic.js';
 
 let gagal = 0, lulus = 0;
 const ok = (c, m) => { if (c) { lulus++; console.log('ok   :', m); } else { gagal++; console.log('GAGAL:', m); } };
@@ -178,6 +178,13 @@ console.log('\n--- Sampul dan tombol "Muat berita lebih lama" ---');
   const kartuPertama = tb.slice(tb.indexOf('<article'), tb.indexOf('</article>'));
   ok(/<img[^>]*aspect-\[16\/10\]/.test(kartuPertama) && !/sm:aspect-auto/.test(kartuPertama), 'sampul kartu: rasio tetap, tidak ikut memanjang saat "Baca selengkapnya" dibuka');
   ok(!tb.includes('sm:col-span-2') && !tb.includes('sm:flex-row') && !tb.includes('items-start'), 'semua kartu berita berukuran sama: tidak ada kartu besar yang melebar, baris grid meregang sama tinggi');
+  // Nama penulis berita (nama tampilan dari server), di kartu beranda dan halaman berita statis.
+  const bp = teks(h(Berita, { berita: [{ ...satu(1), penulis: 'Siti Aminah, S.Pd.' }, satu(2)] }));
+  ok(bp.includes('Ditulis oleh') && bp.includes('Siti Aminah, S.Pd.'), 'kartu berita menampilkan nama penulis');
+  ok((bp.match(/Ditulis oleh <span/g) ?? []).length === 1, 'berita tanpa nama penulis: baris penulis tidak tampil (hanya satu kartu yang punya penulis)');
+  const xss = teks(h(Berita, { berita: [{ ...satu(1), penulis: '<img src=x onerror=alert(1)>' }] }));
+  ok(!xss.includes('<img src=x') && xss.includes('&lt;img'), 'nama penulis dirender sebagai teks, bukan HTML');
+  ok(susunBerita([{ judul: 'J', penulis: '  Budi   Santoso ' }])[0].penulis === 'Budi Santoso' && susunBerita([{ judul: 'J' }])[0].penulis === '', 'susunBerita merapikan penulis; server lama tanpa kolom penulis = kosong');
   const tp = teks(h(Berita, { berita: [satu(1, 'https://photos.app.goo.gl/AbCdEf123'), satu(2, 'https://drive.google.com/drive/folders/abcdefghijklmnopqrst')] }));
   ok(!tp.includes('<img') && tp.includes('aria-hidden="true"'), 'sampul berupa tautan halaman (Photos berbagi, folder Drive): tanpa <img>, memakai gambar pengganti');
   const tg = teks(h(Galeri, { galeri: [{ judul: 'Album A', tautan: 'https://photos.app.goo.gl/x', sampulUrl: `https://drive.google.com/open?id=${id}`, kelompok: 'lainnya' }, { judul: 'Album B', tautan: 'https://photos.app.goo.gl/y', sampulUrl: 'https://photos.app.goo.gl/z', kelompok: 'lainnya' }] }));

@@ -170,7 +170,7 @@ export function susunBerita(mentah) {
   const teks = (x) => (typeof x === 'string' ? rapikan(x) : '');
   // isi = teks BERPARAGRAF (bukan lewat teks(), yang merapikan sebagai satu baris dan menghapus baris baru): server sudah merapikannya sendiri saat disimpan.
   return (Array.isArray(mentah) ? mentah : [])
-    .map((b) => ({ kategori: teks(obj(b).kategori), judul: teks(obj(b).judul), ringkasan: teks(obj(b).ringkasan), isi: typeof obj(b).isi === 'string' ? obj(b).isi : '', sampulUrl: teks(obj(b).sampulUrl), terbitPada: teks(obj(b).terbitPada) }))
+    .map((b) => ({ kategori: teks(obj(b).kategori), judul: teks(obj(b).judul), ringkasan: teks(obj(b).ringkasan), isi: typeof obj(b).isi === 'string' ? obj(b).isi : '', sampulUrl: teks(obj(b).sampulUrl), terbitPada: teks(obj(b).terbitPada), penulis: teks(obj(b).penulis) }))
     .filter((b) => b.judul).slice(0, 6);
 }
 

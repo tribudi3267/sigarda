@@ -39,6 +39,7 @@ export default function HalamanBerita({ b, namaGudep, alamatSitus }) {
           <span className="inline-block w-fit rounded-full bg-emas/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emas-dark">{LABEL_KATEGORI_BERITA[b.kategori] ?? 'Berita'}</span>
           <h1 className="mt-3 font-display text-3xl font-extrabold leading-tight sm:text-4xl">{b.judul}</h1>
           {t && <p className="mt-2 text-sm text-pramuka-500"><time dateTime={b.terbitPada}>{t.namaHari}, {t.hari} {t.bulan} {t.tahun}</time></p>}
+          {b.penulis && <p className="mt-1 text-sm text-pramuka-500">Ditulis oleh <span className="font-semibold text-pramuka-700">{b.penulis}</span></p>}
           {sampul && <img src={sampul} alt="" className="mt-6 w-full rounded-2xl object-cover" />}
           {b.ringkasan && <p className="mt-6 text-lg leading-relaxed text-pramuka-700">{b.ringkasan}</p>}
           <TeksKaya isi={b.isi} kelas="mt-5 space-y-4 text-base leading-relaxed text-pramuka-800" />

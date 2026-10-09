@@ -71,7 +71,7 @@ console.log('\n--- Server: sg_berita_publik ---');
   const publik = async () => (await sebagai(null, 'select public.sg_berita_publik() as d'))[0].d;
   let d = await publik();
   ok(d.map((b) => b.judul).join('|') === 'Terbit baru|Terbit lama', 'anon hanya melihat berita terbit yang sudah waktunya, terbaru dulu (draf, menunggu, ditolak, dan terjadwal masa depan tidak keluar)');
-  ok(d[0].id === idBaru && d[1].id === idLama && d.every((b) => Object.keys(b).sort().join() === 'diubahPada,id,isi,judul,kategori,ringkasan,sampulUrl,terbitPada'), 'kolom hanya id, kategori, judul, ringkasan, isi, sampulUrl, terbitPada, diubahPada');
+  ok(d[0].id === idBaru && d[1].id === idLama && d.every((b) => Object.keys(b).sort().join() === 'diubahPada,id,isi,judul,kategori,penulis,ringkasan,sampulUrl,terbitPada'), 'kolom hanya id, kategori, judul, ringkasan, isi, sampulUrl, penulis, terbitPada, diubahPada');
   ok(!/dibuat|ditinjau|catatan|status|Menunggu Pembina|Akan ditolak|Belum layak/i.test(JSON.stringify(d)), 'tidak ada penulis, peninjau, catatan tinjauan, atau berita yang belum terbit');
   const beranda = (await sebagai(null, 'select public.sg_beranda_publik() as d'))[0].d;
   ok(beranda.berita.map((b) => b.judul).join() === d.map((b) => b.judul).join() && beranda.berita.every((b, i) => b.isi === d[i].isi), 'isi sama dengan yang tampil di halaman muka (sg_beranda_publik)');

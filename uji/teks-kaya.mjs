@@ -129,6 +129,7 @@ console.log('--- Beranda dan halaman berita ---');
   const hal = html(h(HalamanBerita, { b, namaGudep: 'Gudep', alamatSitus: 'https://sigarda.smabukateja.sch.id' }));
   ok(hal.includes('<h4') && hal.includes('<strong') && hal.includes('<ul'), 'halaman berita statis menampilkan isi berformat tanpa JavaScript');
   ok(!hal.includes('**') && !hal.includes('## '), 'penanda tidak bocor ke halaman berita statis');
+  ok(!hal.includes('Ditulis oleh') && html(h(HalamanBerita, { b: { ...b, penulis: 'Siti Aminah' }, namaGudep: 'Gudep', alamatSitus: 'https://sigarda.smabukateja.sch.id' })).includes('Ditulis oleh') , 'halaman berita statis menampilkan nama penulis bila ada');
   const d = deskripsiBerita({ ...b, ringkasan: '' });
   ok(d === 'Bagian' && !d.includes('#') && !d.includes('*'), 'deskripsi mesin pencari dari isi tanpa penanda: ' + d);
   ok(paragrafPolos('Isi **tebal** dan [tautan](https://a.id)').join() === 'Isi tebal dan tautan', 'teks polos tanpa penanda');

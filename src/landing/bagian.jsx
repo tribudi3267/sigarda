@@ -264,7 +264,10 @@ function KartuBerita({ b, halaman = '' }) {
           </details>
         )}
         <div className="mt-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pt-1">
-          {t ? <p className="text-xs text-pramuka-500">{t.namaHari}, {t.hari} {t.bulan} {t.tahun}</p> : <span />}
+          <div className="text-xs text-pramuka-500">
+            {t && <p>{t.namaHari}, {t.hari} {t.bulan} {t.tahun}</p>}
+            {b.penulis && <p>Ditulis oleh <span className="font-semibold text-pramuka-700">{b.penulis}</span></p>}
+          </div>
           <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
             {halaman && <a href={`./${halaman}`} className={kelasBagikan}>Halaman berita →</a>}
             <a href={tautanBagikanWa(b.judul, halaman ? `${ALAMAT_SITUS}${halaman}` : `${ALAMAT_SITUS}#berita`)} target="_blank" rel="noopener noreferrer" className={kelasBagikan}>Bagikan lewat WhatsApp ↗</a>
