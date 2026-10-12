@@ -138,7 +138,7 @@ const DEWAN = {
       ],
     },
     { id: 'dewan-peserta', judul: 'Peserta', isi: ['Mencari dan melihat detail satu Penegak: progres SKU, riwayat pengujian, dan portofolio (bila Calon Garuda).'], gambar: ['dewan-peserta'] },
-    { id: 'dewan-absensi', judul: 'Absensi', isi: ['Mencatat kehadiran latihan Jumat: Hadir, Izin, Sakit, atau Alpa untuk tiap Penegak.'], gambar: ['dewan-absensi'] },
+    { id: 'dewan-absensi', judul: 'Absensi', isi: ['Mencatat kehadiran latihan Jumat: Hadir, Izin, Sakit, atau Alpa untuk tiap Penegak. Panel "Bagikan lewat WhatsApp" menyusun pesan rekap (ringkasan, daftar tidak hadir per kelas, dan yang belum iuran bumbung) yang siap dikirim ke grup atau kontak; pesan panjang dipecah menjadi beberapa bagian.'], gambar: ['dewan-absensi'] },
     { id: 'dewan-iuran', judul: 'Iuran', isi: ['Mencatat pembayaran iuran bumbung tiap Jumat, per Penegak atau sekaligus banyak.'], gambar: ['dewan-iuran'] },
     { id: 'dewan-portofolio', judul: 'Portofolio', isi: ['Meninjau dan memberi catatan pada dokumen portofolio Calon Garuda (bukan mengisi milik Penegak, hanya menilai).'], gambar: ['dewan-portofolio'] },
     { id: 'dewan-sidang', judul: 'Sidang', isi: ['Bila ditugaskan: mencatat keputusan Layak/Tidak Lulus pada Sidang Dewan Kehormatan sebelum pelantikan, dan mencetak Berita Acara.', 'Ketua sidang pada Berita Acara adalah Pemangku Adat (ketua Dewan Kehormatan Penegak); bila jabatan itu belum diisi, dipakai Pradana.'], gambar: ['dewan-sidang'] },

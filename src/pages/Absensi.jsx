@@ -15,6 +15,7 @@ import PilihNominal from '../components/PilihNominal';
 import { NOMINAL_TOMBOL, rupiah } from '../lib/iuranLogic';
 import { Avatar, BadgeAbsen, BadgePeran, Icon, Kosong, MuatAbsensi, ProgressBar } from '../components/ui';
 import SumberPeraturan from '../components/SumberPeraturan';
+import BagikanWaRekap from '../components/BagikanWaRekap';
 
 const KOTAK = 'inline-flex h-6 w-6 items-center justify-center rounded text-xs font-bold ring-1 ring-inset';
 
@@ -261,6 +262,8 @@ function InputAbsensi() {
               Anggota yang belum dicatat tidak dihitung pada rekap. Catat Alpa secara eksplisit bila memang tidak hadir tanpa keterangan.
             </p>
           </section>
+
+          <BagikanWaRekap tanggal={tanggal} peserta={berhak} catatan={catatan} iuran={tampilIuran ? iur.baris : null} />
 
           <div className="mb-3"><FilterBar data={berhak} filter={filter} setFilter={setFilter} /></div>
 
