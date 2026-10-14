@@ -3,7 +3,7 @@ import { ambilKlien, GALAT_KONFIGURASI, LOKAL } from '../lib/supabaseClient';
 import { buatApi } from '../lib/api';
 import { pesertaDenganPeran } from '../lib/skuLogic';
 import {
-  adalahJumat, daftarSemester, gabungHadirSemester, KODE_STATUS, kunciSemester, rentangKunci, semesterDari, tanggalValid,
+  adalahJumat, BATAS_SESI_MENDATANG_HARI, bolehBuatSesi, daftarSemester, gabungHadirSemester, KODE_STATUS, kunciSemester, rentangKunci, semesterDari, tanggalValid,
 } from '../lib/absensiLogic';
 import { bolehResetPin, validasiPinBaru } from '../lib/pinLogic';
 import { periksaBaris, POLA_NTA } from '../lib/importAnggota';
@@ -776,7 +776,7 @@ export function AppProvider({ children }) {
     if (!bolehKelolaAbsen) return ditolak(notify, 'Hanya Dewan Ambalan, Pembina, atau admin yang dapat mencatat absensi.');
     if (!tanggalValid(tanggal)) return ditolak(notify, 'Tanggal tidak valid.');
     if (!adalahJumat(tanggal)) return ditolak(notify, 'Latihan rutin hanya dicatat pada hari Jumat.');
-    if (tanggal > hariIni()) return ditolak(notify, 'Sesi belum bisa dibuat untuk tanggal yang belum tiba.');
+    if (!bolehBuatSesi(tanggal)) return ditolak(notify, `Sesi hanya dapat disiapkan sampai ${BATAS_SESI_MENDATANG_HARI} hari ke depan.`);
     if (db.absensi.sesi[tanggal]) return { ok: true };
     return aksi(api().buatSesiAbsen(tanggal), {
       sukses: 'Sesi absensi dibuat.',

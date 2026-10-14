@@ -91,7 +91,9 @@ begin
   if not sigarda.pengurus() then raise exception 'Hanya Dewan Ambalan, Pembina, atau admin yang dapat mencatat absensi.'; end if;
   if p_tanggal is null or p_tanggal < date '2000-01-01' or p_tanggal > date '2100-12-31' then raise exception 'Tanggal tidak valid.'; end if;
   if extract(dow from p_tanggal) <> 5 then raise exception 'Latihan rutin hanya dicatat pada hari Jumat.'; end if;
-  if p_tanggal > sigarda.hari_ini() then raise exception 'Sesi belum bisa dibuat untuk tanggal yang belum tiba.'; end if;
+  -- Sesi boleh disiapkan lebih awal sampai 60 hari ke depan (cermin BATAS_SESI_MENDATANG_HARI di src/lib/absensiLogic.js). Sesi yang tanggalnya belum tiba
+  -- TIDAK dihitung sebagai pertemuan (iuran_hitung, eskalasi) dan belum bisa diisi kehadiran atau iuran; ia baru "hidup" pada hari latihan.
+  if p_tanggal > sigarda.hari_ini() + 60 then raise exception 'Sesi hanya dapat disiapkan sampai 60 hari ke depan.'; end if;
   insert into public.absensi_sesi (tanggal, dibuat_oleh) values (p_tanggal, auth.uid()) on conflict (tanggal) do nothing;
 end $$;
 
@@ -103,6 +105,7 @@ begin
   if not sigarda.pengurus() then raise exception 'Tidak diizinkan.'; end if;
   if p_status is not null and p_status not in ('H','I','S','A') then raise exception 'Status absensi tidak dikenal.'; end if;
   if not exists (select 1 from public.absensi_sesi where tanggal = p_tanggal) then raise exception 'Sesi absensi belum dibuat.'; end if;
+  if p_tanggal > sigarda.hari_ini() then raise exception 'Kehadiran baru dapat dicatat pada hari latihan atau sesudahnya.'; end if;
   if not exists (select 1 from public.profiles where id = p_peserta_id and role = 'peserta') then raise exception 'Peserta tidak ditemukan.'; end if;
   if p_status is null then
     delete from public.absensi_hadir where tanggal = p_tanggal and peserta_id = p_peserta_id;
@@ -120,6 +123,7 @@ begin
   if not sigarda.pengurus() then raise exception 'Tidak diizinkan.'; end if;
   if p_status is null or p_status not in ('H','I','S','A') then raise exception 'Status absensi tidak dikenal.'; end if;
   if not exists (select 1 from public.absensi_sesi where tanggal = p_tanggal) then raise exception 'Sesi absensi belum dibuat.'; end if;
+  if p_tanggal > sigarda.hari_ini() then raise exception 'Kehadiran baru dapat dicatat pada hari latihan atau sesudahnya.'; end if;
   insert into public.absensi_hadir (tanggal, peserta_id, status, oleh)
   select p_tanggal, u.id, p_status, auth.uid()
   from public.profiles u where u.role = 'peserta' and u.status = 'aktif' and u.id = any (p_peserta_ids)

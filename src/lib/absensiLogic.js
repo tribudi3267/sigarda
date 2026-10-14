@@ -136,10 +136,30 @@ export function daftarTahunAjaran(absensi, sekarang = hariIni()) {
   return hasil;
 }
 
-export function sesiPeriode(absensi, tahunAjaran, periode) {
+/**
+ * Sesi boleh disiapkan lebih awal sampai sekian hari ke depan (cermin `sg_absen_buat_sesi`, dibandingkan langsung dengan SQL di uji/sesi-mendatang.mjs).
+ * Sesi yang tanggalnya belum tiba BUKAN pertemuan: tidak dihitung pada rekap, iuran, dan eskalasi, dan belum bisa diisi kehadiran atau iuran.
+ */
+export const BATAS_SESI_MENDATANG_HARI = 60;
+
+/** Tanggal paling akhir yang boleh dibuatkan sesi: hari ini + 60 hari (hari ini = WIB). */
+export function batasSesiMendatang(sekarang = hariIni()) {
+  const d = new Date(`${sekarang}T00:00:00`);
+  d.setDate(d.getDate() + BATAS_SESI_MENDATANG_HARI);
+  return keIso(d);
+}
+
+/** Sesi pada tanggal ini baru boleh dibuat (hari Jumat, tidak lebih dari 60 hari ke depan)? Tanggal lampau selalu boleh (pengisian susulan). */
+export const bolehBuatSesi = (iso, sekarang = hariIni()) => adalahJumat(iso) && iso <= batasSesiMendatang(sekarang);
+
+/**
+ * Sesi pada satu periode, urut naik. Bawaannya HANYA yang sudah tiba (<= hari ini): semua rekap memakai ini. Layar pengurus yang perlu menampilkan
+ * sesi yang sudah disiapkan lebih awal memberi `{ mendatang: true }`.
+ */
+export function sesiPeriode(absensi, tahunAjaran, periode, { mendatang = false, sekarang = hariIni() } = {}) {
   const { mulai, akhir } = rentangPeriode(tahunAjaran, periode);
   return Object.values(absensi?.sesi ?? {})
-    .filter((s) => s.tanggal >= mulai && s.tanggal <= akhir)
+    .filter((s) => s.tanggal >= mulai && s.tanggal <= akhir && (mendatang || s.tanggal <= sekarang))
     .sort((a, b) => a.tanggal.localeCompare(b.tanggal));
 }
 

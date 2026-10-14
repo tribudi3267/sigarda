@@ -140,6 +140,7 @@ $$
 declare r record; v_beruntun date[] := '{}';
 begin
   for r in select s.tanggal, ah.status from public.absensi_sesi s left join public.absensi_hadir ah on ah.tanggal = s.tanggal and ah.peserta_id = p_peserta
+           where s.tanggal <= sigarda.hari_ini()   -- sesi yang belum tiba tidak memutus beruntun
            order by s.tanggal desc limit 15
   loop
     if r.status = 'A' then v_beruntun := v_beruntun || r.tanggal; else exit; end if;
@@ -154,7 +155,7 @@ $$
 declare r record; v_beruntun date[] := '{}';
 begin
   for r in select s.tanggal, exists (select 1 from public.iuran i where i.tanggal = s.tanggal and i.peserta_id = p_peserta) as bayar
-           from public.absensi_sesi s order by s.tanggal desc limit 15
+           from public.absensi_sesi s where s.tanggal <= sigarda.hari_ini() order by s.tanggal desc limit 15   -- sesi yang belum tiba bukan "tidak iuran"
   loop
     if not r.bayar then v_beruntun := v_beruntun || r.tanggal; else exit; end if;
   end loop;

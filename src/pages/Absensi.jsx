@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { AMBANG_HADIR } from '../config';
 import {
-  adalahJumat, jumatBerdekatan, jumatTerakhir, KODE_STATUS, namaBulan, namaHari, periodeDari, PERIODE,
+  adalahJumat, batasSesiMendatang, BATAS_SESI_MENDATANG_HARI, jumatBerdekatan, jumatTerakhir, KODE_STATUS, namaBulan, namaHari, periodeDari, PERIODE,
   rekapAbsensi, ringkasAbsensi, sesiPeriode, STATUS_ABSEN, tahunAjaranDari, tanggalValid,
 } from '../lib/absensiLogic';
 import { unduhAbsensiXlsx } from '../lib/exportLaporan';
@@ -114,7 +114,9 @@ function InputAbsensi() {
   const valid = tanggalValid(tanggal);
   const jumat = valid && adalahJumat(tanggal);
   const belumTiba = valid && tanggal > hariIni();
-  const bisaCatat = jumat && !belumTiba;
+  const batasSesi = batasSesiMendatang();
+  const terlaluJauh = jumat && tanggal > batasSesi; // sesi boleh disiapkan lebih awal, tetapi paling jauh 60 hari ke depan
+  const bisaCatat = jumat && !belumTiba; // kehadiran dan iuran baru dapat dicatat pada hari latihan atau sesudahnya
 
   // Tahun ajaran dan semester dihitung dari tanggal, sehingga berlaku untuk tahun berapa pun
   const ta = valid ? tahunAjaranDari(tanggal) : '';
@@ -123,9 +125,10 @@ function InputAbsensi() {
   const tanggalLain = valid && !jumat ? { sebelum: jumatBerdekatan(tanggal, -1), sesudah: jumatBerdekatan(tanggal, 1) } : null;
   const jumatBerikut = valid ? jumatBerdekatan(tanggal, 1) : '';
 
-  const sesiSemester = useMemo(() => (valid ? [...sesiPeriode(absensi, ta, periode)].reverse() : []), [absensi, valid, ta, periode]);
+  const sesiSemester = useMemo(() => (valid ? [...sesiPeriode(absensi, ta, periode, { mendatang: true })].reverse() : []), [absensi, valid, ta, periode]);
 
   const sesi = bisaCatat ? absensi.sesi[tanggal] : null;
+  const sesiMendatang = jumat && belumTiba ? absensi.sesi[tanggal] : null; // sudah disiapkan, belum bisa diisi
   const catatan = absensi.hadir[tanggal] ?? {};
   // Iuran bumbung: dicatat Dewan Ambalan; Pembina dan Admin melihat. Bagian ini tersembunyi bila basis data belum dimigrasi.
   const iur = useIuranTanggal(tanggal, bisaCatat && !!sesi);
@@ -164,7 +167,7 @@ function InputAbsensi() {
           <button className="btn btn-outline btn-sm" disabled={!valid} onClick={() => setTanggal(jumatBerdekatan(tanggal, -1))}>
             <Icon nama="kembali" className="h-3.5 w-3.5" /> Jumat sebelumnya
           </button>
-          <button className="btn btn-outline btn-sm" disabled={!valid || jumatBerikut > hariIni()} onClick={() => setTanggal(jumatBerikut)}>
+          <button className="btn btn-outline btn-sm" disabled={!valid || jumatBerikut > batasSesi} onClick={() => setTanggal(jumatBerikut)}>
             Jumat berikutnya <Icon nama="panahKanan" className="h-3.5 w-3.5" />
           </button>
           <button className="btn btn-outline btn-sm" onClick={() => setTanggal(jumatTerakhir(hariIni()))}>Jumat terakhir</button>
@@ -213,7 +216,7 @@ function InputAbsensi() {
             <button className="btn btn-primary btn-sm" onClick={() => setTanggal(tanggalLain.sebelum)}>
               {fmtHariTanggal(tanggalLain.sebelum)}
             </button>
-            {tanggalLain.sesudah <= hariIni() && (
+            {tanggalLain.sesudah <= batasSesi && (
               <button className="btn btn-outline btn-sm" onClick={() => setTanggal(tanggalLain.sesudah)}>
                 {fmtHariTanggal(tanggalLain.sesudah)}
               </button>
@@ -222,8 +225,24 @@ function InputAbsensi() {
         </div>
       )}
 
-      {belumTiba && jumat && (
-        <Kosong judul="Tanggal ini belum tiba" teks="Absensi hanya dapat dicatat pada hari latihan atau sesudahnya." />
+      {belumTiba && jumat && terlaluJauh && (
+        <Kosong judul="Terlalu jauh ke depan" teks={`Sesi hanya dapat disiapkan sampai ${BATAS_SESI_MENDATANG_HARI} hari ke depan (paling jauh ${fmtHariTanggal(batasSesi)}).`} />
+      )}
+
+      {belumTiba && jumat && !terlaluJauh && !sesiMendatang && (
+        <Kosong judul="Tanggal ini belum tiba" teks={`Sesi dapat disiapkan lebih awal untuk ${fmtHariTanggal(tanggal)}. Kehadiran dan iuran baru dapat dicatat pada hari latihan, dan sesi ini belum dihitung sebagai pertemuan.`}>
+          <button className="btn btn-primary" onClick={() => buatSesiAbsen(tanggal)}>
+            <Icon nama="tambah" className="h-4 w-4" /> Siapkan sesi absensi
+          </button>
+        </Kosong>
+      )}
+
+      {belumTiba && jumat && sesiMendatang && (
+        <Kosong judul="Sesi sudah disiapkan" teks={`Sesi ${fmtHariTanggal(tanggal)} siap. Kehadiran dan iuran dapat dicatat mulai hari latihan; sebelum itu sesi ini belum dihitung sebagai pertemuan.`}>
+          <button className="btn btn-outline text-red-700" onClick={hapus}>
+            <Icon nama="hapus" className="h-4 w-4" /> Hapus sesi
+          </button>
+        </Kosong>
       )}
 
       {bisaCatat && !sesi && (

@@ -40,7 +40,7 @@ declare
 begin
   if extract(month from p_tanggal) >= 7 then o_mulai := make_date(v_y, 7, 1); o_akhir := make_date(v_y, 12, 31);
   else o_mulai := make_date(v_y, 1, 1); o_akhir := make_date(v_y, 6, 30); end if;
-  v_hingga := least(o_akhir, p_tanggal);
+  v_hingga := least(o_akhir, p_tanggal, sigarda.hari_ini());   -- sesi yang tanggalnya belum tiba (disiapkan lebih awal) bukan pertemuan
   select count(*)::int into o_pertemuan from public.absensi_sesi where tanggal between o_mulai and v_hingga;
   select count(*)::int, count(*) filter (where jenis = 'susulan')::int into o_kali, o_susulan
     from public.iuran where peserta_id = p_peserta and tanggal between o_mulai and v_hingga;
