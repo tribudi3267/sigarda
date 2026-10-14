@@ -6,6 +6,7 @@
  * Dijaga uji/laporan.mjs.
  */
 import { rentangPeriode } from './absensiLogic';
+import { hariIni } from './format';
 import { pesertaDenganPeran, tanggalLulusTingkat } from './skuLogic';
 import { tingkatRombel } from './naikKelasLogic';
 
@@ -88,9 +89,9 @@ export function rekapPencapaianSku(users, progress, mulai, akhir) {
 export const rekapKegiatan = (agenda, mulai, akhir) =>
   (agenda ?? []).filter((a) => a.tanggal >= mulai && a.tanggal <= akhir).sort((a, b) => a.tanggal.localeCompare(b.tanggal));
 
-/** Sesi absensi (satu baris per Jumat) pada rentang [mulai, akhir], dari data absensi yang sudah dimuat untuk rentang itu. */
-export const sesiRentang = (absensi, mulai, akhir) =>
-  Object.values(absensi?.sesi ?? {}).filter((s) => s.tanggal >= mulai && s.tanggal <= akhir).sort((a, b) => a.tanggal.localeCompare(b.tanggal));
+/** Sesi absensi (satu baris per Jumat) pada rentang [mulai, akhir], dari data absensi yang sudah dimuat untuk rentang itu. Sesi yang tanggalnya belum tiba bukan pertemuan. */
+export const sesiRentang = (absensi, mulai, akhir, sekarang = hariIni()) =>
+  Object.values(absensi?.sesi ?? {}).filter((s) => s.tanggal >= mulai && s.tanggal <= akhir && s.tanggal <= sekarang).sort((a, b) => a.tanggal.localeCompare(b.tanggal));
 
 /** Nama berkas (tanpa akhiran) untuk satu rentang laporan. */
 export const namaFileLaporan = (rentang) => `Laporan-Tahunan-${rentang.label.replace(/\s+/g, '-')}`;

@@ -10,6 +10,7 @@ begin
   if not sigarda.pencatat_iuran() then raise exception 'Hanya Dewan Ambalan atau asisten bendahara yang dapat mencatat iuran.'; end if;
   if v_baru is not null and (v_baru < 1 or v_baru > 1000000) then raise exception 'Jumlah iuran harus antara Rp 1 dan Rp 1.000.000.'; end if;
   if not exists (select 1 from public.absensi_sesi where tanggal = p_tanggal) then raise exception 'Sesi absensi belum dibuat.'; end if;
+  if p_tanggal > sigarda.hari_ini() then raise exception 'Iuran baru dapat dicatat pada hari latihan atau sesudahnya.'; end if;
   if not exists (select 1 from public.profiles where id = p_peserta_id and role = 'peserta') then raise exception 'Peserta tidak ditemukan.'; end if;
   if p_peserta_id = auth.uid() then raise exception 'Iuran Anda sendiri dicatat oleh Dewan Ambalan.'; end if;
   select jumlah, jenis into v_lama, v_jenis from public.iuran where tanggal = p_tanggal and peserta_id = p_peserta_id;
@@ -34,6 +35,7 @@ begin
   if not sigarda.pencatat_iuran() then raise exception 'Hanya Dewan Ambalan atau asisten bendahara yang dapat mencatat iuran.'; end if;
   if p_jumlah is null or p_jumlah < 1 or p_jumlah > 1000000 then raise exception 'Jumlah iuran harus antara Rp 1 dan Rp 1.000.000.'; end if;
   if not exists (select 1 from public.absensi_sesi where tanggal = p_tanggal) then raise exception 'Sesi absensi belum dibuat.'; end if;
+  if p_tanggal > sigarda.hari_ini() then raise exception 'Iuran baru dapat dicatat pada hari latihan atau sesudahnya.'; end if;
   if cardinality(coalesce(p_peserta_ids, '{}')) > 500 then raise exception 'Maksimal 500 peserta per permintaan.'; end if;
   for v_id in select id from public.profiles where role = 'peserta' and status = 'aktif' and id = any (coalesce(p_peserta_ids, '{}')) and id <> auth.uid() loop
     select jumlah, jenis into v_lama, v_jenis from public.iuran where tanggal = p_tanggal and peserta_id = v_id;
@@ -104,6 +106,7 @@ begin
   perform sigarda.wajib_aktif();
   if not sigarda.dewan() then raise exception 'Hanya Dewan Ambalan yang dapat menutup kas.'; end if;
   if not exists (select 1 from public.absensi_sesi where tanggal = p_tanggal) then raise exception 'Sesi absensi belum dibuat.'; end if;
+  if p_total is not null and p_tanggal > sigarda.hari_ini() then raise exception 'Kas baru dapat ditutup pada hari latihan atau sesudahnya.'; end if;
   if p_total is null then
     delete from public.iuran_kas where tanggal = p_tanggal;
     return;
@@ -185,7 +188,7 @@ begin
   select * into h from sigarda.iuran_hitung(p_peserta_id, p_tanggal);
   select coalesce(jsonb_agg(s.tanggal order by s.tanggal), '[]'::jsonb) into v_kosong
     from public.absensi_sesi s
-    where s.tanggal between h.o_mulai and least(h.o_akhir, p_tanggal)
+    where s.tanggal between h.o_mulai and least(h.o_akhir, p_tanggal, sigarda.hari_ini())   -- sesi yang belum tiba bukan pertemuan
       and not exists (select 1 from public.iuran i where i.tanggal = s.tanggal and i.peserta_id = p_peserta_id);
   select count(distinct l.tanggal)::int into v_membantu from public.iuran_log l where l.oleh = p_peserta_id;
   return jsonb_build_object('mulai', h.o_mulai, 'akhir', h.o_akhir, 'pertemuan', h.o_pertemuan, 'kali', h.o_kali, 'susulan', h.o_susulan,
