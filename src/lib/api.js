@@ -16,6 +16,8 @@ import { untukForm as untukFormBeranda, untukKirim as untukKirimBeranda } from '
 export const UKURAN_HALAMAN = 1000;
 /** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
 export const HALAMAN_SEREMPAK = 4;
+/** Kolom sku_progress yang dipakai daftar dan dasbor pengurus; selebihnya (catatan, catatan_peserta, verifikasi, diverifikasi_pada, verifikasi_token) hanya per Penegak. */
+export const KOLOM_PROGRESS_RINGKAS = 'peserta_id,sku_id,status,jadwal,penguji_id,tanggal_uji,nilai';
 
 // Nama (slug) Edge Function di Supabase. Biasanya "sigarda". Bila dashboard membuat nama lain saat deploy lewat editor,
 // isi VITE_NAMA_FUNGSI dengan nama yang tertera pada alamat fungsi (bagian akhir dari .../functions/v1/NAMA).
@@ -44,9 +46,11 @@ export function buatApi(klien) {
    * Membaca seluruh baris sebuah tabel, per halaman 1000.
    * `filter` = [[kolom, nilai], ...] (sama dengan) atau [kolom, 'gte' | 'lte', nilai] (rentang).
    */
-  async function ambilSemua(tabel, { urut = [], filter = [] } = {}) {
+  async function ambilSemua(tabel, { urut = [], filter = [], kolomLanjut = null } = {}) {
+    // `kolomLanjut`: kolom untuk halaman ke-2 dst. saja (tabel besar yang dibaca pengurus). Halaman pertama selalu '*', jadi tabel kecil
+    // (satu halaman, mis. milik satu Penegak) tidak berubah bentuk; pemakai yang butuh kolom lain memuatnya per orang.
     const halaman = async (ke) => {
-      let q = klien.from(tabel).select('*');
+      let q = klien.from(tabel).select(ke > 0 && kolomLanjut ? kolomLanjut : '*');
       for (const f of filter) q = f.length === 3 ? q[f[1] === 'lte' ? 'lte' : 'gte'](f[0], f[2]) : q.eq(f[0], f[1]);
       for (const k of urut) q = q.order(k);
       const { data, error } = await q.range(ke * UKURAN_HALAMAN, (ke + 1) * UKURAN_HALAMAN - 1);
@@ -125,8 +129,11 @@ export function buatApi(klien) {
     muatProgress: (pesertaId = null, { riwayat: denganRiwayat = true } = {}) =>
       muat(async () => {
         const filter = pesertaId ? [['peserta_id', pesertaId]] : [];
+        // Pemuatan massal pengurus (tanpa riwayat): halaman ke-2 dst. tanpa kolom detail (catatan, kode dan token verifikasi), yang hanya dipakai
+        // saat satu Penegak dibuka; detail itu datang bersama muatProgress(pesertaId) lewat pastikanRiwayat.
+        const kolomLanjut = !pesertaId && !denganRiwayat ? KOLOM_PROGRESS_RINGKAS : null;
         const [baris, riwayat] = await Promise.all([
-          ambilSemua('sku_progress', { filter, urut: ['peserta_id', 'sku_id'] }),
+          ambilSemua('sku_progress', { filter, urut: ['peserta_id', 'sku_id'], kolomLanjut }),
           denganRiwayat ? ambilSemua('sku_riwayat', { filter, urut: ['id'] }) : [],
         ]);
         return susunProgress(baris, riwayat);

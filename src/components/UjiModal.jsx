@@ -24,9 +24,10 @@ const PILIHAN_INSTRUMEN = [
 ];
 
 function IsiUji({ pesertaId, poin, instr, pengaturan, tanggalAwal, onTutup }) {
-  const { users, progress, catatHasil } = useApp();
+  const { users, progress, catatHasil, pastikanRiwayat } = useApp();
   const peserta = users.find((u) => u.id === pesertaId);
   const entry = getEntry(progress, pesertaId, poin.id);
+  useEffect(() => { pastikanRiwayat?.(pesertaId); }, [pesertaId]); // eslint-disable-line react-hooks/exhaustive-deps -- catatan Penegak tidak ikut pemuatan massal
 
   const [hasil, setHasil] = useState(entry.status === 'lulus' ? 'reset' : instr ? 'nilai' : 'lulus');
   // Dari papan sesi ujian: tanggal awal = tanggal sesi (kecuali hasil tercatat sudah bertanggal sesi atau sesudahnya), agar papan menghitung hasilnya.
