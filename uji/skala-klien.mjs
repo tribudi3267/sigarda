@@ -1,7 +1,7 @@
 // P3 (skalabilitas klien): (1) ambilSemua membaca halaman serempak per gelombang tanpa kehilangan/menggandakan baris di batas halaman;
 // (2) muatProgress(null, { riwayat: false }) tidak menyentuh sku_riwayat; (3) halaman selain beranda dimuat malas dan dibungkus BatasHalaman.
 import { readFileSync } from 'node:fs';
-import { buatApi, HALAMAN_SEREMPAK, UKURAN_HALAMAN } from '../src/lib/api.js';
+import { buatApi, HALAMAN_SEREMPAK, UKURAN_HALAMAN, KOLOM_PROGRESS_RINGKAS } from '../src/lib/api.js';
 
 let gagal = 0, lulus = 0;
 const ok = (c, m) => { if (c) { lulus++; console.log('ok   :', m); } else { gagal++; console.log('GAGAL:', m); } };
@@ -13,9 +13,9 @@ function klienPalsu(jumlahPerTabel) {
     catatan, puncak: () => puncak,
     from(tabel) {
       const q = { tabel };
-      const b = { select: () => b, eq: () => b, gte: () => b, lte: () => b, order: () => b, range: (a, z) => { q.a = a; q.z = z; return b; },
+      const b = { select: (k) => { q.kolom = k; return b; }, eq: () => b, gte: () => b, lte: () => b, order: () => b, range: (a, z) => { q.a = a; q.z = z; return b; },
         then: (res, rej) => (async () => {
-          catatan.push({ tabel, a: q.a, z: q.z });
+          catatan.push({ tabel, a: q.a, z: q.z, kolom: q.kolom });
           aktif++; puncak = Math.max(puncak, aktif);
           await new Promise((r) => setTimeout(r, 2));
           aktif--;
@@ -46,6 +46,22 @@ for (const n of [0, 5, UKURAN_HALAMAN - 1, UKURAN_HALAMAN, UKURAN_HALAMAN + 1, 2
   ok(r.ok && jumlah === n, `progres ${n} baris: semua baris ada tepat sekali (${jumlah})`);
   const ke = k.catatan.map((c) => c.a / UKURAN_HALAMAN).sort((a, b) => a - b);
   ok(ke.join() === '0,1,2,3,4,5,6' || ke.join() === '0,1,2,3,4', `progres ${n} baris: halaman yang diminta berurutan tanpa lompat (${ke.join()})`);
+}
+
+console.log('--- kolom ringkas progres massal ---');
+{
+  const n = 2 * UKURAN_HALAMAN + 5;
+  const k = klienPalsu({ sku_progress: n });
+  await buatApi(k).muatProgress(null, { riwayat: false });
+  ok(k.catatan.filter((c) => c.a === 0).every((c) => c.kolom === '*'), 'massal: halaman pertama tetap semua kolom');
+  ok(k.catatan.filter((c) => c.a > 0).length >= 2 && k.catatan.filter((c) => c.a > 0).every((c) => c.kolom === KOLOM_PROGRESS_RINGKAS), 'massal: halaman ke-2 dst. memakai kolom ringkas');
+  ok(!/catatan|verifikasi|token/.test(KOLOM_PROGRESS_RINGKAS), 'kolom ringkas tanpa catatan, kode, dan token verifikasi');
+  const k1 = klienPalsu({ sku_progress: 10 });
+  await buatApi(k1).muatProgress(null, { riwayat: false });
+  ok(k1.catatan.every((c) => c.kolom === '*'), 'massal kecil (satu halaman, mis. Penegak): semua kolom');
+  const k2 = klienPalsu({ sku_progress: n, sku_riwayat: 3 });
+  await buatApi(k2).muatProgress('p');
+  ok(k2.catatan.every((c) => c.kolom === '*'), 'satu Penegak: selalu semua kolom (detail lengkap)');
 }
 
 console.log('--- muatProgress tanpa riwayat ---');

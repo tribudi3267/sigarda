@@ -12,10 +12,13 @@
 import { petaPengaturan, petaPraUji, susunAntrianPraUji, petaProfil, petaSidang, susunPengukuhanDewan, susunAgenda, susunBatchNaikKelas, susunBerkasGaruda, susunLogNaikKelas, susunDokumen, susunGuruAgama, susunHadir, susunAsisten, susunInstrumen, susunIuran, susunKas, susunLembarIuran, susunLogKepengurusan, susunLogPenugasan, susunMateri, susunNotifikasi, susunPenilaian, susunPendampingan, susunBinaDamping, susunSanggaRombel, susunCalonPinsa, susunPenugasan, susunPenugasanPeserta, susunPelantikan, susunSaka, susunTkkCapaian, susunTkkKrida, susunTkkPengajuan, susunAmbangTkk, susunSpg, susunTanggalLahir, susunIsian, susunTemplatDokumen, susunSnapshot, susunSfh, susunGerbang, susunTimPenilai, susunGarudaTahap, susunSesiUjian, susunPortofolio, susunProgress, susunRaport, susunSesi, susunUsulanKegiatan, susunBerita, susunPrestasi, susunGaleri, susunSosial, susunFaq } from './mapDb';
 
 import { untukForm as untukFormBeranda, untukKirim as untukKirimBeranda } from './berandaLogic';
+import { galatSementara, kodeGalat } from './ulangLogic';
 
 export const UKURAN_HALAMAN = 1000;
 /** Halaman ke-2 dan seterusnya diminta serempak per gelombang sebesar ini (halaman pertama sendirian, agar tabel kecil tetap satu permintaan). */
 export const HALAMAN_SEREMPAK = 4;
+/** Kolom sku_progress yang dipakai daftar dan dasbor pengurus; selebihnya (catatan, catatan_peserta, verifikasi, diverifikasi_pada, verifikasi_token) hanya per Penegak. */
+export const KOLOM_PROGRESS_RINGKAS = 'peserta_id,sku_id,status,jadwal,penguji_id,tanggal_uji,nilai';
 
 // Nama (slug) Edge Function di Supabase. Biasanya "sigarda". Bila dashboard membuat nama lain saat deploy lewat editor,
 // isi VITE_NAMA_FUNGSI dengan nama yang tertera pada alamat fungsi (bagian akhir dari .../functions/v1/NAMA).
@@ -29,6 +32,11 @@ export function pesanGalat(error) {
   }
   if (/failed to fetch|networkerror|load failed|network request failed/i.test(m)) {
     return 'Tidak dapat terhubung ke server. Periksa koneksi internet lalu coba lagi.';
+  }
+  if (/too many requests|rate limit|\b429\b/i.test(m)) return 'Server menolak sementara karena terlalu banyak permintaan bersamaan (kode 429). Tunggu sebentar, lalu coba lagi.';
+  if (galatSementara(m)) {
+    const kode = kodeGalat(m);
+    return `Server sedang sibuk atau lambat menjawab${kode ? ` (kode ${kode})` : ''}. Tunggu sebentar, lalu coba lagi. Rincian: ${m.slice(0, 90)}`;
   }
   if (/jwt|not authenticated|invalid token|session/i.test(m)) return 'Sesi berakhir. Masuk kembali.';
   if (/permission denied|row-level security/i.test(m)) return 'Anda tidak memiliki izin untuk tindakan ini.';
@@ -44,9 +52,11 @@ export function buatApi(klien) {
    * Membaca seluruh baris sebuah tabel, per halaman 1000.
    * `filter` = [[kolom, nilai], ...] (sama dengan) atau [kolom, 'gte' | 'lte', nilai] (rentang).
    */
-  async function ambilSemua(tabel, { urut = [], filter = [] } = {}) {
+  async function ambilSemua(tabel, { urut = [], filter = [], kolomLanjut = null } = {}) {
+    // `kolomLanjut`: kolom untuk halaman ke-2 dst. saja (tabel besar yang dibaca pengurus). Halaman pertama selalu '*', jadi tabel kecil
+    // (satu halaman, mis. milik satu Penegak) tidak berubah bentuk; pemakai yang butuh kolom lain memuatnya per orang.
     const halaman = async (ke) => {
-      let q = klien.from(tabel).select('*');
+      let q = klien.from(tabel).select(ke > 0 && kolomLanjut ? kolomLanjut : '*');
       for (const f of filter) q = f.length === 3 ? q[f[1] === 'lte' ? 'lte' : 'gte'](f[0], f[2]) : q.eq(f[0], f[1]);
       for (const k of urut) q = q.order(k);
       const { data, error } = await q.range(ke * UKURAN_HALAMAN, (ke + 1) * UKURAN_HALAMAN - 1);
@@ -77,8 +87,10 @@ export function buatApi(klien) {
     try {
       const { data, error } = await klien.functions.invoke(NAMA_FUNGSI, { body: { aksi, ...body } });
       if (error) {
-        if (error?.context?.status === 404) return { ok: false, pesan: `Fungsi server "${NAMA_FUNGSI}" tidak ditemukan di Supabase. Periksa nama fungsi (lihat README, langkah 4).` };
-        return { ok: false, pesan: pesanGalat(error) };
+        const status = error?.context?.status;
+        if (status === 404) return { ok: false, pesan: `Fungsi server "${NAMA_FUNGSI}" tidak ditemukan di Supabase. Periksa nama fungsi (lihat README, langkah 4).` };
+        if (status === 429 || status >= 500) return { ok: false, pesan: `Server sedang sibuk (kode ${status}). Tunggu sebentar, lalu coba lagi.`, sementara: true };
+        return { ok: false, pesan: pesanGalat(error), sementara: galatSementara(error) };
       }
       return data ?? { ok: false, pesan: 'Server tidak memberi jawaban.' };
     } catch (e) {
@@ -90,7 +102,7 @@ export function buatApi(klien) {
     try {
       return { ok: true, data: await fn() };
     } catch (e) {
-      return { ok: false, pesan: pesanGalat(e), sesiBerakhir: sesiBerakhir(e) };
+      return { ok: false, pesan: pesanGalat(e), sesiBerakhir: sesiBerakhir(e), sementara: galatSementara(e) };
     }
   };
 
@@ -125,8 +137,11 @@ export function buatApi(klien) {
     muatProgress: (pesertaId = null, { riwayat: denganRiwayat = true } = {}) =>
       muat(async () => {
         const filter = pesertaId ? [['peserta_id', pesertaId]] : [];
+        // Pemuatan massal pengurus (tanpa riwayat): halaman ke-2 dst. tanpa kolom detail (catatan, kode dan token verifikasi), yang hanya dipakai
+        // saat satu Penegak dibuka; detail itu datang bersama muatProgress(pesertaId) lewat pastikanRiwayat.
+        const kolomLanjut = !pesertaId && !denganRiwayat ? KOLOM_PROGRESS_RINGKAS : null;
         const [baris, riwayat] = await Promise.all([
-          ambilSemua('sku_progress', { filter, urut: ['peserta_id', 'sku_id'] }),
+          ambilSemua('sku_progress', { filter, urut: ['peserta_id', 'sku_id'], kolomLanjut }),
           denganRiwayat ? ambilSemua('sku_riwayat', { filter, urut: ['id'] }) : [],
         ]);
         return susunProgress(baris, riwayat);

@@ -12,7 +12,7 @@ import { Icon, Kosong } from '../components/ui';
  * PDF: klik "Cetak", lalu pilih "Simpan sebagai PDF" pada dialog cetak browser.
  */
 export default function CetakDokumen({ pesertaId: idAwal, bolehPilih, jenisAwal = 'kartu' }) {
-  const { daftarPeserta, daftarPesertaSemua, progress, tokenSuratTingkat, dokumen, muatDokumen, bolehSurat, muatSidang } = useApp();
+  const { daftarPeserta, daftarPesertaSemua, progress, tokenSuratTingkat, dokumen, muatDokumen, bolehSurat, muatSidang, pastikanRiwayat } = useApp();
   const [termasukArsip, setTermasukArsip] = useState(false); // pilihan peserta: sertakan nonaktif dan alumni (dokumen tetap dapat dicetak)
   const awal = daftarPesertaSemua.find((u) => u.id === idAwal);
   const daftar = [...(termasukArsip || (awal && (awal.status ?? 'aktif') !== 'aktif') ? daftarPesertaSemua : daftarPeserta)].sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
@@ -26,6 +26,9 @@ export default function CetakDokumen({ pesertaId: idAwal, bolehPilih, jenisAwal 
   const peserta = daftarPesertaSemua.find((u) => u.id === id);
   const selesai = peserta ? tingkatSelesai(progress, peserta, tingkat) : false;
   const kunciSurat = `${peserta?.id}|${tingkat}`;
+
+  // Kartu SKU memuat kode dan QR verifikasi tiap butir: kolom itu tidak ikut pemuatan massal pengurus, jadi dimuat per Penegak yang dicetak.
+  useEffect(() => { if (jenis === 'kartu') pastikanRiwayat?.(peserta?.id); }, [jenis, peserta?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Surat pengantar agama: dokumen dimuat begitu tab dibuka; Pembina dan Admin juga memerlukan pengaturan (format nomor).
   useEffect(() => {

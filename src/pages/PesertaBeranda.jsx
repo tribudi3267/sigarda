@@ -13,7 +13,7 @@ const KartuPelantikanSaya = lazy(() => import('../components/KartuPelantikanSaya
 import { Badge, Icon, Kosong, Lencana, ProgressBar, TeksPoin } from '../components/ui';
 
 export default function PesertaBeranda({ setTab, setTingkat }) {
-  const { user, users, progress, absensi, peranUser, batalkanAjuan, daftarCalonGaruda, hanyaLihatSaya, praUjiAktif, pastikanPraUji, praUjiPeserta } = useApp();
+  const { user, users, progress, absensi, peranUser, batalkanAjuan, daftarCalonGaruda, hanyaLihatSaya, praUjiAktif, pastikanPraUji, praUjiPeserta, pastikanRiwayat } = useApp();
   useEffect(() => { if (praUjiAktif) pastikanPraUji(user.id); }, [praUjiAktif, user.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const bantara = hitungProgres(progress, user, 'Bantara');
@@ -33,6 +33,9 @@ export default function PesertaBeranda({ setTab, setTingkat }) {
   const menungguPra = butirMenungguPra(entri, barisPra);
   const diulang = entri.filter((x) => x.entry.status === 'ulang' && !menungguPra.some((m) => m.poin.id === x.poin.id));
   const namaPenguji = (id) => users.find((u) => u.id === id)?.nama ?? '-';
+  // Penegak berjabatan Dewan memuat progres massal tanpa catatan penguji; butir 'ulang' selalu bercatatan, jadi yang kosong berarti belum dimuat (Penegak biasa tidak memicu ini).
+  const catatanBelumMuat = diulang.some((x) => !x.entry.catatan);
+  useEffect(() => { if (catatanBelumMuat) pastikanRiwayat?.(user.id); }, [catatanBelumMuat, user.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Kehadiran saya pada semester berjalan
   const saya = useMemo(() => {

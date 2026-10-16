@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ambilKlien, GALAT_KONFIGURASI, LOKAL } from '../lib/supabaseClient';
 import { buatApi } from '../lib/api';
+import { denganUlang } from '../lib/ulangLogic';
 import { pesertaDenganPeran } from '../lib/skuLogic';
 import {
   adalahJumat, BATAS_SESI_MENDATANG_HARI, bolehBuatSesi, daftarSemester, gabungHadirSemester, KODE_STATUS, kunciSemester, rentangKunci, semesterDari, tanggalValid,
@@ -316,10 +317,12 @@ export function AppProvider({ children }) {
     return gagal ?? { ok: true };
   }, [sesiBerakhir]);
 
-  const mulaiSesi = useCallback(async (id) => {
-    const r = await muatSemua();
+  // `pulihkan`: sesi tersimpan dipakai kembali (buka aplikasi). Kegagalan SEMENTARA (server sibuk, batas laju) tidak boleh mengeluarkan pengguna:
+  // keluar memaksa masuk ulang lewat Edge Function, tepat saat server sedang kewalahan. Hanya sesi yang benar-benar berakhir yang dikeluarkan.
+  const mulaiSesi = useCallback(async (id, { pulihkan = false } = {}) => {
+    const r = await denganUlang(() => muatSemua());
     if (!r.ok) {
-      await api().keluar();
+      if (!pulihkan || r.sesiBerakhir) await api().keluar();
       return r;
     }
     setSesiId(id);
@@ -338,8 +341,12 @@ export function AppProvider({ children }) {
         // Nama gudep untuk halaman masuk (tanpa login): tidak perlu bila sesi tersimpan, data gudep lengkap ikut dimuat sesudah masuk.
         if (!id) apiRef.current.muatGudepPublik().then((r) => { if (r.ok) tambahGudep(r.data); });
         if (id) {
-          const r = await mulaiSesi(id);
-          if (!r.ok && !r.sesiBerakhir && !batal) notify(r.pesan, 'err');
+          const r = await mulaiSesi(id, { pulihkan: true });
+          if (!r.ok && !r.sesiBerakhir) {
+            // Sesi masih utuh tetapi data belum termuat: tampilkan layar galat dengan "Muat ulang" (pengguna tetap masuk), bukan halaman masuk.
+            if (!batal) { setGalatMuat(r.pesan ?? ''); setStatus('galat'); }
+            return;
+          }
         }
         if (!batal) setStatus('siap');
       } catch (e) {
@@ -475,7 +482,7 @@ export function AppProvider({ children }) {
 
   /* --------------------------------- Sesi --------------------------------- */
   const login = async (username, pin) => {
-    const r = await api().masuk(username, pin);
+    const r = await denganUlang(() => api().masuk(username, pin)); // hanya galat sementara (server sibuk) yang diulang; PIN salah tidak
     if (!r.ok) return r; // pesan ditampilkan di formulir masuk
     const m = await mulaiSesi(r.id);
     return m.ok ? { ok: true } : { ok: false, pesan: m.pesan };
