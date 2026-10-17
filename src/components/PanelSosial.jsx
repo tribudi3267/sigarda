@@ -126,7 +126,7 @@ export default function PanelSosial() {
         <p className="mt-3 text-xs text-pramuka-600">Beranda menampilkan 6 kiriman terbaru yang tampil; kiriman lebih lama dimuat lewat tombol "Muat kiriman lebih lama".</p>
       </div>
 
-      <form className="min-w-0 space-y-4" onSubmit={(e) => e.preventDefault()} noValidate>
+      <form className="order-first min-w-0 space-y-4 lg:order-none" onSubmit={(e) => e.preventDefault()} noValidate>
         <h3 className="text-base font-bold text-pramuka-900">{id !== null ? 'Ubah kiriman' : 'Tambah kiriman'}</h3>
         <Field label="Platform" htmlFor="sosial-platform">
           <select id="sosial-platform" className="input" value={form.platform} onChange={(e) => ubah('platform', e.target.value)}>
