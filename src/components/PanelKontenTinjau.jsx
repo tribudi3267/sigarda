@@ -167,7 +167,7 @@ export default function PanelKontenTinjau({ skema }) {
         )}
       </div>
 
-      <form className="min-w-0 space-y-4" onSubmit={(e) => e.preventDefault()} noValidate>
+      <form className="order-first min-w-0 space-y-4 lg:order-none" onSubmit={(e) => e.preventDefault()} noValidate>
         <h3 className="text-base font-bold text-pramuka-900">{sedangUbah ? `Ubah ${skema.labelSatuan}` : `Tambah ${skema.labelSatuan}`}</h3>
         {skema.fields.map((f) => (
           <Isian key={f.kunci} f={f} nilai={form[f.kunci]} ubah={ubahIsian} galat={galat[f.kunci]}
