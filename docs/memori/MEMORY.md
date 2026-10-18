@@ -1,0 +1,2 @@
+- [Skala 500 pengguna dan rencana pindah Supabase](rencana-skala-500-pengguna.md) — brainstorm 17 Okt 2026; alat uji beban di scripts/uji-beban, pemilik akan menguji di proyek uji
+- [Rencana hemat log Supabase](rencana-hemat-log-supabase.md) — fase 0-6 menekan log ingestion/query; PR 69 dan 71 sudah merge, fase 0 (ukur) dan 1 berikutnya
