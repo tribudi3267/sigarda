@@ -225,6 +225,7 @@ export function buatKlienFake(pg, penyimpan = null) {
       // (VITE_NAMA_FUNGSI=nama-acak-dari-dashboard) ikut terbaca di mode lokal dan tidak boleh membuat login gagal.
       async invoke(nama, { body } = {}) {
         if (nama === 'galeri-sampul') return { data: { ok: false, pesan: 'Sampul otomatis album Google Photos tidak tersedia di mode lokal.' }, error: null };
+        if (nama === 'sosial-sampul') return { data: { ok: false, pesan: 'Gambar otomatis Instagram/TikTok tidak tersedia di mode lokal.' }, error: null };
         const hasil = await tangani(JSON.parse(JSON.stringify(body ?? {})), sesi?.access_token ? `Bearer ${sesi.access_token}` : 'Bearer anon', deps);
         return { data: JSON.parse(JSON.stringify(hasil)), error: null };
       },

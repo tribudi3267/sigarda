@@ -9,7 +9,7 @@
  *   jenis:   'kosong' | 'tidak-sah' | 'tidak-dikenal' (bukan Instagram/YouTube/Facebook/TikTok) | 'bukan-postingan' (profil, beranda, playlist, story) | 'postingan'
  *   platform: 'instagram' | 'youtube' | 'facebook' | 'tiktok' | ''
  *   embedUrl: alamat pemutar ('' = tidak dapat diputar di beranda; kartu membuka postingannya di platform)
- *   thumbUrl: gambar pratinjau otomatis ('' = pengurus perlu mengisi gambar pratinjau; hanya YouTube yang punya)
+ *   thumbUrl: gambar pratinjau yang dihitung di sini (hanya YouTube; Instagram/TikTok diambil fungsi sosial-sampul saat disimpan, lihat sosialSampulLogic.js)
  *   bentuk:   'video' (16:9) | 'tegak' (pemutar tinggi) | ''
  *   pesan:    penjelasan untuk pengurus bila bukan postingan
  * }

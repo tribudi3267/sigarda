@@ -76,7 +76,7 @@ console.log('\n--- Menu header "Media Sosial" ---');
 console.log('\n--- Formulir Kelola Beranda ---');
 {
   const panel = readFileSync(`${P}/src/components/PanelSosial.jsx`, 'utf8');
-  ok(/tidak menyediakan gambar otomatis/.test(panel), 'petunjuk untuk Instagram, TikTok, dan Facebook: tidak ada gambar otomatis, isi sendiri dari Drive');
+  ok(/tidak menyediakan gambar otomatis/.test(panel), 'petunjuk untuk Facebook (dan tautan yang tidak dapat diambil gambarnya): tidak ada gambar otomatis, isi sendiri dari Drive');
 }
 
 console.log(`\nRINGKASAN MEDIA-SOSIAL-SERAGAM: ${lulus} lulus, ${gagal} GAGAL`);
