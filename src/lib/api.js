@@ -294,6 +294,19 @@ export function buatApi(klien) {
     muatSosial: () => muat(async () => susunSosial(await ambilSemua('beranda_sosial'))),
     simpanSosial: (s) => rpc('sg_sosial_simpan', { p_id: s.id ?? null, p_platform: s.platform, p_tautan: s.tautan, p_keterangan: s.keterangan, p_gambar_url: s.gambarUrl, p_tampil: s.tampil !== false }),
     hapusSosial: (id) => rpc('sg_sosial_hapus', { p_id: id }),
+    /**
+     * Gambar pratinjau postingan Instagram/TikTok lewat Edge Function `sosial-sampul`, yang menyalin gambarnya ke Storage SIGARDA dan mengembalikan alamat
+     * salinan itu (`gambar`). Belum dipasang / tak terjangkau = pesan yang menuntun; gambar tetap dapat diisi manual. Tidak menyimpan kiriman.
+     */
+    async ambilSampulSosial(tautan) {
+      try {
+        const { data, error } = await klien.functions.invoke('sosial-sampul', { body: { tautan } });
+        if (error) return { ok: false, pesan: error?.context?.status === 404 ? 'Gambar otomatis belum dipasang di server (minta pemilik memasang fungsi "sosial-sampul", lihat README). Gambar masih dapat diisi manual.' : pesanGalat(error) };
+        return data?.ok ? { ok: true, gambar: data.gambar } : { ok: false, pesan: data?.pesan ?? 'Gambar pratinjau tidak dapat diambil.', sesiBerakhir: !!data?.sesiBerakhir };
+      } catch (e) {
+        return { ok: false, pesan: pesanGalat(e) };
+      }
+    },
 
     /** Pertanyaan umum (FAQ): hanya Pembina dan Admin Gudep. */
     muatFaq: () => muat(async () => susunFaq(await ambilSemua('beranda_faq'))),

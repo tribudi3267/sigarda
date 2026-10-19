@@ -28,7 +28,7 @@ grant usage on schema cron to cadangan_sigarda;
 grant select on cron.job to cadangan_sigarda;
 ```
 
-**Yang tidak diperiksa:** Edge Function (`sigarda`, `notif-push`, `galeri-sampul`) tidak dapat dilihat dari SQL. Baris "PERIKSA MANUAL" di log mengingatkan itu.
+**Yang tidak diperiksa:** Edge Function (`sigarda`, `notif-push`, `galeri-sampul`, `sosial-sampul`) tidak dapat dilihat dari SQL. Baris "PERIKSA MANUAL" di log mengingatkan itu.
 Deploy Edge Function tetap manual (Dashboard > Edge Functions).
 
 ## Bagian B. Migrasi otomatis (sekitar 20 menit, sekali saja)

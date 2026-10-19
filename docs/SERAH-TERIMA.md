@@ -8,7 +8,7 @@ Sumber: `CLAUDE.md` dan riwayat git lokal folder `sku-bukateja` (repositori `tri
 
 ## 1. Status terakhir
 
-- **Aplikasi sudah berjalan di produksi** di https://sigarda.smabukateja.sch.id/ (GitHub Pages; terbit otomatis saat `git push` ke `main`). Stack: React 18 + Vite 5 + Tailwind 3; Supabase (Postgres + Auth + satu Edge Function `sigarda`, ditambah `notif-push` dan `galeri-sampul`).
+- **Aplikasi sudah berjalan di produksi** di https://sigarda.smabukateja.sch.id/ (GitHub Pages; terbit otomatis saat `git push` ke `main`). Stack: React 18 + Vite 5 + Tailwind 3; Supabase (Postgres + Auth + satu Edge Function `sigarda`, ditambah `notif-push`, `galeri-sampul`, dan `sosial-sampul`).
 - **Diluncurkan dan disosialisasikan 2 Okt 2026** di perpustakaan sekolah, dihadiri 78 peserta (Pembina, Dewan Ambalan A'36, Tekpram, Bina Damping, perwakilan Pinsa dan Caba tiap kelas). Demo berjalan lancar, belum ada laporan bug saat itu. Berita liputannya ditulis untuk beranda.
 - **Peran:** Penegak (`peserta`), Pembina (`penguji`), Admin Gudep (`admin`); Dewan Ambalan adalah atribut akun Penegak (`profiles.jabatan_dewan`).
 - **Fitur utama yang sudah ada:** SKU Bantara dan Laksana (pengajuan, pengujian oleh Pembina, kode verifikasi dan QR, cetak kartu dan Surat Tanda Lulus), absensi latihan Jumat dan iuran bumbung, agenda tahunan dan pengingat, jalur Garuda (TKK, SPG, kelayakan, portofolio 26 dokumen, portofolio format Kwarcab, salinan beku), pra-uji berjenjang, kepengurusan Dewan, pelantikan dan Saka, perlindungan anggota (Safe From Harm), laporan berjenjang tahunan, menu Bantuan dengan panduan bergambar, notifikasi dan PWA, **halaman muka publik** dengan **Kelola Beranda** (berita, prestasi, galeri, media sosial, FAQ, kontak), halaman berita statis dan sitemap.
