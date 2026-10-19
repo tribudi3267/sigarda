@@ -6662,6 +6662,41 @@ create function public.sg_kunci_lepas_internal(p_username text) returns void
 language plpgsql security definer set search_path = public as
 $$ begin delete from public.login_gagal where username = p_username; end $$;
 
+-- ===== Verifikasi PIN tanpa sesi Auth: aksi =====
+-- Memeriksa PIN akun yang SUDAH masuk (ganti PIN, PIN penguji saat mencatat hasil) langsung terhadap hash bcrypt Supabase Auth
+-- (auth.users.encrypted_password, lewat pgcrypto) tanpa membuat sesi dan refresh token baru, sehingga juga tidak terkena batas laju Auth
+-- per IP. Kekuatan hash tidak berubah: crypt() memakai garam dan biaya yang tersimpan di hash itu sendiri. Pembatasan percobaan sama
+-- dengan masuk (sg_kunci_*: 5 kali salah = terkunci 5 menit). Hanya untuk service_role (Edge Function), dengan id dari sesi pemanggil.
+-- Jawaban: {ok:true} | {ok:false, kunciAktif:true, menit} | {ok:false, sisa, terkunci, menit} | {ok:false, dukung:false} (hash bukan
+-- bcrypt atau pgcrypto tidak ada di skema extensions: Edge Function kembali ke cara lama, masuk dengan kata sandi).
+create function public.sg_pin_periksa_internal(p_id uuid, p_pin text) returns jsonb
+language plpgsql security definer set search_path = public as
+$$
+declare v_user text; v_hash text; v_menit int; v_cocok boolean;
+begin
+  select username into v_user from public.profiles where id = p_id;
+  if v_user is null then return jsonb_build_object('ok', false, 'dukung', false); end if;
+  v_menit := public.sg_kunci_cek_internal(v_user);
+  if v_menit > 0 then return jsonb_build_object('ok', false, 'kunciAktif', true, 'menit', v_menit); end if;
+  select encrypted_password into v_hash from auth.users where id = p_id;
+  if v_hash is null or v_hash !~ '^\$2[abxy]\$[0-9]{2}\$.{53}$' then return jsonb_build_object('ok', false, 'dukung', false); end if;
+  if coalesce(p_pin, '') ~ '^[0-9]{6}$' then
+    begin
+      v_cocok := extensions.crypt(p_pin, v_hash) = v_hash;
+    exception when undefined_function or invalid_schema_name then
+      return jsonb_build_object('ok', false, 'dukung', false);
+    end;
+  else
+    v_cocok := false;
+  end if;
+  if v_cocok then
+    perform public.sg_kunci_lepas_internal(v_user);
+    return jsonb_build_object('ok', true);
+  end if;
+  return jsonb_build_object('ok', false) || public.sg_kunci_gagal_internal(v_user);
+end $$;
+-- ===== akhir verifikasi PIN tanpa sesi =====
+
 -- ===== Pra-uji berjenjang (fase C): aksi =====
 -- Pengajuan Penegak lewat sg_sku_ajukan (bila sakelar hidup, diteruskan ke pra-uji); pembatalan lewat sg_sku_batal. Di sini: keputusan penilai pra-uji,
 -- antrian penilai, melewati tahap yang macet, dan sakelar. Pra-uji TIDAK memakai PIN (hanya rekomendasi; uji resmi Pembina tetap lewat Edge Function + PIN).
@@ -7761,7 +7796,8 @@ grant execute on function
   public.sg_sku_catat_rubrik_internal(uuid, uuid, text, date, jsonb, text, text),
   public.sg_push_ambil_internal(bigint[]), public.sg_push_hasil_internal(jsonb),
   public.sg_profil_buat_internal(uuid, text, text, text, text, text, text, text, text),
-  public.sg_kunci_cek_internal(text), public.sg_kunci_gagal_internal(text), public.sg_kunci_lepas_internal(text)
+  public.sg_kunci_cek_internal(text), public.sg_kunci_gagal_internal(text), public.sg_kunci_lepas_internal(text),
+  public.sg_pin_periksa_internal(uuid, text)
   to service_role;
 
 revoke all on all functions in schema sigarda from public, anon;

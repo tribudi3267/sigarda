@@ -82,7 +82,8 @@ grant execute on function
   public.sg_sku_catat_rubrik_internal(uuid, uuid, text, date, jsonb, text, text),
   public.sg_push_ambil_internal(bigint[]), public.sg_push_hasil_internal(jsonb),
   public.sg_profil_buat_internal(uuid, text, text, text, text, text, text, text, text),
-  public.sg_kunci_cek_internal(text), public.sg_kunci_gagal_internal(text), public.sg_kunci_lepas_internal(text)
+  public.sg_kunci_cek_internal(text), public.sg_kunci_gagal_internal(text), public.sg_kunci_lepas_internal(text),
+  public.sg_pin_periksa_internal(uuid, text)
   to service_role;
 
 revoke all on all functions in schema sigarda from public, anon;

@@ -26,7 +26,7 @@ const potret = async (db) => {
   };
 };
 
-const A = await baru(`${P}/supabase/skema.sql`); // skema baru (setelah migrasi ini); bila migrasi berikutnya mengubah fungsi yang sama, ganti dengan `git:<hash>` commit tepat sesudahnya
+const A = await baru('git:5f0164c'); // commit tepat sesudah migrasi ini (main sesudah PR #84); migrasi pin-tanpa-sesi menambah fungsi lain
 const pa = await potret(A);
 
 console.log('--- Database berisi data: kesetaraan, data utuh, idempoten ---');
