@@ -115,10 +115,35 @@ async function panggil(d: any, fn: string, args: any) {
   return data;
 }
 
-async function gagalMasuk(d: any, username: string, awalan: string) {
-  const r = await panggil(d, 'sg_kunci_gagal_internal', { p_username: username });
+function pesanGagal(r: any, awalan: string) {
   if (r?.terkunci) return gagal(`PIN salah 5 kali. Akun dikunci sementara ${r.menit} menit. Coba lagi nanti atau minta reset PIN.`, { terkunci: true });
   return gagal(`${awalan} Sisa ${r?.sisa} percobaan sebelum akun dikunci sementara.`);
+}
+
+async function gagalMasuk(d: any, username: string, awalan: string) {
+  return pesanGagal(await panggil(d, 'sg_kunci_gagal_internal', { p_username: username }), awalan);
+}
+
+/**
+ * Memeriksa PIN akun yang SUDAH masuk (ganti PIN, catat hasil). null = benar; selain itu jawaban galat untuk dikirim.
+ * Cara utama: hash bcrypt dicocokkan di basis data (sg_pin_periksa_internal), TANPA membuat sesi Auth dan refresh token baru dan tanpa
+ * terkena batas laju Auth per IP; kekuatan hash tidak berubah. Cara lama (masuk dengan kata sandi) hanya cadangan: hash bukan bcrypt
+ * (mode lokal), pgcrypto tidak tersedia, atau migrasi 2026-10-pin-tanpa-sesi.sql belum dijalankan.
+ */
+async function periksaPinSaya(d: any, me: any, pin: string, awalan: string) {
+  const { data: r, error } = await d.db.rpc('sg_pin_periksa_internal', { p_id: me.id, p_pin: pin });
+  if (!error && r && r.dukung !== false) {
+    if (r.ok) return null;
+    if (r.kunciAktif) return gagal(pesanKunci(r.menit), { terkunci: true });
+    return pesanGagal(r, awalan);
+  }
+  const menit = await panggil(d, 'sg_kunci_cek_internal', { p_username: me.username });
+  if (menit > 0) return gagal(pesanKunci(menit), { terkunci: true });
+  const benar = POLA_PIN.test(pin) ? await d.masukDenganPassword(emailDari(me.username), pin) : null;
+  if (benar?.terbatas) return gagal(PESAN_BATAS);
+  if (!benar) return gagalMasuk(d, me.username, awalan);
+  await panggil(d, 'sg_kunci_lepas_internal', { p_username: me.username });
+  return null;
 }
 
 async function profilDari(d: any, token: string | null) {
@@ -149,17 +174,12 @@ async function aksiMasuk(b: any, d: any) {
 async function aksiGantiPin(b: any, me: any, d: any) {
   const galat = validasiPinBaru(b.pinBaru, b.pinLama, b.ulangi);
   if (galat) return gagal(galat);
-  const menit = await panggil(d, 'sg_kunci_cek_internal', { p_username: me.username });
-  if (menit > 0) return gagal(pesanKunci(menit), { terkunci: true });
-
-  const benar = POLA_PIN.test(String(b.pinLama ?? '')) ? await d.masukDenganPassword(emailDari(me.username), String(b.pinLama)) : null;
-  if (benar?.terbatas) return gagal(PESAN_BATAS);
-  if (!benar) return gagalMasuk(d, me.username, 'PIN lama tidak sesuai.');
+  const salah = await periksaPinSaya(d, me, String(b.pinLama ?? ''), 'PIN lama tidak sesuai.');
+  if (salah) return salah;
 
   const err = await d.admin.ubahPassword(me.id, b.pinBaru);
   if (err) return gagal('PIN baru belum dapat disimpan. Coba lagi.');
   await d.db.from('profiles').update({ wajib_ganti_pin: false, pin_diubah: new Date(d.sekarang()).toISOString() }).eq('id', me.id);
-  await panggil(d, 'sg_kunci_lepas_internal', { p_username: me.username });
   return { ok: true };
 }
 
@@ -286,15 +306,8 @@ async function aksiUbahUsername(b: any, me: any, d: any) {
 
 async function aksiCatatHasil(b: any, me: any, d: any) {
   if (me.role !== 'penguji' && !penegakDewan(me)) return gagal('Hanya Pembina atau Dewan Ambalan yang dapat mencatat hasil.');
-  const menit = await panggil(d, 'sg_kunci_cek_internal', { p_username: me.username });
-  if (menit > 0) return gagal(pesanKunci(menit), { terkunci: true });
-  const benar = POLA_PIN.test(String(b.pin ?? '')) ? await d.masukDenganPassword(emailDari(me.username), String(b.pin)) : null;
-  if (benar?.terbatas) return gagal(PESAN_BATAS);
-  if (!benar) {
-    const r: any = await gagalMasuk(d, me.username, 'PIN verifikasi salah. Hasil belum disimpan.');
-    return r;
-  }
-  await panggil(d, 'sg_kunci_lepas_internal', { p_username: me.username });
+  const salah = await periksaPinSaya(d, me, String(b.pin ?? ''), 'PIN verifikasi salah. Hasil belum disimpan.');
+  if (salah) return salah;
 
   // Penilaian dengan instrumen: nilai tiap kriteria dikirim, skor dan saran dihitung ulang di server.
   if (b.rincian !== undefined && b.rincian !== null && !Array.isArray(b.rincian)) return gagal('Nilai kriteria tidak sah.');

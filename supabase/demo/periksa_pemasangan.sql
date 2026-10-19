@@ -1494,6 +1494,7 @@ h_fungsi(skema, nama, args, isi, au, an, sv) as (values
     ('public', 'sg_penugasan_salin', 'p_dari text, p_ke text', '2087dc2732261e4f57ede372c8714f5f', true, false, true),
     ('public', 'sg_pf_catat_penguji', 'p_peserta_id uuid, p_item_id text, p_catatan text', '9e19fd9bfe0b75340d41664044714d7b', true, false, true),
     ('public', 'sg_pf_ubah', 'p_item_id text, p_status text, p_catatan text, p_tautan text', '2d0086521c8db8f32f7239edada8cdc9', true, false, true),
+    ('public', 'sg_pin_periksa_internal', 'p_id uuid, p_pin text', 'b90c840400b54c4f99d4df49e5612a98', false, false, true),
     ('public', 'sg_pinsa_cabut', 'p_rombel text, p_penegak_id uuid', 'd8f99d3ee8367daae8d29e5f2fabc02b', true, false, true),
     ('public', 'sg_pinsa_calon', 'p_rombel text', '0bc35af22d90789c2b1b9295d0a75647', true, false, true),
     ('public', 'sg_pinsa_tugaskan', 'p_rombel text, p_sangga text, p_penegak_id uuid', '3059dfcd8c706780140067a8d4d7150a', true, false, true),
