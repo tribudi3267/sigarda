@@ -122,7 +122,7 @@ const potret = async (db) => {
   };
 };
 const cacah = async (db) => (await db.query(`select (select count(*) from public.profiles)::int p, (select count(*) from public.sku_progress)::int s, (select count(*) from auth.users)::int u`)).rows[0];
-const A = await baru(`${P}/supabase/skema.sql`);
+const A = await baru('git:4791a42'); // skema tepat SESUDAH migrasi ini (main sesudah PR #86); migrasi berikutnya mengubah fungsi lain
 const pa = await potret(A);
 const B = await baru('git:5f0164c'); // commit tepat sebelum migrasi ini
 await isiDataContoh(B);

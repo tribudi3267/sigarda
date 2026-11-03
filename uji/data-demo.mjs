@@ -281,9 +281,15 @@ console.log('\n--- Pengingat harian nyata: akun asli hanya diberi tahu bila eska
 const maksId = await N(`select coalesce(max(id), 0)::int n from public.notifikasi`);
 await pg.query('select sigarda.notif_pengingat()');
 const soal = await Q(`select n.jenis, n.judul, n.isi from public.notifikasi n where n.id > $1 and n.penerima_id not in ${demoIds} and (n.judul ~ 'Demo ' or n.isi ~ 'Demo ')`, [maksId]);
-ok(soal.every((x) => x.jenis === 'eskalasi' && /^Perlu tindak lanjut: Demo (Galih Permadi|Bayu Aji)$/.test(x.judul)),
-  'satu-satunya pemberitahuan ke akun asli tentang akun demo: eskalasi tingkat 3 Galih/Bayu (dapat dimatikan): ' + soal.length + ' ' + JSON.stringify(soal.filter((x) => !(x.jenis === 'eskalasi' && /^Perlu tindak lanjut: Demo (Galih Permadi|Bayu Aji)$/.test(x.judul))).slice(0, 3)));
-ok(soal.length > 0, 'eskalasi tingkat 3 contoh memang sampai ke pengurus (untuk menguji menu Tindak Lanjut)');
+// Pengurus menerima SATU ringkasan "Perlu tindak lanjut: N Penegak" (paling banyak tiga nama di isi), bukan satu per Penegak.
+const ringkasDemo = (x) => x.jenis === 'eskalasi' && /^Perlu tindak lanjut: \d+ Penegak$/.test(x.judul) && /Demo (Galih Permadi|Bayu Aji)/.test(x.isi);
+ok(soal.every(ringkasDemo),
+  'satu-satunya pemberitahuan ke akun asli tentang akun demo: ringkasan eskalasi tingkat 3 Galih/Bayu (dapat dimatikan): ' + soal.length + ' ' + JSON.stringify(soal.filter((x) => !ringkasDemo(x)).slice(0, 3)));
+{
+  const ringkasan = await N(`select count(*)::int n from public.notifikasi where id > $1 and kunci like 'eskalasi-p:%' and penerima_id not in ${demoIds}`, [maksId]);
+  const galih = await N(`select count(*)::int n from public.notifikasi where id > $1 and penerima_id = $2 and kunci ~ '^eskalasi:[a-z]+:.*:3:'`, [maksId, await idDemo('990020')]);
+  ok(ringkasan > 0 && galih > 0, `eskalasi tingkat 3 contoh memang sampai ke pengurus sebagai ringkasan (${ringkasan}) dan ke Galih (${galih}) (untuk menguji menu Tindak Lanjut)`);
+}
 ok((await Q(`select 1 from public.notifikasi where id > $1 and jenis in ('ajukan','lama') and penerima_id not in ${demoIds} and (judul ~ 'Demo ' or isi ~ 'Demo ')`, [maksId])).length === 0, 'tidak ada pengingat pengajuan/antrian tentang akun demo ke akun asli');
 
 console.log('\n--- Menjalankan ulang (tidak menggandakan; PIN acak berganti) ---');
