@@ -42,9 +42,20 @@ await tambah('eskalasi-p:sku:00000000-0000-0000-0000-000000000001:2026-11-01', 1
 await tambah('eskalasi-p:2026-11-02', 1);                                               // bentuk ringkasan: tetap
 await tambah(null, 70, 'pengingat');                                                    // > 60 hari: dihapus
 await tambah(null, 5, 'pengingat');                                                     // tetap
+await tambah(null, 31, 'pengingat'); await B1.query(`update public.notifikasi set dibaca_pada = now() where id = (select max(id) from public.notifikasi)`); // dibaca > 30 hari: dihapus
+await tambah('eskalasi:sku:x:2026-10-01:1', 15);                                       // eskalasi > 14 hari: dihapus
+const aid = (await B1.query(`select id from public.profiles where username = 'admin'`)).rows[0].id;
+await B1.query(`insert into public.notifikasi (penerima_id, jenis, judul) select $1, 'pengingat', 'banyak ' || g from generate_series(1, 205) g`, [aid]);
+const idTetap = (await B1.query(`select id from public.notifikasi where penerima_id = $1 and jenis = 'pengingat' and dibuat > now() - interval '6 days'`, [pid])).rows[0].id;
 await B1.exec(MP);
-const sisa = (await B1.query('select coalesce(kunci, jenis) k from public.notifikasi order by id')).rows.map((x) => x.k);
-ok(JSON.stringify(sisa) === JSON.stringify(['eskalasi-p:2026-11-02', 'pengingat']), 'pembersihan sekali: Tindak Lanjut bentuk lama dan notifikasi > 60 hari dihapus, sisanya tetap: ' + JSON.stringify(sisa));
+const sisa = (await B1.query('select coalesce(kunci, jenis) k from public.notifikasi where penerima_id = $1 order by id', [pid])).rows.map((x) => x.k);
+ok(JSON.stringify(sisa) === JSON.stringify(['eskalasi-p:2026-11-02', 'pengingat']), 'pembersihan sekali: Tindak Lanjut bentuk lama, > 60 hari, dibaca > 30 hari, eskalasi > 14 hari dihapus, sisanya tetap: ' + JSON.stringify(sisa));
+ok((await B1.query('select 1 from public.notifikasi where id = $1', [idTetap])).rows.length === 1, 'notifikasi yang disimpan dimasukkan kembali dengan id semula');
+const adm = (await B1.query(`select count(*)::int n, min(judul) filter (where judul = 'banyak 6') palingLama from public.notifikasi where penerima_id = $1`, [aid])).rows[0];
+ok(adm.n === 200 && adm.palinglama === 'banyak 6', `paling banyak 200 terbaru per penerima (${adm.n}; yang tertua tersisa ${adm.palinglama})`);
+ok((await B1.query(`select tgenabled from pg_trigger where tgname = 'notifikasi_push'`)).rows[0]?.tgenabled === 'O', 'pemicu Web Push menyala lagi sesudah pembersihan');
+await B1.query(`insert into public.notifikasi (penerima_id, jenis, judul) values ($1, 'pengingat', 'baru')`, [pid]);
+ok((await B1.query(`select max(id) m from public.notifikasi`)).rows[0].m > idTetap, 'notifikasi baru sesudahnya mendapat id lanjutan (identitas tidak diulang dari awal)');
 ok(JSON.stringify(await cacah(B1)) === JSON.stringify(sebelum), 'jumlah data aplikasi tidak berubah oleh migrasi: ' + JSON.stringify(sebelum));
 await B1.exec(MP); await B1.exec(MP);
 ok(JSON.stringify(await cacah(B1)) === JSON.stringify(sebelum), 'menjalankan migrasi tiga kali: data tetap sama');
