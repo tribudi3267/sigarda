@@ -78,6 +78,24 @@ end $$;
 create trigger notif_dokumen after insert on public.dokumen_terbit
   for each row execute function sigarda.notif_dokumen();
 
+-- ===== Hemat ruang notifikasi: pembersihan =====
+-- Notifikasi adalah tabel terbesar (paket Free Supabase: basis data 500 MB). Dijalankan dari pengingat harian. Aplikasi hanya menampilkan
+-- 60 notifikasi terbaru, jadi yang dihapus: sudah dibaca dan lebih dari 30 hari, semua yang lebih dari 60 hari, pengingat eskalasi lebih dari
+-- 14 hari (keadaan terbarunya selalu ada di menu Tindak Lanjut), dan apa pun di luar 200 terbaru per penerima. Kunci pengingat yang masih
+-- berlaku memuat tanggal atau periode, jadi menghapus baris lama tidak membuat pengingat yang sama terkirim ulang.
+create function sigarda.notifikasi_bersihkan() returns void language plpgsql security definer set search_path = public as
+$$
+begin
+  delete from public.notifikasi
+  where dibuat < now() - interval '60 days'
+     or (dibaca_pada is not null and dibuat < now() - interval '30 days')
+     or (jenis = 'eskalasi' and dibuat < now() - interval '14 days');
+  delete from public.notifikasi n using (
+    select id from (select id, row_number() over (partition by penerima_id order by id desc) urut from public.notifikasi) x where x.urut > 200
+  ) d where n.id = d.id;
+end $$;
+-- ===== akhir pembersihan notifikasi =====
+
 -- ===== Cadangan (tahap L4): pengingat ===== (penanda ketat di sekitar notif_pengingat saja, tanpa trigger di sekitarnya yang
 -- tidak aman diulang, supaya migrasi dapat memperbarui fungsi ini sendirian)
 -- ===== Eskalasi (tahap L5): pengingat ===== (penanda kedua yang membungkus fungsi SAMA; dipakai migrasi L5. Tiap tahap baru yang
@@ -89,11 +107,12 @@ create trigger notif_dokumen after insert on public.dokumen_terbit
 -- ===== Pra-uji berjenjang (fase C): pengingat ===== (penanda keenam, fungsi SAMA; dipakai migrasi pra-uji)
 -- ===== Kalender Garuda (Tahap 2, G4d): pengingat ===== (penanda ketujuh, fungsi SAMA; dipakai migrasi pengingat kalender)
 -- ===== Pembersihan riwayat penjadwal: pengingat ===== (penanda kedelapan, fungsi SAMA; dipakai migrasi pembersihan riwayat cron)
+-- ===== Hemat ruang notifikasi: pengingat ===== (penanda kesembilan, fungsi SAMA; dipakai migrasi 2026-11-hemat-notifikasi)
 -- Pengingat harian (dijalankan pg_cron pukul 07.00 WIB): pengujian dan sesi ujian besok, pengajuan yang menunggu lebih dari 3 hari,
 -- cadangan data yang sudah sebulan tidak diunduh (tahap L4), tangga eskalasi tidak bergerak (tahap L5), agenda tahunan H-30/H-7/H-1
 -- (tahap L6), usulan Musyawarah Ambalan belum terjadwal H-60 lalu tiap 14 hari (tahap L6b), usulan 10 kegiatan lain belum terjadwal
 -- H-30/H-60 lalu tiap 14 hari (tahap L6b, juga di luar jam senyap karena selalu berjalan 07.00 WIB), dan pembersihan notifikasi
--- berumur lebih dari 90 hari, dan tahap kalender seleksi Garuda H-7/H-3/H-1/hari-H serta berakhir besok (Tahap 2, G4d). Kunci membuat tiap pengingat terkirim sekali walau dijalankan berulang.
+-- lama (sigarda.notifikasi_bersihkan), dan tahap kalender seleksi Garuda H-7/H-3/H-1/hari-H serta berakhir besok (Tahap 2, G4d). Kunci membuat tiap pengingat terkirim sekali walau dijalankan berulang.
 create function sigarda.notif_pengingat() returns void language plpgsql security definer set search_path = public as
 $$
 declare v_besok date := sigarda.hari_ini() + 1; r record; v_x uuid; v_label text;
@@ -141,7 +160,7 @@ begin
     exception when others then null;
     end;
   end if;
-  delete from public.notifikasi where dibuat < now() - interval '90 days';
+  perform sigarda.notifikasi_bersihkan();
 end $$;
 -- ===== akhir pengingat cadangan =====
 -- ===== akhir pengingat eskalasi =====
@@ -151,6 +170,7 @@ end $$;
 -- ===== akhir pengingat pra-uji =====
 -- ===== akhir pengingat kalender garuda =====
 -- ===== akhir pembersihan riwayat penjadwal =====
+-- ===== akhir pengingat hemat notifikasi =====
 
 -- Mengantre Web Push: satu permintaan HTTP per pernyataan INSERT (pg_net) ke Edge Function notif-push, hanya untuk penerima yang punya perangkat.
 -- Tanpa konfigurasi (sigarda.push_atur) atau tanpa pg_net tidak ada yang dikirim; Kotak Notifikasi di aplikasi tetap berjalan. Galat push tidak

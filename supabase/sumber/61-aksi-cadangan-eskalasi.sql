@@ -193,12 +193,18 @@ $$;
 create function sigarda.eskalasi_tab(p_jenis text) returns text language sql immutable as
 $$ select case p_jenis when 'sku' then 'sku' when 'absensi' then 'absensi' when 'iuran' then 'iuran' end $$;
 
+-- Hemat ruang (paket Free 500 MB; dulu notifikasi menjadi tabel terbesar): Penegak diberi tahu SEKALI per tingkat per kejadian (kunci memuat
+-- tanggal "mulai" dan tingkat), lalu pada tingkat mendesak paling banyak seminggu sekali; pengurus menerima SATU ringkasan per hari, hanya bila
+-- ada Penegak yang baru mencapai tingkat mendesak atau sudah seminggu tanpa ringkasan (bukan satu notifikasi per Penegak per jenis per pengurus
+-- tiap hari). Daftar lengkap dan terbaru selalu di menu Tindak Lanjut (sg_eskalasi_daftar).
 create function sigarda.eskalasi_proses() returns void language plpgsql security definer set search_path = public as
 $$
-declare v_hari date := sigarda.hari_ini(); r record; v_mulai date; v_elapsed int; v_tingkat int; v_x uuid;
+declare
+  v_hari date := sigarda.hari_ini(); r record; v_mulai date; v_elapsed int; v_tingkat int; v_x uuid; v_dasar text; v_kunci text;
+  v_nama text[] := '{}'; v_baru int := 0; v_isi text;
 begin
-  for r in select id, nama from public.profiles where role = 'peserta' and status = 'aktif' loop
-    declare v_jenis text; v_fn text[] := array['sku','absensi','iuran'];
+  for r in select id, nama from public.profiles where role = 'peserta' and status = 'aktif' order by nama loop
+    declare v_jenis text; v_fn text[] := array['sku','absensi','iuran']; v_mendesak boolean := false;
     begin
       foreach v_jenis in array v_fn loop
         v_mulai := case v_jenis
@@ -209,16 +215,34 @@ begin
         continue when v_mulai is null;
         v_elapsed := v_hari - v_mulai;
         v_tingkat := sigarda.eskalasi_tingkat(v_elapsed);
-        perform sigarda.notif_buat(r.id, 'eskalasi', sigarda.eskalasi_judul(v_jenis, v_tingkat), sigarda.eskalasi_isi(v_jenis, v_tingkat, v_mulai),
-          jsonb_build_object('tab', sigarda.eskalasi_tab(v_jenis)), 'eskalasi:' || v_jenis || ':' || r.id || ':' || v_hari);
+        v_dasar := 'eskalasi:' || v_jenis || ':' || r.id || ':' || v_mulai || ':';
+        v_kunci := v_dasar || v_tingkat;
         if v_tingkat = 3 then
-          for v_x in select id from public.profiles where status = 'aktif' and (role in ('penguji','admin') or (role = 'peserta' and jabatan_dewan is not null)) loop
-            perform sigarda.notif_buat(v_x, 'eskalasi', 'Perlu tindak lanjut: ' || r.nama, sigarda.eskalasi_isi(v_jenis, v_tingkat, v_mulai),
-              '{"tab":"tindaklanjut"}', 'eskalasi-p:' || v_jenis || ':' || r.id || ':' || v_hari);
-          end loop;
+          v_mendesak := true;
+          if not exists (select 1 from public.notifikasi where penerima_id = r.id and kunci like v_dasar || '3%') then
+            v_baru := v_baru + 1;
+          elsif exists (select 1 from public.notifikasi where penerima_id = r.id and kunci like v_dasar || '3%' and dibuat > now() - interval '6 days') then
+            v_kunci := null;   -- sudah diingatkan minggu ini
+          end if;
+          v_kunci := v_kunci || ':' || v_hari;
+        end if;
+        if v_kunci is not null then
+          perform sigarda.notif_buat(r.id, 'eskalasi', sigarda.eskalasi_judul(v_jenis, v_tingkat), sigarda.eskalasi_isi(v_jenis, v_tingkat, v_mulai),
+            jsonb_build_object('tab', sigarda.eskalasi_tab(v_jenis)), v_kunci);
         end if;
       end loop;
+      if v_mendesak then v_nama := v_nama || r.nama; end if;
     end;
+  end loop;
+  if coalesce(array_length(v_nama, 1), 0) = 0 then return; end if;
+  v_isi := array_to_string(v_nama[1:3], ', ')
+    || case when array_length(v_nama, 1) > 3 then ', dan ' || (array_length(v_nama, 1) - 3) || ' lainnya' else '' end
+    || '. Lihat menu Tindak Lanjut.';
+  for v_x in select id from public.profiles where status = 'aktif' and (role in ('penguji','admin') or (role = 'peserta' and jabatan_dewan is not null)) loop
+    continue when v_baru = 0 and exists (
+      select 1 from public.notifikasi where penerima_id = v_x and kunci like 'eskalasi-p:%' and dibuat > now() - interval '6 days');
+    perform sigarda.notif_buat(v_x, 'eskalasi', 'Perlu tindak lanjut: ' || array_length(v_nama, 1) || ' Penegak', v_isi,
+      '{"tab":"tindaklanjut"}', 'eskalasi-p:' || v_hari);
   end loop;
 end $$;
 

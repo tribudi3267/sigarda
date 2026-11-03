@@ -124,6 +124,46 @@ console.log('\n--- Server (PGlite + data contoh) ---');
   const totalSesudah = (await q(`select count(*)::int n from public.notifikasi`))[0].n;
   ok(totalSebelum === totalSesudah, `dijalankan lagi pada hari yang sama: tidak ada notifikasi ganda (${totalSebelum} = ${totalSesudah})`);
 
+  console.log('  - hemat ruang: ringkasan untuk pengurus, pengingat mingguan, pembersihan');
+  const namaAhmad = (await q('select nama from public.profiles where id = $1', [ahmad]))[0].nama;
+  const ringkas = await q(`select penerima_id, judul, isi from public.notifikasi where kunci like 'eskalasi-p:%'`);
+  ok(ringkas.length === pengurusIds.length, `pengurus menerima SATU ringkasan masing-masing, bukan satu per Penegak per jenis (${ringkas.length} baris untuk ${pengurusIds.length} pengurus)`);
+  ok(ringkas.every((n) => /^Perlu tindak lanjut: \d+ Penegak$/.test(n.judul) && /Tindak Lanjut/.test(n.isi)), 'judul ringkasan menyebut jumlah Penegak dan isinya menunjuk menu Tindak Lanjut: ' + ringkas[0]?.judul + ' / ' + ringkas[0]?.isi);
+  ok(ringkas.some((n) => n.isi.includes(namaAhmad)) || /lainnya/.test(ringkas[0]?.isi ?? ''), 'ringkasan menyebut nama (paling banyak tiga, sisanya "lainnya")');
+  const t3 = await q(`select kunci from public.notifikasi where penerima_id = $1 and kunci ~ '^eskalasi:[a-z]+:.*:3:'`, [ahmad]);
+  ok(t3.length === 2, `Ahmad: satu pengingat mendesak per kejadian (SKU, absensi): ${t3.length}`);
+  // Seminggu kemudian (kunci tanggal digeser mundur): diingatkan lagi sekali; dijalankan lagi hari itu juga: tidak bertambah.
+  await q(`update public.notifikasi set dibuat = dibuat - interval '7 days', kunci = regexp_replace(kunci, ':[0-9]{4}-[0-9]{2}-[0-9]{2}$', ':2000-01-01')
+    where kunci ~ '^eskalasi:[a-z]+:.*:3:' or kunci like 'eskalasi-p:%'`);
+  await q('select sigarda.eskalasi_proses()');
+  const t3b = (await q(`select count(*)::int n from public.notifikasi where penerima_id = $1 and kunci ~ '^eskalasi:[a-z]+:.*:3:' and dibuat > now() - interval '1 day'`, [ahmad]))[0].n;
+  const ringkasB = (await q(`select count(*)::int n from public.notifikasi where kunci like 'eskalasi-p:%' and dibuat > now() - interval '1 day'`))[0].n;
+  ok(t3b === 2 && ringkasB === pengurusIds.length, `seminggu tanpa pengingat: Ahmad diingatkan lagi (${t3b}) dan pengurus mendapat ringkasan lagi (${ringkasB})`);
+  const n1 = (await q(`select count(*)::int n from public.notifikasi`))[0].n;
+  await q('select sigarda.eskalasi_proses()');
+  ok((await q(`select count(*)::int n from public.notifikasi`))[0].n === n1, 'dijalankan lagi hari itu: tidak bertambah');
+  // Hari berikutnya (masih dalam seminggu, tanpa Penegak baru mendesak): tidak ada pengingat maupun ringkasan baru.
+  await q(`update public.notifikasi set dibuat = dibuat - interval '1 day', kunci = regexp_replace(kunci, ':[0-9]{4}-[0-9]{2}-[0-9]{2}$', ':2000-01-02')
+    where dibuat > now() - interval '1 day' and (kunci ~ '^eskalasi:[a-z]+:.*:3:' or kunci like 'eskalasi-p:%')`);
+  await q('select sigarda.eskalasi_proses()');
+  ok((await q(`select count(*)::int n from public.notifikasi`))[0].n === n1, 'hari berikutnya dalam minggu yang sama: tidak ada pengingat mendesak atau ringkasan baru');
+
+  await q(`delete from public.notifikasi`);
+  const isi = (umur, dibaca, jenis = 'pengingat') => q(`insert into public.notifikasi (penerima_id, jenis, judul, dibuat, dibaca_pada)
+    values ($1, $2, 'uji', now() - ($3 || ' days')::interval, case when $4 then now() else null end)`, [pembina, jenis, String(umur), dibaca]);
+  await isi(10, true); await isi(31, true); await isi(31, false); await isi(61, false); await isi(13, false, 'eskalasi'); await isi(15, false, 'eskalasi');
+  await q('select sigarda.notifikasi_bersihkan()');
+  const sisa = await q(`select jenis, extract(day from now() - dibuat)::int umur, dibaca_pada is not null dibaca from public.notifikasi order by dibuat desc`);
+  ok(JSON.stringify(sisa.map((x) => `${x.jenis}:${x.umur}:${x.dibaca}`)) === JSON.stringify(['pengingat:10:true', 'eskalasi:13:false', 'pengingat:31:false']),
+    'pembersihan: dibaca > 30 hari, semua > 60 hari, eskalasi > 14 hari dihapus; sisanya tetap: ' + JSON.stringify(sisa));
+  await q(`insert into public.notifikasi (penerima_id, jenis, judul) select $1, 'pengingat', 'uji ' || g from generate_series(1, 230) g`, [pembina]);
+  await q(`insert into public.notifikasi (penerima_id, jenis, judul) values ($1, 'pengingat', 'milik admin')`, [admin]);
+  await q('select sigarda.notifikasi_bersihkan()');
+  const perOrang = await q(`select penerima_id, count(*)::int n, max(judul) filter (where judul = 'uji 230') terbaru from public.notifikasi group by 1`);
+  ok(perOrang.find((x) => x.penerima_id === pembina)?.n === 200 && perOrang.find((x) => x.penerima_id === pembina)?.terbaru === 'uji 230' && perOrang.find((x) => x.penerima_id === admin)?.n === 1,
+    'pembersihan: paling banyak 200 terbaru per penerima, penerima lain tidak tersentuh: ' + JSON.stringify(perOrang.map((x) => x.n)));
+  await q(`delete from public.notifikasi`);
+
   console.log('  - sg_eskalasi_daftar (Pembina/Admin melihat, Penegak biasa ditolak)');
   const K = { admin: await masuk('admin'), pembina: await masuk('pembina'), ahmad: await masuk('10231') };
   let r = await K.pembina.a.muatEskalasi();

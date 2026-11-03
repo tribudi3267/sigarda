@@ -25,7 +25,7 @@ const urutanReadme = urutanMigrasiReadme(readFileSync(`${P}/README.md`, 'utf8'))
 ok(migrasi.map((m) => m.nama).join() === urutanReadme.join(), `urutan yang dijalankan = urutan README (${migrasi.length} migrasi)`);
 ok(migrasi.length === readdirSync(`${P}/supabase/migrasi`).filter((f) => f.endsWith('.sql')).length, 'setiap berkas migrasi terdaftar di README (tanpa yang tertinggal)');
 ok(migrasi.every((m) => m.sql.length > 100 && !m.sql.startsWith('﻿')), 'isi tiap migrasi terbaca dan tanpa BOM');
-ok(migrasi.at(-1).nama === '2026-10-pin-tanpa-sesi', 'migrasi terbaru ada di ujung daftar: ' + migrasi.at(-1).nama);
+ok(migrasi.at(-1).nama === '2026-11-hemat-notifikasi', 'migrasi terbaru ada di ujung daftar: ' + migrasi.at(-1).nama);
 {
   const tmp = `${P}/.uji/tmp/penerapan-readme`;
   rmSync(tmp, { recursive: true, force: true });
@@ -68,7 +68,7 @@ console.log('\n--- Menerapkan migrasi terbaru pada basis data lama ---');
   for (const m of migrasi.slice(0, -7)) await db.query(`insert into sigarda.migrasi_terapan (nama, cara) values ($1, 'ditandai')`, [m.nama]); // seolah sudah dijalankan tangan
   const lama = (await db.query(`select md5(prosrc) m from pg_proc where proname = 'notif_pengingat'`)).rows[0].m;
   const hasil = await terapkanTertunda({ db: a, migrasi, log });
-  ok(hasil.diterapkan.join() === '2026-09-bersih-riwayat-cron,2026-10-update-where,2026-10-muat-awal,2026-10-pinsa-bebas,2026-10-penulis-berita,2026-10-sesi-mendatang,2026-10-pin-tanpa-sesi', 'hanya migrasi tertunda yang dijalankan: ' + hasil.diterapkan.join());
+  ok(hasil.diterapkan.join() === '2026-10-update-where,2026-10-muat-awal,2026-10-pinsa-bebas,2026-10-penulis-berita,2026-10-sesi-mendatang,2026-10-pin-tanpa-sesi,2026-11-hemat-notifikasi', 'hanya migrasi tertunda yang dijalankan: ' + hasil.diterapkan.join());
   ok((await db.query(`select md5(prosrc) m from pg_proc where proname = 'notif_pengingat'`)).rows[0].m !== lama, 'isi fungsi benar-benar berubah');
   ok((await db.query(`select cara from sigarda.migrasi_terapan where nama = '2026-10-sesi-mendatang'`)).rows[0].cara === 'dijalankan', 'tercatat sebagai "dijalankan"');
   const sesudah = await jalankanPeriksa({ db: a, sql: sqlPeriksa, log: () => {} });
